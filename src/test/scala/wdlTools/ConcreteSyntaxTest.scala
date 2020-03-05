@@ -88,7 +88,8 @@ class Antlr4Test extends FlatSpec with Matchers {
        |""".stripMargin
 
   it should "parse a task" in {
-    val doc = ConcreteSyntax.apply(doc_task_with_output_section)
-    System.out.println(doc)
+    val doc = ConcreteSyntax.apply(getWdlSource("task_with_output_section.wdl"))
+    //System.out.println(doc)
+    ignoreValue(doc)
   }
 }
