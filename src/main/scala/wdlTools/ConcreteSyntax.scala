@@ -3,6 +3,11 @@ package dxWDL.language
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
 //
+
+// we need these for safe casting, and reporting on errors
+import reflect.ClassTag
+import scala.reflect.runtime.universe.{TypeTag, typeOf}
+
 import collection.JavaConverters._
 import java.nio.ByteBuffer
 import org.antlr.v4.runtime._
@@ -132,18 +137,23 @@ object ConcreteSyntax {
 import ConcreteSyntax._
 class ConcreteSyntax extends WdlParserBaseVisitor[Element] {
 
-  // I wonder if there is a way to do this without reflection
-  import reflect.ClassTag
-  private def visitAndSafeCast[T : ClassTag](ctx : ParserRuleContext) : T = {
+  // visit the children of [ctx], and cast to the expected type [T]. Provide a reasonable
+  // report if there is an error.
+  //
+  // The complex construction with the implicit "tt" is so that we could print the class of the
+  // expected class T.
+  private def visitAndSafeCast[T : ClassTag](ctx : ParserRuleContext)(implicit tt: TypeTag[T]) : T = {
     val child = visitChildren(ctx)
     val ct = implicitly[ClassTag[T]]
     child match {
       case ct(x) => x
       case _ =>
+        // TODO: improve the error report here
         val tok = ctx.start
         val line = tok.getLine()
         val col = tok.getCharPositionInLine()
-        throw new Exception(s"${child} has wrong type #line=${line} #column=${col}")
+        System.out.println(s"Syntax error in line=${line} column=${col} startToken=${tok.getText()}")
+        throw new Exception(s"${child} has wrong type ${child.getClass.getSimpleName}, expecting ${typeOf[T]}")
     }
   }
 
@@ -225,27 +235,26 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlParser.Type_baseContext) : Type = {
-    // TODO: Is there a better way to do this?
+    System.out.println("visitType_base")
+    // Can this be done with type matchin?
     if (ctx.STRING() != null)
       return TypeString
     if (ctx.FILE() != null)
       return TypeFile
-    if (ctx.BOOLEAN() != null) {
+    if (ctx.BOOLEAN() != null)
       return TypeBool
-    }
     if (ctx.OBJECT() != null)
       return TypeObject
     if (ctx.INT() != null) {
+      System.out.println("integer")
       return TypeInt
     }
-    if (ctx.FLOAT() != null) {
+    if (ctx.FLOAT() != null)
       return TypeFloat
-    }
-    if (ctx.Identifier() != null) {
+    if (ctx.Identifier() != null)
       return TypeIdentifier(ctx.getText())
-    }
 
-    // a compound type (array, map, ..)
+    // a compound type (array, map, pair)
     return visitAndSafeCast[Type](ctx)
   }
 
@@ -279,12 +288,11 @@ string
  */
 
   override def visitNumber(ctx : WdlParser.NumberContext) : Expr = {
+    System.out.println("visitNumber")
     if (ctx.IntLiteral() != null) {
-      // TODO: return a proper error message if there is a problem
       return ExprInt(ctx.getText().toInt)
     }
     if (ctx.FloatLiteral() != null) {
-      // TODO: return a proper error message if there is a problem
       return ExprFloat(ctx.getText().toDouble)
     }
     throw new Exception(s"Not an integer nor a float ${ctx.getText()}")
@@ -300,8 +308,8 @@ string
     if (ctx.BoolLiteral() != null) {
       ExprPlaceholderOption(child)
     }
-    if (ctx.DEFAULT() != null) {
-    }
+//    if (ctx.DEFAULT() != null) {
+//    }
     throw new Exception("unrecognized case")
   }
 
@@ -331,10 +339,6 @@ string
       return ExprIdentifier(ctx.getText())
     }
     return visitAndSafeCast[Expr](ctx)
-  }
-
-  override def visitExpr(ctx : WdlParser.ExprContext) : Expr = {
-    visitAndSafeCast[Expr](ctx)
   }
 
   override def visitLor(ctx : WdlParser.LorContext) : Expr = {
@@ -524,9 +528,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlParser.Bound_declsContext): Declaration = {
-    val wdlType: Type = visitWdl_type(ctx.wdl_type())
+    System.out.println("visitBound_decls")
+    val wdlType: Type = visitAndSafeCast[Type](ctx.wdl_type())
     val name: String = ctx.Identifier().getText()
-    val expr: Expr = visitExpr(ctx.expr())
+    val expr: Expr = visitAndSafeCast[Expr](ctx.expr())
     Declaration(name, wdlType, Some(expr))
   }
 
