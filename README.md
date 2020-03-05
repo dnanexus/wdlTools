@@ -22,3 +22,8 @@ The scala code was then compiled with:
 ```
 sbt compile
 ```
+
+to run the tests do:
+```
+sbt test
+```

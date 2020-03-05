@@ -30,63 +30,6 @@ class Antlr4Test extends FlatSpec with Matchers {
     ignoreValue(doc)
   }
 
-  /*
-  // A task that counts how many lines a file has
-  val doc_task_wc =
-    """|version 1.0
-       |
-       |task wc {
-       |  input {
-       |    File inp_file
-       |  }
-       |  # Just a random declaration
-       |  Int i = 4 + 5
-       |
-       |  output {
-       |    # Int num_lines = read_int(stdout())
-       |    Int num_lines = 3
-       |  }
-       |  command {
-       |    wc -l ~{inp_file}
-       |  }
-       |  meta {
-       |    author : "Robin Hood"
-       |  }
-       |  parameterMeta {
-       |    reason : "just because"
-       |  }
-       |}
-       |""".stripMargin
-
-  // A task that counts how many lines a file has
-  val doc_task_wc_II =
-    """|version 1.0
-       |
-       |task wc {
-       |  input {
-       |    File inp_file
-       |  }
-       |
-       |  output {
-       |    Int num_lines = 3
-       |  }
-       |  command {
-       |    wc -l ~{inp_file}
-       |  }
-       |}
-       |""".stripMargin
-   */
-
-  val doc_task_with_output_section =
-    """|version 1.0
-       |
-       |task wc {
-       |  output {
-       |    Int num_lines = 3
-       |  }
-       |}
-       |""".stripMargin
-
   it should "parse a task" in {
     val doc = ConcreteSyntax.apply(getWdlSource("task_with_output_section.wdl"))
     //System.out.println(doc)
