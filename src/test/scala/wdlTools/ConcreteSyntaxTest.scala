@@ -42,7 +42,7 @@ class Antlr4Test extends FlatSpec with Matchers {
        |""".stripMargin
 
   ignore should "handle various types" in {
-    val doc = ConcreteAST.apply(doc_types)
+    val doc = ConcreteSyntax.apply(doc_types)
     System.out.println(doc)
   }
 
@@ -87,8 +87,39 @@ class Antlr4Test extends FlatSpec with Matchers {
        |}
        |""".stripMargin
 
-  it should "handle expressions" in {
-    val doc = ConcreteAST.apply(doc_expressions)
+  ignore should "handle types and expressions" in {
+    val doc = ConcreteSyntax.apply(doc_expressions)
+    System.out.println(doc)
+  }
+
+  // A task that counts how many lines a file has
+  val doc_task_wc =
+    """|version 1.0
+       |
+       |task wc {
+       |  input {
+       |    File inp_file
+       |  }
+       |  # Just a random declaration
+       |  Int i = 4 + 5
+       |
+       |  output {
+       |    Int num_lines = read_int(stdout())
+       |  }
+       |  command {
+       |    wc -l ~{inp_file}
+       |  }
+       |  meta {
+       |    author : "Robin Hood"
+       |  }
+       |  parameterMeta {
+       |    reason : "just because"
+       |  }
+       |}
+       |""".stripMargin
+
+  it should "parse a task" in {
+    val doc = ConcreteSyntax.apply(doc_task_wc)
     System.out.println(doc)
   }
 }
