@@ -30,6 +30,8 @@ object ConcreteAST {
   case object TypeFloat extends Type
   case class TypeIdentifier(id : String) extends Type
   case object TypeObject extends Type
+  case class TypeStruct(name : String,
+                        members : Map[String, Type]) extends Type
 
   // expressions
   sealed trait Expr extends Element
@@ -144,9 +146,15 @@ struct
 	: STRUCT Identifier LBRACE (unboud_decls)* RBRACE
 	;
    */
-  override def visitStruct(ctx: WdlParser.StructContext): Struct = {
+  override def visitStruct(ctx: WdlParser.StructContext): TypeStruct = {
     val name = ctx.Identifier().getText()
-    Struct(name)
+    val members = ctx.unboud_decls()
+      .asScala
+      .map{ case x =>
+        val decl = visitChildren(x).asInstanceOf[Declaration]
+        decl.name -> decl.wdlType
+    }.toMap
+    TypeStruct(name, members)
   }
 
   /*
@@ -623,6 +631,7 @@ task_input
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: WdlParser.TaskContext): Task = {
+    // TODO: return an error if there are two sections of type X.
     val name = ctx.Identifier().getText()
     val elems = ctx.task_element().asScala.map(visitTask_element).toVector
 
