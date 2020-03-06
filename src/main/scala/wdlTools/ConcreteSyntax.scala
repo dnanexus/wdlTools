@@ -18,7 +18,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 object ConcreteSyntax {
 
   sealed trait Element
-  case class ImportDoc(url: String, name: String) extends Element
+  sealed trait WorkflowElement
 
   // type system
   sealed trait Type extends Element
@@ -72,7 +72,7 @@ object ConcreteSyntax {
   case class ExprIfThenElse(cond : Expr, tBranch : Expr, fBranch : Expr) extends Expr
   case class ExprGetName(e : Expr, id : String) extends Expr
 
-  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends Element
+  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends Element with WorkflowElement
 
   // sections
   case class InputSection(declarations: Vector[Declaration]) extends Element
@@ -103,6 +103,10 @@ object ConcreteSyntax {
   case class ParameterMetaSection(kvs : Vector[MetaKV]) extends Element
   case class MetaSection(kvs : Vector[MetaKV]) extends Element
 
+  // imports
+  case class ImportAlias(id1 : String, id2 : String) extends Element
+  case class ImportDoc(url: String, name: String, aliases : Vector[ImportAlias]) extends Element
+
   // top level definitions
   case class Task(name: String,
                   input: Option[InputSection],
@@ -112,7 +116,19 @@ object ConcreteSyntax {
                   meta: Option[MetaSection],
                   parameterMeta : Option[ParameterMetaSection]) extends Element
 
-  case class Workflow(name: String) extends Element
+  case class CallAlias(name : String) extends Element
+  case class CallInput(name : String, expr : Expr) extends Element
+  case class CallInputs(value : Map[String, Expr]) extends Element
+  case class Call(name : String,
+                  alias : Option[String],
+                  inputs : Map[String, Expr]) extends Element with WorkflowElement
+//  case class Scatter() extends Element with WorkflowElement
+//  case class Conditional() extends Element with WorkflowElement
+
+  case class Workflow(name: String,
+                      input: Option[InputSection],
+                      output: Option[OutputSection],
+                      meta: Option[MetaSection]) extends Element
 
   case class Version(value: String) extends Element
   case class Document(version: String, docElements: Vector[Element]) extends Element
@@ -164,17 +180,6 @@ class ConcreteSyntax extends WdlParserBaseVisitor[Element] {
   }
 
   /*
- import_doc
-	: IMPORT string AS Identifier (import_alias)*
-	;
-   */
-  override def visitImport_doc(ctx: WdlParser.Import_docContext): ImportDoc = {
-    val url = ctx.string().getText
-    val name = ctx.Identifier().getText()
-    ImportDoc(url, name)
-  }
-
-  /*
 struct
 	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
@@ -188,16 +193,6 @@ struct
         decl.name -> decl.wdlType
     }.toMap
     TypeStruct(name, members)
-  }
-
-  /*
-workflow
-	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
-	;
-   */
-  override def visitWorkflow(ctx: WdlParser.WorkflowContext): Workflow = {
-    val name = ctx.Identifier().getText()
-    Workflow(name)
   }
 
   /*
@@ -305,21 +300,21 @@ wdl_type
 /* dquote_string
   : DQUOTE DQuoteStringPart* (DQuoteStringPart* DQuoteCommandStart (expression_placeholder_option)* expr RBRACE DQuoteStringPart*)* DQUOTE
   ; */
-  override def visitDquote_string(ctx : WdlParser.Dquote_stringContext) : Expr = ???
+//  override def visitDquote_string(ctx : WdlParser.Dquote_stringContext) : Expr = ???
 
 /* squote_string
   : SQUOTE SQuoteStringPart* (SQuoteStringPart* SQuoteCommandStart (expression_placeholder_option)* expr RBRACE SQuoteStringPart*)* SQUOTE
   ;*/
-  override def visitSquote_string(ctx : WdlParser.Squote_stringContext) : Expr = ???
+//  override def visitSquote_string(ctx : WdlParser.Squote_stringContext) : Expr = ???
 
 /* string
   : dquote_string
   | squote_string
   ;
  */
-/*  override def visitString(ctx : WdlParser.StringContext) : Expr = {
+  override def visitString(ctx : WdlParser.StringContext) : Expr = {
     return ExprString(ctx.getText())
-  }*/
+  }
 
 /* primitive_literal
 	: BoolLiteral
@@ -430,7 +425,7 @@ wdl_type
   // | expr_core LBRACK expr RBRACK #at
   override def visitAt(ctx : WdlParser.AtContext) : Expr = {
     val array = visitAndSafeCast[Expr](ctx.expr_core())
-    val index = visitAndSafeCast[Expr](ctx.expr())
+    val index = visitExpr(ctx.expr())
     ExprAt(array, index)
   }
 
@@ -439,7 +434,7 @@ wdl_type
     val funcName = ctx.Identifier().getText()
     val elements = ctx.expr()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitExpr(x))
       .toVector
     ExprApply(funcName, elements)
   }
@@ -472,7 +467,7 @@ wdl_type
   override def visitIfthenelse(ctx : WdlParser.IfthenelseContext) : Expr = {
     val elements = ctx.expr()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitExpr(x))
       .toVector
     ExprIfThenElse(elements(0), elements(1), elements(2))
   }
@@ -488,11 +483,11 @@ wdl_type
   override def visitObject_literal(ctx : WdlParser.Object_literalContext) : Expr = {
     val ids : Vector[Expr] = ctx.primitive_literal()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitPrimitive_literal(x))
       .toVector
     val elements : Vector[Expr] = ctx.expr()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitExpr(x))
       .toVector
     ExprObjectLiteral((ids zip elements).toMap)
   }
@@ -501,7 +496,7 @@ wdl_type
   override def visitArray_literal(ctx : WdlParser.Array_literalContext) : Expr = {
     val elements : Vector[Expr] = ctx.expr()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitExpr(x))
       .toVector
     ExprArrayLiteral(elements)
   }
@@ -679,6 +674,165 @@ task_input
          decls = decls,
          meta = meta,
          parameterMeta = parameterMeta)
+  }
+
+/* import_alias
+	: ALIAS Identifier AS Identifier
+	;*/
+  override def visitImport_alias(ctx : WdlParser.Import_aliasContext) : ImportAlias = {
+    val ids = ctx.Identifier()
+      .asScala
+      .map(x => x.getText())
+      .toVector
+    ImportAlias(ids(0), ids(1))
+  }
+
+  /*
+ import_doc
+	: IMPORT string AS Identifier (import_alias)*
+	;
+   */
+  override def visitImport_doc(ctx: WdlParser.Import_docContext): ImportDoc = {
+    val url = ctx.string().getText
+    val name = ctx.Identifier().getText()
+    val aliases = ctx.import_alias()
+      .asScala
+      .map(x => visitImport_alias(x))
+      .toVector
+    ImportDoc(url, name, aliases)
+  }
+
+
+/* inner_workflow_element
+	: bound_decls
+	| call
+	| scatter
+	| conditional
+	; */
+
+/* call_alias
+	: AS Identifier
+	; */
+  override def visitCall_alias(ctx : WdlParser.Call_aliasContext) : CallAlias = {
+    CallAlias(ctx.Identifier().getText)
+  }
+
+/* call_input
+	: Identifier EQUAL expr
+	; */
+  override def visitCall_input(ctx : WdlParser.Call_inputContext) : CallInput = {
+    val expr = visitExpr(ctx.expr())
+    CallInput(ctx.Identifier().getText, expr)
+  }
+
+/* call_inputs
+	: INPUT COLON (call_input (COMMA call_input)*)
+	; */
+  override def visitCall_inputs(ctx : WdlParser.Call_inputsContext) : CallInputs = {
+    val inputs : Map[String, Expr] = ctx.call_input()
+      .asScala
+      .map{ case x =>
+        val inp = visitCall_input(x)
+        inp.name -> inp.expr
+    }.toMap
+    CallInputs(inputs)
+  }
+
+/* call_body
+	: LBRACE call_inputs? RBRACE
+	; */
+  override def visitCall_body(ctx : WdlParser.Call_bodyContext) : CallInputs = {
+    if (ctx.call_inputs() == null)
+      CallInputs(Map.empty)
+    else
+      visitCall_inputs(ctx.call_inputs())
+  }
+
+/* call
+	: CALL Identifier call_alias?  call_body?
+	; */
+  override def visitCall(ctx : WdlParser.CallContext) : Call = {
+    val name = ctx.Identifier.getText()
+
+    val alias : Option[String] =
+      if (ctx.call_alias() == null ) None
+      else  Some(ctx.call_alias().getText())
+
+    val inputs : Map[String, Expr] =
+      if (ctx.call_body() == null) {
+        Map.empty[String, Expr]
+      } else {
+        val cb = visitCall_body(ctx.call_body())
+        cb.value
+      }
+
+    Call(name : String,
+         alias : Option[String],
+         inputs : Map[String, Expr])
+  }
+
+/*
+scatter
+	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
+	; */
+
+/* conditional
+	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
+	; */
+
+/* workflow_input
+	: INPUT LBRACE (any_decls)* RBRACE
+	; */
+  override def visitWorkflow_input(ctx : WdlParser.Workflow_inputContext) : InputSection = {
+    val decls = ctx.any_decls()
+      .asScala
+      .map(x => visitAny_decls(x))
+      .toVector
+    InputSection(decls)
+  }
+
+/* workflow_output
+	: OUTPUT LBRACE (bound_decls)* RBRACE
+	;
+ */
+  override def visitWorkflow_output(ctx : WdlParser.Workflow_outputContext) : OutputSection = {
+    val decls = ctx.bound_decls()
+      .asScala
+      .map(x => visitBound_decls(x))
+      .toVector
+    OutputSection(decls)
+  }
+
+
+/* workflow_element
+	: workflow_input #input
+	| workflow_output #output
+	| inner_workflow_element #inner_element
+	| meta_obj #meta_element
+	;
+
+workflow
+	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
+	;
+   */
+  override def visitWorkflow(ctx: WdlParser.WorkflowContext): Workflow = {
+    val name = ctx.Identifier().getText()
+    val elems = ctx.workflow_element()
+      .asScala
+      .map(x => visitAndSafeCast[WorkflowElement](ctx))
+      .toVector
+
+    val input: Option[InputSection] = elems.collectFirst{
+      case x : InputSection => x
+    }
+    val output: Option[OutputSection] = elems.collectFirst{
+      case x : OutputSection => x
+    }
+    val meta: Option[MetaSection] = elems.collectFirst {
+      case x : MetaSection => x
+    }
+
+    Workflow(name, input, output, meta)
   }
 
   /*
