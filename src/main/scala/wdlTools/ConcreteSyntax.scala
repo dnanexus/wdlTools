@@ -132,7 +132,7 @@ object ConcreteSyntax {
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
-                      calls: Vector[WorkflowElement]) extends Element
+                      body: Vector[WorkflowElement]) extends Element
 
   case class Version(value: String) extends Element
   case class Document(version: String, elements: Vector[Element]) extends Element
@@ -150,9 +150,11 @@ object ConcreteSyntax {
     parser
   }
 
-  def apply(buf: String): Document = {
+  def apply(buf: String,
+            tracing : Boolean = false): Document = {
     val parser: WdlParser = getParser(buf)
-    parser.setTrace(true)
+    if (tracing)
+      parser.setTrace(true)
     val visitor = new ConcreteSyntax()
     val doc = visitor.visit(parser.document)
     doc.asInstanceOf[Document]

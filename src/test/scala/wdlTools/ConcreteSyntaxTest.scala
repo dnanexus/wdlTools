@@ -56,7 +56,6 @@ class Antlr4Test extends FlatSpec with Matchers {
 
   it should "parse a simple workflow" taggedAs(Edge) in {
     val doc = ConcreteSyntax.apply(getWdlSource("workflow_I.wdl"))
-    System.out.println(doc)
     doc.elements.size shouldBe(1)
 
     // Shouldn't this be just "1.0"?
@@ -66,6 +65,6 @@ class Antlr4Test extends FlatSpec with Matchers {
     val wf = wf1.asInstanceOf[ConcreteSyntax.Workflow]
 
     wf.name shouldBe("biz")
-    //wf.calls.size shouldBe(1)
+    wf.body.size shouldBe(3)
   }
 }
