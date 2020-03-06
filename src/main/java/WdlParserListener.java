@@ -58,15 +58,15 @@ public interface WdlParserListener extends ParseTreeListener {
 	 */
 	void exitWdl_type(WdlParser.Wdl_typeContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link WdlParser#unbound_decls}.
+	 * Enter a parse tree produced by {@link WdlParser#unboud_decls}.
 	 * @param ctx the parse tree
 	 */
-	void enterUnbound_decls(WdlParser.Unbound_declsContext ctx);
+	void enterUnboud_decls(WdlParser.Unboud_declsContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link WdlParser#unbound_decls}.
+	 * Exit a parse tree produced by {@link WdlParser#unboud_decls}.
 	 * @param ctx the parse tree
 	 */
-	void exitUnbound_decls(WdlParser.Unbound_declsContext ctx);
+	void exitUnboud_decls(WdlParser.Unboud_declsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link WdlParser#bound_decls}.
 	 * @param ctx the parse tree
@@ -108,25 +108,35 @@ public interface WdlParserListener extends ParseTreeListener {
 	 */
 	void exitExpression_placeholder_option(WdlParser.Expression_placeholder_optionContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link WdlParser#dquote_string}.
+	 * Enter a parse tree produced by {@link WdlParser#string_part}.
 	 * @param ctx the parse tree
 	 */
-	void enterDquote_string(WdlParser.Dquote_stringContext ctx);
+	void enterString_part(WdlParser.String_partContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link WdlParser#dquote_string}.
+	 * Exit a parse tree produced by {@link WdlParser#string_part}.
 	 * @param ctx the parse tree
 	 */
-	void exitDquote_string(WdlParser.Dquote_stringContext ctx);
+	void exitString_part(WdlParser.String_partContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link WdlParser#squote_string}.
+	 * Enter a parse tree produced by {@link WdlParser#string_expr_part}.
 	 * @param ctx the parse tree
 	 */
-	void enterSquote_string(WdlParser.Squote_stringContext ctx);
+	void enterString_expr_part(WdlParser.String_expr_partContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link WdlParser#squote_string}.
+	 * Exit a parse tree produced by {@link WdlParser#string_expr_part}.
 	 * @param ctx the parse tree
 	 */
-	void exitSquote_string(WdlParser.Squote_stringContext ctx);
+	void exitString_expr_part(WdlParser.String_expr_partContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link WdlParser#string_expr_with_string_part}.
+	 * @param ctx the parse tree
+	 */
+	void enterString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link WdlParser#string_expr_with_string_part}.
+	 * @param ctx the parse tree
+	 */
+	void exitString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link WdlParser#string}.
 	 * @param ctx the parse tree
@@ -666,15 +676,35 @@ public interface WdlParserListener extends ParseTreeListener {
 	 */
 	void exitTask_output(WdlParser.Task_outputContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link WdlParser#task_command_part}.
+	 * Enter a parse tree produced by {@link WdlParser#task_command_string_part}.
 	 * @param ctx the parse tree
 	 */
-	void enterTask_command_part(WdlParser.Task_command_partContext ctx);
+	void enterTask_command_string_part(WdlParser.Task_command_string_partContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link WdlParser#task_command_part}.
+	 * Exit a parse tree produced by {@link WdlParser#task_command_string_part}.
 	 * @param ctx the parse tree
 	 */
-	void exitTask_command_part(WdlParser.Task_command_partContext ctx);
+	void exitTask_command_string_part(WdlParser.Task_command_string_partContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link WdlParser#task_command_expr_part}.
+	 * @param ctx the parse tree
+	 */
+	void enterTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link WdlParser#task_command_expr_part}.
+	 * @param ctx the parse tree
+	 */
+	void exitTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link WdlParser#task_command_expr_with_string}.
+	 * @param ctx the parse tree
+	 */
+	void enterTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link WdlParser#task_command_expr_with_string}.
+	 * @param ctx the parse tree
+	 */
+	void exitTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link WdlParser#task_command}.
 	 * @param ctx the parse tree

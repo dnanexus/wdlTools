@@ -18,7 +18,6 @@ import org.antlr.v4.runtime.tree.TerminalNode
 object ConcreteSyntax {
 
   sealed trait Element
-  sealed trait WorkflowElement
 
   // type system
   sealed trait Type extends Element
@@ -72,7 +71,7 @@ object ConcreteSyntax {
   case class ExprIfThenElse(cond : Expr, tBranch : Expr, fBranch : Expr) extends Expr
   case class ExprGetName(e : Expr, id : String) extends Expr
 
-  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends Element with WorkflowElement
+  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends Element
 
   // sections
   case class InputSection(declarations: Vector[Declaration]) extends Element
@@ -92,8 +91,11 @@ object ConcreteSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandPart(expr : Expr, text : String) extends Element
-  case class CommandSection(start : String, parts : Vector[CommandPart]) extends Element
+
+  case class CommandPartString(value : String) extends Element
+  case class CommandPartExpr(value : Vector[Expr]) extends Element
+  case class CommandPartExprWithString(expr: Vector[Expr], text : String) extends Element
+  case class CommandSection(start : String, parts : Vector[CommandPartExprWithString]) extends Element
 
   case class RuntimeKV(id : String, expr: Expr) extends Element
   case class RuntimeSection(kvs : Vector[RuntimeKV]) extends Element
@@ -121,17 +123,18 @@ object ConcreteSyntax {
   case class CallInputs(value : Map[String, Expr]) extends Element
   case class Call(name : String,
                   alias : Option[String],
-                  inputs : Map[String, Expr]) extends Element with WorkflowElement
+                  inputs : Map[String, Expr]) extends Element
 //  case class Scatter() extends Element with WorkflowElement
 //  case class Conditional() extends Element with WorkflowElement
 
   case class Workflow(name: String,
                       input: Option[InputSection],
                       output: Option[OutputSection],
-                      meta: Option[MetaSection]) extends Element
+                      meta: Option[MetaSection],
+                      calls: Vector[Call]) extends Element
 
   case class Version(value: String) extends Element
-  case class Document(version: String, docElements: Vector[Element]) extends Element
+  case class Document(version: String, elements: Vector[Element]) extends Element
 
 
   private def getParser(inp: String): WdlParser = {
@@ -142,6 +145,7 @@ object ConcreteSyntax {
 
     // TODO: how do we get human readable errors?
     //parser.removeErrorListeners()
+    parser.setErrorHandler(new BailErrorStrategy())
     parser
   }
 
@@ -181,15 +185,15 @@ class ConcreteSyntax extends WdlParserBaseVisitor[Element] {
 
   /*
 struct
-	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
+	: STRUCT Identifier LBRACE (unboud_decls)* RBRACE
 	;
    */
   override def visitStruct(ctx: WdlParser.StructContext): TypeStruct = {
     val name = ctx.Identifier().getText()
-    val members = ctx.unbound_decls()
+    val members = ctx.unboud_decls()
       .asScala
       .map{ case x =>
-        val decl = visitUnbound_decls(x)
+        val decl = visitUnboud_decls(x)
         decl.name -> decl.wdlType
     }.toMap
     TypeStruct(name, members)
@@ -506,11 +510,11 @@ wdl_type
   }
 
   /*
-unbound_decls
+unboud_decls
 	: wdl_type Identifier
 	;
    */
-  override def visitUnbound_decls(ctx: WdlParser.Unbound_declsContext): Declaration = {
+  override def visitUnboud_decls(ctx: WdlParser.Unboud_declsContext): Declaration = {
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText()
     Declaration(name, wdlType, None)
@@ -530,7 +534,7 @@ bound_decls
 
   /*
 any_decls
-	: unbound_decls
+	: unboud_decls
 	| bound_decls
 	;
    */
@@ -611,33 +615,49 @@ task_input
     OutputSection(decls)
   }
 
-/* task_command_part
-        : StringCommandStart expr RBRACE CommandStringPart*
-        ; */
-  override def visitTask_command_part(ctx : WdlParser.Task_command_partContext) : CommandPart = {
-    val expr : Expr = visitExpr(ctx.expr())
+  /* task_command_string_part
+    : CommandStringPart*
+    ; */
+  override def visitTask_command_string_part(ctx : WdlParser.Task_command_string_partContext) : CommandPartString = {
     val text : String = ctx.CommandStringPart()
       .asScala
       .map(x => x.getText())
       .mkString("")
-    CommandPart(expr, text)
+    CommandPartString(text)
+  }
+
+/* task_command_expr_part
+    : StringCommandStart  (expression_placeholder_option)* expr RBRACE
+    ; */
+  override def visitTask_command_expr_part(ctx : WdlParser.Task_command_expr_partContext) : CommandPartExpr = {
+    val elements = ctx.expression_placeholder_option()
+      .asScala
+      .map(x => visitExpression_placeholder_option(x).asInstanceOf[Expr])
+      .toVector
+    val expr = visitExpr(ctx.expr())
+    CommandPartExpr(elements :+ expr)
+  }
+
+/* task_command_expr_with_string
+    : task_command_expr_part task_command_string_part
+    ; */
+  override def visitTask_command_expr_with_string(ctx : WdlParser.Task_command_expr_with_stringContext) : CommandPartExprWithString = {
+    val exprPart : CommandPartExpr = visitTask_command_expr_part(ctx.task_command_expr_part())
+    val stringPart : CommandPartString = visitTask_command_string_part(ctx.task_command_string_part())
+    CommandPartExprWithString(exprPart.value, stringPart.value)
   }
 
 /* task_command
-  : COMMAND CommandStringPart* task_command_part* EndCommand
-  | HEREDOC_COMMAND CommandStringPart* task_command_part* EndCommand
+  : COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+  | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
   ; */
   override def visitTask_command(ctx : WdlParser.Task_commandContext) : CommandSection = {
-    val initialText : String = ctx.CommandStringPart()
+    val start : CommandPartString = visitTask_command_string_part(ctx.task_command_string_part())
+    val parts : Vector[CommandPartExprWithString] = ctx.task_command_expr_with_string()
       .asScala
-      .map(x => x.getText())
+      .map(x => visitTask_command_expr_with_string(x))
       .toVector
-      .mkString("")
-    val parts : Vector[CommandPart] = ctx.task_command_part()
-      .asScala
-      .map(x => visitTask_command_part(x))
-      .toVector
-    CommandSection(initialText, parts)
+    CommandSection(start.value, parts)
   }
 
 /* task
@@ -803,7 +823,6 @@ scatter
     OutputSection(decls)
   }
 
-
 /* workflow_element
 	: workflow_input #input
 	| workflow_output #output
@@ -817,9 +836,9 @@ workflow
    */
   override def visitWorkflow(ctx: WdlParser.WorkflowContext): Workflow = {
     val name = ctx.Identifier().getText()
-    val elems = ctx.workflow_element()
+    val elems : Vector[Element] = ctx.workflow_element()
       .asScala
-      .map(x => visitAndSafeCast[WorkflowElement](ctx))
+      .map(x => visitChildren(ctx))
       .toVector
 
     val input: Option[InputSection] = elems.collectFirst{
@@ -831,8 +850,10 @@ workflow
     val meta: Option[MetaSection] = elems.collectFirst {
       case x : MetaSection => x
     }
-
-    Workflow(name, input, output, meta)
+    val calls: Vector[Call] = elems.collect {
+      case x : Call => x
+    }
+    Workflow(name, input, output, meta, calls)
   }
 
   /*
@@ -859,6 +880,9 @@ version
       return Version("draft-2")
     }
     val value: String = ctx.VERSION().getText()
+/*    if (!value.toLowerCase().startsWith("version"))
+      throw new Exception("the version string must start with VERSION")*/
+
     Version(value)
   }
 

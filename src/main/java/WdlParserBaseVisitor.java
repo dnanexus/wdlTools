@@ -87,14 +87,21 @@ public class WdlParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> impleme
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDquote_string(WdlParser.Dquote_stringContext ctx) { return visitChildren(ctx); }
+	@Override public T visitString_part(WdlParser.String_partContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSquote_string(WdlParser.Squote_stringContext ctx) { return visitChildren(ctx); }
+	@Override public T visitString_expr_part(WdlParser.String_expr_partContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -430,7 +437,21 @@ public class WdlParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> impleme
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTask_command_part(WdlParser.Task_command_partContext ctx) { return visitChildren(ctx); }
+	@Override public T visitTask_command_string_part(WdlParser.Task_command_string_partContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

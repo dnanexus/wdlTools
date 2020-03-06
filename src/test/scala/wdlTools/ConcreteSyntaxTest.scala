@@ -7,6 +7,8 @@ import collection.JavaConverters._
 import org.scalatest.Tag
 object Edge extends Tag("edge")
 
+import ConcreteSyntax._
+
 class Antlr4Test extends FlatSpec with Matchers {
 
   // Ignore a value. This is useful for avoiding warnings/errors
@@ -40,15 +42,30 @@ class Antlr4Test extends FlatSpec with Matchers {
     ignoreValue(doc)
   }
 
-  it should "parse a task" taggedAs(Edge) in {
+  it should "parse a task" in {
     val doc = ConcreteSyntax.apply(getWdlSource("task_wc.wdl"))
-    System.out.println(doc)
+    //System.out.println(doc)
     ignoreValue(doc)
   }
 
   it should "parse structs" in {
     val doc = ConcreteSyntax.apply(getWdlSource("struct.wdl"))
-    System.out.println(doc)
+    //System.out.println(doc)
     ignoreValue(doc)
+  }
+
+  it should "parse a simple workflow" taggedAs(Edge) in {
+    val doc = ConcreteSyntax.apply(getWdlSource("workflow_I.wdl"))
+    System.out.println(doc)
+    doc.elements.size shouldBe(1)
+
+    // Shouldn't this be just "1.0"?
+    doc.version shouldBe("version 1.0")
+    val wf1 = doc.elements(0)
+    wf1 shouldBe a[Workflow]
+    val wf = wf1.asInstanceOf[ConcreteSyntax.Workflow]
+
+    wf.name shouldBe("biz")
+    //wf.calls.size shouldBe(1)
   }
 }

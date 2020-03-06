@@ -41,11 +41,11 @@ public interface WdlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitWdl_type(WdlParser.Wdl_typeContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link WdlParser#unbound_decls}.
+	 * Visit a parse tree produced by {@link WdlParser#unboud_decls}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitUnbound_decls(WdlParser.Unbound_declsContext ctx);
+	T visitUnboud_decls(WdlParser.Unboud_declsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link WdlParser#bound_decls}.
 	 * @param ctx the parse tree
@@ -71,17 +71,23 @@ public interface WdlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitExpression_placeholder_option(WdlParser.Expression_placeholder_optionContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link WdlParser#dquote_string}.
+	 * Visit a parse tree produced by {@link WdlParser#string_part}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitDquote_string(WdlParser.Dquote_stringContext ctx);
+	T visitString_part(WdlParser.String_partContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link WdlParser#squote_string}.
+	 * Visit a parse tree produced by {@link WdlParser#string_expr_part}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitSquote_string(WdlParser.Squote_stringContext ctx);
+	T visitString_expr_part(WdlParser.String_expr_partContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link WdlParser#string_expr_with_string_part}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link WdlParser#string}.
 	 * @param ctx the parse tree
@@ -399,11 +405,23 @@ public interface WdlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitTask_output(WdlParser.Task_outputContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link WdlParser#task_command_part}.
+	 * Visit a parse tree produced by {@link WdlParser#task_command_string_part}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitTask_command_part(WdlParser.Task_command_partContext ctx);
+	T visitTask_command_string_part(WdlParser.Task_command_string_partContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link WdlParser#task_command_expr_part}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link WdlParser#task_command_expr_with_string}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link WdlParser#task_command}.
 	 * @param ctx the parse tree

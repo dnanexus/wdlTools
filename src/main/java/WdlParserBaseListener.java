@@ -76,13 +76,13 @@ public class WdlParserBaseListener implements WdlParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUnbound_decls(WdlParser.Unbound_declsContext ctx) { }
+	@Override public void enterUnboud_decls(WdlParser.Unboud_declsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUnbound_decls(WdlParser.Unbound_declsContext ctx) { }
+	@Override public void exitUnboud_decls(WdlParser.Unboud_declsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -136,25 +136,37 @@ public class WdlParserBaseListener implements WdlParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDquote_string(WdlParser.Dquote_stringContext ctx) { }
+	@Override public void enterString_part(WdlParser.String_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDquote_string(WdlParser.Dquote_stringContext ctx) { }
+	@Override public void exitString_part(WdlParser.String_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterSquote_string(WdlParser.Squote_stringContext ctx) { }
+	@Override public void enterString_expr_part(WdlParser.String_expr_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitSquote_string(WdlParser.Squote_stringContext ctx) { }
+	@Override public void exitString_expr_part(WdlParser.String_expr_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitString_expr_with_string_part(WdlParser.String_expr_with_string_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -724,13 +736,37 @@ public class WdlParserBaseListener implements WdlParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterTask_command_part(WdlParser.Task_command_partContext ctx) { }
+	@Override public void enterTask_command_string_part(WdlParser.Task_command_string_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitTask_command_part(WdlParser.Task_command_partContext ctx) { }
+	@Override public void exitTask_command_string_part(WdlParser.Task_command_string_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTask_command_expr_part(WdlParser.Task_command_expr_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTask_command_expr_with_string(WdlParser.Task_command_expr_with_stringContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
