@@ -18,6 +18,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 object ConcreteSyntax {
 
   sealed trait Element
+  sealed trait WorkflowElement extends Element
 
   // type system
   sealed trait Type extends Element
@@ -71,7 +72,7 @@ object ConcreteSyntax {
   case class ExprIfThenElse(cond : Expr, tBranch : Expr, fBranch : Expr) extends Expr
   case class ExprGetName(e : Expr, id : String) extends Expr
 
-  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends Element
+  case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends WorkflowElement
 
   // sections
   case class InputSection(declarations: Vector[Declaration]) extends Element
@@ -123,15 +124,15 @@ object ConcreteSyntax {
   case class CallInputs(value : Map[String, Expr]) extends Element
   case class Call(name : String,
                   alias : Option[String],
-                  inputs : Map[String, Expr]) extends Element
-//  case class Scatter() extends Element with WorkflowElement
-//  case class Conditional() extends Element with WorkflowElement
+                  inputs : Map[String, Expr]) extends WorkflowElement
+  case class Scatter(identifier : String, expr: Expr, body : Vector[WorkflowElement]) extends WorkflowElement
+  case class Conditional(expr : Expr, body : Vector[WorkflowElement]) extends WorkflowElement
 
   case class Workflow(name: String,
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
-                      calls: Vector[Call]) extends Element
+                      calls: Vector[WorkflowElement]) extends Element
 
   case class Version(value: String) extends Element
   case class Document(version: String, elements: Vector[Element]) extends Element
@@ -151,7 +152,7 @@ object ConcreteSyntax {
 
   def apply(buf: String): Document = {
     val parser: WdlParser = getParser(buf)
-    //parser.setTrace(true)
+    parser.setTrace(true)
     val visitor = new ConcreteSyntax()
     val doc = visitor.visit(parser.document)
     doc.asInstanceOf[Document]
@@ -301,6 +302,7 @@ wdl_type
     throw new Exception(s"Not one of three known variants of a placeholder ${ctx}")
   }
 
+  // TODO
 /* dquote_string
   : DQUOTE DQuoteStringPart* (DQuoteStringPart* DQuoteCommandStart (expression_placeholder_option)* expr RBRACE DQuoteStringPart*)* DQUOTE
   ; */
@@ -794,11 +796,28 @@ task_input
 /*
 scatter
 	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
-	; */
+ ; */
+  override def visitScatter(ctx : WdlParser.ScatterContext) : Scatter = {
+    val id = ctx.Identifier.getText()
+    val expr = visitExpr(ctx.expr())
+    val body = ctx.inner_workflow_element()
+      .asScala
+      .map(visitInner_workflow_element)
+      .toVector
+    Scatter(id, expr, body)
+  }
 
 /* conditional
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	; */
+  override def visitConditional(ctx : WdlParser.ConditionalContext) : Conditional = {
+    val expr = visitExpr(ctx.expr())
+    val body = ctx.inner_workflow_element()
+      .asScala
+      .map(visitInner_workflow_element)
+      .toVector
+    Conditional(expr, body)
+  }
 
 /* workflow_input
 	: INPUT LBRACE (any_decls)* RBRACE
@@ -810,6 +829,7 @@ scatter
       .toVector
     InputSection(decls)
   }
+
 
 /* workflow_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
@@ -823,6 +843,16 @@ scatter
     OutputSection(decls)
   }
 
+/* inner_workflow_element
+	: bound_decls
+	| call
+	| scatter
+	| conditional
+	; */
+  override def visitInner_workflow_element(ctx : WdlParser.Inner_workflow_elementContext) : WorkflowElement = {
+    visitAndSafeCast[WorkflowElement](ctx)
+  }
+
 /* workflow_element
 	: workflow_input #input
 	| workflow_output #output
@@ -833,27 +863,34 @@ scatter
 workflow
 	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
 	;
-   */
+ */
   override def visitWorkflow(ctx: WdlParser.WorkflowContext): Workflow = {
     val name = ctx.Identifier().getText()
-    val elems : Vector[Element] = ctx.workflow_element()
+
+    val elems : Vector[WdlParser.Workflow_elementContext] = ctx.workflow_element()
       .asScala
-      .map(x => visitChildren(ctx))
       .toVector
 
+    // TODO: return an error if there are two sections of type X.
     val input: Option[InputSection] = elems.collectFirst{
-      case x : InputSection => x
+      case x : WdlParser.InputContext =>
+        visitWorkflow_input(x.workflow_input())
     }
     val output: Option[OutputSection] = elems.collectFirst{
-      case x : OutputSection => x
+      case x : WdlParser.OutputContext =>
+        visitWorkflow_output(x.workflow_output())
     }
     val meta: Option[MetaSection] = elems.collectFirst {
-      case x : MetaSection => x
+      case x : WdlParser.Meta_elementContext =>
+        val m : WdlParser.Meta_objContext = x.meta_obj()
+        visitMeta(m.asInstanceOf[WdlParser.MetaContext])
     }
-    val calls: Vector[Call] = elems.collect {
-      case x : Call => x
+    val wfElems : Vector[WorkflowElement] = elems.collect{
+      case x : WdlParser.Inner_elementContext =>
+        visitInner_workflow_element(x.inner_workflow_element())
     }
-    Workflow(name, input, output, meta, calls)
+
+    Workflow(name, input, output, meta, wfElems)
   }
 
   /*
