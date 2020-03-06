@@ -12,18 +12,24 @@ developed by Patrick Magee.
 
 ## Building
 
-The java code was generated from the `.g4` sources with ANTLR4 in this way:
+The java code for the parser was generated with the [ANTRL4](https://www.antlr.org) tool.
+
+1. Download a jar file with the [java instructions](https://github.com/antlr/antlr4/blob/master/doc/java-target.md)
+2. `cd ROOT_OF_GIT_REPO`
+3. Assuming you downloaded the jar file to `$HOME/antlr-4.8-complete.jar` generated java code from the grammar in this way:
 
 ```
-java -jar ~/antlr-4.8-complete.jar -o java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
+cd ROOT_OF_GIT_REPO/src/main/antrl4
+java -jar ~/antlr-4.8-complete.jar -o ROOT_GIT/src/main/java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
+cd ROOT_OF_GIT_REPO
 ```
 
-The scala code was then compiled with:
+4. Build the scala code:
 ```
 sbt compile
 ```
 
-to run the tests do:
+5. Run the tests:
 ```
 sbt test
 ```

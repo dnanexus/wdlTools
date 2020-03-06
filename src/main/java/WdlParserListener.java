@@ -58,15 +58,15 @@ public interface WdlParserListener extends ParseTreeListener {
 	 */
 	void exitWdl_type(WdlParser.Wdl_typeContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link WdlParser#unboud_decls}.
+	 * Enter a parse tree produced by {@link WdlParser#unbound_decls}.
 	 * @param ctx the parse tree
 	 */
-	void enterUnboud_decls(WdlParser.Unboud_declsContext ctx);
+	void enterUnbound_decls(WdlParser.Unbound_declsContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link WdlParser#unboud_decls}.
+	 * Exit a parse tree produced by {@link WdlParser#unbound_decls}.
 	 * @param ctx the parse tree
 	 */
-	void exitUnboud_decls(WdlParser.Unboud_declsContext ctx);
+	void exitUnbound_decls(WdlParser.Unbound_declsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link WdlParser#bound_decls}.
 	 * @param ctx the parse tree
@@ -665,6 +665,16 @@ public interface WdlParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitTask_output(WdlParser.Task_outputContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link WdlParser#task_command_part}.
+	 * @param ctx the parse tree
+	 */
+	void enterTask_command_part(WdlParser.Task_command_partContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link WdlParser#task_command_part}.
+	 * @param ctx the parse tree
+	 */
+	void exitTask_command_part(WdlParser.Task_command_partContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link WdlParser#task_command}.
 	 * @param ctx the parse tree

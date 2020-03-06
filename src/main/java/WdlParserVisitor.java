@@ -41,11 +41,11 @@ public interface WdlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitWdl_type(WdlParser.Wdl_typeContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link WdlParser#unboud_decls}.
+	 * Visit a parse tree produced by {@link WdlParser#unbound_decls}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitUnboud_decls(WdlParser.Unboud_declsContext ctx);
+	T visitUnbound_decls(WdlParser.Unbound_declsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link WdlParser#bound_decls}.
 	 * @param ctx the parse tree
@@ -398,6 +398,12 @@ public interface WdlParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitTask_output(WdlParser.Task_outputContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link WdlParser#task_command_part}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTask_command_part(WdlParser.Task_command_partContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link WdlParser#task_command}.
 	 * @param ctx the parse tree

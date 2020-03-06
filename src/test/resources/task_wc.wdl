@@ -18,7 +18,7 @@ task wc {
   meta {
     author : "Robin Hood"
   }
-  parameterMeta {
+  parameter_meta {
     reason : "just because"
   }
 }

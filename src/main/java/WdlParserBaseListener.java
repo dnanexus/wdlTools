@@ -76,13 +76,13 @@ public class WdlParserBaseListener implements WdlParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUnboud_decls(WdlParser.Unboud_declsContext ctx) { }
+	@Override public void enterUnbound_decls(WdlParser.Unbound_declsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUnboud_decls(WdlParser.Unboud_declsContext ctx) { }
+	@Override public void exitUnbound_decls(WdlParser.Unbound_declsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -719,6 +719,18 @@ public class WdlParserBaseListener implements WdlParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitTask_output(WdlParser.Task_outputContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTask_command_part(WdlParser.Task_command_partContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTask_command_part(WdlParser.Task_command_partContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

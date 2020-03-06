@@ -28,7 +28,7 @@ wdl_type
   ;
 
 
-unboud_decls
+unbound_decls
 	: wdl_type Identifier
 	;
 
@@ -37,7 +37,7 @@ bound_decls
 	;
 
 any_decls
-	: unboud_decls
+	: unbound_decls
 	| bound_decls
 	;
 
@@ -148,7 +148,7 @@ import_doc
 	;
 
 struct
-	: STRUCT Identifier LBRACE (unboud_decls)* RBRACE
+	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
 
 meta_kv
@@ -178,9 +178,13 @@ task_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	;
 
+task_command_part
+        : StringCommandStart expr RBRACE CommandStringPart*
+        ;
+
 task_command
-  : COMMAND CommandStringPart* (CommandStringPart* StringCommandStart expr RBRACE CommandStringPart* )* EndCommand
-  | HEREDOC_COMMAND CommandStringPart* (CommandStringPart* StringCommandStart expr RBRACE CommandStringPart* )* EndCommand
+  : COMMAND CommandStringPart* task_command_part* EndCommand
+  | HEREDOC_COMMAND CommandStringPart* task_command_part* EndCommand
   ;
 
 task_element
