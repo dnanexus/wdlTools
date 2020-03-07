@@ -15,7 +15,7 @@ class Antlr4Test extends FlatSpec with Matchers {
   // on unused variables.
   private def ignoreValue[A](value: A): Unit = {}
 
-  private def getWdlSource(dirname : String, fname: String): String = {
+  private def getWdlSource(dirname: String, fname: String): String = {
     val p: String = getClass.getResource(s"/${dirname}/${fname}").getPath
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())

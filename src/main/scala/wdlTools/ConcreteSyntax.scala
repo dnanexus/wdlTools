@@ -23,7 +23,7 @@ object ConcreteSyntax {
   // type system
   sealed trait Type extends Element
   case class TypeOptional(t: Type) extends Type
-  case class TypeArray(t: Type, nonEmpty : Boolean) extends Type
+  case class TypeArray(t: Type, nonEmpty: Boolean) extends Type
   case class TypeMap(k: Type, v: Type) extends Type
   case class TypePair(l: Type, r: Type) extends Type
   case object TypeString extends Type
@@ -170,13 +170,13 @@ class ConcreteSyntax extends WdlParserBaseVisitor[Element] {
   private def visitAndSafeCast[T: ClassTag](ctx: ParserRuleContext)(implicit tt: TypeTag[T]): T = {
     val child = visitChildren(ctx)
     if (child == null) {
-        throw new Exception(s"child is null, expecting child of type ${typeOf[T]}")
+      throw new Exception(s"child is null, expecting child of type ${typeOf[T]}")
     }
 
     val ct = implicitly[ClassTag[T]]
     child match {
       case ct(x) => x
-      case _     =>
+      case _ =>
         val tok = ctx.start
         val line = tok.getLine()
         val col = tok.getCharPositionInLine()
@@ -691,14 +691,16 @@ task_input
   }
 
   // Each section should appear at most once. Make sure this is the case.
-  private def atMostOneSection[T](sections : Vector[T]) : Option[T] = {
+  private def atMostOneSection[T](sections: Vector[T]): Option[T] = {
     sections.size match {
       case 0 => None
       case 1 => Some(sections.head)
       case n =>
         val first = sections.head
         val sectionName = first.getClass.getSimpleName
-        throw new Exception(s"section ${sectionName} appears ${n} times, it cannot appear more than once")
+        throw new Exception(
+            s"section ${sectionName} appears ${n} times, it cannot appear more than once"
+        )
     }
   }
 
@@ -947,7 +949,7 @@ document_element
     visitChildren(ctx)
   }
 
-/* version
+  /* version
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: WdlParser.VersionContext): Version = {
