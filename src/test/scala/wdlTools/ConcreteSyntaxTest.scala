@@ -15,56 +15,66 @@ class Antlr4Test extends FlatSpec with Matchers {
   // on unused variables.
   private def ignoreValue[A](value: A): Unit = {}
 
-  private def getWdlSource(fname: String): String = {
-    val p : String = getClass.getResource(s"/${fname}").getPath
-    val path : Path = Paths.get(p)
+  private def getWdlSource(dirname : String, fname: String): String = {
+    val p: String = getClass.getResource(s"/${dirname}/${fname}").getPath
+    val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
 
-
   it should "handle various types" in {
-    val doc = ConcreteSyntax.apply(getWdlSource("types.wdl"))
+    val doc = ConcreteSyntax.apply(getWdlSource("tasks", "types.wdl"))
 
     // TODO: add assertions here, to check the correct output
     ignoreValue(doc)
   }
 
   it should "handle types and expressions" in {
-    val doc = ConcreteSyntax.apply(getWdlSource("expressions.wdl"))
+    val doc = ConcreteSyntax.apply(getWdlSource("tasks", "expressions.wdl"))
 
     // TODO: add assertions here, to check the correct output
     ignoreValue(doc)
   }
 
   it should "parse a task with an output section only" in {
-    val doc = ConcreteSyntax.apply(getWdlSource("task_with_output_section.wdl"))
+    val doc = ConcreteSyntax.apply(getWdlSource("tasks", "output_section.wdl"))
     //System.out.println(doc)
     ignoreValue(doc)
   }
 
   it should "parse a task" in {
-    val doc = ConcreteSyntax.apply(getWdlSource("task_wc.wdl"))
+    val doc = ConcreteSyntax.apply(getWdlSource("tasks", "wc.wdl"))
     //System.out.println(doc)
+    ignoreValue(doc)
+  }
+
+  it should "detect when a task section appears twice" in {
+    assertThrows[Exception] {
+      ConcreteSyntax.apply(getWdlSource("tasks", "multiple_input_section.wdl"))
+    }
+  }
+
+  it should "handle string interpolation" taggedAs (Edge) in {
+    val doc = ConcreteSyntax.apply(getWdlSource("tasks", "interpolation.wdl"))
+    System.out.println(doc)
     ignoreValue(doc)
   }
 
   it should "parse structs" in {
-    val doc = ConcreteSyntax.apply(getWdlSource("struct.wdl"))
+    val doc = ConcreteSyntax.apply(getWdlSource("structs", "I.wdl"))
     //System.out.println(doc)
     ignoreValue(doc)
   }
 
-  it should "parse a simple workflow" taggedAs(Edge) in {
-    val doc = ConcreteSyntax.apply(getWdlSource("workflow_I.wdl"))
-    doc.elements.size shouldBe(1)
+  it should "parse a simple workflow" in {
+    val doc = ConcreteSyntax.apply(getWdlSource("workflows", "I.wdl"))
+    doc.elements.size shouldBe (1)
 
-    // Shouldn't this be just "1.0"?
-    doc.version shouldBe("version 1.0")
+    doc.version shouldBe ("1.0")
     val wf1 = doc.elements(0)
     wf1 shouldBe a[Workflow]
-    val wf = wf1.asInstanceOf[ConcreteSyntax.Workflow]
+    val wf = wf1.asInstanceOf[Workflow]
 
-    wf.name shouldBe("biz")
-    wf.body.size shouldBe(3)
+    wf.name shouldBe ("biz")
+    wf.body.size shouldBe (3)
   }
 }
