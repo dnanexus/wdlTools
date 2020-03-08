@@ -97,13 +97,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     doc.version shouldBe ("1.0")
 
-    val imports = doc.elements.collect{
-      case x : ImportDocElaborated => x
+    val imports = doc.elements.collect {
+      case x: ImportDocElaborated => x
     }
     imports.size shouldBe (1)
 
-    val wfs = doc.elements.collect{
-      case x : Workflow => x
+    val wfs = doc.elements.collect {
+      case x: Workflow => x
     }
     wfs.size shouldBe (1)
   }

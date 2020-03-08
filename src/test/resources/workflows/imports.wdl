@@ -2,8 +2,10 @@ version 1.0
 
 import "I.wdl" as biz
 
-#import "https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/JointGenotyping-terra.wdl" as terra
+# try an http address
+#import "https://github.com/dnanexus-rnd/wdlTools/blob/master/src/test/resources/tasks/wc.wdl" as wc
 
 workflow foo {
   call biz { input : s = "anybody there?" }
+  call wc
 }

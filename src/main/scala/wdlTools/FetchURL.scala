@@ -49,10 +49,10 @@ case class FetchURL(localDirectories: Vector[Path]) {
       val components = p.split("://").toList
       val protocol = components(0)
       protocol match {
-        case "http" => fetchHttpAddress(p)
+        case "http"  => fetchHttpAddress(p)
         case "https" => fetchHttpAddress(p)
-        case "file" => fetchLocalFile(p)
-        case _ => throw new Exception(s"unknown protocol ${protocol} in path ${p}")
+        case "file"  => fetchLocalFile(p)
+        case _       => throw new Exception(s"unknown protocol ${protocol} in path ${p}")
       }
     } else {
       // no recognizable protocol, assuming a file
