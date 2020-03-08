@@ -632,7 +632,7 @@ task_input
 	;
    */
   override def visitImport_doc(ctx: WdlParser.Import_docContext): ImportDoc = {
-    val url = ctx.string().getText
+    val url = ctx.string().getText().replaceAll("\"", "")
     val name = ctx.Identifier().getText()
     val aliases = ctx
       .import_alias()

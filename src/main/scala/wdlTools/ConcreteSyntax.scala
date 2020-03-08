@@ -103,15 +103,15 @@ object ConcreteSyntax {
   //   https://google.com/A.txt
   //   file://A/B.txt
   //   foo.txt
-  case class URL(path: String)
+  case class URL(addr: String)
 
   // import statement as read from the document
-  case class ImportDoc(name: String, aliases: Vector[ImportAlias], url: URL) extends Element
+  case class ImportDoc(name: String, aliases: Vector[ImportAlias], url: URL) extends WorkflowElement
 
   // the basic import-doc is replaced with the elaborated version after we
   // dive in and parse it.
   case class ImportDocElaborated(name: String, aliases: Vector[ImportAlias], doc: Document)
-      extends Element
+      extends WorkflowElement
 
   // top level definitions
   case class Task(name: String,
