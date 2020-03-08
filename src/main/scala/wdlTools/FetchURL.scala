@@ -13,22 +13,22 @@ import scala.io.Source
 //   foo.txt
 //
 // Follow the URL and retrieve the content as a string.
-case class FetchURL(localDirectories : Vector[Path]) {
+case class FetchURL(localDirectories: Vector[Path]) {
 
-  private def read(p : Path) : String = {
+  private def read(p: Path): String = {
     Files.readAllLines(p).asScala.mkString(System.lineSeparator())
   }
 
   // This is a local file. Look for it in all the possible
   // search locations.
-  private def fetchLocalFile(filepath : String) : String = {
+  private def fetchLocalFile(filepath: String): String = {
     val path: Path = Paths.get(filepath)
     if (Files.exists(path))
       return read(path)
 
     // search in all directories where imports may be found
     for (d <- localDirectories) {
-      val fp : Path = d.resolve(filepath)
+      val fp: Path = d.resolve(filepath)
       if (Files.exists(fp))
         return read(fp)
     }
@@ -36,20 +36,27 @@ case class FetchURL(localDirectories : Vector[Path]) {
     throw new Exception(s"Could not find local file ${filepath}")
   }
 
-  private def fetchHttpAddress(urlAddr : String) : String = {
+  private def fetchHttpAddress(urlAddr: String): String = {
     val lines = Source.fromURL(urlAddr)
     lines.mkString
   }
 
   def apply(url: URL): String = {
-    val p : String = url.addr
-    if (p.startsWith("http://") ||
-         p.startsWith("https://"))
-      fetchHttpAddress(p)
-    if (p.startsWith("file://"))
-      fetchLocalFile(p)
+    val p: String = url.addr
+    System.out.println(s"looking for ${p}")
 
-    // no recognizable prefix, assuming this is a file
-    fetchLocalFile(p)
+    if (p contains "://") {
+      val components = p.split("://").toList
+      val protocol = components(0)
+      protocol match {
+        case "http" => fetchHttpAddress(p)
+        case "https" => fetchHttpAddress(p)
+        case "file" => fetchLocalFile(p)
+        case _ => throw new Exception(s"unknown protocol ${protocol} in path ${p}")
+      }
+    } else {
+      // no recognizable protocol, assuming a file
+      fetchLocalFile(p)
+    }
   }
 }

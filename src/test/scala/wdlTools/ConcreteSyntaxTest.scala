@@ -14,7 +14,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   // on unused variables.
   private def ignoreValue[A](value: A): Unit = {}
 
-  private lazy val wdlSourceDirs : Vector[Path] = {
+  private lazy val wdlSourceDirs: Vector[Path] = {
     val p1: Path = Paths.get(getClass.getResource("/workflows").getPath)
     val p2: Path = Paths.get(getClass.getResource("/tasks").getPath)
     Vector(p1, p2)
@@ -91,17 +91,20 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.body.size shouldBe (3)
   }
 
-  ignore should "handle import statements" taggedAs (Edge) in {
-    val pa = new ParseAll(trace = false,
-                          localDirectories = wdlSourceDirs)
+  it should "handle import statements" taggedAs (Edge) in {
+    val pa = new ParseAll(trace = false, localDirectories = wdlSourceDirs)
     val doc = pa.apply(getWdlSource("workflows", "imports.wdl"))
 
     doc.version shouldBe ("1.0")
-    val wf1 = doc.elements(0)
-    wf1 shouldBe a[Workflow]
-    val wf = wf1.asInstanceOf[Workflow]
 
-    ignoreValue(wf)
-    System.out.println(doc)
+    val imports = doc.elements.collect{
+      case x : ImportDocElaborated => x
+    }
+    imports.size shouldBe (1)
+
+    val wfs = doc.elements.collect{
+      case x : Workflow => x
+    }
+    wfs.size shouldBe (1)
   }
 }

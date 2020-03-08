@@ -6,9 +6,8 @@ import java.nio.file.Path
 import scala.collection.mutable.Map
 
 // parse and follow imports
-case class ParseAll(trace: Boolean = false,
-                    localDirectories : Vector[Path] = Vector.empty) {
-  private val docCache : Map[URL, Document] = Map.empty
+case class ParseAll(trace: Boolean = false, localDirectories: Vector[Path] = Vector.empty) {
+  private val docCache: Map[URL, Document] = Map.empty
 
   private def followImport(url: URL): Document = {
     docCache.get(url) match {
@@ -24,7 +23,7 @@ case class ParseAll(trace: Boolean = false,
 
   // start from a document [doc], and recursively dive into all the imported
   // documents. Replace all the raw import statements with fully elaborated ones.
-  private def dfs(doc : Document): Document = {
+  private def dfs(doc: Document): Document = {
     // scan for import statements and follow them
     val elems = doc.elements.map {
       case ImportDoc(name, aliases, url) =>
@@ -42,11 +41,10 @@ case class ParseAll(trace: Boolean = false,
     Document(doc.version, elems)
   }
 
-
   // [dirs] : the directories where to search for imported documents
   //
-  def apply(sourceCode : String): Document = {
-    val topDoc : Document = ParseDocument.apply(sourceCode, trace)
+  def apply(sourceCode: String): Document = {
+    val topDoc: Document = ParseDocument.apply(sourceCode, trace)
     dfs(topDoc)
   }
 }

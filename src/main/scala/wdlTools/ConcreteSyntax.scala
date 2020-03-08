@@ -106,12 +106,12 @@ object ConcreteSyntax {
   case class URL(addr: String)
 
   // import statement as read from the document
-  case class ImportDoc(name: String, aliases: Vector[ImportAlias], url: URL) extends WorkflowElement
+  case class ImportDoc(name: String, aliases: Vector[ImportAlias], url: URL) extends Element
 
   // the basic import-doc is replaced with the elaborated version after we
   // dive in and parse it.
   case class ImportDocElaborated(name: String, aliases: Vector[ImportAlias], doc: Document)
-      extends WorkflowElement
+      extends Element
 
   // top level definitions
   case class Task(name: String,
