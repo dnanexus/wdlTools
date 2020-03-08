@@ -3,7 +3,7 @@ import sbtassembly.AssemblyPlugin.autoImport._
 import scoverage.ScoverageKeys._
 
 scalaVersion := "2.12.9"
-name := "dxWDL"
+name := "wdlTools"
 organization := "com.dnanexus"
 val root = Project("root", file("."))
 

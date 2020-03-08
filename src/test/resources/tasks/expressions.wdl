@@ -27,6 +27,7 @@ task district {
   Int j4 = j + 19
 
   Array[Int] ia = [1, 2, 3]
+  Array[Int]+ ia = [10]
   Int k = ia[3]
   Int k2 = f(1, 2, 3)
   Map[Int, String] = {1 : "a", 2: "b"}
