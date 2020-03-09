@@ -6,14 +6,18 @@ import java.nio.file.Path
 import scala.collection.mutable.Map
 
 // parse and follow imports
-case class ParseAll(trace: Boolean = false, localDirectories: Vector[Path] = Vector.empty) {
+case class ParseAll(antlr4Trace: Boolean = false,
+                    verbose: Boolean = false,
+                    localDirectories: Vector[Path] = Vector.empty) {
+
+  // cache of documents that have already been fetched and parsed.
   private val docCache: Map[URL, Document] = Map.empty
 
   private def followImport(url: URL): Document = {
     docCache.get(url) match {
       case None =>
-        val docText = FetchURL(localDirectories).apply(url)
-        val doc = ParseDocument.apply(docText, trace)
+        val docText = FetchURL(verbose, localDirectories).apply(url)
+        val doc = ParseDocument.apply(docText, verbose, antlr4Trace)
         docCache(url) = doc
         doc
       case Some(doc) =>
@@ -44,7 +48,7 @@ case class ParseAll(trace: Boolean = false, localDirectories: Vector[Path] = Vec
   // [dirs] : the directories where to search for imported documents
   //
   def apply(sourceCode: String): Document = {
-    val topDoc: Document = ParseDocument.apply(sourceCode, trace)
+    val topDoc: Document = ParseDocument.apply(sourceCode, verbose, antlr4Trace)
     dfs(topDoc)
   }
 }

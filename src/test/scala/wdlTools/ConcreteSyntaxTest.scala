@@ -63,8 +63,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "handle string interpolation" in {
-    val pa = new ParseAll()
+  ignore should "handle string interpolation" taggedAs (Edge) in {
+    val pa = new ParseAll(antlr4Trace = true)
     val doc = pa.apply(getWdlSource("tasks", "interpolation.wdl"))
     System.out.println(doc)
     ignoreValue(doc)
@@ -92,7 +92,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle import statements" taggedAs (Edge) in {
-    val pa = new ParseAll(trace = false, localDirectories = wdlSourceDirs)
+    val pa = new ParseAll(antlr4Trace = false, localDirectories = wdlSourceDirs)
     val doc = pa.apply(getWdlSource("workflows", "imports.wdl"))
 
     doc.version shouldBe ("1.0")
@@ -100,7 +100,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val imports = doc.elements.collect {
       case x: ImportDocElaborated => x
     }
-    imports.size shouldBe (1)
+    imports.size shouldBe (2)
 
     val wfs = doc.elements.collect {
       case x: Workflow => x

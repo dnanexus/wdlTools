@@ -7,7 +7,6 @@ task foo {
     String prefix
   }
   command {
-    echo ${prefix}
     echo ${sep=',' min_std_max_min}
   }
 }

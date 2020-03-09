@@ -13,7 +13,7 @@ import scala.io.Source
 //   foo.txt
 //
 // Follow the URL and retrieve the content as a string.
-case class FetchURL(localDirectories: Vector[Path]) {
+case class FetchURL(verbose: Boolean, localDirectories: Vector[Path]) {
 
   private def read(p: Path): String = {
     Files.readAllLines(p).asScala.mkString(System.lineSeparator())
@@ -43,7 +43,8 @@ case class FetchURL(localDirectories: Vector[Path]) {
 
   def apply(url: URL): String = {
     val p: String = url.addr
-    System.out.println(s"looking for ${p}")
+    if (verbose)
+      System.out.println(s"looking for ${p}")
 
     if (p contains "://") {
       val components = p.split("://").toList
