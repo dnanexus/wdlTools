@@ -14,28 +14,42 @@ import org.openwdl.wdl.parser._
 import ConcreteSyntax._
 
 object ParseDocument {
-  private def getParser(inp: String): WdlParser = {
+  private def getParser(inp: String): (ErrorListener, WdlParser) = {
     val codePointBuffer: CodePointBuffer =
       CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
     val lexer: WdlLexer = new WdlLexer(CodePointCharStream.fromBuffer(codePointBuffer))
     val parser: WdlParser = new WdlParser(new CommonTokenStream(lexer))
 
-    // TODO: how do we get human readable errors?
-    //parser.removeErrorListeners()
-    parser.setErrorHandler(new BailErrorStrategy())
-    parser
+    // setting up our own error handling
+    val errListener = new ErrorListener(false, false)
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(errListener)
+    parser.removeErrorListeners()
+    parser.addErrorListener(errListener)
+
+    (errListener, parser)
   }
 
-  def apply(sourceCode: String, tracing: Boolean = false): Document = {
-    val parser: WdlParser = getParser(sourceCode)
-    if (tracing)
+  def apply(sourceCode: String, verbose: Boolean, antrl4Trace: Boolean = false): Document = {
+    val (errListener, parser) = getParser(sourceCode)
+    if (antrl4Trace)
       parser.setTrace(true)
-    val visitor = new ParseDocument()
-    visitor.visitDocument(parser.document)
+    val visitor = new ParseDocument(verbose)
+    val document = visitor.visitDocument(parser.document)
+
+    // check if any errors were found
+    val errors: Vector[SyntaxError] = errListener.getAllErrors
+    if (!errors.isEmpty) {
+      for (err <- errors) {
+        System.out.println(err)
+      }
+      throw new Exception(s"${errors.size} syntax errors were found, stopping")
+    }
+    document
   }
 }
 
-class ParseDocument extends WdlParserBaseVisitor[Element] {
+case class ParseDocument(verbose: Boolean) extends WdlParserBaseVisitor[Element] {
 
   // visit the children of [ctx], and cast to the expected type [T]. Provide a reasonable
   // report if there is an error.
@@ -175,7 +189,15 @@ wdl_type
   override def visitExpression_placeholder_option(
       ctx: WdlParser.Expression_placeholder_optionContext
   ): Expr = {
-    val expr = visitAndSafeCast[Expr](ctx)
+    val expr: Expr =
+      if (ctx.string() != null)
+        visitString(ctx.string())
+      else if (ctx.number() != null)
+        visitNumber(ctx.number())
+      else
+        throw new Exception("sanity: not a string or a number")
+    System.out.println(s"ctx = ${ctx}, expr=${expr}")
+
     if (ctx.BoolLiteral() != null) {
       ExprPlaceholderEqual(expr)
     }
@@ -188,24 +210,64 @@ wdl_type
     throw new Exception(s"Not one of three known variants of a placeholder ${ctx}")
   }
 
-  // TODO
-  /* dquote_string
-  : DQUOTE DQuoteStringPart* (DQuoteStringPart* DQuoteCommandStart (expression_placeholder_option)* expr RBRACE DQuoteStringPart*)* DQUOTE
+  /* string_part
+  : StringPart*
   ; */
-//  override def visitDquote_string(ctx : WdlParser.Dquote_stringContext) : Expr = ???
+  override def visitString_part(ctx: WdlParser.String_partContext): ExprCompoundString = {
+    val parts: Vector[Expr] = ctx
+      .StringPart()
+      .asScala
+      .map(x => ExprString(x.getText()))
+      .toVector
+    ExprCompoundString(parts)
+  }
 
-  /* squote_string
-  : SQUOTE SQuoteStringPart* (SQuoteStringPart* SQuoteCommandStart (expression_placeholder_option)* expr RBRACE SQuoteStringPart*)* SQUOTE
-  ;*/
-//  override def visitSquote_string(ctx : WdlParser.Squote_stringContext) : Expr = ???
+  /* string_expr_part
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
+  ; */
+  override def visitString_expr_part(ctx: WdlParser.String_expr_partContext): ExprCompoundString = {
+    val pHolder: Vector[Expr] = ctx
+      .expression_placeholder_option()
+      .asScala
+      .map(visitExpression_placeholder_option)
+      .toVector
+    val expr = visitExpr(ctx.expr())
+    ExprCompoundString(pHolder :+ expr)
+  }
 
-  /* string
-  : dquote_string
-  | squote_string
+  /* string_expr_with_string_part
+  : string_expr_part string_part
+  ; */
+  override def visitString_expr_with_string_part(
+      ctx: WdlParser.String_expr_with_string_partContext
+  ): ExprCompoundString = {
+    val exprPart = visitString_expr_part(ctx.string_expr_part())
+    val strPart = visitString_part(ctx.string_part())
+    val subExprs: Vector[Expr] = exprPart.value ++ strPart.value
+    ExprCompoundString(subExprs)
+  }
+
+  /*
+string
+  : DQUOTE string_part string_expr_with_string_part* DQUOTE
+  | SQUOTE string_part string_expr_with_string_part* SQUOTE
   ;
    */
   override def visitString(ctx: WdlParser.StringContext): Expr = {
-    return ExprString(ctx.getText())
+    val stringPart = ExprString(ctx.string_part().getText())
+    val exprPart: Vector[ExprCompoundString] = ctx
+      .string_expr_with_string_part()
+      .asScala
+      .map(visitString_expr_with_string_part)
+      .toVector
+    val exprPart2: Vector[Expr] = exprPart.map(_.value).flatten
+    if (exprPart2.isEmpty) {
+      // A string  literal
+      stringPart
+    } else {
+      // A string that includes interpolation
+      ExprCompoundString(Vector(stringPart) ++ exprPart2)
+    }
   }
 
   /* primitive_literal
@@ -219,10 +281,16 @@ wdl_type
       val value = ctx.getText().toLowerCase() == "true"
       return ExprBool(value)
     }
+    if (ctx.number() != null) {
+      return visitNumber(ctx.number())
+    }
+    if (ctx.string() != null) {
+      return visitString(ctx.string())
+    }
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText())
     }
-    return visitAndSafeCast[Expr](ctx)
+    throw new Exception("Not one of four supported variants of primitive_literal")
   }
 
   override def visitLor(ctx: WdlParser.LorContext): Expr = {

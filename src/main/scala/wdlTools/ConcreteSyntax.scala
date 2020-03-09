@@ -31,6 +31,11 @@ object ConcreteSyntax {
   case class ExprBool(value: Boolean) extends Expr
   case class ExprInt(value: Int) extends Expr
   case class ExprFloat(value: Double) extends Expr
+
+  // represents strings with interpolation.
+  // For example:
+  //  "some string part ~{ident + ident} some string part after"
+  case class ExprCompoundString(value: Vector[Expr]) extends Expr
   case class ExprMapLiteral(value: Map[Expr, Expr]) extends Expr
   case class ExprObjectLiteral(value: Map[Expr, Expr]) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr]) extends Expr
