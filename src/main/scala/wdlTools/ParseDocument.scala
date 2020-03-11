@@ -199,13 +199,13 @@ wdl_type
     System.out.println(s"ctx = ${ctx}, expr=${expr}")
 
     if (ctx.BoolLiteral() != null) {
-      ExprPlaceholderEqual(expr)
+      return ExprPlaceholderEqual(expr)
     }
     if (ctx.DEFAULT() != null) {
-      ExprPlaceholderDefault(expr)
+      return ExprPlaceholderDefault(expr)
     }
     if (ctx.SEP() != null) {
-      ExprPlaceholderSep(expr)
+      return ExprPlaceholderSep(expr)
     }
     throw new Exception(s"Not one of three known variants of a placeholder ${ctx}")
   }
@@ -370,15 +370,76 @@ string
     ExprDivide(arg0, arg1)
   }
 
+  // | LPAREN expr RPAREN #expression_group
+  override def visitExpression_group(ctx: WdlParser.Expression_groupContext): Expr = {
+    visitExpr(ctx.expr())
+  }
+
+  // | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
+  override def visitArray_literal(ctx: WdlParser.Array_literalContext): Expr = {
+    val elements: Vector[Expr] = ctx
+      .expr()
+      .asScala
+      .map(x => visitExpr(x))
+      .toVector
+    ExprArrayLiteral(elements)
+  }
+
+  // | LPAREN expr COMMA expr RPAREN #pair_literal
   override def visitPair_literal(ctx: WdlParser.Pair_literalContext): Expr = {
     val arg0 = visitAndSafeCast[Expr](ctx.expr(0))
     val arg1 = visitAndSafeCast[Expr](ctx.expr(1))
     ExprPair(arg0, arg1)
   }
 
-  override def visitLeft_name(ctx: WdlParser.Left_nameContext): Expr = {
-    val id = ctx.Identifier().getText()
-    ExprIdentifier(id)
+  //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
+  override def visitMap_literal(ctx: WdlParser.Map_literalContext): Expr = {
+    val elements = ctx
+      .expr()
+      .asScala
+      .map(x => visitAndSafeCast[Expr](x))
+      .toVector
+
+    val n = elements.size
+    if (n % 2 != 0)
+      throw new Exception("the expressions in a map must come in pairs")
+
+    val m: Map[Expr, Expr] =
+      Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
+    ExprMapLiteral(m)
+  }
+
+  // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  override def visitObject_literal(ctx: WdlParser.Object_literalContext): Expr = {
+    val ids: Vector[String] = ctx
+      .Identifier()
+      .asScala
+      .map(x => x.getText())
+      .toVector
+    val elements: Vector[Expr] = ctx
+      .expr()
+      .asScala
+      .map(x => visitExpr(x))
+      .toVector
+    ExprObjectLiteral((ids zip elements).toMap)
+  }
+
+  // | NOT expr #negate
+  override def visitNegate(ctx: WdlParser.NegateContext): Expr = {
+    val element = visitAndSafeCast[Expr](ctx.expr())
+    ExprNegate(element)
+  }
+
+  // | (PLUS | MINUS) expr #unirarysigned
+  override def visitUnirarysigned(ctx: WdlParser.UnirarysignedContext): Expr = {
+    val expr = visitExpr(ctx.expr())
+
+    if (ctx.PLUS() != null)
+      ExprUniraryPlus(expr)
+    else if (ctx.MINUS() != null)
+      ExprUniraryMinus(expr)
+    else
+      throw new Exception("sanity")
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -399,29 +460,6 @@ string
     ExprApply(funcName, elements)
   }
 
-  // | NOT expr #negate
-  override def visitNegate(ctx: WdlParser.NegateContext): Expr = {
-    val element = visitAndSafeCast[Expr](ctx.expr())
-    ExprNegate(element)
-  }
-
-  //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
-  override def visitMap_literal(ctx: WdlParser.Map_literalContext): Expr = {
-    val elements = ctx
-      .expr()
-      .asScala
-      .map(x => visitAndSafeCast[Expr](x))
-      .toVector
-
-    val n = elements.size
-    if (n % 2 != 0)
-      throw new Exception("the expressions in a map must come in pairs")
-
-    val m: Map[Expr, Expr] =
-      Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
-    ExprMapLiteral(m)
-  }
-
   // | IF expr THEN expr ELSE expr #ifthenelse
   override def visitIfthenelse(ctx: WdlParser.IfthenelseContext): Expr = {
     val elements = ctx
@@ -432,36 +470,16 @@ string
     ExprIfThenElse(elements(0), elements(1), elements(2))
   }
 
+  override def visitLeft_name(ctx: WdlParser.Left_nameContext): Expr = {
+    val id = ctx.Identifier().getText()
+    ExprIdentifier(id)
+  }
+
   // | expr_core DOT Identifier #get_name
   override def visitGet_name(ctx: WdlParser.Get_nameContext): Expr = {
     val e = visitAndSafeCast[Expr](ctx.expr_core())
     val id = ctx.Identifier.getText()
     ExprGetName(e, id)
-  }
-
-  // | OBJECT_LITERAL LBRACE (primitive_literal COLON expr (COMMA primitive_literal COLON expr)*)* RBRACE #object_literal
-  override def visitObject_literal(ctx: WdlParser.Object_literalContext): Expr = {
-    val ids: Vector[Expr] = ctx
-      .primitive_literal()
-      .asScala
-      .map(x => visitPrimitive_literal(x))
-      .toVector
-    val elements: Vector[Expr] = ctx
-      .expr()
-      .asScala
-      .map(x => visitExpr(x))
-      .toVector
-    ExprObjectLiteral((ids zip elements).toMap)
-  }
-
-  // | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
-  override def visitArray_literal(ctx: WdlParser.Array_literalContext): Expr = {
-    val elements: Vector[Expr] = ctx
-      .expr()
-      .asScala
-      .map(x => visitExpr(x))
-      .toVector
-    ExprArrayLiteral(elements)
   }
 
   override def visitExpr(ctx: WdlParser.ExprContext): Expr = {
@@ -597,10 +615,10 @@ task_input
   override def visitTask_command_expr_part(
       ctx: WdlParser.Task_command_expr_partContext
   ): CommandPartExpr = {
-    val elements = ctx
+    val elements: Vector[Expr] = ctx
       .expression_placeholder_option()
       .asScala
-      .map(x => visitExpression_placeholder_option(x).asInstanceOf[Expr])
+      .map(x => visitExpression_placeholder_option(x))
       .toVector
     val expr = visitExpr(ctx.expr())
     CommandPartExpr(elements :+ expr)
@@ -695,13 +713,22 @@ task_input
   }
 
   /*
+import_as
+    : AS Identifier
+    ;
+
  import_doc
-	: IMPORT string AS Identifier (import_alias)*
+	: IMPORT string import_as? (import_alias)*
 	;
    */
   override def visitImport_doc(ctx: WdlParser.Import_docContext): ImportDoc = {
     val url = ctx.string().getText().replaceAll("\"", "")
-    val name = ctx.Identifier().getText()
+    val name =
+      if (ctx.import_as() == null)
+        None
+      else
+        Some(ctx.import_as().Identifier().getText())
+
     val aliases = ctx
       .import_alias()
       .asScala
@@ -844,11 +871,13 @@ scatter
     visitAndSafeCast[WorkflowElement](ctx)
   }
 
-  /* workflow_element
+  /*
+workflow_element
 	: workflow_input #input
 	| workflow_output #output
 	| inner_workflow_element #inner_element
-	| meta_obj #meta_element
+	| parameter_meta #parameter_meta_element
+	| meta #meta_element
 	;
 
 workflow
@@ -869,15 +898,18 @@ workflow
     })
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
       case x: WdlParser.Meta_elementContext =>
-        val m: WdlParser.Meta_objContext = x.meta_obj()
-        visitMeta(m.asInstanceOf[WdlParser.MetaContext])
+        visitMeta(x.meta())
+    })
+    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
+      case x: WdlParser.Parameter_meta_elementContext =>
+        visitParameter_meta(x.parameter_meta())
     })
     val wfElems: Vector[WorkflowElement] = elems.collect {
       case x: WdlParser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
 
-    Workflow(name, input, output, meta, wfElems)
+    Workflow(name, input, output, meta, parameterMeta, wfElems)
   }
 
   /*
@@ -885,11 +917,10 @@ document_element
 	: import_doc
 	| struct
 	| task
-	| workflow
 	;
    */
-  override def visitDocument_element(ctx: WdlParser.Document_elementContext): Element = {
-    visitChildren(ctx)
+  override def visitDocument_element(ctx: WdlParser.Document_elementContext): DocumentElement = {
+    visitChildren(ctx).asInstanceOf[DocumentElement]
   }
 
   /* version
@@ -902,16 +933,25 @@ document_element
 
   /*
 document
-	: version document_element*
+	: version document_element* (workflow document_element*)?
 	;
    */
   override def visitDocument(ctx: WdlParser.DocumentContext): Document = {
     val version = visitVersion(ctx.version())
 
-    val elems_raw: Vector[WdlParser.Document_elementContext] =
-      ctx.document_element().asScala.toVector
-    val elems = elems_raw.map(e => visitDocument_element(e)).toVector
+    val elems: Vector[DocumentElement] =
+      ctx
+        .document_element()
+        .asScala
+        .map(e => visitDocument_element(e))
+        .toVector
 
-    Document(version.value, elems)
+    val workflow =
+      if (ctx.workflow() == null)
+        None
+      else
+        Some(visitWorkflow(ctx.workflow()))
+
+    Document(version.value, elems, workflow)
   }
 }
