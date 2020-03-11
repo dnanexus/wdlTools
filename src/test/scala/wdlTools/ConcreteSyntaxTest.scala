@@ -30,16 +30,82 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val pa = new ParseAll()
     val doc = pa.apply(getWdlSource("tasks", "types.wdl"))
 
-    // TODO: add assertions here, to check the correct output
-    ignoreValue(doc)
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    val InputSection(decls) = task.input.get
+    decls shouldBe (
+        Vector(
+            Declaration("i", TypeInt, None),
+            Declaration("s", TypeString, None),
+            Declaration("x", TypeFloat, None),
+            Declaration("b", TypeBoolean, None),
+            Declaration("f", TypeFile, None),
+            Declaration("p1", TypePair(TypeInt, TypeString), None),
+            Declaration("p2", TypePair(TypeFloat, TypeFile), None),
+            Declaration("p3", TypePair(TypeBoolean, TypeBoolean), None),
+            Declaration("ia", TypeArray(TypeInt, false), None),
+            Declaration("sa", TypeArray(TypeString, false), None),
+            Declaration("xa", TypeArray(TypeFloat, false), None),
+            Declaration("ba", TypeArray(TypeBoolean, false), None),
+            Declaration("fa", TypeArray(TypeFile, false), None),
+            Declaration("m_si", TypeMap(TypeInt, TypeString), None),
+            Declaration("m_ff", TypeMap(TypeFile, TypeFile), None),
+            Declaration("m_bf", TypeMap(TypeBoolean, TypeFloat), None)
+        )
+    )
   }
 
-  it should "handle types and expressions" in {
-    val pa = new ParseAll()
+  it should "handle types and expressions" taggedAs (Edge) in {
+    val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "expressions.wdl"))
 
-    // TODO: add assertions here, to check the correct output
-    ignoreValue(doc)
+    doc.version shouldBe ("1.0")
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    val numDecl = task.declarations.size
+    task.declarations.dropRight(numDecl - 7) shouldBe (
+        Vector(
+            Declaration("i", TypeInt, Some(ExprInt(3))),
+            Declaration("s", TypeString, Some(ExprString("hello world"))),
+            Declaration("x", TypeFloat, Some(ExprFloat(4.3))),
+            Declaration("f", TypeFile, Some(ExprString("/dummy/x.txt"))),
+            Declaration("b", TypeBoolean, Some(ExprBoolean(false))),
+            // Logical expressions
+            Declaration("b2", TypeBoolean, Some(ExprLor(ExprBoolean(true), ExprBoolean(false)))),
+            Declaration("b3", TypeBoolean, Some(ExprLand(ExprBoolean(true), ExprBoolean(false))))
+        )
+    )
+    /*Declaration("b4", TypeBoolean, ExprEq(ExprInt(3) == ExprInt5)),
+Declaration("b5", TypeBoolean, ExprBoolean 4 < 5)),
+Declaration("b6", TypeBoolean, ExprBoolean 4 >= 5)),
+Declaration("b7", TypeBoolean, ExprBoolean 6 != 7)),
+Declaration("b8", TypeBoolean, ExprBoolean 6 <= 7)),
+Declaration("b9", TypeBoolean, ExprBoolean 6 > 7)),
+Declaration("b10", TypeBoolean, ExprBoolean= !b2)),
+
+                                  // Arithmetic
+Declaration(  Int j = 4 + 5),
+Declaration(  Int j1 = 4 % 10),
+Declaration(  Int j2 = 10 / 7),
+Declaration(  Int j3 = j),
+Declaration(  Int j4 = j + 19),
+
+Declaration(  Array[Int] ia = [1, 2, 3]),
+Declaration(  Array[Int]+ ia = [10]),
+Declaration(  Int k = ia[3]),
+Declaration(  Int k2 = f(1, 2, 3)),
+Declaration(  Map[Int, String] = {1 : "a", 2: "b"}),
+Declaration(  Int k3 = if (true) then 1 else 2),
+Declaration(  Int k4 = x.a),
+Declaration(  Object o = { A : 1, B : 2 }),
+Declaration(  Pair[Int, String] twenty_threes = (23, "twenty-three")),
+   */
   }
 
   it should "parse a task with an output section only" in {
@@ -63,10 +129,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle string interpolation" taggedAs (Edge) in {
-    val pa = new ParseAll(antlr4Trace = true)
+  it should "handle string interpolation" in {
+    val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "interpolation.wdl"))
-    System.out.println(doc)
+//    System.out.println(doc)
     ignoreValue(doc)
   }
 

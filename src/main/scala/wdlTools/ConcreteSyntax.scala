@@ -18,7 +18,7 @@ object ConcreteSyntax {
   case class TypePair(l: Type, r: Type) extends Type
   case object TypeString extends Type
   case object TypeFile extends Type
-  case object TypeBool extends Type
+  case object TypeBoolean extends Type
   case object TypeInt extends Type
   case object TypeFloat extends Type
   case class TypeIdentifier(id: String) extends Type
@@ -29,7 +29,7 @@ object ConcreteSyntax {
   sealed trait Expr extends Element
   case class ExprString(value: String) extends Expr
   case class ExprFile(value: String) extends Expr
-  case class ExprBool(value: Boolean) extends Expr
+  case class ExprBoolean(value: Boolean) extends Expr
   case class ExprInt(value: Int) extends Expr
   case class ExprFloat(value: Double) extends Expr
 
@@ -127,7 +127,7 @@ object ConcreteSyntax {
                   input: Option[InputSection],
                   output: Option[OutputSection],
                   command: Option[CommandSection],
-                  decls: Vector[Declaration],
+                  declarations: Vector[Declaration],
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection])
       extends DocumentElement

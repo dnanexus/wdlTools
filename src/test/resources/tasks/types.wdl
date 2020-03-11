@@ -19,7 +19,7 @@ task bar {
     Array[File] fa
 
     Map[Int, String] m_si
-    Map[File, File] m_si
-    Map[Boolean, Float] m_si
+    Map[File, File] m_ff
+    Map[Boolean, Float] m_bf
   }
 }

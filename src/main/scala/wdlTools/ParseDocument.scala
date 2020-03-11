@@ -139,25 +139,27 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlParser.Type_baseContext): Type = {
-    // Can this be done with type matchin?
+    if (ctx.array_type() != null)
+      return visitArray_type(ctx.array_type())
+    if (ctx.map_type() != null)
+      return visitMap_type(ctx.map_type())
+    if (ctx.pair_type() != null)
+      return visitPair_type(ctx.pair_type())
     if (ctx.STRING() != null)
       return TypeString
     if (ctx.FILE() != null)
       return TypeFile
     if (ctx.BOOLEAN() != null)
-      return TypeBool
+      return TypeBoolean
     if (ctx.OBJECT() != null)
       return TypeObject
-    if (ctx.INT() != null) {
+    if (ctx.INT() != null)
       return TypeInt
-    }
     if (ctx.FLOAT() != null)
       return TypeFloat
     if (ctx.Identifier() != null)
       return TypeIdentifier(ctx.getText())
-
-    // a compound type (array, map, pair)
-    return visitAndSafeCast[Type](ctx)
+    throw new Exception("sanity: unrecgonized type case")
   }
 
   /*
@@ -196,7 +198,6 @@ wdl_type
         visitNumber(ctx.number())
       else
         throw new Exception("sanity: not a string or a number")
-    System.out.println(s"ctx = ${ctx}, expr=${expr}")
 
     if (ctx.BoolLiteral() != null) {
       return ExprPlaceholderEqual(expr)
@@ -279,7 +280,7 @@ string
   override def visitPrimitive_literal(ctx: WdlParser.Primitive_literalContext): Expr = {
     if (ctx.BoolLiteral() != null) {
       val value = ctx.getText().toLowerCase() == "true"
-      return ExprBool(value)
+      return ExprBoolean(value)
     }
     if (ctx.number() != null) {
       return visitNumber(ctx.number())
@@ -695,7 +696,7 @@ task_input
          input = input,
          output = output,
          command = command,
-         decls = decls,
+         declarations = decls,
          meta = meta,
          parameterMeta = parameterMeta)
   }
