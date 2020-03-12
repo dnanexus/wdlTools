@@ -163,7 +163,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     ))
   }
 
-  it should "handle get name" taggedAs (Edge) in {
+  it should "handle get name" in {
     val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "get_name_bug.wdl"))
 
@@ -183,6 +183,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.declarations(0) shouldBe (Declaration("k",
                                                TypeInt,
                                                Some(ExprGetName(ExprIdentifier("x"), "a"))))
+  }
+
+  it should "detect a wrong comment style" taggedAs (Edge) in {
+    val pa = new ParseAll(antlr4Trace = false)
+
+    assertThrows[Exception] {
+      pa.apply(getWdlSource("tasks", "wrong_comment_style.wdl"))
+    }
+
   }
 
   it should "parse a task with an output section only" in {
