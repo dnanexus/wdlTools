@@ -58,7 +58,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     )
   }
 
-  it should "handle types and expressions" taggedAs (Edge) in {
+  it should "handle types and expressions" in {
     val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "expressions.wdl"))
 
@@ -68,44 +68,121 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    val numDecl = task.declarations.size
-    task.declarations.dropRight(numDecl - 7) shouldBe (
-        Vector(
-            Declaration("i", TypeInt, Some(ExprInt(3))),
-            Declaration("s", TypeString, Some(ExprString("hello world"))),
-            Declaration("x", TypeFloat, Some(ExprFloat(4.3))),
-            Declaration("f", TypeFile, Some(ExprString("/dummy/x.txt"))),
-            Declaration("b", TypeBoolean, Some(ExprBoolean(false))),
-            // Logical expressions
-            Declaration("b2", TypeBoolean, Some(ExprLor(ExprBoolean(true), ExprBoolean(false)))),
-            Declaration("b3", TypeBoolean, Some(ExprLand(ExprBoolean(true), ExprBoolean(false))))
-        )
-    )
-    /*Declaration("b4", TypeBoolean, ExprEq(ExprInt(3) == ExprInt5)),
-Declaration("b5", TypeBoolean, ExprBoolean 4 < 5)),
-Declaration("b6", TypeBoolean, ExprBoolean 4 >= 5)),
-Declaration("b7", TypeBoolean, ExprBoolean 6 != 7)),
-Declaration("b8", TypeBoolean, ExprBoolean 6 <= 7)),
-Declaration("b9", TypeBoolean, ExprBoolean 6 > 7)),
-Declaration("b10", TypeBoolean, ExprBoolean= !b2)),
+    task.declarations(0) shouldBe (Declaration("i", TypeInt, Some(ExprInt(3))))
+    task.declarations(1) shouldBe (Declaration("s", TypeString, Some(ExprString("hello world"))))
+    task.declarations(2) shouldBe (Declaration("x", TypeFloat, Some(ExprFloat(4.3))))
+    task.declarations(3) shouldBe (Declaration("f", TypeFile, Some(ExprString("/dummy/x.txt"))))
+    task.declarations(4) shouldBe (Declaration("b", TypeBoolean, Some(ExprBoolean(false))))
 
-                                  // Arithmetic
-Declaration(  Int j = 4 + 5),
-Declaration(  Int j1 = 4 % 10),
-Declaration(  Int j2 = 10 / 7),
-Declaration(  Int j3 = j),
-Declaration(  Int j4 = j + 19),
+    // Logical expressions
+    task.declarations(5) shouldBe (Declaration(
+        "b2",
+        TypeBoolean,
+        Some(ExprLor(ExprBoolean(true), ExprBoolean(false)))
+    ))
+    task.declarations(6) shouldBe (Declaration(
+        "b3",
+        TypeBoolean,
+        Some(ExprLand(ExprBoolean(true), ExprBoolean(false)))
+    ))
+    task.declarations(7) shouldBe (Declaration("b4",
+                                               TypeBoolean,
+                                               Some(ExprEqeq(ExprInt(3), ExprInt(5)))))
+    task.declarations(8) shouldBe (Declaration("b5",
+                                               TypeBoolean,
+                                               Some(ExprLt(ExprInt(4), ExprInt(5)))))
+    task.declarations(9) shouldBe (Declaration("b6",
+                                               TypeBoolean,
+                                               Some(ExprGte(ExprInt(4), ExprInt(5)))))
+    task.declarations(10) shouldBe (Declaration("b7",
+                                                TypeBoolean,
+                                                Some(ExprNeq(ExprInt(6), ExprInt(7)))))
+    task.declarations(11) shouldBe (Declaration("b8",
+                                                TypeBoolean,
+                                                Some(ExprLte(ExprInt(6), ExprInt(7)))))
+    task.declarations(12) shouldBe (Declaration("b9",
+                                                TypeBoolean,
+                                                Some(ExprGt(ExprInt(6), ExprInt(7)))))
+    task.declarations(13) shouldBe (Declaration("b10",
+                                                TypeBoolean,
+                                                Some(ExprNegate(ExprIdentifier("b2")))))
 
-Declaration(  Array[Int] ia = [1, 2, 3]),
-Declaration(  Array[Int]+ ia = [10]),
-Declaration(  Int k = ia[3]),
-Declaration(  Int k2 = f(1, 2, 3)),
-Declaration(  Map[Int, String] = {1 : "a", 2: "b"}),
-Declaration(  Int k3 = if (true) then 1 else 2),
-Declaration(  Int k4 = x.a),
-Declaration(  Object o = { A : 1, B : 2 }),
-Declaration(  Pair[Int, String] twenty_threes = (23, "twenty-three")),
-   */
+    // Arithmetic
+    task
+      .declarations(14) shouldBe (Declaration("j", TypeInt, Some(ExprAdd(ExprInt(4), ExprInt(5)))))
+    task.declarations(15) shouldBe (Declaration("j1",
+                                                TypeInt,
+                                                Some(ExprMod(ExprInt(4), ExprInt(10)))))
+    task.declarations(16) shouldBe (Declaration("j2",
+                                                TypeInt,
+                                                Some(ExprDivide(ExprInt(10), ExprInt(7)))))
+    task.declarations(17) shouldBe (Declaration("j3", TypeInt, Some(ExprIdentifier("j"))))
+    task.declarations(18) shouldBe (Declaration("j4",
+                                                TypeInt,
+                                                Some(ExprAdd(ExprIdentifier("j"), ExprInt(19)))))
+
+    task.declarations(19) shouldBe (Declaration(
+        "ia",
+        TypeArray(TypeInt, false),
+        Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+    ))
+    task.declarations(20) shouldBe (Declaration("ia",
+                                                TypeArray(TypeInt, true),
+                                                Some(ExprArrayLiteral(Vector(ExprInt(10))))))
+    task.declarations(21) shouldBe (Declaration("k",
+                                                TypeInt,
+                                                Some(ExprAt(ExprIdentifier("ia"), ExprInt(3)))))
+    task.declarations(22) shouldBe (Declaration(
+        "k2",
+        TypeInt,
+        Some(ExprApply("f", Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+    ))
+    task.declarations(23) shouldBe (Declaration(
+        "m",
+        TypeMap(TypeInt, TypeString),
+        Some(ExprMapLiteral(Map(ExprInt(1) -> ExprString("a"), ExprInt(2) -> ExprString("b"))))
+    ))
+    task.declarations(24) shouldBe (Declaration(
+        "k3",
+        TypeInt,
+        Some(ExprIfThenElse(ExprBoolean(true), ExprInt(1), ExprInt(2)))
+    ))
+    task.declarations(25) shouldBe (Declaration("k4",
+                                                TypeInt,
+                                                Some(ExprGetName(ExprIdentifier("x"), "a"))))
+
+    task.declarations(26) shouldBe (Declaration(
+        "o",
+        TypeObject,
+        Some(ExprObjectLiteral(Map("A" -> ExprInt(1), "B" -> ExprInt(2))))
+    ))
+    task.declarations(27) shouldBe (Declaration(
+        "twenty_threes",
+        TypePair(TypeInt, TypeString),
+        Some(ExprPair(ExprInt(23), ExprString("twenty-three")))
+    ))
+  }
+
+  it should "handle get name" taggedAs (Edge) in {
+    val pa = new ParseAll(antlr4Trace = false)
+    val doc = pa.apply(getWdlSource("tasks", "get_name_bug.wdl"))
+
+    doc.version shouldBe ("1.0")
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    task.name shouldBe ("district")
+    task.input shouldBe (None)
+    task.output shouldBe (None)
+    task.command shouldBe (None)
+    task.meta shouldBe (None)
+    task.parameterMeta shouldBe (None)
+
+    task.declarations(0) shouldBe (Declaration("k",
+                                               TypeInt,
+                                               Some(ExprGetName(ExprIdentifier("x"), "a"))))
   }
 
   it should "parse a task with an output section only" in {

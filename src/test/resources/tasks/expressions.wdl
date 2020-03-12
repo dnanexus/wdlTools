@@ -33,6 +33,6 @@ task district {
   Map[Int, String] m = {1 : "a", 2: "b"}
   Int k3 = if (true) then 1 else 2
   Int k4 = x.a
-  Object o = { A : 1, B : 2 }
+  Object o = object { A : 1, B : 2 }
   Pair[Int, String] twenty_threes = (23, "twenty-three")
 }

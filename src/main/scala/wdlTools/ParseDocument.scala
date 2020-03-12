@@ -427,8 +427,8 @@ string
 
   // | NOT expr #negate
   override def visitNegate(ctx: WdlParser.NegateContext): Expr = {
-    val element = visitAndSafeCast[Expr](ctx.expr())
-    ExprNegate(element)
+    val expr = visitExpr(ctx.expr())
+    ExprNegate(expr)
   }
 
   // | (PLUS | MINUS) expr #unirarysigned

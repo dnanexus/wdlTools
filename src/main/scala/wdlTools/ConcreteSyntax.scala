@@ -50,6 +50,7 @@ object ConcreteSyntax {
   case class ExprUniraryMinus(value: Expr) extends Expr
   case class ExprLor(a: Expr, b: Expr) extends Expr
   case class ExprLand(a: Expr, b: Expr) extends Expr
+  case class ExprNegate(value: Expr) extends Expr
   case class ExprEqeq(a: Expr, b: Expr) extends Expr
   case class ExprLt(a: Expr, b: Expr) extends Expr
   case class ExprGte(a: Expr, b: Expr) extends Expr
@@ -64,7 +65,6 @@ object ConcreteSyntax {
   case class ExprPair(l: Expr, r: Expr) extends Expr
   case class ExprAt(array: Expr, index: Expr) extends Expr
   case class ExprApply(funcName: String, elements: Vector[Expr]) extends Expr
-  case class ExprNegate(value: Expr) extends Expr
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) extends Expr
   case class ExprGetName(e: Expr, id: String) extends Expr
 
