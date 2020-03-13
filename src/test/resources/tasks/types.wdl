@@ -22,4 +22,5 @@ task bar {
     Map[File, File] m_ff
     Map[Boolean, Float] m_bf
   }
+  command {}
 }

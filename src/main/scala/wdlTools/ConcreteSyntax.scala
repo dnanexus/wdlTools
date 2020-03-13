@@ -42,9 +42,29 @@ object ConcreteSyntax {
   case class ExprArrayLiteral(value: Vector[Expr]) extends Expr
 
   case class ExprIdentifier(id: String) extends Expr
-  case class ExprPlaceholderEqual(value: Expr) extends Expr
-  case class ExprPlaceholderDefault(value: Expr) extends Expr
-  case class ExprPlaceholderSep(value: Expr) extends Expr
+
+  // These are parts of string interpolation expressions like:
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  //
+  trait PlaceHolderPart extends Element
+  // true="--yes"    false="--no"
+  case class ExprPlaceholderPartEqual(b: Boolean, value: Expr) extends PlaceHolderPart
+  // default="foo"
+  case class ExprPlaceholderPartDefault(value: Expr) extends PlaceHolderPart
+  // sep=", "
+  case class ExprPlaceholderPartSep(value: Expr) extends PlaceHolderPart
+
+  // These are full expressions of the same kind
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr) extends Expr
+  case class ExprPlaceholderDefault(default: Expr, value: Expr) extends Expr
+  case class ExprPlaceholderSep(sep: Expr, value: Expr) extends Expr
 
   case class ExprUniraryPlus(value: Expr) extends Expr
   case class ExprUniraryMinus(value: Expr) extends Expr
@@ -87,11 +107,7 @@ object ConcreteSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-
-  case class CommandPartString(value: String) extends Element
-  case class CommandPartExpr(value: Vector[Expr]) extends Element
-  case class CommandPartExprWithString(expr: Vector[Expr], text: String) extends Element
-  case class CommandSection(start: String, parts: Vector[CommandPartExprWithString]) extends Element
+  case class CommandSection(parts: Vector[Expr]) extends Element
 
   case class RuntimeKV(id: String, expr: Expr) extends Element
   case class RuntimeSection(kvs: Vector[RuntimeKV]) extends Element
@@ -126,7 +142,7 @@ object ConcreteSyntax {
   case class Task(name: String,
                   input: Option[InputSection],
                   output: Option[OutputSection],
-                  command: Option[CommandSection],
+                  command: CommandSection, // the command section is required
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection])

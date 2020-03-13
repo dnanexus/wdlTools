@@ -3,6 +3,7 @@ package wdlTools
 import ConcreteSyntax._
 import java.nio.file.{Path, Paths, Files}
 import org.scalatest.{FlatSpec, Matchers}
+//import org.scalatest.Inside._
 import collection.JavaConverters._
 
 import org.scalatest.Tag
@@ -176,7 +177,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.name shouldBe ("district")
     task.input shouldBe (None)
     task.output shouldBe (None)
-    task.command shouldBe (None)
+    task.command shouldBe (CommandSection(Vector()))
     task.meta shouldBe (None)
     task.parameterMeta shouldBe (None)
 
@@ -185,27 +186,59 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                                                Some(ExprGetName(ExprIdentifier("x"), "a"))))
   }
 
-  it should "detect a wrong comment style" taggedAs (Edge) in {
+  it should "detect a wrong comment style" in {
     val pa = new ParseAll(antlr4Trace = false)
 
     assertThrows[Exception] {
       pa.apply(getWdlSource("tasks", "wrong_comment_style.wdl"))
     }
-
   }
 
   it should "parse a task with an output section only" in {
     val pa = new ParseAll()
     val doc = pa.apply(getWdlSource("tasks", "output_section.wdl"))
-    //System.out.println(doc)
-    ignoreValue(doc)
+
+    doc.version shouldBe ("1.0")
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    task.name shouldBe ("wc")
+    task.output shouldBe (Some(
+        OutputSection(
+            Vector(
+                Declaration("num_lines", TypeInt, Some(ExprInt(3)))
+            )
+        )
+    ))
   }
 
   it should "parse a task" in {
     val pa = new ParseAll()
     val doc = pa.apply(getWdlSource("tasks", "wc.wdl"))
-    //System.out.println(doc)
-    ignoreValue(doc)
+
+    doc.version shouldBe ("1.0")
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    task.name shouldBe ("wc")
+    task.input shouldBe (Some(InputSection(Vector(Declaration("inp_file", TypeFile, None)))))
+    task.output shouldBe (Some(
+        OutputSection(Vector(Declaration("num_lines", TypeInt, Some(ExprInt(3)))))
+    ))
+    task.command shouldBe a[CommandSection]
+    task.command.parts should contain(ExprIdentifier("inp_file"))
+    task.command.parts should contain(ExprString("\n    wc -l "))
+//    task.command.parts should contain(ExprString("\n"))
+
+    task.meta shouldBe (Some(MetaSection(Vector(MetaKV("author", ExprString("Robin Hood"))))))
+    task.parameterMeta shouldBe (Some(
+        ParameterMetaSection(Vector(MetaKV("reason", ExprString("just because"))))
+    ))
+    task.declarations(0) shouldBe (Declaration("i", TypeInt, Some(ExprAdd(ExprInt(4), ExprInt(5)))))
   }
 
   it should "detect when a task section appears twice" in {
@@ -215,11 +248,28 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle string interpolation" in {
+  it should "handle string interpolation" taggedAs (Edge) in {
     val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "interpolation.wdl"))
-//    System.out.println(doc)
-    ignoreValue(doc)
+
+    doc.version shouldBe ("1.0")
+    doc.elements.size shouldBe (1)
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    task.name shouldBe ("foo")
+    task.input shouldBe (Some(
+        InputSection(
+            Vector(Declaration("min_std_max_min", TypeInt, None),
+                   Declaration("prefix", TypeString, None))
+        )
+    ))
+    task.command shouldBe a[CommandSection]
+    task.command.parts should contain(ExprString("\n    echo "))
+    task.command.parts should contain(
+        ExprPlaceholderSep(ExprString(","), ExprIdentifier("min_std_max_min"))
+    )
   }
 
   it should "parse structs" in {

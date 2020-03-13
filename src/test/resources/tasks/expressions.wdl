@@ -35,4 +35,6 @@ task district {
   Int k4 = x.a
   Object o = object { A : 1, B : 2 }
   Pair[Int, String] twenty_threes = (23, "twenty-three")
+
+  command{}
 }
