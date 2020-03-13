@@ -1,6 +1,6 @@
 version 1.0
 
-// These are various expressions
+# These are various expressions
 task district {
   Int i = 3
   String s = "hello world"
@@ -30,9 +30,11 @@ task district {
   Array[Int]+ ia = [10]
   Int k = ia[3]
   Int k2 = f(1, 2, 3)
-  Map[Int, String] = {1 : "a", 2: "b"}
+  Map[Int, String] m = {1 : "a", 2: "b"}
   Int k3 = if (true) then 1 else 2
   Int k4 = x.a
-  Object o = { A : 1, B : 2 }
+  Object o = object { A : 1, B : 2 }
   Pair[Int, String] twenty_threes = (23, "twenty-three")
+
+  command{}
 }

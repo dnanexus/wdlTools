@@ -8,6 +8,7 @@ package wdlTools
 object ConcreteSyntax {
   sealed trait Element
   sealed trait WorkflowElement extends Element
+  sealed trait DocumentElement extends Element
 
   // type system
   sealed trait Type extends Element
@@ -17,18 +18,18 @@ object ConcreteSyntax {
   case class TypePair(l: Type, r: Type) extends Type
   case object TypeString extends Type
   case object TypeFile extends Type
-  case object TypeBool extends Type
+  case object TypeBoolean extends Type
   case object TypeInt extends Type
   case object TypeFloat extends Type
   case class TypeIdentifier(id: String) extends Type
   case object TypeObject extends Type
-  case class TypeStruct(name: String, members: Map[String, Type]) extends Type
+  case class TypeStruct(name: String, members: Map[String, Type]) extends Type with DocumentElement
 
   // expressions
   sealed trait Expr extends Element
   case class ExprString(value: String) extends Expr
   case class ExprFile(value: String) extends Expr
-  case class ExprBool(value: Boolean) extends Expr
+  case class ExprBoolean(value: Boolean) extends Expr
   case class ExprInt(value: Int) extends Expr
   case class ExprFloat(value: Double) extends Expr
 
@@ -37,16 +38,39 @@ object ConcreteSyntax {
   //  "some string part ~{ident + ident} some string part after"
   case class ExprCompoundString(value: Vector[Expr]) extends Expr
   case class ExprMapLiteral(value: Map[Expr, Expr]) extends Expr
-  case class ExprObjectLiteral(value: Map[Expr, Expr]) extends Expr
+  case class ExprObjectLiteral(value: Map[String, Expr]) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr]) extends Expr
 
   case class ExprIdentifier(id: String) extends Expr
-  case class ExprPlaceholderEqual(value: Expr) extends Expr
-  case class ExprPlaceholderDefault(value: Expr) extends Expr
-  case class ExprPlaceholderSep(value: Expr) extends Expr
 
+  // These are parts of string interpolation expressions like:
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  //
+  trait PlaceHolderPart extends Element
+  // true="--yes"    false="--no"
+  case class ExprPlaceholderPartEqual(b: Boolean, value: Expr) extends PlaceHolderPart
+  // default="foo"
+  case class ExprPlaceholderPartDefault(value: Expr) extends PlaceHolderPart
+  // sep=", "
+  case class ExprPlaceholderPartSep(value: Expr) extends PlaceHolderPart
+
+  // These are full expressions of the same kind
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr) extends Expr
+  case class ExprPlaceholderDefault(default: Expr, value: Expr) extends Expr
+  case class ExprPlaceholderSep(sep: Expr, value: Expr) extends Expr
+
+  case class ExprUniraryPlus(value: Expr) extends Expr
+  case class ExprUniraryMinus(value: Expr) extends Expr
   case class ExprLor(a: Expr, b: Expr) extends Expr
   case class ExprLand(a: Expr, b: Expr) extends Expr
+  case class ExprNegate(value: Expr) extends Expr
   case class ExprEqeq(a: Expr, b: Expr) extends Expr
   case class ExprLt(a: Expr, b: Expr) extends Expr
   case class ExprGte(a: Expr, b: Expr) extends Expr
@@ -61,7 +85,6 @@ object ConcreteSyntax {
   case class ExprPair(l: Expr, r: Expr) extends Expr
   case class ExprAt(array: Expr, index: Expr) extends Expr
   case class ExprApply(funcName: String, elements: Vector[Expr]) extends Expr
-  case class ExprNegate(value: Expr) extends Expr
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) extends Expr
   case class ExprGetName(e: Expr, id: String) extends Expr
 
@@ -84,11 +107,7 @@ object ConcreteSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-
-  case class CommandPartString(value: String) extends Element
-  case class CommandPartExpr(value: Vector[Expr]) extends Element
-  case class CommandPartExprWithString(expr: Vector[Expr], text: String) extends Element
-  case class CommandSection(start: String, parts: Vector[CommandPartExprWithString]) extends Element
+  case class CommandSection(parts: Vector[Expr]) extends Element
 
   case class RuntimeKV(id: String, expr: Expr) extends Element
   case class RuntimeSection(kvs: Vector[RuntimeKV]) extends Element
@@ -111,22 +130,23 @@ object ConcreteSyntax {
   case class URL(addr: String)
 
   // import statement as read from the document
-  case class ImportDoc(name: String, aliases: Vector[ImportAlias], url: URL) extends Element
+  case class ImportDoc(name: Option[String], aliases: Vector[ImportAlias], url: URL)
+      extends DocumentElement
 
   // the basic import-doc is replaced with the elaborated version after we
   // dive in and parse it.
-  case class ImportDocElaborated(name: String, aliases: Vector[ImportAlias], doc: Document)
-      extends Element
+  case class ImportDocElaborated(name: Option[String], aliases: Vector[ImportAlias], doc: Document)
+      extends DocumentElement
 
   // top level definitions
   case class Task(name: String,
                   input: Option[InputSection],
                   output: Option[OutputSection],
-                  command: Option[CommandSection],
-                  decls: Vector[Declaration],
+                  command: CommandSection, // the command section is required
+                  declarations: Vector[Declaration],
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection])
-      extends Element
+      extends DocumentElement
 
   case class CallAlias(name: String) extends Element
   case class CallInput(name: String, expr: Expr) extends Element
@@ -141,9 +161,13 @@ object ConcreteSyntax {
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
+                      parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement])
       extends Element
 
   case class Version(value: String) extends Element
-  case class Document(version: String, elements: Vector[Element]) extends Element
+  case class Document(version: String,
+                      elements: Vector[DocumentElement],
+                      workflow: Option[Workflow])
+      extends Element
 }

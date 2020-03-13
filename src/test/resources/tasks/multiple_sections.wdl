@@ -8,6 +8,7 @@ task wc {
   input {
     File inp_file
   }
+  command {}
 
   meta {
     author : "Robin Hood"

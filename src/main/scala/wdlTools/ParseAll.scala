@@ -42,7 +42,7 @@ case class ParseAll(antlr4Trace: Boolean = false,
       // all other document parts are unchanged.
       case x => x
     }.toVector
-    Document(doc.version, elems)
+    Document(doc.version, elems, doc.workflow)
   }
 
   // [dirs] : the directories where to search for imported documents

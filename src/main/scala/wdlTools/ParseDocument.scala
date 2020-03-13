@@ -51,6 +51,13 @@ object ParseDocument {
 
 case class ParseDocument(verbose: Boolean) extends WdlParserBaseVisitor[Element] {
 
+  private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
+    val tok = ctx.start
+    val line = tok.getLine()
+    val col = tok.getCharPositionInLine()
+    new RuntimeException(s"${msg}  in line ${line} col ${col}")
+  }
+
   // visit the children of [ctx], and cast to the expected type [T]. Provide a reasonable
   // report if there is an error.
   //
@@ -59,22 +66,15 @@ case class ParseDocument(verbose: Boolean) extends WdlParserBaseVisitor[Element]
   private def visitAndSafeCast[T: ClassTag](ctx: ParserRuleContext)(implicit tt: TypeTag[T]): T = {
     val child = visitChildren(ctx)
     if (child == null) {
-      throw new Exception(s"child is null, expecting child of type ${typeOf[T]}")
+      throw makeWdlException(s"child is null, expecting child of type ${typeOf[T]}", ctx)
     }
 
     val ct = implicitly[ClassTag[T]]
     child match {
       case ct(x) => x
       case _ =>
-        val tok = ctx.start
-        val line = tok.getLine()
-        val col = tok.getCharPositionInLine()
-        System.out.println(
-            s"Parser internal error occurred in line=${line} column=${col} startToken=${tok.getText()}"
-        )
-        throw new Exception(
-            s"${child} has wrong type ${child.getClass.getSimpleName}, expecting ${typeOf[T]}"
-        )
+        val msg = s"${child} has wrong type ${child.getClass.getSimpleName}, expecting ${typeOf[T]}"
+        throw makeWdlException(msg, ctx)
     }
   }
 
@@ -139,25 +139,27 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlParser.Type_baseContext): Type = {
-    // Can this be done with type matchin?
+    if (ctx.array_type() != null)
+      return visitArray_type(ctx.array_type())
+    if (ctx.map_type() != null)
+      return visitMap_type(ctx.map_type())
+    if (ctx.pair_type() != null)
+      return visitPair_type(ctx.pair_type())
     if (ctx.STRING() != null)
       return TypeString
     if (ctx.FILE() != null)
       return TypeFile
     if (ctx.BOOLEAN() != null)
-      return TypeBool
+      return TypeBoolean
     if (ctx.OBJECT() != null)
       return TypeObject
-    if (ctx.INT() != null) {
+    if (ctx.INT() != null)
       return TypeInt
-    }
     if (ctx.FLOAT() != null)
       return TypeFloat
     if (ctx.Identifier() != null)
       return TypeIdentifier(ctx.getText())
-
-    // a compound type (array, map, pair)
-    return visitAndSafeCast[Type](ctx)
+    throw makeWdlException("sanity: unrecgonized type case", ctx)
   }
 
   /*
@@ -178,7 +180,7 @@ wdl_type
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText().toDouble)
     }
-    throw new Exception(s"Not an integer nor a float ${ctx.getText()}")
+    throw makeWdlException(s"Not an integer nor a float ${ctx.getText()}", ctx)
   }
 
   /* expression_placeholder_option
@@ -188,26 +190,72 @@ wdl_type
   ; */
   override def visitExpression_placeholder_option(
       ctx: WdlParser.Expression_placeholder_optionContext
-  ): Expr = {
+  ): PlaceHolderPart = {
     val expr: Expr =
       if (ctx.string() != null)
         visitString(ctx.string())
       else if (ctx.number() != null)
         visitNumber(ctx.number())
       else
-        throw new Exception("sanity: not a string or a number")
-    System.out.println(s"ctx = ${ctx}, expr=${expr}")
+        throw makeWdlException("sanity: not a string or a number", ctx)
 
     if (ctx.BoolLiteral() != null) {
-      ExprPlaceholderEqual(expr)
+      val b = ctx.BoolLiteral().getText().toLowerCase() == "true"
+      return ExprPlaceholderPartEqual(b, expr)
     }
     if (ctx.DEFAULT() != null) {
-      ExprPlaceholderDefault(expr)
+      return ExprPlaceholderPartDefault(expr)
     }
     if (ctx.SEP() != null) {
-      ExprPlaceholderSep(expr)
+      return ExprPlaceholderPartSep(expr)
     }
-    throw new Exception(s"Not one of three known variants of a placeholder ${ctx}")
+    throw makeWdlException(s"Not one of three known variants of a placeholder", ctx)
+  }
+
+  // These are full expressions of the same kind
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  private def parseEntirePlaceHolderExpression(placeHolders: Vector[PlaceHolderPart],
+                                               expr: Expr,
+                                               ctx: ParserRuleContext): Expr = {
+    if (placeHolders.isEmpty) {
+      // This is just an expression inside braces
+      // ${1}
+      // ${x + 3}
+      return expr
+    }
+
+    // This is a place-holder such as
+    //   ${default="foo" optional_value}
+    //   ${sep=", " array_value}
+    if (placeHolders.size == 1) {
+      placeHolders.head match {
+        case ExprPlaceholderPartDefault(default) =>
+          return ExprPlaceholderDefault(default, expr)
+        case ExprPlaceholderPartSep(sep) =>
+          return ExprPlaceholderSep(sep, expr)
+        case _ =>
+          throw makeWdlException("invalid place holder", ctx)
+      }
+    }
+
+    //   ${true="--yes" false="--no" boolean_value}
+    if (placeHolders.size == 2) {
+      (placeHolders(0), placeHolders(1)) match {
+        case (ExprPlaceholderPartEqual(true, x), ExprPlaceholderPartEqual(false, y)) =>
+          return ExprPlaceholderEqual(x, y, expr)
+        case (ExprPlaceholderPartEqual(false, x), ExprPlaceholderPartEqual(true, y)) =>
+          return ExprPlaceholderEqual(y, x, expr)
+        case (ExprPlaceholderPartEqual(_, _), ExprPlaceholderPartEqual(_, _)) =>
+          throw makeWdlException("invalid boolean place holder", ctx)
+        case (_, _) =>
+          throw makeWdlException("invalid place holder", ctx)
+      }
+    }
+
+    throw makeWdlException("invalid place holder", ctx)
   }
 
   /* string_part
@@ -225,14 +273,14 @@ wdl_type
   /* string_expr_part
   : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ; */
-  override def visitString_expr_part(ctx: WdlParser.String_expr_partContext): ExprCompoundString = {
-    val pHolder: Vector[Expr] = ctx
+  override def visitString_expr_part(ctx: WdlParser.String_expr_partContext): Expr = {
+    val pHolder: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
       .map(visitExpression_placeholder_option)
       .toVector
     val expr = visitExpr(ctx.expr())
-    ExprCompoundString(pHolder :+ expr)
+    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
   }
 
   /* string_expr_with_string_part
@@ -243,8 +291,7 @@ wdl_type
   ): ExprCompoundString = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val strPart = visitString_part(ctx.string_part())
-    val subExprs: Vector[Expr] = exprPart.value ++ strPart.value
-    ExprCompoundString(subExprs)
+    ExprCompoundString(Vector(exprPart, strPart))
   }
 
   /*
@@ -279,7 +326,7 @@ string
   override def visitPrimitive_literal(ctx: WdlParser.Primitive_literalContext): Expr = {
     if (ctx.BoolLiteral() != null) {
       val value = ctx.getText().toLowerCase() == "true"
-      return ExprBool(value)
+      return ExprBoolean(value)
     }
     if (ctx.number() != null) {
       return visitNumber(ctx.number())
@@ -290,7 +337,7 @@ string
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText())
     }
-    throw new Exception("Not one of four supported variants of primitive_literal")
+    throw makeWdlException("Not one of four supported variants of primitive_literal", ctx)
   }
 
   override def visitLor(ctx: WdlParser.LorContext): Expr = {
@@ -370,15 +417,76 @@ string
     ExprDivide(arg0, arg1)
   }
 
+  // | LPAREN expr RPAREN #expression_group
+  override def visitExpression_group(ctx: WdlParser.Expression_groupContext): Expr = {
+    visitExpr(ctx.expr())
+  }
+
+  // | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
+  override def visitArray_literal(ctx: WdlParser.Array_literalContext): Expr = {
+    val elements: Vector[Expr] = ctx
+      .expr()
+      .asScala
+      .map(x => visitExpr(x))
+      .toVector
+    ExprArrayLiteral(elements)
+  }
+
+  // | LPAREN expr COMMA expr RPAREN #pair_literal
   override def visitPair_literal(ctx: WdlParser.Pair_literalContext): Expr = {
     val arg0 = visitAndSafeCast[Expr](ctx.expr(0))
     val arg1 = visitAndSafeCast[Expr](ctx.expr(1))
     ExprPair(arg0, arg1)
   }
 
-  override def visitLeft_name(ctx: WdlParser.Left_nameContext): Expr = {
-    val id = ctx.Identifier().getText()
-    ExprIdentifier(id)
+  //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
+  override def visitMap_literal(ctx: WdlParser.Map_literalContext): Expr = {
+    val elements = ctx
+      .expr()
+      .asScala
+      .map(x => visitAndSafeCast[Expr](x))
+      .toVector
+
+    val n = elements.size
+    if (n % 2 != 0)
+      throw makeWdlException("the expressions in a map must come in pairs", ctx)
+
+    val m: Map[Expr, Expr] =
+      Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
+    ExprMapLiteral(m)
+  }
+
+  // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  override def visitObject_literal(ctx: WdlParser.Object_literalContext): Expr = {
+    val ids: Vector[String] = ctx
+      .Identifier()
+      .asScala
+      .map(x => x.getText())
+      .toVector
+    val elements: Vector[Expr] = ctx
+      .expr()
+      .asScala
+      .map(x => visitExpr(x))
+      .toVector
+    ExprObjectLiteral((ids zip elements).toMap)
+  }
+
+  // | NOT expr #negate
+  override def visitNegate(ctx: WdlParser.NegateContext): Expr = {
+    val expr = visitExpr(ctx.expr())
+    ExprNegate(expr)
+  }
+
+  // | (PLUS | MINUS) expr #unirarysigned
+  override def visitUnirarysigned(ctx: WdlParser.UnirarysignedContext): Expr = {
+    val expr = visitExpr(ctx.expr())
+
+    if (ctx.PLUS() != null)
+      ExprUniraryPlus(expr)
+    else if (ctx.MINUS() != null)
+      ExprUniraryMinus(expr)
+    else
+      throw makeWdlException("sanity", ctx)
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -399,29 +507,6 @@ string
     ExprApply(funcName, elements)
   }
 
-  // | NOT expr #negate
-  override def visitNegate(ctx: WdlParser.NegateContext): Expr = {
-    val element = visitAndSafeCast[Expr](ctx.expr())
-    ExprNegate(element)
-  }
-
-  //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
-  override def visitMap_literal(ctx: WdlParser.Map_literalContext): Expr = {
-    val elements = ctx
-      .expr()
-      .asScala
-      .map(x => visitAndSafeCast[Expr](x))
-      .toVector
-
-    val n = elements.size
-    if (n % 2 != 0)
-      throw new Exception("the expressions in a map must come in pairs")
-
-    val m: Map[Expr, Expr] =
-      Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
-    ExprMapLiteral(m)
-  }
-
   // | IF expr THEN expr ELSE expr #ifthenelse
   override def visitIfthenelse(ctx: WdlParser.IfthenelseContext): Expr = {
     val elements = ctx
@@ -432,36 +517,16 @@ string
     ExprIfThenElse(elements(0), elements(1), elements(2))
   }
 
+  override def visitLeft_name(ctx: WdlParser.Left_nameContext): Expr = {
+    val id = ctx.Identifier().getText()
+    ExprIdentifier(id)
+  }
+
   // | expr_core DOT Identifier #get_name
   override def visitGet_name(ctx: WdlParser.Get_nameContext): Expr = {
     val e = visitAndSafeCast[Expr](ctx.expr_core())
     val id = ctx.Identifier.getText()
     ExprGetName(e, id)
-  }
-
-  // | OBJECT_LITERAL LBRACE (primitive_literal COLON expr (COMMA primitive_literal COLON expr)*)* RBRACE #object_literal
-  override def visitObject_literal(ctx: WdlParser.Object_literalContext): Expr = {
-    val ids: Vector[Expr] = ctx
-      .primitive_literal()
-      .asScala
-      .map(x => visitPrimitive_literal(x))
-      .toVector
-    val elements: Vector[Expr] = ctx
-      .expr()
-      .asScala
-      .map(x => visitExpr(x))
-      .toVector
-    ExprObjectLiteral((ids zip elements).toMap)
-  }
-
-  // | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
-  override def visitArray_literal(ctx: WdlParser.Array_literalContext): Expr = {
-    val elements: Vector[Expr] = ctx
-      .expr()
-      .asScala
-      .map(x => visitExpr(x))
-      .toVector
-    ExprArrayLiteral(elements)
   }
 
   override def visitExpr(ctx: WdlParser.ExprContext): Expr = {
@@ -582,13 +647,13 @@ task_input
     ; */
   override def visitTask_command_string_part(
       ctx: WdlParser.Task_command_string_partContext
-  ): CommandPartString = {
+  ): ExprString = {
     val text: String = ctx
       .CommandStringPart()
       .asScala
       .map(x => x.getText())
       .mkString("")
-    CommandPartString(text)
+    ExprString(text)
   }
 
   /* task_command_expr_part
@@ -596,14 +661,14 @@ task_input
     ; */
   override def visitTask_command_expr_part(
       ctx: WdlParser.Task_command_expr_partContext
-  ): CommandPartExpr = {
-    val elements = ctx
+  ): Expr = {
+    val placeHolders: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
-      .map(x => visitExpression_placeholder_option(x).asInstanceOf[Expr])
+      .map(x => visitExpression_placeholder_option(x))
       .toVector
     val expr = visitExpr(ctx.expr())
-    CommandPartExpr(elements :+ expr)
+    parseEntirePlaceHolderExpression(placeHolders, expr, ctx)
   }
 
   /* task_command_expr_with_string
@@ -611,12 +676,12 @@ task_input
     ; */
   override def visitTask_command_expr_with_string(
       ctx: WdlParser.Task_command_expr_with_stringContext
-  ): CommandPartExprWithString = {
-    val exprPart: CommandPartExpr = visitTask_command_expr_part(ctx.task_command_expr_part())
-    val stringPart: CommandPartString = visitTask_command_string_part(
+  ): ExprCompoundString = {
+    val exprPart: Expr = visitTask_command_expr_part(ctx.task_command_expr_part())
+    val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    CommandPartExprWithString(exprPart.value, stringPart.value)
+    ExprCompoundString(Vector(exprPart, stringPart))
   }
 
   /* task_command
@@ -624,25 +689,52 @@ task_input
   | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
   ; */
   override def visitTask_command(ctx: WdlParser.Task_commandContext): CommandSection = {
-    val start: CommandPartString = visitTask_command_string_part(ctx.task_command_string_part())
-    val parts: Vector[CommandPartExprWithString] = ctx
+    val start: Expr = visitTask_command_string_part(ctx.task_command_string_part())
+    val parts: Vector[Expr] = ctx
       .task_command_expr_with_string()
       .asScala
       .map(x => visitTask_command_expr_with_string(x))
       .toVector
-    CommandSection(start.value, parts)
+
+    val allParts: Vector[Expr] = start +: parts
+
+    // discard empty strings, and flatten compound vectors of strings
+    val cleanedParts = allParts.map {
+      case ExprString(x) if x.isEmpty => Vector.empty
+      case ExprCompoundString(v)      => v
+      case other                      => Vector(other)
+    }.flatten
+
+    // TODO: do the above until reaching a fixed point
+
+    CommandSection(cleanedParts)
   }
 
-  // Each section should appear at most once. Make sure this is the case.
-  private def atMostOneSection[T](sections: Vector[T]): Option[T] = {
+  // A that should appear zero or once. Make sure this is the case.
+  private def atMostOneSection[T](sections: Vector[T],
+                                  ctx: ParserRuleContext)(implicit tt: TypeTag[T]): Option[T] = {
     sections.size match {
       case 0 => None
       case 1 => Some(sections.head)
       case n =>
-        val first = sections.head
-        val sectionName = first.getClass.getSimpleName
-        throw new Exception(
-            s"section ${sectionName} appears ${n} times, it cannot appear more than once"
+        val sectionName: String = typeOf[T].toString
+        throw makeWdlException(
+            s"section ${sectionName} appears ${n} times, it cannot appear more than once",
+            ctx
+        )
+    }
+  }
+
+  // A section that must appear exactly once
+  private def exactlyOneSection[T](sections: Vector[T],
+                                   ctx: ParserRuleContext)(implicit tt: TypeTag[T]): T = {
+    sections.size match {
+      case 1 => sections.head
+      case n =>
+        val sectionName: String = typeOf[T].toString
+        throw makeWdlException(
+            s"section ${sectionName} appears ${n} times, it must appear exactly once",
+            ctx
         )
     }
   }
@@ -656,28 +748,28 @@ task_input
 
     val input: Option[InputSection] = atMostOneSection(elems.collect {
       case x: InputSection => x
-    })
+    }, ctx)
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
       case x: OutputSection => x
-    })
-    val command: Option[CommandSection] = atMostOneSection(elems.collect {
+    }, ctx)
+    val command: CommandSection = exactlyOneSection(elems.collect {
       case x: CommandSection => x
-    })
+    }, ctx)
     val decls: Vector[Declaration] = elems.collect {
       case x: Declaration => x
     }
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
       case x: MetaSection => x
-    })
+    }, ctx)
     val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
       case x: ParameterMetaSection => x
-    })
+    }, ctx)
 
     Task(name,
          input = input,
          output = output,
          command = command,
-         decls = decls,
+         declarations = decls,
          meta = meta,
          parameterMeta = parameterMeta)
   }
@@ -695,13 +787,22 @@ task_input
   }
 
   /*
+import_as
+    : AS Identifier
+    ;
+
  import_doc
-	: IMPORT string AS Identifier (import_alias)*
+	: IMPORT string import_as? (import_alias)*
 	;
    */
   override def visitImport_doc(ctx: WdlParser.Import_docContext): ImportDoc = {
     val url = ctx.string().getText().replaceAll("\"", "")
-    val name = ctx.Identifier().getText()
+    val name =
+      if (ctx.import_as() == null)
+        None
+      else
+        Some(ctx.import_as().Identifier().getText())
+
     val aliases = ctx
       .import_alias()
       .asScala
@@ -844,11 +945,13 @@ scatter
     visitAndSafeCast[WorkflowElement](ctx)
   }
 
-  /* workflow_element
+  /*
+workflow_element
 	: workflow_input #input
 	| workflow_output #output
 	| inner_workflow_element #inner_element
-	| meta_obj #meta_element
+	| parameter_meta #parameter_meta_element
+	| meta #meta_element
 	;
 
 workflow
@@ -862,22 +965,25 @@ workflow
     val input: Option[InputSection] = atMostOneSection(elems.collect {
       case x: WdlParser.InputContext =>
         visitWorkflow_input(x.workflow_input())
-    })
+    }, ctx)
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
       case x: WdlParser.OutputContext =>
         visitWorkflow_output(x.workflow_output())
-    })
+    }, ctx)
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
       case x: WdlParser.Meta_elementContext =>
-        val m: WdlParser.Meta_objContext = x.meta_obj()
-        visitMeta(m.asInstanceOf[WdlParser.MetaContext])
-    })
+        visitMeta(x.meta())
+    }, ctx)
+    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
+      case x: WdlParser.Parameter_meta_elementContext =>
+        visitParameter_meta(x.parameter_meta())
+    }, ctx)
     val wfElems: Vector[WorkflowElement] = elems.collect {
       case x: WdlParser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
 
-    Workflow(name, input, output, meta, wfElems)
+    Workflow(name, input, output, meta, parameterMeta, wfElems)
   }
 
   /*
@@ -885,11 +991,10 @@ document_element
 	: import_doc
 	| struct
 	| task
-	| workflow
 	;
    */
-  override def visitDocument_element(ctx: WdlParser.Document_elementContext): Element = {
-    visitChildren(ctx)
+  override def visitDocument_element(ctx: WdlParser.Document_elementContext): DocumentElement = {
+    visitChildren(ctx).asInstanceOf[DocumentElement]
   }
 
   /* version
@@ -902,16 +1007,25 @@ document_element
 
   /*
 document
-	: version document_element*
+	: version document_element* (workflow document_element*)?
 	;
    */
   override def visitDocument(ctx: WdlParser.DocumentContext): Document = {
     val version = visitVersion(ctx.version())
 
-    val elems_raw: Vector[WdlParser.Document_elementContext] =
-      ctx.document_element().asScala.toVector
-    val elems = elems_raw.map(e => visitDocument_element(e)).toVector
+    val elems: Vector[DocumentElement] =
+      ctx
+        .document_element()
+        .asScala
+        .map(e => visitDocument_element(e))
+        .toVector
 
-    Document(version.value, elems)
+    val workflow =
+      if (ctx.workflow() == null)
+        None
+      else
+        Some(visitWorkflow(ctx.workflow()))
+
+    Document(version.value, elems, workflow)
   }
 }
