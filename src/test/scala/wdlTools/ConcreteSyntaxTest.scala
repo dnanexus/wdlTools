@@ -11,10 +11,6 @@ object Edge extends Tag("edge")
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
-  // Ignore a value. This is useful for avoiding warnings/errors
-  // on unused variables.
-  private def ignoreValue[A](value: A): Unit = {}
-
   private lazy val wdlSourceDirs: Vector[Path] = {
     val p1: Path = Paths.get(getClass.getResource("/workflows").getPath)
     val p2: Path = Paths.get(getClass.getResource("/tasks").getPath)
@@ -187,7 +183,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val pa = new ParseAll(antlr4Trace = false)
+    val pa = new ParseAll(antlr4Trace = false, quiet = true)
 
     assertThrows[Exception] {
       pa.apply(getWdlSource("tasks", "wrong_comment_style.wdl"))
@@ -232,7 +228,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.command shouldBe a[CommandSection]
     task.command.parts should contain(ExprIdentifier("inp_file"))
     task.command.parts should contain(ExprString("\n    wc -l "))
-//    task.command.parts should contain(ExprString("\n"))
+    //task.command.parts should contain(ExprString("\n"))
 
     task.meta shouldBe (Some(MetaSection(Vector(MetaKV("author", ExprString("Robin Hood"))))))
     task.parameterMeta shouldBe (Some(
@@ -242,13 +238,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect when a task section appears twice" in {
-    val pa = new ParseAll()
+    val pa = new ParseAll(quiet = true)
     assertThrows[Exception] {
       pa.apply(getWdlSource("tasks", "multiple_input_section.wdl"))
     }
   }
 
-  it should "handle string interpolation" taggedAs (Edge) in {
+  it should "handle string interpolation" in {
     val pa = new ParseAll(antlr4Trace = false)
     val doc = pa.apply(getWdlSource("tasks", "interpolation.wdl"))
 
@@ -275,11 +271,23 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse structs" in {
     val pa = new ParseAll()
     val doc = pa.apply(getWdlSource("structs", "I.wdl"))
-    //System.out.println(doc)
-    ignoreValue(doc)
+
+    doc.version shouldBe ("1.0")
+    val structs = doc.elements.collect {
+      case x: TypeStruct => x
+    }
+    structs.size shouldBe (2)
+    structs(0) shouldBe TypeStruct(
+        "Address",
+        Map("street" -> TypeString, "city" -> TypeString, "zipcode" -> TypeInt)
+    )
+    structs(1) shouldBe TypeStruct(
+        "Data",
+        Map("history" -> TypeFile, "date" -> TypeInt, "month" -> TypeString)
+    )
   }
 
-  it should "parse a simple workflow" in {
+  it should "parse a simple workflow" taggedAs (Edge) in {
     val pa = new ParseAll()
     val doc = pa.apply(getWdlSource("workflows", "I.wdl"))
     doc.elements.size shouldBe (0)
@@ -290,6 +298,33 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     wf.name shouldBe ("biz")
     wf.body.size shouldBe (3)
+
+    val calls = wf.body.collect {
+      case x: Call => x
+    }
+    calls.size shouldBe (1)
+    calls(0) shouldBe (Call(name = "bar",
+                            alias = Some("boz"),
+                            inputs = Map("i" -> ExprIdentifier("s"))))
+
+    val scatters = wf.body.collect {
+      case x: Scatter => x
+    }
+    scatters.size shouldBe (1)
+    scatters(0).identifier shouldBe ("i")
+    scatters(0).expr shouldBe (ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+    scatters(0).body shouldBe (Vector(
+        Call(name = "add", alias = None, inputs = Map("x" -> ExprIdentifier("i")))
+    ))
+
+    val conditionals = wf.body.collect {
+      case x: Conditional => x
+    }
+    conditionals.size shouldBe (1)
+    conditionals(0).expr shouldBe (ExprEqeq(ExprBoolean(true), ExprBoolean(false)))
+    conditionals(0).body shouldBe (Vector(Call("sub", None, Map.empty)))
+
+    wf.meta shouldBe (Some(MetaSection(Vector(MetaKV("author", ExprString("Robert Heinlein"))))))
   }
 
   it should "handle import statements" in {

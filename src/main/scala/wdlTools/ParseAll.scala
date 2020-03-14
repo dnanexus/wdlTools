@@ -8,6 +8,7 @@ import scala.collection.mutable.Map
 // parse and follow imports
 case class ParseAll(antlr4Trace: Boolean = false,
                     verbose: Boolean = false,
+                    quiet: Boolean = false,
                     localDirectories: Vector[Path] = Vector.empty) {
 
   // cache of documents that have already been fetched and parsed.
@@ -17,7 +18,7 @@ case class ParseAll(antlr4Trace: Boolean = false,
     docCache.get(url) match {
       case None =>
         val docText = FetchURL(verbose, localDirectories).apply(url)
-        val doc = ParseDocument.apply(docText, verbose, antlr4Trace)
+        val doc = ParseDocument.apply(docText, verbose, quiet, antlr4Trace)
         docCache(url) = doc
         doc
       case Some(doc) =>
@@ -48,7 +49,7 @@ case class ParseAll(antlr4Trace: Boolean = false,
   // [dirs] : the directories where to search for imported documents
   //
   def apply(sourceCode: String): Document = {
-    val topDoc: Document = ParseDocument.apply(sourceCode, verbose, antlr4Trace)
+    val topDoc: Document = ParseDocument.apply(sourceCode, verbose, quiet, antlr4Trace)
     dfs(topDoc)
   }
 }

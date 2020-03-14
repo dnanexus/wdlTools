@@ -30,7 +30,10 @@ object ParseDocument {
     (errListener, parser)
   }
 
-  def apply(sourceCode: String, verbose: Boolean, antrl4Trace: Boolean = false): Document = {
+  def apply(sourceCode: String,
+            verbose: Boolean,
+            quiet: Boolean = false,
+            antrl4Trace: Boolean = false): Document = {
     val (errListener, parser) = getParser(sourceCode)
     if (antrl4Trace)
       parser.setTrace(true)
@@ -40,8 +43,10 @@ object ParseDocument {
     // check if any errors were found
     val errors: Vector[SyntaxError] = errListener.getAllErrors
     if (!errors.isEmpty) {
-      for (err <- errors) {
-        System.out.println(err)
+      if (!quiet) {
+        for (err <- errors) {
+          System.out.println(err)
+        }
       }
       throw new Exception(s"${errors.size} syntax errors were found, stopping")
     }
@@ -867,7 +872,10 @@ import_as
 
     val alias: Option[String] =
       if (ctx.call_alias() == null) None
-      else Some(ctx.call_alias().getText())
+      else {
+        val ca: CallAlias = visitCall_alias(ctx.call_alias())
+        Some(ca.name)
+      }
 
     val inputs: Map[String, Expr] =
       if (ctx.call_body() == null) {
