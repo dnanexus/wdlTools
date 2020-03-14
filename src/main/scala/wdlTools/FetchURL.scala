@@ -1,10 +1,17 @@
 package wdlTools
 
-import ConcreteSyntax.URL
-
 import collection.JavaConverters._
 import java.nio.file.{Path, Paths, Files}
 import scala.io.Source
+
+// a path to a file or an http location
+//
+// examples:
+//   http://google.com/A.txt
+//   https://google.com/A.txt
+//   file://A/B.txt
+//   foo.txt
+case class URL(addr: String)
 
 // Examples for URLs:
 //   http://google.com/A.txt
