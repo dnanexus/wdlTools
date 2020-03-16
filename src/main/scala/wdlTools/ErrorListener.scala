@@ -21,13 +21,13 @@ case class ErrorListener(assertNoErrors: Boolean, verbose: Boolean) extends Base
                            msg: String,
                            e: RecognitionException): Unit = {
     val symbolText =
-      if (offendingSymbol.isInstanceOf[Token]) {
-        val tok = offendingSymbol.asInstanceOf[Token]
-        tok.getText()
-      } else {
-        offendingSymbol.toString
+      offendingSymbol match {
+        case tok: Token =>
+          tok.getText
+        case _ =>
+          offendingSymbol.toString
       }
-    val err = new SyntaxError(symbolText, line, charPositionInLine, msg)
+    val err = SyntaxError(symbolText, line, charPositionInLine, msg)
     errors = errors :+ err
   }
 

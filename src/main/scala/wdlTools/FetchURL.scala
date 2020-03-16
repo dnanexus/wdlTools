@@ -55,7 +55,7 @@ case class FetchURL(verbose: Boolean, localDirectories: Vector[Path]) {
 
     if (p contains "://") {
       val components = p.split("://").toList
-      val protocol = components(0)
+      val protocol = components.head
       protocol match {
         case "http"  => fetchHttpAddress(p)
         case "https" => fetchHttpAddress(p)
