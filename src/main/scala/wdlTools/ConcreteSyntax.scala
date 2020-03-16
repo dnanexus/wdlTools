@@ -135,7 +135,10 @@ object ConcreteSyntax {
 
   // the basic import-doc is replaced with the elaborated version after we
   // dive in and parse it.
-  case class ImportDocElaborated(name: Option[String], aliases: Vector[ImportAlias], doc: Document)
+  case class ImportDocElaborated(name: Option[String],
+                                 aliases: Vector[ImportAlias],
+                                 url: URL,
+                                 doc: Document)
       extends DocumentElement
 
   // top level definitions
