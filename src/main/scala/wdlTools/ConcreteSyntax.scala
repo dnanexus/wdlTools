@@ -125,11 +125,6 @@ object ConcreteSyntax {
   case class ImportDoc(name: Option[String], aliases: Vector[ImportAlias], url: URL)
       extends DocumentElement
 
-  // the basic import-doc is replaced with the elaborated version after we
-  // dive in and parse it.
-  case class ImportDocElaborated(name: Option[String], aliases: Vector[ImportAlias], doc: Document)
-      extends DocumentElement
-
   // top level definitions
   case class Task(name: String,
                   input: Option[InputSection],

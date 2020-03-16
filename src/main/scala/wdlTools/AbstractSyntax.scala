@@ -18,18 +18,18 @@ object AbstractSyntax {
   case object TypeFloat extends Type
   case class TypeIdentifier(id: String) extends Type
   case object TypeObject extends Type
-  case class TypeStruct(name: String, members: Map[String, Type]) extends Type
+  case class TypeStruct(name: String, members: Map[String, Type]) extends Type with DocumentElement
+
+  // expressions
+  sealed trait Expr
 
   // values
-  sealed trait Value
+  sealed trait Value extends Expr
   case class ValueString(value: String) extends Value
   case class ValueFile(value: String) extends Value
   case class ValueBoolean(value: Boolean) extends Value
   case class ValueInt(value: Int) extends Value
   case class ValueFloat(value: Double) extends Value
-
-  // expressions
-  sealed trait Expr extends Value
 
   // represents strings with interpolation.
   // For example:
@@ -113,15 +113,6 @@ object AbstractSyntax {
   case class MetaKV(id: String, expr: Expr)
   case class ParameterMetaSection(kvs: Vector[MetaKV])
   case class MetaSection(kvs: Vector[MetaKV])
-
-  // a path to a file or an http location
-  //
-  // examples:
-  //   http://google.com/A.txt
-  //   https://google.com/A.txt
-  //   file://A/B.txt
-  //   foo.txt
-  case class URL(addr: String)
 
   // import statement with the AST for the referenced document
   case class ImportAlias(id1: String, id2: String)

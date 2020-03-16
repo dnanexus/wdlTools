@@ -37,14 +37,17 @@ case class ParseAll(antlr4Trace: Boolean = false,
         AbstractSyntax.TypeMap(translateType(k), translateType(v))
       case ConcreteSyntax.TypePair(l, r) =>
         AbstractSyntax.TypePair(translateType(l), translateType(r))
-      case ConcreteSyntax.TypeString                => AbstractSyntax.TypeString
-      case ConcreteSyntax.TypeFile                  => AbstractSyntax.TypeFile
-      case ConcreteSyntax.TypeBoolean               => AbstractSyntax.TypeBoolean
-      case ConcreteSyntax.TypeInt                   => AbstractSyntax.TypeInt
-      case ConcreteSyntax.TypeFloat                 => AbstractSyntax.TypeFloat
-      case ConcreteSyntax.TypeIdentifier(id)        => AbstractSyntax.TypeIdentifier(id)
-      case ConcreteSyntax.TypeObject                => AbstractSyntax.TypeObject
-      case ConcreteSyntax.TypeStruct(name, members) => AbstractSyntax.TypeStruct(name, members)
+      case ConcreteSyntax.TypeString         => AbstractSyntax.TypeString
+      case ConcreteSyntax.TypeFile           => AbstractSyntax.TypeFile
+      case ConcreteSyntax.TypeBoolean        => AbstractSyntax.TypeBoolean
+      case ConcreteSyntax.TypeInt            => AbstractSyntax.TypeInt
+      case ConcreteSyntax.TypeFloat          => AbstractSyntax.TypeFloat
+      case ConcreteSyntax.TypeIdentifier(id) => AbstractSyntax.TypeIdentifier(id)
+      case ConcreteSyntax.TypeObject         => AbstractSyntax.TypeObject
+      case ConcreteSyntax.TypeStruct(name, members) =>
+        AbstractSyntax.TypeStruct(name, members.map {
+          case (name, t) => name -> translateType(t)
+        }.toMap)
     }
   }
 
@@ -61,14 +64,15 @@ case class ParseAll(antlr4Trace: Boolean = false,
       case ConcreteSyntax.ExprIdentifier(id) => AbstractSyntax.ExprIdentifier(id)
       case ConcreteSyntax.ExprCompoundString(vec) =>
         AbstractSyntax.ExprCompoundString(vec.map(translateExpr).toVector)
-      case ConcreteSyntax.ExprPair(l, r) => AbstractSyntax.ExprPair(l, r)
-      case ConcreteSyntax.ExprArray(vec) =>
+      case ConcreteSyntax.ExprPair(l, r) =>
+        AbstractSyntax.ExprPair(translateExpr(l), translateExpr(r))
+      case ConcreteSyntax.ExprArrayLiteral(vec) =>
         AbstractSyntax.ExprArray(vec.map(translateExpr).toVector)
-      case ConcreteSyntax.ExprMap(m) =>
+      case ConcreteSyntax.ExprMapLiteral(m) =>
         AbstractSyntax.ExprMap(m.map {
           case (k, v) => translateExpr(k) -> translateExpr(v)
         }.toMap)
-      case ConcreteSyntax.ExprObject(m) =>
+      case ConcreteSyntax.ExprObjectLiteral(m) =>
         AbstractSyntax.ExprObject(m.map {
           case (fieldName, v) => fieldName -> translateExpr(v)
         }.toMap)
@@ -88,14 +92,14 @@ case class ParseAll(antlr4Trace: Boolean = false,
         AbstractSyntax.ExprUniraryPlus(translateExpr(value))
       case ConcreteSyntax.ExprUniraryMinus(value) =>
         AbstractSyntax.ExprUniraryMinus(translateExpr(value))
+      case ConcreteSyntax.ExprNegate(value) =>
+        AbstractSyntax.ExprNegate(translateExpr(value))
 
       // operators on two arguments
       case ConcreteSyntax.ExprLor(a, b) =>
         AbstractSyntax.ExprLor(translateExpr(a), translateExpr(b))
       case ConcreteSyntax.ExprLand(a, b) =>
         AbstractSyntax.ExprLand(translateExpr(a), translateExpr(b))
-      case ConcreteSyntax.ExprNegate(a, b) =>
-        AbstractSyntax.ExprNegate(translateExpr(a), translateExpr(b))
       case ConcreteSyntax.ExprEqeq(a, b) =>
         AbstractSyntax.ExprEqeq(translateExpr(a), translateExpr(b))
       case ConcreteSyntax.ExprLt(a, b) => AbstractSyntax.ExprLt(translateExpr(a), translateExpr(b))
@@ -127,36 +131,124 @@ case class ParseAll(antlr4Trace: Boolean = false,
                                       translateExpr(fBranch))
       case ConcreteSyntax.ExprApply(funcName, elements) =>
         AbstractSyntax.ExprApply(funcName, elements.map(translateExpr).toVector)
-      case ConcreteSyntax.ExprGetName(e: Expr, id: String) =>
-        AbstractSyntax.ExprGetName(translateExpr(expr), id)
+      case ConcreteSyntax.ExprGetName(e, id) =>
+        AbstractSyntax.ExprGetName(translateExpr(e), id)
 
       case other =>
         throw new Exception(s"invalid concrete syntax element ${other}")
     }
   }
 
+  private def translateMetaKV(kv: ConcreteSyntax.MetaKV): AbstractSyntax.MetaKV = {
+    AbstractSyntax.MetaKV(kv.id, translateExpr(kv.expr))
+  }
+
+  private def translateInputSection(
+      inp: ConcreteSyntax.InputSection
+  ): AbstractSyntax.InputSection = {
+    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration).toVector)
+  }
+
+  private def translateOutputSection(
+      output: ConcreteSyntax.OutputSection
+  ): AbstractSyntax.OutputSection = {
+    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration).toVector)
+  }
+
+  private def translateCommandSection(
+      cs: ConcreteSyntax.CommandSection
+  ): AbstractSyntax.CommandSection = {
+    AbstractSyntax.CommandSection(cs.parts.map(translateExpr).toVector)
+  }
+
+  private def translateDeclaration(decl: ConcreteSyntax.Declaration): AbstractSyntax.Declaration = {
+    AbstractSyntax.Declaration(decl.name, translateType(decl.wdlType), decl.expr.map(translateExpr))
+  }
+
+  private def translateMetaSection(meta: ConcreteSyntax.MetaSection): AbstractSyntax.MetaSection = {
+    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV).toVector)
+  }
+
+  private def translateParameterMetaSection(
+      paramMeta: ConcreteSyntax.ParameterMetaSection
+  ): AbstractSyntax.ParameterMetaSection = {
+    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV).toVector)
+  }
+
+  private def translateWorkflowElement(
+      elem: ConcreteSyntax.WorkflowElement
+  ): AbstractSyntax.WorkflowElement = {
+    elem match {
+      case ConcreteSyntax.Declaration(name, wdlType, expr) =>
+        AbstractSyntax.Declaration(name, translateType(wdlType), expr.map(translateExpr))
+
+      case ConcreteSyntax.Call(name, alias, inputs) =>
+        AbstractSyntax.Call(name, alias, inputs.map {
+          case (name, expr) => name -> translateExpr(expr)
+        }.toMap)
+
+      case ConcreteSyntax.Scatter(identifier, expr, body) =>
+        AbstractSyntax.Scatter(identifier,
+                               translateExpr(expr),
+                               body.map(translateWorkflowElement).toVector)
+
+      case ConcreteSyntax.Conditional(expr, body) =>
+        AbstractSyntax.Conditional(translateExpr(expr), body.map(translateWorkflowElement).toVector)
+    }
+  }
+
+  private def translateWorkflow(wf: ConcreteSyntax.Workflow): AbstractSyntax.Workflow = {
+    AbstractSyntax.Workflow(
+        wf.name,
+        wf.input.map(translateInputSection),
+        wf.output.map(translateOutputSection),
+        wf.meta.map(translateMetaSection),
+        wf.parameterMeta.map(translateParameterMetaSection),
+        wf.body.map(translateWorkflowElement)
+    )
+  }
+
   // start from a document [doc], and recursively dive into all the imported
   // documents. Replace all the raw import statements with fully elaborated ones.
   private def dfs(doc: ConcreteSyntax.Document): AbstractSyntax.Document = {
-    // scan for import statements and follow them
-    val elems = doc.elements.map {
-      case t: Type       => translateType(t)
-      case e: Expression => translateExpression(e)
 
-      case ImportDoc(name, aliases, url) =>
+    // translate all the elements of the document to the abstract syntax
+    val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
+      case ConcreteSyntax.TypeStruct(name, members) =>
+        AbstractSyntax.TypeStruct(name,
+                                  members.map { case (name, t) => name -> translateType(t) }.toMap)
+
+      case ConcreteSyntax.ImportDoc(name, aliases, url) =>
         val importedDoc = followImport(url)
+        val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = aliases.map {
+          case ConcreteSyntax.ImportAlias(x, y) => AbstractSyntax.ImportAlias(x, y)
+        }.toVector
 
         // Replace the original statement with a new one
-        ImportDocElaborated(name, aliases, importedDoc)
+        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc)
 
+      case ConcreteSyntax.Task(name, input, output, command, declarations, meta, parameterMeta) =>
+        AbstractSyntax.Task(
+            name,
+            input.map(translateInputSection),
+            output.map(translateOutputSection),
+            translateCommandSection(command),
+            declarations.map(translateDeclaration).toVector,
+            meta.map(translateMetaSection),
+            parameterMeta.map(translateParameterMetaSection)
+        )
+
+      case other => throw new Exception(s"unrecognized document element ${other}")
     }.toVector
-    Document(doc.version, elems, doc.workflow)
+
+    val aWf = doc.workflow.map(translateWorkflow)
+    AbstractSyntax.Document(doc.version, elems, aWf)
   }
 
   // [dirs] : the directories where to search for imported documents
   //
   def apply(sourceCode: String): AbstractSyntax.Document = {
-    val topDoc: Document = ParseDocument.apply(sourceCode, verbose, quiet, antlr4Trace)
-    dfs(topDoc)
+    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, verbose, quiet, antlr4Trace)
+    dfs(top)
   }
 }

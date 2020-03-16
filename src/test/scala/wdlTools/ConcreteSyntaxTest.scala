@@ -6,16 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 //import org.scalatest.Inside._
 import collection.JavaConverters._
 
-import org.scalatest.Tag
-object Edge extends Tag("edge")
-
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
-
-  private lazy val wdlSourceDirs: Vector[Path] = {
-    val p1: Path = Paths.get(getClass.getResource("/workflows").getPath)
-    val p2: Path = Paths.get(getClass.getResource("/tasks").getPath)
-    Vector(p1, p2)
-  }
 
   private def getWdlSource(dirname: String, fname: String): String = {
     val p: String = getClass.getResource(s"/${dirname}/${fname}").getPath
@@ -24,8 +15,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle various types" in {
-    val pa = new ParseAll()
-    val doc = pa.apply(getWdlSource("tasks", "types.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), false)
 
     doc.elements.size shouldBe (1)
     val elem = doc.elements(0)
@@ -56,8 +46,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle types and expressions" in {
-    val pa = new ParseAll(antlr4Trace = false)
-    val doc = pa.apply(getWdlSource("tasks", "expressions.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "expressions.wdl"), false)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -161,8 +150,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle get name" in {
-    val pa = new ParseAll(antlr4Trace = false)
-    val doc = pa.apply(getWdlSource("tasks", "get_name_bug.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "get_name_bug.wdl"), false)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -183,16 +171,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val pa = new ParseAll(antlr4Trace = false, quiet = true)
 
     assertThrows[Exception] {
-      pa.apply(getWdlSource("tasks", "wrong_comment_style.wdl"))
+      ParseDocument.apply(getWdlSource("tasks", "wrong_comment_style.wdl"), false, quiet = true)
     }
   }
 
   it should "parse a task with an output section only" in {
-    val pa = new ParseAll()
-    val doc = pa.apply(getWdlSource("tasks", "output_section.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "output_section.wdl"), false)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -211,8 +197,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a task" in {
-    val pa = new ParseAll()
-    val doc = pa.apply(getWdlSource("tasks", "wc.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "wc.wdl"), false)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -238,15 +223,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect when a task section appears twice" in {
-    val pa = new ParseAll(quiet = true)
     assertThrows[Exception] {
-      pa.apply(getWdlSource("tasks", "multiple_input_section.wdl"))
+      ParseDocument.apply(getWdlSource("tasks", "multiple_input_section.wdl"), false)
     }
   }
 
   it should "handle string interpolation" in {
-    val pa = new ParseAll(antlr4Trace = false)
-    val doc = pa.apply(getWdlSource("tasks", "interpolation.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("tasks", "interpolation.wdl"), false)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -269,8 +252,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse structs" in {
-    val pa = new ParseAll()
-    val doc = pa.apply(getWdlSource("structs", "I.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("structs", "I.wdl"), false)
 
     doc.version shouldBe ("1.0")
     val structs = doc.elements.collect {
@@ -288,8 +270,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a simple workflow" taggedAs (Edge) in {
-    val pa = new ParseAll()
-    val doc = pa.apply(getWdlSource("workflows", "I.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("workflows", "I.wdl"), false)
     doc.elements.size shouldBe (0)
 
     doc.version shouldBe ("1.0")
@@ -328,13 +309,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle import statements" in {
-    val pa = new ParseAll(antlr4Trace = false, localDirectories = wdlSourceDirs)
-    val doc = pa.apply(getWdlSource("workflows", "imports.wdl"))
+    val doc = ParseDocument.apply(getWdlSource("workflows", "imports.wdl"), false)
 
     doc.version shouldBe ("1.0")
 
     val imports = doc.elements.collect {
-      case x: ImportDocElaborated => x
+      case x: ImportDoc => x
     }
     imports.size shouldBe (2)
 
