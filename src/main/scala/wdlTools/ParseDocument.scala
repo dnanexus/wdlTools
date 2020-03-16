@@ -769,6 +769,9 @@ task_input
     val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
       case x: ParameterMetaSection => x
     }, ctx)
+    val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
+      case x: RuntimeSection => x
+    }, ctx)
 
     Task(name,
          input = input,
@@ -776,7 +779,8 @@ task_input
          command = command,
          declarations = decls,
          meta = meta,
-         parameterMeta = parameterMeta)
+         parameterMeta = parameterMeta,
+         runtime = runtime)
   }
 
   /* import_alias
