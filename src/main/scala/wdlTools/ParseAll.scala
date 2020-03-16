@@ -175,6 +175,14 @@ case class ParseAll(antlr4Trace: Boolean = false,
     AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV).toVector)
   }
 
+  private def translateRuntimeSection(
+      runtime: ConcreteSyntax.RuntimeSection
+  ): AbstractSyntax.RuntimeSection = {
+    AbstractSyntax.RuntimeSection(runtime.kvs.map {
+      case ConcreteSyntax.RuntimeKV(id, expr) => AbstractSyntax.RuntimeKV(id, translateExpr(expr))
+    }.toVector)
+  }
+
   private def translateWorkflowElement(
       elem: ConcreteSyntax.WorkflowElement
   ): AbstractSyntax.WorkflowElement = {
@@ -227,7 +235,14 @@ case class ParseAll(antlr4Trace: Boolean = false,
         // Replace the original statement with a new one
         AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc)
 
-      case ConcreteSyntax.Task(name, input, output, command, declarations, meta, parameterMeta) =>
+      case ConcreteSyntax.Task(name,
+                               input,
+                               output,
+                               command,
+                               declarations,
+                               meta,
+                               parameterMeta,
+                               runtime) =>
         AbstractSyntax.Task(
             name,
             input.map(translateInputSection),
@@ -235,7 +250,8 @@ case class ParseAll(antlr4Trace: Boolean = false,
             translateCommandSection(command),
             declarations.map(translateDeclaration).toVector,
             meta.map(translateMetaSection),
-            parameterMeta.map(translateParameterMetaSection)
+            parameterMeta.map(translateParameterMetaSection),
+            runtime.map(translateRuntimeSection)
         )
 
       case other => throw new Exception(s"unrecognized document element ${other}")

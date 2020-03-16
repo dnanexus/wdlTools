@@ -132,7 +132,8 @@ object ConcreteSyntax {
                   command: CommandSection, // the command section is required
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
-                  parameterMeta: Option[ParameterMetaSection])
+                  parameterMeta: Option[ParameterMetaSection],
+                  runtime: Option[RuntimeSection])
       extends DocumentElement
 
   case class CallAlias(name: String) extends Element
