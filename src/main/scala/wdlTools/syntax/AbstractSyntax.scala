@@ -146,7 +146,6 @@ object AbstractSyntax {
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement])
 
-  case class Version(value: String)
   case class Document(version: String,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow])
