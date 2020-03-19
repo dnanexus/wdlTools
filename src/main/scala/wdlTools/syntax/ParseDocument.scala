@@ -1,4 +1,4 @@
-package wdlTools
+package wdlTools.syntax
 
 // Parse one document. Do not follow imports.
 
@@ -12,16 +12,18 @@ import org.antlr.v4.runtime._
 import org.openwdl.wdl.parser._
 
 import ConcreteSyntax._
+import wdlTools.util.Util.Conf
 
 object ParseDocument {
-  private def getParser(inp: String): (ErrorListener, WdlParser) = {
+  private def getParser(inp: String,
+                        conf : Conf): (ErrorListener, WdlParser) = {
     val codePointBuffer: CodePointBuffer =
       CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
     val lexer: WdlLexer = new WdlLexer(CodePointCharStream.fromBuffer(codePointBuffer))
     val parser: WdlParser = new WdlParser(new CommonTokenStream(lexer))
 
     // setting up our own error handling
-    val errListener = ErrorListener(assertNoErrors = false, verbose = false)
+    val errListener = ErrorListener(conf)
     lexer.removeErrorListeners()
     lexer.addErrorListener(errListener)
     parser.removeErrorListeners()
@@ -30,20 +32,17 @@ object ParseDocument {
     (errListener, parser)
   }
 
-  def apply(sourceCode: String,
-            verbose: Boolean,
-            quiet: Boolean = false,
-            antrl4Trace: Boolean = false): Document = {
-    val (errListener, parser) = getParser(sourceCode)
-    if (antrl4Trace)
+  def apply(sourceCode: String, conf : Conf) : Document = {
+    val (errListener, parser) = getParser(sourceCode, conf)
+    if (conf.antlr4Trace)
       parser.setTrace(true)
-    val visitor = new ParseDocument(verbose)
+    val visitor = new ParseDocument(conf)
     val document = visitor.visitDocument(parser.document)
 
     // check if any errors were found
     val errors: Vector[SyntaxError] = errListener.getAllErrors
     if (errors.nonEmpty) {
-      if (!quiet) {
+      if (!conf.quiet) {
         for (err <- errors) {
           System.out.println(err)
         }
@@ -54,7 +53,7 @@ object ParseDocument {
   }
 }
 
-case class ParseDocument(verbose: Boolean) extends WdlParserBaseVisitor[Element] {
+case class ParseDocument(conf : Conf) extends WdlParserBaseVisitor[Element] {
 
   private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
     val tok = ctx.start
