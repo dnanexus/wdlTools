@@ -24,11 +24,11 @@ class CheckerTest extends FlatSpec with Matchers {
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }*/
 
-  it should "typecheck a declaration" in {
+  it should "type check simple declarations" in {
     val decl = AST.Declaration("a", AST.TypeInt, None)
-    checker.apply(decl) shouldBe(true)
+    checker.apply(decl, Map.empty)
 
     val decl2 = AST.Declaration("a", AST.TypeInt, Some(AST.ValueInt(13)))
-    checker.apply(decl2) shouldBe(true)
+    checker.apply(decl2, Map.empty)
   }
 }

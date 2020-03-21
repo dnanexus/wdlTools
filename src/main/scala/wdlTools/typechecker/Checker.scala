@@ -1,11 +1,17 @@
 package wdlTools.typechecker
 
 import wdlTools.util.Util.Conf
-import wdlTools.syntax.{AbstractSyntax => AST}
+import wdlTools.syntax.AbstractSyntax._
 
 case class Checker(conf : Conf) {
 
-  type Context = Map[String, AST.Type]
+  type Context = Map[String, Type]
+
+  // There are cases where we don't know the type. For example, an empty array, or an empty map.
+  //
+  // Array[Int] names = []
+  // Map[String, File] locations = {}
+  case object TypeUnknown extends Type
 
   // check if the right hand side of an assignment matches the left hand side
   //
@@ -18,34 +24,284 @@ case class Checker(conf : Conf) {
   //    Int j = k * 3
   //    String s = "Ford model T"
   //    String s2 = 5
-  private def tMatch(left : AST.Type,
-                     right : AST.Type) : Boolean = ???
+  private def isCoercibleTo(left : Type, right : Type) : Boolean = {
+    (left, right) match {
+      case (TypeString, (TypeString | TypeFile | TypeBoolean | TypeInt | TypeFloat)) => true
+      case (TypeFile, (TypeString | TypeFile)) => true
+      case (TypeBoolean, TypeBoolean) => true
+      case (TypeInt, TypeInt) => true
+      case (TypeFloat, (TypeInt | TypeFloat)) => true
 
-  private def typeEval(expr : AST.Expr,
-                       ctx : Context) : AST.Type = ???
+      case (TypeOptional(l), TypeOptional(r)) => isCoercibleTo(l, r)
+      case (TypeOptional(l), r) => isCoercibleTo(l, r)
 
+      case (TypeArray(l, _), TypeArray(r, _)) => isCoercibleTo(l, r)
+      case (TypeMap(kl,vl), TypeMap(kr,vr)) => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
+      case (TypePair(l1, l2), TypePair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
+
+      case (TypeIdentifier(structNameL), TypeIdentifier(structNameR)) =>
+        structNameL == structNameR
+
+      case (TypeObject, TypeObject) => true
+
+      case (_, TypeUnknown) => true
+      case (TypeUnknown, _) => true
+
+      case _ => false
+    }
+  }
+
+  private def typeEvalMathOp(expr: Expr, ctx : Context) : Type = {
+    val t = typeEval(expr, ctx)
+    t match {
+      case TypeInt => TypeInt
+      case TypeFloat => TypeFloat
+      case _ => throw new Exception(s"${expr} must be an integer or a float")
+    }
+  }
+
+  private def typeEvalMathOp(a : Expr, b : Expr, ctx : Context) : Type = {
+    val at = typeEval(a, ctx)
+    val bt = typeEval(b, ctx)
+    (at, bt) match {
+      case (TypeInt, TypeInt) => TypeInt
+      case (TypeFloat, TypeInt) => TypeFloat
+      case (TypeInt, TypeFloat) => TypeFloat
+      case (TypeFloat, TypeFloat) => TypeFloat
+      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
+    }
+  }
+
+  private def typeEvalLogicalOp(expr : Expr, ctx : Context) : Type = {
+    val t = typeEval(expr, ctx)
+    t match {
+      case TypeBoolean => TypeBoolean
+      case other =>
+        throw new Exception(s"${expr} must be a boolean, it is ${other}")
+    }
+  }
+
+  private def typeEvalLogicalOp(a : Expr, b : Expr, ctx : Context) : Type = {
+    val at = typeEval(a, ctx)
+    val bt = typeEval(b, ctx)
+    (at, bt) match {
+      case (TypeBoolean, TypeBoolean) => TypeBoolean
+      case (_, _) => throw new Exception(s"${a} and ${b} must have boolean type")
+    }
+  }
+
+  private def typeEvalCompareNumbersOp(a : Expr, b : Expr, ctx : Context) : Type = {
+    val at = typeEval(a, ctx)
+    val bt = typeEval(b, ctx)
+    (at, bt) match {
+      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat))  => TypeBoolean
+      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
+    }
+  }
+
+  private def typeEvalCompareOp(a : Expr, b : Expr, ctx : Context) : Type = {
+    val at = typeEval(a, ctx)
+    val bt = typeEval(b, ctx)
+    (at, bt) match {
+      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat))  => TypeBoolean
+      case (TypeString, TypeString) => TypeBoolean
+      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers, floats, or strings")
+    }
+  }
+
+  // Figure out what the type of an expression is.
+  //
+  private def typeEval(expr : Expr, ctx : Context) : Type = {
+    expr match {
+      // base cases, primitive types
+      case _ : ValueString => TypeString
+      case _ : ValueFile => TypeFile
+      case _ : ValueBoolean => TypeBoolean
+      case _ : ValueInt => TypeInt
+      case _ : ValueFloat => TypeFloat
+
+      // an identifier has to be bound to a known type
+      case ExprIdentifier(id) =>
+        ctx.get(id) match {
+          case None => throw new RuntimeException(s"Identifier ${id} is not defined")
+          case Some(t) => t
+        }
+
+      // All the sub-exressions have to be strings, or coercible to strings
+      case ExprCompoundString(vec) =>
+        vec.foreach{
+          case subExpr =>
+            val t = typeEval(subExpr, ctx)
+            if (!isCoercibleTo(TypeString, t))
+              throw new Exception(s"Type ${t} is not coercible to string")
+        }
+        TypeString
+
+      case ExprPair(l, r) => TypePair(typeEval(l, ctx), typeEval(r, ctx))
+      case ExprArray(vec) if vec.isEmpty =>
+          // The array is empty, we can't tell what the array type is.
+        TypeArray(TypeUnknown, false)
+
+      case ExprArray(vec) =>
+        val vecTypes = vec.map(typeEval(_, ctx))
+        val t = vecTypes.head
+        if (!vecTypes.tail.forall(isCoercibleTo(_, t)))
+          throw new Exception(s"Array elements do not all have type ${t}")
+        TypeArray(t, false)
+
+      case ExprMap(m) if m.isEmpty =>
+        // The map type is unknown
+        TypeMap(TypeUnknown, TypeUnknown)
+
+      case ExprMap(m) =>
+        // figure out the types from the first element
+        val mTypes : Map[Type, Type] = m.map{
+          case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
+        }
+        val tk = mTypes.keys.head
+        if (!mTypes.keys.tail.forall(isCoercibleTo(_, tk)))
+          throw new Exception(s"Map keys do not all have type ${tk}")
+        val tv = mTypes.values.head
+        if (!mTypes.values.tail.forall(isCoercibleTo(_, tv)))
+          throw new Exception(s"Map values do not all have type ${tv}")
+
+        TypeMap(tk, tv)
+
+        // These are expressions like:
+        // ${true="--yes" false="--no" boolean_value}
+      case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr) =>
+        val tType = typeEval(t, ctx)
+        val fType = typeEval(f, ctx)
+        if (fType != tType)
+          throw new Exception(s"subexpressions ${t} and ${f} in ${expr} must have the same type")
+        val tv = typeEval(value, ctx)
+        if (tv != TypeBoolean)
+          throw new Exception(s"${value} in ${expr} should have boolean type, it has type ${tv} instead")
+        tType
+
+      // An expression like:
+      // ${default="foo" optional_value}
+      case ExprPlaceholderDefault(default: Expr, value: Expr) =>
+        val vt = typeEval(value, ctx)
+        val dt = typeEval(default, ctx)
+        vt match {
+          case TypeOptional(vt2) if vt2 == dt => dt
+          case _ =>
+            throw new Exception(s"""|Subxpression ${value} in ${expr} must have type optional(${dt})
+                                    |it has type ${vt} instead""".stripMargin.replaceAll("\n", " "))
+        }
+
+      // An expression like:
+      // ${sep=", " array_value}
+      case ExprPlaceholderSep(sep: Expr, value: Expr) =>
+        val sepType = typeEval(sep, ctx)
+        if (sepType != TypeString)
+          throw new Exception(s"separator ${sep} in ${expr} must have string type")
+        val vt = typeEval(value, ctx)
+        vt match {
+          case TypeArray(t, _) if isCoercibleTo(TypeString, t) =>
+            TypeString
+          case other =>
+            throw new Exception(s"expression ${value} should be of type Array[String], but it is ${other}")
+        }
+
+      // math operators on one argument
+      case ExprUniraryPlus(value) => typeEvalMathOp(value, ctx)
+      case ExprUniraryMinus(value) => typeEvalMathOp(value, ctx)
+
+      // logical operators
+      case ExprLor(a: Expr, b: Expr) => typeEvalLogicalOp(a, b, ctx)
+      case ExprLand(a: Expr, b: Expr) => typeEvalLogicalOp(a, b, ctx)
+      case ExprNegate(value: Expr) => typeEvalLogicalOp(value, ctx)
+
+      // equality comparisons
+      case ExprEqeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
+      case ExprNeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
+
+      // comparisons, the arguments must be integers or floats
+      case ExprLt(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+      case ExprGte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+      case ExprLte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+      case ExprGt(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+
+      // math operators on two arguments
+      case ExprAdd(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+      case ExprSub(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+      case ExprMod(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+      case ExprMul(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+      case ExprDivide(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+
+      // Access an array element at [index]
+      case ExprAt(array: Expr, index: Expr) =>
+        val idxt = typeEval(index, ctx)
+        if (idxt != TypeInt)
+          throw new Exception(s"${index} must be an integer")
+        val arrayt = typeEval(array, ctx)
+        arrayt match {
+          case TypeArray(elemType, _) => elemType
+          case _ => throw new Exception(s"subexpression ${array} in (${expr}) must be an array")
+        }
+
+      // conditional:
+      // if (x == 1) then "Sunday" else "Weekday"
+      case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) =>
+        val condType = typeEval(cond, ctx)
+        if (condType != TypeBoolean)
+          throw new Exception(s"condition ${cond} must be a boolean")
+        val tBranchT = typeEval(tBranch, ctx)
+        val fBranchT = typeEval(fBranch, ctx)
+        if (tBranchT != fBranchT)
+          throw new Exception(s"The branches of conditional (${expr}) expression must the same type")
+        tBranchT
+
+      // Apply a standard library function to arguments. For example:
+      //   read_int("4")
+      case ExprApply(funcName: String, elements: Vector[Expr]) =>
+        throw new Exception("NotImplemented : standard library functions")
+
+        // Access a field in a struct or an object. For example:
+        //   Int z = x.a
+      case ExprGetName(e: Expr, id: String) =>
+        throw new Exception("TODO")
+    }
+  }
+
+  // In a declaration the right hand type must be coercible to
+  // the left hand type.
+  //
   // Examples:
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def apply(decl : AST.Declaration, ctx : Context) : Boolean = {
+  def apply(decl : Declaration, ctx : Context) : Unit = {
     decl.expr match {
       case None =>
-        true
+        ()
       case Some(expr) =>
-        val rhsType : AST.Type = typeEval(expr)
-        tMatch(decl.wdlType, rhsType)
+        val rhsType : Type = typeEval(expr, ctx)
+        if (!isCoercibleTo(decl.wdlType, rhsType))
+          throw new Exception(s"declaration ${decl} is badly typed")
     }
   }
 
-  def apply(inputSection : AST.InputSection, ctx : Context) : Boolean = {
-    val cDecl = inputSection.declarations.map(apply)
-    cDecl.forall(_ == true)
+  // type check the input section and return a context with bindings for all of the input variables.
+  private def applyInputSection(inputSection : InputSection, ctx : Context) : Context = {
+    val ctx2 = inputSection.declarations.foldLeft(ctx){
+      case (accu : Context, decl) =>
+        // check the declaration and add a binding for its (variable -> wdlType)
+        apply(decl, accu)
+        accu + (decl.name -> decl.wdlType)
+    }
+    ctx2
   }
 
-  def apply(outputSection : AST.OutputSection, ctx : Context) : Boolean = {
-    val cDecl = outputSection.declarations.map(apply)
-    cDecl.forall(_ == true)
+  private def applyOutputSection(outputSection : OutputSection, ctx : Context) : Unit = {
+    outputSection.declarations.foldLeft(ctx){
+      case (accu : Context, decl) =>
+        // check the declaration and add a binding for its (variable -> wdlType)
+        apply(decl, accu)
+        accu + (decl.name -> decl.wdlType)
+    }
   }
 
   // TASK
@@ -55,42 +311,34 @@ case class Checker(conf : Conf) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  def apply(task : AST.Task, ctx : Context) : Boolean = {
-    val cIn = task.input.map(apply).getOrElse(true)
-    if (!cIn)
-      return false
-    val cOut = task.output.map(apply).getOrElse(true)
-    if (!cOut)
-      return false
-    return true
+  private def applyTask(task : Task, ctx : Context) : Unit = {
+    val ctx2 : Context = task.input match {
+      case None => Map.empty
+      case Some(inpSection) => applyInputSection(inpSection, ctx)
+    }
+    task.output.map(x => applyOutputSection(x, ctx2))
   }
 
-  // DOCUMENT
+  // Main entry point
   //
-  // check if the WDL document is correctly typed
-  def apply(doc : AST.Document) : Boolean = {
-    val vec : Vector[Boolean] = doc.elements.map{
-      case task : AST.Task =>
-        apply(task)
+  // check if the WDL document is correctly typed. Otherwise, throw an exception
+  // describing the problem in a human readable fashion.
+  def apply(doc : Document) : Unit = {
+    doc.elements.foreach{
+      case task : Task =>
+        applyTask(task, Map.empty)
 
-      case importDoc : AST.ImportDoc =>
+      case importDoc : ImportDoc =>
         // don't go into imports right now
-        true
+        ()
 
-      case struct : AST.TypeStruct =>
+      case struct : TypeStruct =>
         // TODO: record the struct, because we are going to need it
         // for the rest of the typechecking.
-        true
+        ()
     }
-
-    // a single type error suffices to declare
-    // the entire document wrong
-    if (vec.exists(_ == false))
-      return false
 
     // TODO
     // doc.workflow
-
-    return true
   }
 }

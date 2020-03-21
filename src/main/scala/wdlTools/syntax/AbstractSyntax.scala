@@ -2,11 +2,11 @@ package wdlTools.syntax
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
-  sealed trait WorkflowElement
-  sealed trait DocumentElement
+  trait WorkflowElement
+  trait DocumentElement
 
   // type system
-  sealed trait Type
+  trait Type
   case class TypeOptional(t: Type) extends Type
   case class TypeArray(t: Type, nonEmpty: Boolean) extends Type
   case class TypeMap(k: Type, v: Type) extends Type
@@ -21,20 +21,21 @@ object AbstractSyntax {
   case class TypeStruct(name: String, members: Map[String, Type]) extends Type with DocumentElement
 
   // expressions
-  sealed trait Expr
+  trait Expr
 
   // values
-  sealed trait Value extends Expr
+  trait Value extends Expr
   case class ValueString(value: String) extends Value
   case class ValueFile(value: String) extends Value
   case class ValueBoolean(value: Boolean) extends Value
   case class ValueInt(value: Int) extends Value
   case class ValueFloat(value: Double) extends Value
 
+  case class ExprIdentifier(id: String) extends Expr
+
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprIdentifier(id: String) extends Expr
   case class ExprCompoundString(value: Vector[Expr]) extends Expr
   case class ExprPair(l: Expr, r: Expr) extends Expr
   case class ExprArray(value: Vector[Expr]) extends Expr
