@@ -2,77 +2,34 @@ package wdlTools.typechecker
 
 import wdlTools.util.Util.Conf
 import wdlTools.syntax.AbstractSyntax._
+import Base._
 
-case class Checker(conf : Conf) {
+case class Checker(stdlib: Stdlib, conf: Conf) {
 
   type Context = Map[String, Type]
 
-  // There are cases where we don't know the type. For example, an empty array, or an empty map.
-  //
-  // Array[Int] names = []
-  // Map[String, File] locations = {}
-  case object TypeUnknown extends Type
-
-  // check if the right hand side of an assignment matches the left hand side
-  //
-  // Negative examples:
-  //    Int i = "hello"
-  //    Array[File] files = "8"
-  //
-  // Positive examples:
-  //    Int k =  3 + 9
-  //    Int j = k * 3
-  //    String s = "Ford model T"
-  //    String s2 = 5
-  private def isCoercibleTo(left : Type, right : Type) : Boolean = {
-    (left, right) match {
-      case (TypeString, (TypeString | TypeFile | TypeBoolean | TypeInt | TypeFloat)) => true
-      case (TypeFile, (TypeString | TypeFile)) => true
-      case (TypeBoolean, TypeBoolean) => true
-      case (TypeInt, TypeInt) => true
-      case (TypeFloat, (TypeInt | TypeFloat)) => true
-
-      case (TypeOptional(l), TypeOptional(r)) => isCoercibleTo(l, r)
-      case (TypeOptional(l), r) => isCoercibleTo(l, r)
-
-      case (TypeArray(l, _), TypeArray(r, _)) => isCoercibleTo(l, r)
-      case (TypeMap(kl,vl), TypeMap(kr,vr)) => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
-      case (TypePair(l1, l2), TypePair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
-
-      case (TypeIdentifier(structNameL), TypeIdentifier(structNameR)) =>
-        structNameL == structNameR
-
-      case (TypeObject, TypeObject) => true
-
-      case (_, TypeUnknown) => true
-      case (TypeUnknown, _) => true
-
-      case _ => false
-    }
-  }
-
-  private def typeEvalMathOp(expr: Expr, ctx : Context) : Type = {
+  private def typeEvalMathOp(expr: Expr, ctx: Context): Type = {
     val t = typeEval(expr, ctx)
     t match {
-      case TypeInt => TypeInt
+      case TypeInt   => TypeInt
       case TypeFloat => TypeFloat
-      case _ => throw new Exception(s"${expr} must be an integer or a float")
+      case _         => throw new Exception(s"${expr} must be an integer or a float")
     }
   }
 
-  private def typeEvalMathOp(a : Expr, b : Expr, ctx : Context) : Type = {
+  private def typeEvalMathOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
-      case (TypeInt, TypeInt) => TypeInt
-      case (TypeFloat, TypeInt) => TypeFloat
-      case (TypeInt, TypeFloat) => TypeFloat
+      case (TypeInt, TypeInt)     => TypeInt
+      case (TypeFloat, TypeInt)   => TypeFloat
+      case (TypeInt, TypeFloat)   => TypeFloat
       case (TypeFloat, TypeFloat) => TypeFloat
-      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
+      case (_, _)                 => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
     }
   }
 
-  private def typeEvalLogicalOp(expr : Expr, ctx : Context) : Type = {
+  private def typeEvalLogicalOp(expr: Expr, ctx: Context): Type = {
     val t = typeEval(expr, ctx)
     t match {
       case TypeBoolean => TypeBoolean
@@ -81,55 +38,54 @@ case class Checker(conf : Conf) {
     }
   }
 
-  private def typeEvalLogicalOp(a : Expr, b : Expr, ctx : Context) : Type = {
+  private def typeEvalLogicalOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
       case (TypeBoolean, TypeBoolean) => TypeBoolean
-      case (_, _) => throw new Exception(s"${a} and ${b} must have boolean type")
+      case (_, _)                     => throw new Exception(s"${a} and ${b} must have boolean type")
     }
   }
 
-  private def typeEvalCompareNumbersOp(a : Expr, b : Expr, ctx : Context) : Type = {
+  private def typeEvalCompareNumbersOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
-      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat))  => TypeBoolean
-      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
+      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat)) => TypeBoolean
+      case (_, _)                                         => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
     }
   }
 
-  private def typeEvalCompareOp(a : Expr, b : Expr, ctx : Context) : Type = {
+  private def typeEvalCompareOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
-    (at, bt) match {
-      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat))  => TypeBoolean
-      case (TypeString, TypeString) => TypeBoolean
-      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} must be integers, floats, or strings")
-    }
+    if (at == bt)
+      TypeBoolean
+    else
+      throw new Exception(s"Expressions ${a} and ${b} must have the same type")
   }
 
   // Figure out what the type of an expression is.
   //
-  private def typeEval(expr : Expr, ctx : Context) : Type = {
+  private def typeEval(expr: Expr, ctx: Context): Type = {
     expr match {
       // base cases, primitive types
-      case _ : ValueString => TypeString
-      case _ : ValueFile => TypeFile
-      case _ : ValueBoolean => TypeBoolean
-      case _ : ValueInt => TypeInt
-      case _ : ValueFloat => TypeFloat
+      case _: ValueString  => TypeString
+      case _: ValueFile    => TypeFile
+      case _: ValueBoolean => TypeBoolean
+      case _: ValueInt     => TypeInt
+      case _: ValueFloat   => TypeFloat
 
       // an identifier has to be bound to a known type
       case ExprIdentifier(id) =>
         ctx.get(id) match {
-          case None => throw new RuntimeException(s"Identifier ${id} is not defined")
+          case None    => throw new RuntimeException(s"Identifier ${id} is not defined")
           case Some(t) => t
         }
 
       // All the sub-exressions have to be strings, or coercible to strings
       case ExprCompoundString(vec) =>
-        vec.foreach{
+        vec.foreach {
           case subExpr =>
             val t = typeEval(subExpr, ctx)
             if (!isCoercibleTo(TypeString, t))
@@ -137,9 +93,9 @@ case class Checker(conf : Conf) {
         }
         TypeString
 
-      case ExprPair(l, r) => TypePair(typeEval(l, ctx), typeEval(r, ctx))
+      case ExprPair(l, r)                => TypePair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec) if vec.isEmpty =>
-          // The array is empty, we can't tell what the array type is.
+        // The array is empty, we can't tell what the array type is.
         TypeArray(TypeUnknown, false)
 
       case ExprArray(vec) =>
@@ -155,7 +111,7 @@ case class Checker(conf : Conf) {
 
       case ExprMap(m) =>
         // figure out the types from the first element
-        val mTypes : Map[Type, Type] = m.map{
+        val mTypes: Map[Type, Type] = m.map {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
         val tk = mTypes.keys.head
@@ -167,8 +123,8 @@ case class Checker(conf : Conf) {
 
         TypeMap(tk, tv)
 
-        // These are expressions like:
-        // ${true="--yes" false="--no" boolean_value}
+      // These are expressions like:
+      // ${true="--yes" false="--no" boolean_value}
       case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr) =>
         val tType = typeEval(t, ctx)
         val fType = typeEval(f, ctx)
@@ -176,7 +132,9 @@ case class Checker(conf : Conf) {
           throw new Exception(s"subexpressions ${t} and ${f} in ${expr} must have the same type")
         val tv = typeEval(value, ctx)
         if (tv != TypeBoolean)
-          throw new Exception(s"${value} in ${expr} should have boolean type, it has type ${tv} instead")
+          throw new Exception(
+              s"${value} in ${expr} should have boolean type, it has type ${tv} instead"
+          )
         tType
 
       // An expression like:
@@ -202,33 +160,35 @@ case class Checker(conf : Conf) {
           case TypeArray(t, _) if isCoercibleTo(TypeString, t) =>
             TypeString
           case other =>
-            throw new Exception(s"expression ${value} should be of type Array[String], but it is ${other}")
+            throw new Exception(
+                s"expression ${value} should be of type Array[String], but it is ${other}"
+            )
         }
 
       // math operators on one argument
-      case ExprUniraryPlus(value) => typeEvalMathOp(value, ctx)
+      case ExprUniraryPlus(value)  => typeEvalMathOp(value, ctx)
       case ExprUniraryMinus(value) => typeEvalMathOp(value, ctx)
 
       // logical operators
-      case ExprLor(a: Expr, b: Expr) => typeEvalLogicalOp(a, b, ctx)
+      case ExprLor(a: Expr, b: Expr)  => typeEvalLogicalOp(a, b, ctx)
       case ExprLand(a: Expr, b: Expr) => typeEvalLogicalOp(a, b, ctx)
-      case ExprNegate(value: Expr) => typeEvalLogicalOp(value, ctx)
+      case ExprNegate(value: Expr)    => typeEvalLogicalOp(value, ctx)
 
       // equality comparisons
       case ExprEqeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
-      case ExprNeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
+      case ExprNeq(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
 
       // comparisons, the arguments must be integers or floats
-      case ExprLt(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+      case ExprLt(a: Expr, b: Expr)  => typeEvalCompareNumbersOp(a, b, ctx)
       case ExprGte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
       case ExprLte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
-      case ExprGt(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
+      case ExprGt(a: Expr, b: Expr)  => typeEvalCompareNumbersOp(a, b, ctx)
 
       // math operators on two arguments
-      case ExprAdd(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
-      case ExprSub(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
-      case ExprMod(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
-      case ExprMul(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
+      case ExprAdd(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
+      case ExprSub(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
+      case ExprMod(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
+      case ExprMul(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
       case ExprDivide(a: Expr, b: Expr) => typeEvalMathOp(a, b, ctx)
 
       // Access an array element at [index]
@@ -239,7 +199,7 @@ case class Checker(conf : Conf) {
         val arrayt = typeEval(array, ctx)
         arrayt match {
           case TypeArray(elemType, _) => elemType
-          case _ => throw new Exception(s"subexpression ${array} in (${expr}) must be an array")
+          case _                      => throw new Exception(s"subexpression ${array} in (${expr}) must be an array")
         }
 
       // conditional:
@@ -251,18 +211,32 @@ case class Checker(conf : Conf) {
         val tBranchT = typeEval(tBranch, ctx)
         val fBranchT = typeEval(fBranch, ctx)
         if (tBranchT != fBranchT)
-          throw new Exception(s"The branches of conditional (${expr}) expression must the same type")
+          throw new Exception(
+              s"The branches of conditional (${expr}) expression must the same type"
+          )
         tBranchT
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
       case ExprApply(funcName: String, elements: Vector[Expr]) =>
-        throw new Exception("NotImplemented : standard library functions")
+        val elementTypes = elements.map(typeEval(_, ctx))
+        stdlib.apply(funcName, elementTypes)
 
-        // Access a field in a struct or an object. For example:
-        //   Int z = x.a
+      // Access a field in a struct or an object. For example:
+      //   Int z = x.a
       case ExprGetName(e: Expr, id: String) =>
-        throw new Exception("TODO")
+        val et = typeEval(e, ctx)
+        et match {
+          case TypeStruct(name, members) =>
+            members.get(id) match {
+              case None =>
+                throw new Exception(
+                    s"Struct ${name} does not have member ${id} in expression ${expr}"
+                )
+              case Some(t) =>
+                t
+            }
+        }
     }
   }
 
@@ -273,21 +247,21 @@ case class Checker(conf : Conf) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def apply(decl : Declaration, ctx : Context) : Unit = {
+  def apply(decl: Declaration, ctx: Context): Unit = {
     decl.expr match {
       case None =>
         ()
       case Some(expr) =>
-        val rhsType : Type = typeEval(expr, ctx)
+        val rhsType: Type = typeEval(expr, ctx)
         if (!isCoercibleTo(decl.wdlType, rhsType))
           throw new Exception(s"declaration ${decl} is badly typed")
     }
   }
 
   // type check the input section and return a context with bindings for all of the input variables.
-  private def applyInputSection(inputSection : InputSection, ctx : Context) : Context = {
-    val ctx2 = inputSection.declarations.foldLeft(ctx){
-      case (accu : Context, decl) =>
+  private def applyInputSection(inputSection: InputSection, ctx: Context): Context = {
+    val ctx2 = inputSection.declarations.foldLeft(ctx) {
+      case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
         apply(decl, accu)
         accu + (decl.name -> decl.wdlType)
@@ -295,9 +269,9 @@ case class Checker(conf : Conf) {
     ctx2
   }
 
-  private def applyOutputSection(outputSection : OutputSection, ctx : Context) : Unit = {
-    outputSection.declarations.foldLeft(ctx){
-      case (accu : Context, decl) =>
+  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Unit = {
+    outputSection.declarations.foldLeft(ctx) {
+      case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
         apply(decl, accu)
         accu + (decl.name -> decl.wdlType)
@@ -311,34 +285,59 @@ case class Checker(conf : Conf) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task : Task, ctx : Context) : Unit = {
-    val ctx2 : Context = task.input match {
-      case None => Map.empty
+  private def applyTask(task: Task, ctx: Context): TypeTask = {
+    val ctx2: Context = task.input match {
+      case None             => Map.empty
       case Some(inpSection) => applyInputSection(inpSection, ctx)
     }
-    task.output.map(x => applyOutputSection(x, ctx2))
+    val _ = task.output.map(x => applyOutputSection(x, ctx2))
+
+    // calculate the type of task
+    val inputType: Map[String, Type] = task.input match {
+      case None => Map.empty
+      case Some(InputSection(decls)) =>
+        decls.map {
+          case decl =>
+            decl.name -> decl.wdlType
+        }.toMap
+    }
+    val outputType: Map[String, Type] = task.output match {
+      case None => Map.empty
+      case Some(OutputSection(decls)) =>
+        decls.map {
+          case decl =>
+            decl.name -> decl.wdlType
+        }.toMap
+    }
+    TypeTask(task.name, inputType, outputType)
   }
+
+  private def applyWorkflow(wf: Workflow, ctx: Context): Unit = ???
 
   // Main entry point
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc : Document) : Unit = {
-    doc.elements.foreach{
-      case task : Task =>
-        applyTask(task, Map.empty)
+  def apply(doc: Document): Unit = {
+    val context: Context = doc.elements.foldLeft(Map.empty[String, Type]) {
+      case (context, task: Task) =>
+        val taskType = applyTask(task, Map.empty)
+        context + (task.name -> taskType)
 
-      case importDoc : ImportDoc =>
+      case (context, importDoc: ImportDoc) =>
         // don't go into imports right now
-        ()
+        context
 
-      case struct : TypeStruct =>
-        // TODO: record the struct, because we are going to need it
-        // for the rest of the typechecking.
-        ()
+      case (context, struct: TypeStruct) =>
+        // Add the struct to the context
+        context + (struct.name -> struct)
+
+      case (_, other) =>
+        throw new Exception("sanity: wrong element type in workflow")
     }
 
-    // TODO
-    // doc.workflow
+    // now that we have types for everything else, we can check the workflow
+    doc.workflow.map(applyWorkflow(_, context))
+    ()
   }
 }

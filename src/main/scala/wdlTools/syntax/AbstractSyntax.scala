@@ -8,7 +8,7 @@ object AbstractSyntax {
   // type system
   trait Type
   case class TypeOptional(t: Type) extends Type
-  case class TypeArray(t: Type, nonEmpty: Boolean) extends Type
+  case class TypeArray(t: Type, nonEmpty: Boolean = false) extends Type
   case class TypeMap(k: Type, v: Type) extends Type
   case class TypePair(l: Type, r: Type) extends Type
   case object TypeString extends Type

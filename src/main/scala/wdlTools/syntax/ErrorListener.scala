@@ -7,7 +7,6 @@ import org.antlr.v4.runtime.Token
 
 import wdlTools.util.Util.Conf
 
-
 case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
 
 case class ErrorListener(conf: Conf) extends BaseErrorListener {
