@@ -320,9 +320,10 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
           throw new Exception(s"Expression ${expr} in the command section is not a string")
     }
 
-    val _ = task.output.map(x => applyOutputSection(x, ctx2))
+    // check the output section. We don't need a return context.
+    task.output.map(x => applyOutputSection(x, ctx2))
 
-    // calculate the type of task
+    // calculate the type of task. This is like building a prototype
     val inputType: Map[String, Type] = task.input match {
       case None => Map.empty
       case Some(InputSection(decls)) =>

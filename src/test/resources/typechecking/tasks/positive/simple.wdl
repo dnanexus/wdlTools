@@ -12,6 +12,7 @@ task simple {
   String s4 = s3 + 89
 
   command {
+    echo "~{s3} ~{s4}"
   }
   output {
     Int c = a + b
