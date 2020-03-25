@@ -17,6 +17,30 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     }
   }
 
+  // The add operation is overloaded.
+  // 1) The result of adding two integers is an integer
+  // 2)    -"-                   floats   -"-   float
+  // 3)    -"-                   strings  -"-   string
+  private def typeEvalAdd(a: Expr, b: Expr, ctx: Context): Type = {
+    val at = typeEval(a, ctx)
+    val bt = typeEval(b, ctx)
+    (at, bt) match {
+      case (TypeInt, TypeInt)     => TypeInt
+      case (TypeFloat, TypeInt)   => TypeFloat
+      case (TypeInt, TypeFloat)   => TypeFloat
+      case (TypeFloat, TypeFloat) => TypeFloat
+
+        // if we are adding strings, the result is a string
+      case (TypeString, TypeString) => TypeString
+      case (TypeString, TypeInt) => TypeString
+      case (TypeString, TypeFloat) => TypeString
+      case (TypeInt,    TypeString) => TypeString
+      case (TypeFloat,  TypeString) => TypeString
+
+      case (_, _)                 => throw new Exception(s"Expressions ${a} and ${b} must be integers, floats, or strings")
+    }
+  }
+
   private def typeEvalMathOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
@@ -44,15 +68,6 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     (at, bt) match {
       case (TypeBoolean, TypeBoolean) => TypeBoolean
       case (_, _)                     => throw new Exception(s"${a} and ${b} must have boolean type")
-    }
-  }
-
-  private def typeEvalCompareNumbersOp(a: Expr, b: Expr, ctx: Context): Type = {
-    val at = typeEval(a, ctx)
-    val bt = typeEval(b, ctx)
-    (at, bt) match {
-      case ((TypeInt | TypeFloat), (TypeInt | TypeFloat)) => TypeBoolean
-      case (_, _)                                         => throw new Exception(s"Expressions ${a} and ${b} must be integers or floats")
     }
   }
 
@@ -177,15 +192,15 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       // equality comparisons
       case ExprEqeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
       case ExprNeq(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
+      case ExprLt(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
+      case ExprGte(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
+      case ExprLte(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
+      case ExprGt(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
 
-      // comparisons, the arguments must be integers or floats
-      case ExprLt(a: Expr, b: Expr)  => typeEvalCompareNumbersOp(a, b, ctx)
-      case ExprGte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
-      case ExprLte(a: Expr, b: Expr) => typeEvalCompareNumbersOp(a, b, ctx)
-      case ExprGt(a: Expr, b: Expr)  => typeEvalCompareNumbersOp(a, b, ctx)
+      // add is overloaded, it is a special case
+      case ExprAdd(a: Expr, b: Expr)    => typeEvalAdd(a, b, ctx)
 
       // math operators on two arguments
-      case ExprAdd(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
       case ExprSub(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
       case ExprMod(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
       case ExprMul(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
@@ -240,6 +255,8 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     }
   }
 
+  // check the declaration and add a binding for its (variable -> wdlType)
+  //
   // In a declaration the right hand type must be coercible to
   // the left hand type.
   //
@@ -247,7 +264,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def apply(decl: Declaration, ctx: Context): Unit = {
+  def apply(decl: Declaration, ctx: Context): Context = {
     decl.expr match {
       case None =>
         ()
@@ -256,15 +273,14 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
         if (!isCoercibleTo(decl.wdlType, rhsType))
           throw new Exception(s"declaration ${decl} is badly typed")
     }
+    ctx + (decl.name -> decl.wdlType)
   }
 
   // type check the input section and return a context with bindings for all of the input variables.
   private def applyInputSection(inputSection: InputSection, ctx: Context): Context = {
     val ctx2 = inputSection.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
-        // check the declaration and add a binding for its (variable -> wdlType)
         apply(decl, accu)
-        accu + (decl.name -> decl.wdlType)
     }
     ctx2
   }
@@ -274,7 +290,6 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
         apply(decl, accu)
-        accu + (decl.name -> decl.wdlType)
     }
   }
 
@@ -285,11 +300,26 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: Task, ctx: Context): TypeTask = {
-    val ctx2: Context = task.input match {
+  private def applyTask(task: Task, ctxOuter: Context): TypeTask = {
+    val ctx: Context = task.input match {
       case None             => Map.empty
-      case Some(inpSection) => applyInputSection(inpSection, ctx)
+      case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
     }
+
+    // check the declaration, and accumulate context
+    val ctx2 = task.declarations.foldLeft(ctx){
+      case (accu: Context, decl) =>
+        apply(decl, accu)
+    }
+
+    // check that all expressions in the command section are strings
+    task.command.parts.foreach{
+      case expr =>
+        val t = typeEval(expr, ctx2)
+        if (!isCoercibleTo(TypeString, t))
+          throw new Exception(s"Expression ${expr} in the command section is not a string")
+    }
+
     val _ = task.output.map(x => applyOutputSection(x, ctx2))
 
     // calculate the type of task

@@ -10,7 +10,7 @@ import wdlTools.util.Util.Conf
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   private def getWdlSource(dirname: String, fname: String): String = {
-    val p: String = getClass.getResource(s"/${dirname}/${fname}").getPath
+    val p: String = getClass.getResource(s"/syntax/${dirname}/${fname}").getPath
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
