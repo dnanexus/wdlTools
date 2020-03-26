@@ -10,7 +10,7 @@ import wdlTools.util.{FetchURL, Util}
 import collection.JavaConverters._
 import scala.language.reflectiveCalls
 
-case class Format(conf: WdlToolsConf) extends Command {
+class Format(conf: WdlToolsConf, verbose: Boolean = false) extends Command {
   override def apply(): Unit = {
     val uri = new URI(conf.check.uri())
     val uriLocalPath = Util.getLocalPath(uri)
@@ -19,7 +19,7 @@ case class Format(conf: WdlToolsConf) extends Command {
     val parser = ParseAll(opts)
     val document = parser.apply(sourceCode)
 
-    val formatter = WDL10Formatter(conf.verbosity)
+    val formatter = WDL10Formatter(verbose)
     formatter.formatDocument(uri, document, followImports = conf.format.followImports())
 
     formatter.documents.foreach {
