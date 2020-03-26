@@ -3,10 +3,27 @@ package wdlTools.util
 import java.net.URI
 import java.nio.file.{Path, Paths}
 
+import com.typesafe.config.ConfigFactory
+
 object Util {
+
+  /**
+    * Enumeration for verbosity level.
+    * The values are in increasing order, so that they can be compared using integer comparison
+    * operators, e.g. `if (verbosity > Normal) { println("debugging") }`.
+    */
   object Verbosity extends Enumeration {
     type Verbosity = Value
     val Quiet, Normal, Verbose = Value
+  }
+
+  /**
+    * The current wdlTools version.
+    * @return
+    */
+  def getVersion: String = {
+    val config = ConfigFactory.load("application.conf")
+    config.getString("wdlTools.version")
   }
 
   /**
@@ -35,5 +52,16 @@ object Util {
       case _ =>
         parent.getOrElse(Paths.get("")).resolve(Paths.get(uri.getPath).getFileName)
     }
+  }
+
+  /**
+    * Reads the lines from a file and concatenates the lines using the system line separator.
+    * @param path the path to the file
+    * @return
+    */
+  def readFromFile(path: Path): String = {
+    val source = io.Source.fromFile(path.toString)
+    try source.getLines.mkString(System.lineSeparator())
+    finally source.close()
   }
 }

@@ -3,9 +3,14 @@ package wdlTools.cli
 import java.nio.file.{Path, Paths}
 
 import org.rogach.scallop.{ScallopConf, ScallopOption, Subcommand, ValueConverter, listArgConverter}
-import wdlTools.syntax
-import wdlTools.util.Util.Verbosity.{Normal, Quiet, Verbose, Verbosity}
 
+import wdlTools.syntax
+import wdlTools.util.Util.Verbosity._
+import wdlTools.util.Util.getVersion
+
+/**
+  * Base class for wdlTools CLI commands.
+  */
 trait Command {
   def apply(): Unit
 }
@@ -13,7 +18,7 @@ trait Command {
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
 
-  version(s"wdlTools ${Util.version()}")
+  version(s"wdlTools ${getVersion}")
   banner("""Usage: wdlTools <COMMAND> [OPTIONS]
            |Options:
            |""".stripMargin)
@@ -83,6 +88,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
   verify()
 
+  /**
+    * The verbosity level
+    * @return
+    */
   def verbosity: Verbosity = {
     if (this.verbose.getOrElse(default = false)) {
       Verbose
@@ -93,6 +102,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   }
 
+  /**
+    * The local directories to search for WDL imports.
+    * @param merge a Set of Paths to merge in with the local directories.
+    * @return
+    */
   def localDirectories(merge: Set[Path] = Set.empty): Seq[Path] = {
     if (this.localDir.isDefined) {
       (this.localDir().toSet ++ merge).toVector
@@ -101,6 +115,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }.toVector
   }
 
+  /**
+    * Gets a syntax.Util.Options object based on the command line options.
+    * @param merge a Set of Paths to merge in with the local directories.
+    * @return
+    */
   def getSyntaxOptions(merge: Set[Path]): syntax.Util.Options = {
     syntax.Util.Options(localDirectories = this.localDirectories(merge),
                         verbosity = this.verbosity,
