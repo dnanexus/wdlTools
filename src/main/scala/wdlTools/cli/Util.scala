@@ -30,7 +30,7 @@ object Util {
       case null | "" | "file" => readFromFile(uriLocalPath)
       case _ =>
         syntax
-          .FetchURL(conf.getSyntaxConf(Set(uriLocalPath.getParent)))
+          .FetchURL(conf.getSyntaxOptions(Set(uriLocalPath.getParent)))
           .apply(syntax.URL(uri.toString))
     }
     (uriLocalPath, sourceCode)

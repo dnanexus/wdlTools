@@ -101,7 +101,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }.toVector
   }
 
-  def getSyntaxConf(merge: Set[Path]): syntax.Util.Options = {
+  def getSyntaxOptions(merge: Set[Path]): syntax.Util.Options = {
     syntax.Util.Options(localDirectories = this.localDirectories(merge),
                         verbosity = this.verbosity,
                         antlr4Trace = this.antlr4Trace.getOrElse(default = false))
