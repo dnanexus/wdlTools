@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.syntax.Util.Options
+import wdlTools.util.{FetchURL, Options, URL}
 
 import scala.collection.mutable
 

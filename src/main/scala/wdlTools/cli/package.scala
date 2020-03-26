@@ -4,9 +4,8 @@ import java.nio.file.{Path, Paths}
 
 import org.rogach.scallop.{ScallopConf, ScallopOption, Subcommand, ValueConverter, listArgConverter}
 
-import wdlTools.syntax
-import wdlTools.util.Util.Verbosity._
-import wdlTools.util.Util.getVersion
+import wdlTools.util.Verbosity._
+import wdlTools.util.{Options, Util}
 
 /**
   * Base class for wdlTools CLI commands.
@@ -18,7 +17,7 @@ trait Command {
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
 
-  version(s"wdlTools ${getVersion}")
+  version(s"wdlTools ${Util.getVersion}")
   banner("""Usage: wdlTools <COMMAND> [OPTIONS]
            |Options:
            |""".stripMargin)
@@ -120,9 +119,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     * @param merge a Set of Paths to merge in with the local directories.
     * @return
     */
-  def getSyntaxOptions(merge: Set[Path]): syntax.Util.Options = {
-    syntax.Util.Options(localDirectories = this.localDirectories(merge),
-                        verbosity = this.verbosity,
-                        antlr4Trace = this.antlr4Trace.getOrElse(default = false))
+  def getSyntaxOptions(merge: Set[Path]): Options = {
+    Options(localDirectories = this.localDirectories(merge),
+            verbosity = this.verbosity,
+            antlr4Trace = this.antlr4Trace.getOrElse(default = false))
   }
 }

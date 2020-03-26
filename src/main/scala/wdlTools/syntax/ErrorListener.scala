@@ -5,7 +5,7 @@ import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
 
-import wdlTools.syntax.Util.Options
+import wdlTools.util.Options
 
 case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
 
