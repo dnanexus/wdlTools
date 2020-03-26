@@ -1,7 +1,6 @@
 package wdlTools.typechecker
 
 import collection.JavaConverters._
-import scala.jdk.StreamConverters._
 import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -16,34 +15,57 @@ class CheckerTest extends FlatSpec with Matchers {
   private val parser = new ParseAll(conf)
   private val checker = new Checker(stdlib, conf)
 
-/*  private def getWdlSource(dirname: String, dirname2 : String fname: String): String = {
-    val p: String = getClass.getResource(s"/typechecking/${dirname}/${dirname2}/${fname}").getPath
-    val path: Path = Paths.get(p)
-    Files.readAllLines(path).asScala.mkString(System.lineSeparator())
-  } */
+  // Get a list of WDL files from a resource directory.
+  private def getWdlSourceFiles(dirname: String): Vector[Path] = {
+    val d: String = getClass.getResource(dirname).getPath
+    val folder = Paths.get(d)
+    Files.exists(folder) shouldBe (true)
+    Files.isDirectory(folder) shouldBe (true)
+    val allFiles: Vector[Path] = Files.list(folder).iterator().asScala.toVector
+    allFiles.filter {
+      case p =>
+        Files.isRegularFile(p) && p.toString.endsWith(".wdl")
+    }
+  }
 
   it should "type check simple declarations" in {
     val decl = Declaration("a", TypeInt, None)
-    checker.apply(decl, Map.empty)
+    checker.applyDecl(decl, Map.empty)
 
     val decl2 = Declaration("a", TypeInt, Some(ValueInt(13)))
-    checker.apply(decl2, Map.empty)
+    checker.applyDecl(decl2, Map.empty)
   }
 
-  it should "type check tasks" in {
-    val d : String = getClass.getResource("/typechecking/tasks/positive").getPath
-    //val folder = new File(d.getPath)
-    val folder = Paths.get(d)
-    Files.exists(folder) shouldBe(true)
-    Files.isDirectory(folder) shouldBe(true)
-    val positiveCases = Files.list(folder).asScala.toVector
-    System.out.println(positiveCases)
-
+  it should "type check tasks (positive cases)" in {
+    val positiveCases = getWdlSourceFiles("/typechecking/tasks/positive")
     for (pc <- positiveCases) {
-      val p = Paths.get(pc)
-      val wdlSourceCode = Files.readAllLines(p).asScala.mkString(System.lineSeparator())
+      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
       val doc = parser.apply(wdlSourceCode)
-      checker.apply(doc)
+      try {
+        checker.apply(doc)
+      } catch {
+        case e: Throwable =>
+          throw new RuntimeException(s"Type error in file ${pc}")
+      }
+    }
+  }
+
+  it should "type check tasks (negative cases)" in {
+    val negativeCases = getWdlSourceFiles("/typechecking/tasks/negative")
+    for (pc <- negativeCases) {
+      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
+      val doc = parser.apply(wdlSourceCode)
+      val checkVal =
+        try {
+          checker.apply(doc)
+          false
+        } catch {
+          case e: Throwable =>
+            // This file should NOT pass type validation
+            true
+        }
+      if (!checkVal)
+        throw new RuntimeException(s"Type error missed in file ${pc}")
     }
   }
 }

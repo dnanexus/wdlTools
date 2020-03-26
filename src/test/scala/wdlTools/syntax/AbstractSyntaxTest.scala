@@ -13,8 +13,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     val p2: Path = Paths.get(getClass.getResource("/syntax/tasks").getPath)
     Vector(p1, p2)
   }
-  private lazy val conf = Conf(antlr4Trace = false,
-                               localDirectories = wdlSourceDirs)
+  private lazy val conf = Conf(antlr4Trace = false, localDirectories = wdlSourceDirs)
 
   private def getWdlSource(dirname: String, fname: String): String = {
     val p: String = getClass.getResource(s"/syntax/${dirname}/${fname}").getPath

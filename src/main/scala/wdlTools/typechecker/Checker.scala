@@ -30,14 +30,17 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       case (TypeInt, TypeFloat)   => TypeFloat
       case (TypeFloat, TypeFloat) => TypeFloat
 
-        // if we are adding strings, the result is a string
+      // if we are adding strings, the result is a string
       case (TypeString, TypeString) => TypeString
-      case (TypeString, TypeInt) => TypeString
-      case (TypeString, TypeFloat) => TypeString
-      case (TypeInt,    TypeString) => TypeString
-      case (TypeFloat,  TypeString) => TypeString
+      case (TypeString, TypeInt)    => TypeString
+      case (TypeString, TypeFloat)  => TypeString
+      case (TypeInt, TypeString)    => TypeString
+      case (TypeFloat, TypeString)  => TypeString
 
-      case (_, _)                 => throw new Exception(s"Expressions ${a} and ${b} must be integers, floats, or strings")
+      // adding files is equivalent to concatenating paths
+      case (TypeFile, TypeFile) => TypeFile
+
+      case (_, _) => throw new Exception(s"Expressions ${a} and ${b} cannot be added")
     }
   }
 
@@ -74,10 +77,19 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   private def typeEvalCompareOp(a: Expr, b: Expr, ctx: Context): Type = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
-    if (at == bt)
-      TypeBoolean
-    else
-      throw new Exception(s"Expressions ${a} and ${b} must have the same type")
+    if (at == bt) {
+      // These could be complex types, such as Array[Array[Int]].
+      return TypeBoolean
+    }
+
+    // Even if the types are not the same, there are cases where they can
+    // be compared.
+    (at, bt) match {
+      case (TypeInt, TypeFloat) => TypeBoolean
+      case (TypeFloat, TypeInt) => TypeBoolean
+      case (_, _) =>
+        throw new Exception(s"Expressions ${a} and ${b} must have the same type")
+    }
   }
 
   // Figure out what the type of an expression is.
@@ -192,13 +204,13 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       // equality comparisons
       case ExprEqeq(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
       case ExprNeq(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
-      case ExprLt(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
-      case ExprGte(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
-      case ExprLte(a: Expr, b: Expr) => typeEvalCompareOp(a, b, ctx)
-      case ExprGt(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
+      case ExprLt(a: Expr, b: Expr)   => typeEvalCompareOp(a, b, ctx)
+      case ExprGte(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
+      case ExprLte(a: Expr, b: Expr)  => typeEvalCompareOp(a, b, ctx)
+      case ExprGt(a: Expr, b: Expr)   => typeEvalCompareOp(a, b, ctx)
 
       // add is overloaded, it is a special case
-      case ExprAdd(a: Expr, b: Expr)    => typeEvalAdd(a, b, ctx)
+      case ExprAdd(a: Expr, b: Expr) => typeEvalAdd(a, b, ctx)
 
       // math operators on two arguments
       case ExprSub(a: Expr, b: Expr)    => typeEvalMathOp(a, b, ctx)
@@ -264,7 +276,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def apply(decl: Declaration, ctx: Context): Context = {
+  def applyDecl(decl: Declaration, ctx: Context): Context = {
     decl.expr match {
       case None =>
         ()
@@ -273,24 +285,65 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
         if (!isCoercibleTo(decl.wdlType, rhsType))
           throw new Exception(s"declaration ${decl} is badly typed")
     }
-    ctx + (decl.name -> decl.wdlType)
+    ctx.get(decl.name) match {
+      case None =>
+        ctx + (decl.name -> decl.wdlType)
+      case Some(_) =>
+        throw new Exception(
+            s"declaration ${decl} shadows an existing variable by the same name (${decl.name})"
+        )
+    }
   }
 
   // type check the input section and return a context with bindings for all of the input variables.
   private def applyInputSection(inputSection: InputSection, ctx: Context): Context = {
     val ctx2 = inputSection.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
-        apply(decl, accu)
+        applyDecl(decl, accu)
     }
     ctx2
   }
 
-  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Unit = {
+  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Context = {
     outputSection.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
-        apply(decl, accu)
+        applyDecl(decl, accu)
     }
+  }
+
+  // calculate the type signature of a workflow or a task
+  private def calcSignature(
+      inputSection: Option[InputSection],
+      outputSection: Option[OutputSection]
+  ): (Map[String, (Type, Boolean)], Map[String, Type]) = {
+
+    val inputType: Map[String, (Type, Boolean)] = inputSection match {
+      case None => Map.empty
+      case Some(InputSection(decls)) =>
+        decls.map {
+          case Declaration(name, wdlType, Some(_)) =>
+            // input has a default value, caller may omit it.
+            name -> (wdlType, true)
+
+          case Declaration(name, TypeOptional(wdlType), _) =>
+            // input is optional, caller can omit it.
+            name -> (TypeOptional(wdlType), true)
+
+          case Declaration(name, wdlType, _) =>
+            // input is compulsory
+            name -> (wdlType, false)
+        }.toMap
+    }
+    val outputType: Map[String, Type] = outputSection match {
+      case None => Map.empty
+      case Some(OutputSection(decls)) =>
+        decls.map {
+          case decl =>
+            decl.name -> decl.wdlType
+        }.toMap
+    }
+    (inputType, outputType)
   }
 
   // TASK
@@ -300,75 +353,165 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: Task, ctxOuter: Context): TypeTask = {
+  private def applyTask(task: Task, ctxOuter: Context): Context = {
     val ctx: Context = task.input match {
-      case None             => Map.empty
+      case None             => ctxOuter
+      case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
+    }
+
+    // TODO: type-check the runtime section
+
+    // check the declaration, and accumulate context
+    val ctx2 = task.declarations.foldLeft(ctx) {
+      case (accu: Context, decl) =>
+        applyDecl(decl, accu)
+    }
+
+    // check that all expressions in the command section are strings
+    task.command.parts.foreach {
+      case expr =>
+        val t = typeEval(expr, ctx2)
+        if (!isCoercibleTo(TypeString, t))
+          throw new Exception(s"Expression ${expr} in the command section is coercible to a string")
+    }
+
+    // check the output section. We don't need the returned context.
+    task.output.map(x => applyOutputSection(x, ctx2))
+
+    // calculate the type signature of the task
+    val (inputType, outputType) = calcSignature(task.input, task.output)
+    val tt = TypeTask(task.name, inputType, outputType)
+    ctxOuter.get(task.name) match {
+      case None =>
+        ctxOuter + (task.name -> tt)
+      case Some(_) =>
+        throw new Exception(s"Redeclaration of task ${task.name}")
+    }
+  }
+
+  private def applyStruct(struct: TypeStruct, ctx: Context): Context = {
+    ctx.get(struct.name) match {
+      case None =>
+        ctx + (struct.name -> struct)
+      case Some(_) =>
+        throw new Exception(s"Redeclaration of struct ${struct.name}")
+    }
+  }
+
+  // 1. all the caller arguments have to exist with the correct types
+  //    in the callee
+  // 2. all the compulsory callee arguments must be specified. Optionals
+  //    and arguments that have defaults can be skipped.
+  private def applyCall(call: Call, ctx: Context): Context = {
+    val callerInputs = call.inputs.map {
+      case (name, expr) => name -> typeEval(expr, ctx)
+    }.toMap
+
+    val (calleeInputs, calleeOutputs) = ctx.get(call.name) match {
+      case None =>
+        throw new Exception(s"called task/workflow ${call.name} is not defined")
+      case Some(TypeTask(_, input, output)) =>
+        (input, output)
+      case Some(TypeWorkflow(_, input, output)) =>
+        (input, output)
+      case _ =>
+        throw new Exception(s"callee ${call.name} is not a task or workflow")
+    }
+
+    // type-check input arguments
+    callerInputs.foreach {
+      case (argName, wdlType) =>
+        calleeInputs.get(argName) match {
+          case None =>
+            throw new Exception(
+                s"call ${call} has argument ${argName} that does not exist in the callee"
+            )
+          case Some((calleeType, _)) =>
+            if (!isCoercibleTo(calleeType, wdlType))
+              throw new Exception(
+                  s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}"
+              )
+        }
+    }
+
+    // check that all the compulsory arguments are provided
+    calleeInputs.foreach {
+      case (argName, (wdlType, false)) =>
+        callerInputs.get(argName) match {
+          case None =>
+            throw new Exception(
+                s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
+            )
+          case Some(_) => ()
+        }
+    }
+
+    // build a type for the resulting object
+    val callName = call.alias match {
+      case None        => call.name
+      case Some(alias) => alias
+    }
+    ctx + (callName -> TypeCall(callName, calleeOutputs))
+  }
+
+  private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
+    val ctx: Context = wf.input match {
+      case None             => ctxOuter
       case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
     }
 
     // check the declaration, and accumulate context
-    val ctx2 = task.declarations.foldLeft(ctx){
-      case (accu: Context, decl) =>
-        apply(decl, accu)
+    val ctxBody = wf.body.foldLeft(ctx) {
+      case (accu: Context, decl: Declaration) =>
+        applyDecl(decl, accu)
+      case (accu, call: Call) =>
+        applyCall(call, accu)
+
+      // case (accu, scatter : Scatter) =>
+      // case (accu, cond : Conditional) =>
+
+      case (_, _) =>
+        throw new Exception("Not implement yet")
     }
 
-    // check that all expressions in the command section are strings
-    task.command.parts.foreach{
-      case expr =>
-        val t = typeEval(expr, ctx2)
-        if (!isCoercibleTo(TypeString, t))
-          throw new Exception(s"Expression ${expr} in the command section is not a string")
-    }
+    // check the output section. We don't need the returned context.
+    wf.output.map(x => applyOutputSection(x, ctxBody))
 
-    // check the output section. We don't need a return context.
-    task.output.map(x => applyOutputSection(x, ctx2))
-
-    // calculate the type of task. This is like building a prototype
-    val inputType: Map[String, Type] = task.input match {
-      case None => Map.empty
-      case Some(InputSection(decls)) =>
-        decls.map {
-          case decl =>
-            decl.name -> decl.wdlType
-        }.toMap
+    // calculate the type signature of the workflow
+    val (inputType, outputType) = calcSignature(wf.input, wf.output)
+    val wft = TypeWorkflow(wf.name, inputType, outputType)
+    ctxOuter.get(wf.name) match {
+      case None =>
+        ctxOuter + (wf.name -> wft)
+      case Some(_) =>
+        throw new Exception(s"Redeclaration of workflow ${wf.name}")
     }
-    val outputType: Map[String, Type] = task.output match {
-      case None => Map.empty
-      case Some(OutputSection(decls)) =>
-        decls.map {
-          case decl =>
-            decl.name -> decl.wdlType
-        }.toMap
-    }
-    TypeTask(task.name, inputType, outputType)
   }
-
-  private def applyWorkflow(wf: Workflow, ctx: Context): Unit = ???
 
   // Main entry point
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc: Document): Unit = {
+  def apply(doc: Document): Context = {
     val context: Context = doc.elements.foldLeft(Map.empty[String, Type]) {
-      case (context, task: Task) =>
-        val taskType = applyTask(task, Map.empty)
-        context + (task.name -> taskType)
+      case (accu: Context, task: Task) =>
+        applyTask(task, accu)
 
-      case (context, importDoc: ImportDoc) =>
-        // don't go into imports right now
-        context
+      case (accu, importDoc: ImportDoc) =>
+        throw new Exception("imports not implemented yet")
 
-      case (context, struct: TypeStruct) =>
+      case (accu: Context, struct: TypeStruct) =>
         // Add the struct to the context
-        context + (struct.name -> struct)
+        applyStruct(struct, accu)
 
       case (_, other) =>
         throw new Exception("sanity: wrong element type in workflow")
     }
 
     // now that we have types for everything else, we can check the workflow
-    doc.workflow.map(applyWorkflow(_, context))
-    ()
+    doc.workflow match {
+      case None     => context
+      case Some(wf) => applyWorkflow(wf, context)
+    }
   }
 }

@@ -87,16 +87,28 @@ struct
 	;
    */
   override def visitStruct(ctx: WdlParser.StructContext): TypeStruct = {
-    val name = ctx.Identifier().getText
-    val members = ctx
+    val sName = ctx.Identifier().getText
+    val membersVec: Vector[(String, Type)] = ctx
       .unbound_decls()
       .asScala
       .map { x =>
         val decl = visitUnbound_decls(x)
         decl.name -> decl.wdlType
       }
+      .toVector
+
+    // check that each field appears once
+    val members: Map[String, Type] = membersVec
+      .foldLeft(Map.empty[String, Type]) {
+        case (accu, (fieldName, wdlType)) =>
+          accu.get(fieldName) match {
+            case None => accu + (fieldName -> wdlType)
+            case Some(_) =>
+              throw makeWdlException(s"struct ${sName} has field ${fieldName} defined twice", ctx)
+          }
+      }
       .toMap
-    TypeStruct(name, members)
+    TypeStruct(sName, members)
   }
 
   /*
@@ -741,6 +753,36 @@ task_input
     }
   }
 
+  // check that the parameter meta section references only has variables declared in
+  // the input or output sections.
+  private def validateParamMeta(paramMeta: ParameterMetaSection,
+                                inputSection: Option[InputSection],
+                                outputSection: Option[OutputSection],
+                                ctx: ParserRuleContext): Unit = {
+    val inputVarNames: Set[String] =
+      inputSection
+        .map(_.declarations.map(_.name).toSet)
+        .getOrElse(Set.empty)
+    val outputVarNames: Set[String] =
+      outputSection
+        .map(_.declarations.map(_.name).toSet)
+        .getOrElse(Set.empty)
+
+    // make sure the input and output sections to not intersect
+    val both = inputVarNames intersect outputVarNames
+    if (both.isEmpty)
+      throw makeWdlException(s"${both} appears in both input and output sections", ctx)
+
+    val ioVarNames = inputVarNames ++ outputVarNames
+
+    paramMeta.kvs.foreach {
+      case MetaKV(k, _) =>
+        if (!(ioVarNames contains k))
+          throw makeWdlException(s"parameter ${k} does not appear in the input or output sections",
+                                 ctx)
+    }
+  }
+
   /* task
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
@@ -769,6 +811,8 @@ task_input
     val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
       case x: RuntimeSection => x
     }, ctx)
+
+    parameterMeta.map(validateParamMeta(_, input, output, ctx))
 
     Task(name,
          input = input,
@@ -990,6 +1034,8 @@ workflow
       case x: WdlParser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
+
+    parameterMeta.map(validateParamMeta(_, input, output, ctx))
 
     Workflow(name, input, output, meta, parameterMeta, wfElems)
   }

@@ -5,6 +5,7 @@ task simple {
     String a
     String b
   }
+  command {}
   output {
     Int c = a + b
   }

@@ -11,16 +11,23 @@ object Base {
   case object TypeUnknown extends Type
 
   // The type of a task.
-  // It takes typed-inputs and returns typed-outputs.
-  case class TypeTask(name: String, input: Map[String, Type], output: Map[String, Type])
+  //
+  // It takes typed-inputs and returns typed-outputs. The boolean flag denotes
+  // if input is optional
+  case class TypeTask(name: String, input: Map[String, (Type, Boolean)], output: Map[String, Type])
       extends Type
 
   // The type of a workflow.
   // It takes typed-inputs and returns typed-outputs.
-  case class TypeWorkflow(name: String, input: Map[String, Type], output: Map[String, Type])
+  case class TypeWorkflow(name: String,
+                          input: Map[String, (Type, Boolean)],
+                          output: Map[String, Type])
       extends Type
 
-  // A standard library function impelmented by the engine.
+  // The type of a call to a task or a workflow.
+  case class TypeCall(name: String, output: Map[String, Type]) extends Type
+
+  // A standard library function implemented by the engine.
   sealed trait TypeStdlibFunc extends Type {
     val name: String
   }
