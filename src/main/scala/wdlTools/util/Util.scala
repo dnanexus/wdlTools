@@ -22,7 +22,7 @@ import Verbosity._
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Seq[Path] = Seq.empty,
+case class Options(localDirectories: Seq[Path],
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false)
 

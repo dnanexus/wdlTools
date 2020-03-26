@@ -7,7 +7,7 @@ import wdlTools.util.{FetchURL, Util}
 
 import scala.language.reflectiveCalls
 
-case class PrintAST(conf: WdlToolsConf) extends Command {
+class PrintAST(conf: WdlToolsConf, verbose: Boolean = false) extends Command {
   override def apply(): Unit = {
     val uri = new URI(conf.check.uri())
     val uriLocalPath = Util.getLocalPath(uri)
@@ -15,6 +15,7 @@ case class PrintAST(conf: WdlToolsConf) extends Command {
     val sourceCode = FetchURL.readFromUri(uri, opts)
     val parser = ParseAll(opts)
     val document = parser.apply(sourceCode)
-    println(Util.prettyPrint(document))
+
+    println(s"$document")
   }
 }
