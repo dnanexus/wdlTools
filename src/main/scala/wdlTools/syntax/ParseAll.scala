@@ -174,7 +174,7 @@ case class ParseAll(conf: Conf) {
   ): AbstractSyntax.RuntimeSection = {
     AbstractSyntax.RuntimeSection(runtime.kvs.map {
       case ConcreteSyntax.RuntimeKV(id, expr) => AbstractSyntax.RuntimeKV(id, translateExpr(expr))
-    }.toVector)
+    })
   }
 
   private def translateWorkflowElement(
