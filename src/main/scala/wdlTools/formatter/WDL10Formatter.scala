@@ -3,6 +3,8 @@ package wdlTools.formatter
 import java.net.URI
 
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.util.Verbosity
+import wdlTools.util.Verbosity._
 
 import wdlTools.util.Verbosity
 import wdlTools.util.Verbosity._
