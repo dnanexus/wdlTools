@@ -181,7 +181,7 @@ case class ParseAll(antlr4Trace: Boolean = false,
   ): AbstractSyntax.RuntimeSection = {
     AbstractSyntax.RuntimeSection(runtime.kvs.map {
       case ConcreteSyntax.RuntimeKV(id, expr) => AbstractSyntax.RuntimeKV(id, translateExpr(expr))
-    }.toVector)
+    })
   }
 
   private def translateWorkflowElement(
