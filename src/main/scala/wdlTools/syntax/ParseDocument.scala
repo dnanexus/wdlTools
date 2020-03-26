@@ -770,7 +770,7 @@ task_input
 
     // make sure the input and output sections to not intersect
     val both = inputVarNames intersect outputVarNames
-    if (both.isEmpty)
+    if (!both.isEmpty)
       throw makeWdlException(s"${both} appears in both input and output sections", ctx)
 
     val ioVarNames = inputVarNames ++ outputVarNames

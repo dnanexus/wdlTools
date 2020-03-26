@@ -478,8 +478,8 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
-  private def applyScatter(scatter : Scatter , outerCtx : Context) : Context = {
-    val collectionType = typeEval(scatter.expr, outerCtx)
+  private def applyScatter(scatter: Scatter, outerCtx: Context): Binding = ???
+  /*    val collectionType = typeEval(scatter.expr, outerCtx)
     val elementType = collectionType match {
       case TypeArray(elementType, _) => elementType
       case _ =>
@@ -515,11 +515,9 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
 
     // The iterator binding is not exported outside the scatter
     ctx - scatter.name
-  }
+  } */
 
-  private def applyConditional(cond : Conditional , outerCtx : Context) : Context = {
-
-  }
+  private def applyConditional(cond: Conditional, outerCtx: Context): Binding = ???
 
   private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
     val ctx: Context = wf.input match {
@@ -528,17 +526,17 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     }
 
     val ctxBody = wf.body.foldLeft(ctx) {
-      case (accu: Context, elem : WorkflowElement) =>
+      case (accu: Context, elem: WorkflowElement) =>
         val binding = elem match {
-          case decl : Declaration =>
+          case decl: Declaration =>
             applyDecl(decl, accu)
           case call: Call =>
             applyCall(call, accu)
-          case scatter : Scatter =>
+          case scatter: Scatter =>
             applyScatter(scatter, accu)
-          case cond : Conditional =>
+          case cond: Conditional =>
             applyConditional(cond, accu)
-          case (_, other) =>
+          case other =>
             throw new Exception(s"Sanity: ${other}")
         }
         accu + binding

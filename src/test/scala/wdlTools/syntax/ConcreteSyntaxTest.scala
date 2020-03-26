@@ -219,7 +219,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     task.meta shouldBe (Some(MetaSection(Vector(MetaKV("author", ExprString("Robin Hood"))))))
     task.parameterMeta shouldBe (Some(
-        ParameterMetaSection(Vector(MetaKV("reason", ExprString("just because"))))
+        ParameterMetaSection(Vector(MetaKV("inp_file", ExprString("just because"))))
     ))
     task.declarations(0) shouldBe (Declaration("i", TypeInt, Some(ExprAdd(ExprInt(4), ExprInt(5)))))
   }
