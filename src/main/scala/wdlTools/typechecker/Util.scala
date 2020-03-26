@@ -54,13 +54,13 @@ object Base {
   //
   // Array[Array[X]] transpose(Array[Array[X]])
   //
-  case class TypeFunctionParamPoly1Arg(name: String, io: (Type => (Type, Type)))
+  case class TypeFunctionParamPoly1Arg(name: String, io: Type => (Type, Type))
       extends TypeStdlibFunc
 
   // A function that obays parametric polymorphism with two inputs.
   //
   // Array[Pair[X,Y]] zip(Array[X], Array[Y])
-  case class TypeFunctionParamPoly2Arg(name: String, io: ((Type, Type) => ((Type, Type), Type)))
+  case class TypeFunctionParamPoly2Arg(name: String, io: (Type, Type) => ((Type, Type), Type))
       extends TypeStdlibFunc
 
   // check if the right hand side of an assignment matches the left hand side
@@ -76,11 +76,11 @@ object Base {
   //    String s2 = 5
   def isCoercibleTo(left: Type, right: Type): Boolean = {
     (left, right) match {
-      case (TypeString, (TypeString | TypeFile | TypeBoolean | TypeInt | TypeFloat)) => true
-      case (TypeFile, (TypeString | TypeFile))                                       => true
-      case (TypeBoolean, TypeBoolean)                                                => true
-      case (TypeInt, TypeInt)                                                        => true
-      case (TypeFloat, (TypeInt | TypeFloat))                                        => true
+      case (TypeString, TypeString | TypeFile | TypeBoolean | TypeInt | TypeFloat) => true
+      case (TypeFile, TypeString | TypeFile)                                       => true
+      case (TypeBoolean, TypeBoolean)                                              => true
+      case (TypeInt, TypeInt)                                                      => true
+      case (TypeFloat, TypeInt | TypeFloat)                                        => true
 
       case (TypeOptional(l), TypeOptional(r)) => isCoercibleTo(l, r)
       case (TypeOptional(l), r)               => isCoercibleTo(l, r)

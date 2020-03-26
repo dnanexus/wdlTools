@@ -1,10 +1,11 @@
 package wdlTools.syntax
 
+import wdlTools.util.{FetchURL, Options, URL}
+
 import scala.collection.mutable
-import wdlTools.util.Util.Conf
 
 // parse and follow imports
-case class ParseAll(conf: Conf) {
+case class ParseAll(conf: Options) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 
@@ -174,7 +175,7 @@ case class ParseAll(conf: Conf) {
   ): AbstractSyntax.RuntimeSection = {
     AbstractSyntax.RuntimeSection(runtime.kvs.map {
       case ConcreteSyntax.RuntimeKV(id, expr) => AbstractSyntax.RuntimeKV(id, translateExpr(expr))
-    }.toVector)
+    })
   }
 
   private def translateWorkflowElement(
