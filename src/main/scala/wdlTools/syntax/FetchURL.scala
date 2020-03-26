@@ -1,10 +1,12 @@
 package wdlTools.syntax
 
 import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
-import scala.io.Source
+import java.nio.file.{Files, Path, Paths}
 
-import wdlTools.util.Util.Conf
+import wdlTools.syntax.Util.Conf
+
+import scala.io.Source
+import wdlTools.util.Util.Verbosity._
 
 // a path to a file or an http location
 //
@@ -52,7 +54,7 @@ case class FetchURL(conf: Conf) {
 
   def apply(url: URL): String = {
     val p: String = url.addr
-    if (conf.verbose)
+    if (conf.verbosity > Normal)
       System.out.println(s"looking for ${p}")
 
     if (p contains "://") {

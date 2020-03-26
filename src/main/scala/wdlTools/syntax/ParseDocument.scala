@@ -5,14 +5,15 @@ package wdlTools.syntax
 // we need these for safe casting, and reporting on errors
 import reflect.ClassTag
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
-
 import collection.JavaConverters._
 import java.nio.ByteBuffer
+
 import org.antlr.v4.runtime._
 import org.openwdl.wdl.parser._
 
 import ConcreteSyntax._
-import wdlTools.util.Util.Conf
+import wdlTools.syntax.Util.Conf
+import wdlTools.util.Util.Verbosity.Quiet
 
 object ParseDocument {
   private def getParser(inp: String, conf: Conf): (ErrorListener, WdlParser) = {
@@ -41,7 +42,7 @@ object ParseDocument {
     // check if any errors were found
     val errors: Vector[SyntaxError] = errListener.getAllErrors
     if (errors.nonEmpty) {
-      if (!conf.quiet) {
+      if (conf.verbosity > Quiet) {
         for (err <- errors) {
           System.out.println(err)
         }
@@ -107,7 +108,6 @@ struct
               throw makeWdlException(s"struct ${sName} has field ${fieldName} defined twice", ctx)
           }
       }
-      .toMap
     TypeStruct(sName, members)
   }
 
@@ -770,7 +770,7 @@ task_input
 
     // make sure the input and output sections to not intersect
     val both = inputVarNames intersect outputVarNames
-    if (!both.isEmpty)
+    if (both.nonEmpty)
       throw makeWdlException(s"${both} appears in both input and output sections", ctx)
 
     val ioVarNames = inputVarNames ++ outputVarNames
@@ -812,7 +812,7 @@ task_input
       case x: RuntimeSection => x
     }, ctx)
 
-    parameterMeta.map(validateParamMeta(_, input, output, ctx))
+    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Task(name,
          input = input,
@@ -1035,7 +1035,7 @@ workflow
         visitInner_workflow_element(x.inner_workflow_element())
     }
 
-    parameterMeta.map(validateParamMeta(_, input, output, ctx))
+    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Workflow(name, input, output, meta, parameterMeta, wfElems)
   }

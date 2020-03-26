@@ -1,7 +1,8 @@
 package wdlTools.syntax
 
+import wdlTools.syntax.Util.Conf
+
 import scala.collection.mutable
-import wdlTools.util.Util.Conf
 
 // parse and follow imports
 case class ParseAll(conf: Conf) {
