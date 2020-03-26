@@ -1,12 +1,12 @@
-package wdlTools.syntax
+package wdlTools.util
 
-import collection.JavaConverters._
+import java.net.URI
 import java.nio.file.{Files, Path, Paths}
 
-import wdlTools.syntax.Util.Options
+import wdlTools.util.Verbosity._
 
+import scala.collection.JavaConverters._
 import scala.io.Source
-import wdlTools.util.Util.Verbosity._
 
 // a path to a file or an http location
 //
@@ -69,6 +69,24 @@ case class FetchURL(conf: Options) {
     } else {
       // no recognizable protocol, assuming a file
       fetchLocalFile(p)
+    }
+  }
+}
+
+object FetchURL {
+
+  /**
+    * Reads the contents from a URI, which may be a local file or a remote (http(s)) URL.
+    * @param uri the URI to reAd
+    * @param conf the options
+    * @return a tuple (localPath, contents), where localPath is
+    */
+  def readFromUri(uri: URI, conf: Options): String = {
+    val uriLocalPath = Util.getLocalPath(uri)
+    uri.getScheme match {
+      case null | "" | "file" => Util.readFromFile(uriLocalPath)
+      case _ =>
+        FetchURL(conf).apply(URL(uri.toString))
     }
   }
 }

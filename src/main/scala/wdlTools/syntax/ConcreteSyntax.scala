@@ -1,5 +1,7 @@
 package wdlTools.syntax
 
+import wdlTools.util.URL
+
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
 //

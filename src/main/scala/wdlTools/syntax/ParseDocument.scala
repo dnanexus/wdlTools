@@ -10,10 +10,9 @@ import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime._
 import org.openwdl.wdl.parser._
-
 import ConcreteSyntax._
-import wdlTools.syntax.Util.Options
-import wdlTools.util.Util.Verbosity.Quiet
+import wdlTools.util.{URL, Options}
+import wdlTools.util.Verbosity.Quiet
 
 object ParseDocument {
   private def getParser(inp: String, conf: Options): (ErrorListener, WdlParser) = {

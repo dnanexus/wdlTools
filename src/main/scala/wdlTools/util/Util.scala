@@ -5,17 +5,28 @@ import java.nio.file.{Path, Paths}
 
 import com.typesafe.config.ConfigFactory
 
-object Util {
+/**
+  * Enumeration for verbosity level.
+  * The values are in increasing order, so that they can be compared using integer comparison
+  * operators, e.g. `if (verbosity > Normal) { println("debugging") }`.
+  */
+object Verbosity extends Enumeration {
+  type Verbosity = Value
+  val Quiet, Normal, Verbose = Value
+}
+import Verbosity._
 
-  /**
-    * Enumeration for verbosity level.
-    * The values are in increasing order, so that they can be compared using integer comparison
-    * operators, e.g. `if (verbosity > Normal) { println("debugging") }`.
-    */
-  object Verbosity extends Enumeration {
-    type Verbosity = Value
-    val Quiet, Normal, Verbose = Value
-  }
+/**
+  * Common configuration options used by syntax classes.
+  * @param localDirectories local directories to search for imports.
+  * @param verbosity verbosity level.
+  * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
+  */
+case class Options(localDirectories: Seq[Path],
+                   verbosity: Verbosity = Normal,
+                   antlr4Trace: Boolean = false)
+
+object Util {
 
   /**
     * The current wdlTools version.

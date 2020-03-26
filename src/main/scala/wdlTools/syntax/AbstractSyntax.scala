@@ -1,5 +1,7 @@
 package wdlTools.syntax
 
+import wdlTools.util.URL
+
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
   trait WorkflowElement
