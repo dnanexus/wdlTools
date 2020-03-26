@@ -78,9 +78,7 @@ object Main extends App {
     case None => conf.printHelp()
     case Some(subcommand) =>
       val command: Command = subcommand match {
-        case conf.format   => new Format(conf.format, verbose)
-        case conf.printAST => new PrintAST(conf.printAST, verbose)
-        case other         => throw new Exception(s"Unrecognized command $other")
+        case other => throw new Exception(s"Unrecognized command $other")
       }
       command.apply()
   }
