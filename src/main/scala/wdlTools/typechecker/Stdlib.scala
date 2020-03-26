@@ -2,8 +2,9 @@ package wdlTools.typechecker
 
 import wdlTools.syntax.AbstractSyntax._
 import Base._
+import wdlTools.util.Options
 
-case class Stdlib() {
+case class Stdlib(conf: Options) {
 
   private val stdlibV1_0: Vector[TypeStdlibFunc] = Vector(
       TypeFunctionUnit("stdout", TypeFile),

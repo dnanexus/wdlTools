@@ -4,7 +4,7 @@ import AbstractSyntax._
 import collection.JavaConverters._
 import java.nio.file.{Path, Paths, Files}
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.util.Util.Conf
+import wdlTools.util.Options
 
 class AbstractSyntaxTest extends FlatSpec with Matchers {
 
@@ -13,7 +13,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     val p2: Path = Paths.get(getClass.getResource("/syntax/tasks").getPath)
     Vector(p1, p2)
   }
-  private lazy val conf = Conf(antlr4Trace = false, localDirectories = wdlSourceDirs)
+  private lazy val conf = Options(antlr4Trace = false, localDirectories = wdlSourceDirs)
 
   private def getWdlSource(dirname: String, fname: String): String = {
     val p: String = getClass.getResource(s"/syntax/${dirname}/${fname}").getPath

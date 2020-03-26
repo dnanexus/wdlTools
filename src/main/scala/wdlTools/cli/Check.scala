@@ -16,7 +16,7 @@ case class Check(conf: WdlToolsConf) extends Command {
     val sourceCode = FetchURL.readFromUri(uri, opts)
     val parser = ParseAll(opts)
     val document = parser.apply(sourceCode)
-    val checker = Checker(Stdlib())
+    val checker = Checker(Stdlib(opts))
     checker.apply(document)
   }
 }

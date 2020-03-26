@@ -611,7 +611,7 @@ any_decls
   /* task_runtime_kv
  : Identifier COLON expr
  ; */
-  override def visitTask_runtime_kv(ctx: WdlParser.Task_runtime_kvContext): Element = {
+  override def visitTask_runtime_kv(ctx: WdlParser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
     val expr: Expr = visitAndSafeCast[Expr](ctx.expr())
     RuntimeKV(id, expr)
@@ -624,7 +624,7 @@ any_decls
     val kvs = ctx
       .task_runtime_kv()
       .asScala
-      .map(x => visitAndSafeCast[RuntimeKV](x))
+      .map(x => visitTask_runtime_kv(x))
       .toVector
     RuntimeSection(kvs)
   }

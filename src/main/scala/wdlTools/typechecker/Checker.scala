@@ -5,8 +5,12 @@ import Base._
 
 case class Checker(stdlib: Stdlib) {
 
+  // An entire context
   type Context = Map[String, Type]
-  type Binding = (String, Type)
+
+  // A group of bindings. This is typically a part of the context. For example,
+  // the body of a scatter.
+  type Bindings = Map[String, Type]
 
   private def typeEvalMathOp(expr: Expr, ctx: Context): Type = {
     val t = typeEval(expr, ctx)
@@ -286,7 +290,7 @@ case class Checker(stdlib: Stdlib) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def applyDecl(decl: Declaration, ctx: Context): Binding = {
+  def applyDecl(decl: Declaration, ctx: Context): (String, Type) = {
     decl.expr match {
       case None =>
         ()
@@ -305,21 +309,21 @@ case class Checker(stdlib: Stdlib) {
     }
   }
 
-  // type check the input section and return a context with bindings for all of the input variables.
-  private def applyInputSection(inputSection: InputSection, ctx: Context): Context = {
-    val ctx2 = inputSection.declarations.foldLeft(ctx) {
+  // type check the input section and return bindings for all of the input variables.
+  private def applyInputSection(inputSection: InputSection, ctx: Context): Bindings = {
+    inputSection.declarations.foldLeft(Map.empty[String, Type]) {
       case (accu: Context, decl) =>
-        val binding = applyDecl(decl, accu)
+        val binding = applyDecl(decl, accu ++ ctx)
         accu + binding
     }
-    ctx2
   }
 
-  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Context = {
-    outputSection.declarations.foldLeft(ctx) {
+  // type check the input section and return bindings for all of the output variables.
+  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Bindings = {
+    outputSection.declarations.foldLeft(Map.empty[String, Type]) {
       case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
-        val binding = applyDecl(decl, accu)
+        val binding = applyDecl(decl, accu ++ ctx)
         accu + binding
     }
   }
@@ -362,16 +366,16 @@ case class Checker(stdlib: Stdlib) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: Task, ctxOuter: Context): Context = {
+  private def applyTask(task: Task, ctxOuter: Context): TypeTask = {
     val ctx: Context = task.input match {
       case None             => ctxOuter
-      case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
+      case Some(inpSection) => ctxOuter ++ applyInputSection(inpSection, ctxOuter)
     }
 
     // TODO: type-check the runtime section
 
-    // check the declaration, and accumulate context
-    val ctx2 = task.declarations.foldLeft(ctx) {
+    // check the declarations, and accumulate context
+    val ctxDecl = task.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
         val binding = applyDecl(decl, accu)
         accu + binding
@@ -379,29 +383,28 @@ case class Checker(stdlib: Stdlib) {
 
     // check that all expressions in the command section are strings
     task.command.parts.foreach { expr =>
-      val t = typeEval(expr, ctx2)
+      val t = typeEval(expr, ctxDecl)
       if (!isCoercibleTo(TypeString, t))
         throw new Exception(s"Expression ${expr} in the command section is coercible to a string")
     }
 
     // check the output section. We don't need the returned context.
-    task.output.map(x => applyOutputSection(x, ctx2))
+    task.output.map(x => applyOutputSection(x, ctxDecl))
 
     // calculate the type signature of the task
     val (inputType, outputType) = calcSignature(task.input, task.output)
-    val tt = TypeTask(task.name, inputType, outputType)
     ctxOuter.get(task.name) match {
       case None =>
-        ctxOuter + (task.name -> tt)
+        TypeTask(task.name, inputType, outputType)
       case Some(_) =>
         throw new Exception(s"Redeclaration of task ${task.name}")
     }
   }
 
-  private def applyStruct(struct: TypeStruct, ctx: Context): Context = {
+  private def applyStruct(struct: TypeStruct, ctx: Context): TypeStruct = {
     ctx.get(struct.name) match {
       case None =>
-        ctx + (struct.name -> struct)
+        struct
       case Some(_) =>
         throw new Exception(s"Redeclaration of struct ${struct.name}")
     }
@@ -460,7 +463,19 @@ case class Checker(stdlib: Stdlib) {
       case None        => call.name
       case Some(alias) => alias
     }
-    callName -> TypeCall(callName, calleeOutputs)
+
+    if (ctx contains callName)
+      throw new Exception(s"call ${callName} shadows an existing definition")
+    (callName -> TypeCall(callName, calleeOutputs))
+  }
+
+  // check that the new variables do not redefine the old variables
+  private def checkNoShadowing(ctx: Context, bindings: Bindings): Unit = {
+    val existingVarNames = ctx.keys.toSet
+    val newVarNames = bindings.keys.toSet
+    val both = existingVarNames intersect newVarNames
+    if (!both.isEmpty)
+      throw new Exception(s"Variables ${both} are being redeclared")
   }
 
   // The body of the scatter becomes accessible to statements that come after it.
@@ -472,68 +487,122 @@ case class Checker(stdlib: Stdlib) {
   //
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
-  private def applyScatter(scatter: Scatter, outerCtx: Context): Binding = ???
-  /*    val collectionType = typeEval(scatter.expr, outerCtx)
+  private def applyScatter(scatter: Scatter, ctxOuter: Context): Bindings = {
+    val collectionType = typeEval(scatter.expr, ctxOuter)
     val elementType = collectionType match {
       case TypeArray(elementType, _) => elementType
       case _ =>
         throw new Exception(s"Collection in scatter (${scatter}) is not an array type")
     }
     // add a binding for the iteration variable
-    val ctxInner = ctxOuter + (scatter.name -> elementType)
+    if (ctxOuter contains scatter.identifier)
+      throw new Exception(s"Scatter iterator ${scatter.identifier} shadows an exisiting variable")
+    val ctxInner = ctxOuter + (scatter.identifier -> elementType)
 
-    // Add an "array" over and above whatever the type is
-    val ctx = wf.body.foldLeft(ctxInner) {
-      case (accu: Context, elem : WorkflowElement) =>
-        val binding = elem match {
-          case decl : Declaration =>
-            val (varName, typ) = applyDecl(decl, accu)
-            (varName -> TypeArray(typ))
+    // Add an array type to all variables defined in the scatter body
+    val bodyBindings: Bindings = scatter.body.foldLeft(Map.empty[String, Type]) {
+      case (accu: Context, decl: Declaration) =>
+        val (varName, typ) = applyDecl(decl, accu ++ ctxInner)
+        accu + (varName -> TypeArray(typ))
 
-          case call: Call =>
-            val (callName, callType) = applyCall(call, accu)
-            val callOutput = callType.output.map{
-              case (name, t) => name -> TypeArray(t)
-            }.toMap
-            (callName -> TypeCall(typeCall.name, callOutput))
+      case (accu: Context, call: Call) =>
+        val (callName, callType) = applyCall(call, accu ++ ctxInner)
+        val callOutput = callType.output.map {
+          case (name, t) => name -> TypeArray(t)
+        }.toMap
+        accu + (callName -> TypeCall(callType.name, callOutput))
 
-          case scatter : Scatter =>
-            applyScatter(scatter, accu)
-          case cond : Conditional =>
-            applyConditional(cond, accu)
-          case (_, other) =>
-            throw new Exception(s"Sanity: ${other}")
-        }
-        accu + binding
+      case (accu: Context, subSct: Scatter) =>
+        // a nested scatter
+        val sctBindings = applyScatter(subSct, accu ++ ctxInner)
+        val sctBindings2 = sctBindings.map {
+          case (varName, typ) => varName -> TypeArray(typ)
+        }.toMap
+        accu ++ sctBindings2
+
+      case (accu: Context, cond: Conditional) =>
+        // a nested conditional
+        val condBindings = applyConditional(cond, accu ++ ctxInner)
+        val condBindings2 = condBindings.map {
+          case (varName, typ) => varName -> TypeArray(typ)
+        }.toMap
+        accu ++ condBindings2
+
+      case (_, other) =>
+        throw new Exception(s"Sanity: ${other}")
+    }
+    checkNoShadowing(ctxInner, bodyBindings)
+    // The iterator binding is not exported outside the scatter
+    bodyBindings
+  }
+
+  // The body of a conditional is accessible to the statements that come after it.
+  // This is different than the scoping rules for other programming languages.
+  //
+  // Add an optional modifier to all the types inside the body.
+  private def applyConditional(cond: Conditional, ctxOuter: Context): Bindings = {
+    val condType = typeEval(cond.expr, ctxOuter)
+    if (condType != TypeBoolean)
+      throw new Exception(s"Expression ${cond.expr} must have boolean type")
+
+    // Add an array type to all variables defined in the scatter body
+    val bodyBindings = cond.body.foldLeft(Map.empty[String, Type]) {
+      case (accu: Context, decl: Declaration) =>
+        val (varName, typ) = applyDecl(decl, accu ++ ctxOuter)
+        accu + (varName -> TypeOptional(typ))
+
+      case (accu: Context, call: Call) =>
+        val (callName, callType) = applyCall(call, accu ++ ctxOuter)
+        val callOutput = callType.output.map {
+          case (name, t) => name -> TypeOptional(t)
+        }.toMap
+        accu + (callName -> TypeCall(callType.name, callOutput))
+
+      case (accu: Context, subSct: Scatter) =>
+        // a nested scatter
+        val sctBindings = applyScatter(subSct, accu ++ ctxOuter)
+        val sctBindings2 = sctBindings.map {
+          case (varName, typ) => varName -> TypeOptional(typ)
+        }.toMap
+        accu ++ sctBindings2
+
+      case (accu: Context, cond: Conditional) =>
+        // a nested conditional
+        val condBindings = applyConditional(cond, accu ++ ctxOuter)
+        val condBindings2 = condBindings.map {
+          case (varName, typ) => varName -> TypeOptional(typ)
+        }.toMap
+        accu ++ condBindings2
+
+      case (_, other) =>
+        throw new Exception(s"Sanity: ${other}")
     }
 
-    // The iterator binding is not exported outside the scatter
-    ctx - scatter.name
-  } */
-
-  private def applyConditional(cond: Conditional, outerCtx: Context): Binding = ???
+    checkNoShadowing(ctxOuter, bodyBindings)
+    bodyBindings
+  }
 
   private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
     val ctx: Context = wf.input match {
       case None             => ctxOuter
-      case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
+      case Some(inpSection) => ctxOuter ++ applyInputSection(inpSection, ctxOuter)
     }
 
     val ctxBody = wf.body.foldLeft(ctx) {
-      case (accu: Context, elem: WorkflowElement) =>
-        val binding = elem match {
-          case decl: Declaration =>
-            applyDecl(decl, accu)
-          case call: Call =>
-            applyCall(call, accu)
-          case scatter: Scatter =>
-            applyScatter(scatter, accu)
-          case cond: Conditional =>
-            applyConditional(cond, accu)
-          case other =>
-            throw new Exception(s"Sanity: ${other}")
-        }
-        accu + binding
+      case (accu: Context, decl: Declaration) =>
+        accu + applyDecl(decl, accu)
+
+      case (accu: Context, call: Call) =>
+        accu + applyCall(call, accu)
+
+      case (accu: Context, scatter: Scatter) =>
+        accu ++ applyScatter(scatter, accu)
+
+      case (accu: Context, cond: Conditional) =>
+        accu ++ applyConditional(cond, accu)
+
+      case (_, other) =>
+        throw new Exception(s"Sanity: ${other}")
     }
 
     // check the output section. We don't need the returned context.
@@ -554,17 +623,19 @@ case class Checker(stdlib: Stdlib) {
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc: Document): Context = {
-    val context: Context = doc.elements.foldLeft(Map.empty[String, Type]) {
+  def apply(doc: Document, ctxOuter: Context = Map.empty): Context = {
+    val context: Context = doc.elements.foldLeft(ctxOuter) {
       case (accu: Context, task: Task) =>
-        applyTask(task, accu)
+        val tt = applyTask(task, accu)
+        accu + (task.name -> tt)
 
       case (accu, importDoc: ImportDoc) =>
         throw new Exception("imports not implemented yet")
 
       case (accu: Context, struct: TypeStruct) =>
         // Add the struct to the context
-        applyStruct(struct, accu)
+        val _ = applyStruct(struct, accu)
+        accu + (struct.name -> struct)
 
       case (_, other) =>
         throw new Exception("sanity: wrong element type in workflow")

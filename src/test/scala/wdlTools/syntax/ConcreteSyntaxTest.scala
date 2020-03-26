@@ -5,7 +5,8 @@ import java.nio.file.{Path, Paths, Files}
 import org.scalatest.{FlatSpec, Matchers}
 
 import ConcreteSyntax._
-import wdlTools.util.Util.Conf
+import wdlTools.util.Options
+import wdlTools.util.Verbosity.Quiet
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
@@ -14,10 +15,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
-  private lazy val conf = Conf(antlr4Trace = false)
+  private lazy val conf = Options(antlr4Trace = false)
 
   it should "handle various types" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "types.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), conf)
 
     doc.elements.size shouldBe (1)
     val elem = doc.elements(0)
@@ -48,7 +49,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle types and expressions" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "expressions.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "expressions.wdl"), conf)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -152,7 +153,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle get name" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "get_name_bug.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "get_name_bug.wdl"), conf)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -173,14 +174,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = conf.copy(quiet = true)
+    val confQuiet = conf.copy(verbosity = Quiet)
     assertThrows[Exception] {
-      ParseDocument.apply(getWdlSource("format", "wrong_comment_style.wdl"), confQuiet)
+      ParseDocument.apply(getWdlSource("tasks", "wrong_comment_style.wdl"), confQuiet)
     }
   }
 
   it should "parse a task with an output section only" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "output_section.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "output_section.wdl"), conf)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -199,7 +200,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a task" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "wc.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "wc.wdl"), conf)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
@@ -226,12 +227,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "detect when a task section appears twice" in {
     assertThrows[Exception] {
-      ParseDocument.apply(getWdlSource("format", "multiple_input_section.wdl"), conf)
+      ParseDocument.apply(getWdlSource("tasks", "multiple_input_section.wdl"), conf)
     }
   }
 
   it should "handle string interpolation" in {
-    val doc = ParseDocument.apply(getWdlSource("format", "interpolation.wdl"), conf)
+    val doc = ParseDocument.apply(getWdlSource("tasks", "interpolation.wdl"), conf)
 
     doc.version shouldBe ("1.0")
     doc.elements.size shouldBe (1)
