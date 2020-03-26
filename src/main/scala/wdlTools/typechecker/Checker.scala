@@ -7,6 +7,7 @@ import Base._
 case class Checker(stdlib: Stdlib, conf: Conf) {
 
   type Context = Map[String, Type]
+  type Binding = (String, Type)
 
   private def typeEvalMathOp(expr: Expr, ctx: Context): Type = {
     val t = typeEval(expr, ctx)
@@ -263,6 +264,17 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
               case Some(t) =>
                 t
             }
+          case TypeCall(name, members) =>
+            members.get(id) match {
+              case None =>
+                throw new Exception(
+                    s"Call object ${name} does not have member ${id} in expression ${expr}"
+                )
+              case Some(t) =>
+                t
+            }
+          case _ =>
+            throw new Exception(s"Member access ${id} in expression ${e} is illegal")
         }
     }
   }
@@ -276,7 +288,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def applyDecl(decl: Declaration, ctx: Context): Context = {
+  def applyDecl(decl: Declaration, ctx: Context): Binding = {
     decl.expr match {
       case None =>
         ()
@@ -287,7 +299,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     }
     ctx.get(decl.name) match {
       case None =>
-        ctx + (decl.name -> decl.wdlType)
+        (decl.name, decl.wdlType)
       case Some(_) =>
         throw new Exception(
             s"declaration ${decl} shadows an existing variable by the same name (${decl.name})"
@@ -299,7 +311,8 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   private def applyInputSection(inputSection: InputSection, ctx: Context): Context = {
     val ctx2 = inputSection.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
-        applyDecl(decl, accu)
+        val binding = applyDecl(decl, accu)
+        accu + binding
     }
     ctx2
   }
@@ -308,7 +321,8 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     outputSection.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
-        applyDecl(decl, accu)
+        val binding = applyDecl(decl, accu)
+        accu + binding
     }
   }
 
@@ -364,7 +378,8 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     // check the declaration, and accumulate context
     val ctx2 = task.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
-        applyDecl(decl, accu)
+        val binding = applyDecl(decl, accu)
+        accu + binding
     }
 
     // check that all expressions in the command section are strings
@@ -402,7 +417,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
   //    and arguments that have defaults can be skipped.
-  private def applyCall(call: Call, ctx: Context): Context = {
+  private def applyCall(call: Call, ctx: Context): (String, TypeCall) = {
     val callerInputs = call.inputs.map {
       case (name, expr) => name -> typeEval(expr, ctx)
     }.toMap
@@ -451,7 +466,59 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       case None        => call.name
       case Some(alias) => alias
     }
-    ctx + (callName -> TypeCall(callName, calleeOutputs))
+    (callName -> TypeCall(callName, calleeOutputs))
+  }
+
+  // The body of the scatter becomes accessible to statements that come after it.
+  // The iterator is not visible outside the scatter body.
+  //
+  // for (i in [1, 2, 3]) {
+  //    call A
+  // }
+  //
+  // Variable "i" is not visible after the scatter completes.
+  // A's members are arrays.
+  private def applyScatter(scatter : Scatter , outerCtx : Context) : Context = {
+    val collectionType = typeEval(scatter.expr, outerCtx)
+    val elementType = collectionType match {
+      case TypeArray(elementType, _) => elementType
+      case _ =>
+        throw new Exception(s"Collection in scatter (${scatter}) is not an array type")
+    }
+    // add a binding for the iteration variable
+    val ctxInner = ctxOuter + (scatter.name -> elementType)
+
+    // Add an "array" over and above whatever the type is
+    val ctx = wf.body.foldLeft(ctxInner) {
+      case (accu: Context, elem : WorkflowElement) =>
+        val binding = elem match {
+          case decl : Declaration =>
+            val (varName, typ) = applyDecl(decl, accu)
+            (varName -> TypeArray(typ))
+
+          case call: Call =>
+            val (callName, callType) = applyCall(call, accu)
+            val callOutput = callType.output.map{
+              case (name, t) => name -> TypeArray(t)
+            }.toMap
+            (callName -> TypeCall(typeCall.name, callOutput))
+
+          case scatter : Scatter =>
+            applyScatter(scatter, accu)
+          case cond : Conditional =>
+            applyConditional(cond, accu)
+          case (_, other) =>
+            throw new Exception(s"Sanity: ${other}")
+        }
+        accu + binding
+    }
+
+    // The iterator binding is not exported outside the scatter
+    ctx - scatter.name
+  }
+
+  private def applyConditional(cond : Conditional , outerCtx : Context) : Context = {
+
   }
 
   private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
@@ -460,18 +527,21 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       case Some(inpSection) => applyInputSection(inpSection, ctxOuter)
     }
 
-    // check the declaration, and accumulate context
     val ctxBody = wf.body.foldLeft(ctx) {
-      case (accu: Context, decl: Declaration) =>
-        applyDecl(decl, accu)
-      case (accu, call: Call) =>
-        applyCall(call, accu)
-
-      // case (accu, scatter : Scatter) =>
-      // case (accu, cond : Conditional) =>
-
-      case (_, _) =>
-        throw new Exception("Not implement yet")
+      case (accu: Context, elem : WorkflowElement) =>
+        val binding = elem match {
+          case decl : Declaration =>
+            applyDecl(decl, accu)
+          case call: Call =>
+            applyCall(call, accu)
+          case scatter : Scatter =>
+            applyScatter(scatter, accu)
+          case cond : Conditional =>
+            applyConditional(cond, accu)
+          case (_, other) =>
+            throw new Exception(s"Sanity: ${other}")
+        }
+        accu + binding
     }
 
     // check the output section. We don't need the returned context.
