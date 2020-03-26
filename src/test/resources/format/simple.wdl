@@ -16,6 +16,6 @@ task foo {
     }
 
     runtime {
-        docker: "ubuntu:slim-stretch"
+        docker: "debian:stretch-slim"
     }
 }
