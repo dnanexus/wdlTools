@@ -68,4 +68,19 @@ class CheckerTest extends FlatSpec with Matchers {
         throw new RuntimeException(s"Type error missed in file ${pc}")
     }
   }
+
+  it should "type check correct workflows" in {
+    val positiveCases = getWdlSourceFiles("/typechecking/workflows/positive")
+    for (pc <- positiveCases) {
+      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
+      val doc = parser.apply(wdlSourceCode)
+      try {
+        checker.apply(doc)
+      } catch {
+        case e: Throwable =>
+          System.out.println(s"Type error in file ${pc}")
+          throw e
+      }
+    }
+  }
 }
