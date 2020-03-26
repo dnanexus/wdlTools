@@ -3,15 +3,10 @@ package wdlTools.formatter
 import java.net.URI
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.Verbosity
-import wdlTools.util.Verbosity._
-
-import wdlTools.util.Verbosity
-import wdlTools.util.Verbosity._
 
 import scala.collection.mutable
 
-case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
+case class WDL10Formatter(verbose: Boolean,
                           indentation: String = " ",
                           indentStep: Int = 2,
                           maxLineWidth: Int = 100,
