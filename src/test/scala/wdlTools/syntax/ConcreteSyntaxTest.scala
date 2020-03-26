@@ -5,7 +5,8 @@ import java.nio.file.{Path, Paths, Files}
 import org.scalatest.{FlatSpec, Matchers}
 
 import ConcreteSyntax._
-import wdlTools.util.Util.Conf
+import wdlTools.util.Options
+import wdlTools.util.Verbosity.Quiet
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
@@ -14,7 +15,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
-  private lazy val conf = Conf(antlr4Trace = false)
+  private lazy val conf = Options(antlr4Trace = false)
 
   it should "handle various types" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), conf)
@@ -173,7 +174,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = conf.copy(quiet = true)
+    val confQuiet = conf.copy(verbosity = Quiet)
     assertThrows[Exception] {
       ParseDocument.apply(getWdlSource("tasks", "wrong_comment_style.wdl"), confQuiet)
     }

@@ -1,10 +1,9 @@
 package wdlTools.typechecker
 
-import wdlTools.util.Util.Conf
 import wdlTools.syntax.AbstractSyntax._
 import Base._
 
-case class Checker(stdlib: Stdlib, conf: Conf) {
+case class Checker(stdlib: Stdlib) {
 
   // An entire context
   type Context = Map[String, Type]
@@ -117,25 +116,24 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
 
       // All the sub-exressions have to be strings, or coercible to strings
       case ExprCompoundString(vec) =>
-        vec.foreach {
-          case subExpr =>
-            val t = typeEval(subExpr, ctx)
-            if (!isCoercibleTo(TypeString, t))
-              throw new Exception(s"Type ${t} is not coercible to string")
+        vec foreach { subExpr =>
+          val t = typeEval(subExpr, ctx)
+          if (!isCoercibleTo(TypeString, t))
+            throw new Exception(s"Type ${t} is not coercible to string")
         }
         TypeString
 
       case ExprPair(l, r)                => TypePair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
-        TypeArray(TypeUnknown, false)
+        TypeArray(TypeUnknown)
 
       case ExprArray(vec) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val t = vecTypes.head
         if (!vecTypes.tail.forall(isCoercibleTo(_, t)))
           throw new Exception(s"Array elements do not all have type ${t}")
-        TypeArray(t, false)
+        TypeArray(t)
 
       case ExprMap(m) if m.isEmpty =>
         // The map type is unknown
@@ -292,7 +290,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  def applyDecl(decl: Declaration, ctx: Context) : (String, Type) = {
+  def applyDecl(decl: Declaration, ctx: Context): (String, Type) = {
     decl.expr match {
       case None =>
         ()
@@ -356,10 +354,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     val outputType: Map[String, Type] = outputSection match {
       case None => Map.empty
       case Some(OutputSection(decls)) =>
-        decls.map {
-          case decl =>
-            decl.name -> decl.wdlType
-        }.toMap
+        decls.map(decl => decl.name -> decl.wdlType).toMap
     }
     (inputType, outputType)
   }
@@ -387,11 +382,10 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     }
 
     // check that all expressions in the command section are strings
-    task.command.parts.foreach {
-      case expr =>
-        val t = typeEval(expr, ctxDecl)
-        if (!isCoercibleTo(TypeString, t))
-          throw new Exception(s"Expression ${expr} in the command section is coercible to a string")
+    task.command.parts.foreach { expr =>
+      val t = typeEval(expr, ctxDecl)
+      if (!isCoercibleTo(TypeString, t))
+        throw new Exception(s"Expression ${expr} in the command section is coercible to a string")
     }
 
     // check the output section. We don't need the returned context.
@@ -423,7 +417,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   private def applyCall(call: Call, ctx: Context): (String, TypeCall) = {
     val callerInputs = call.inputs.map {
       case (name, expr) => name -> typeEval(expr, ctx)
-    }.toMap
+    }
 
     val (calleeInputs, calleeOutputs) = ctx.get(call.name) match {
       case None =>
@@ -469,13 +463,14 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
       case None        => call.name
       case Some(alias) => alias
     }
+
     if (ctx contains callName)
       throw new Exception(s"call ${callName} shadows an existing definition")
     (callName -> TypeCall(callName, calleeOutputs))
   }
 
   // check that the new variables do not redefine the old variables
-  private def checkNoShadowing(ctx : Context, bindings : Bindings) : Unit = {
+  private def checkNoShadowing(ctx: Context, bindings: Bindings): Unit = {
     val existingVarNames = ctx.keys.toSet
     val newVarNames = bindings.keys.toSet
     val both = existingVarNames intersect newVarNames
@@ -505,30 +500,30 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
     val ctxInner = ctxOuter + (scatter.identifier -> elementType)
 
     // Add an array type to all variables defined in the scatter body
-    val bodyBindings : Bindings = scatter.body.foldLeft(Map.empty[String, Type]) {
-      case (accu: Context, decl : Declaration) =>
+    val bodyBindings: Bindings = scatter.body.foldLeft(Map.empty[String, Type]) {
+      case (accu: Context, decl: Declaration) =>
         val (varName, typ) = applyDecl(decl, accu ++ ctxInner)
         accu + (varName -> TypeArray(typ))
 
       case (accu: Context, call: Call) =>
         val (callName, callType) = applyCall(call, accu ++ ctxInner)
-        val callOutput = callType.output.map{
+        val callOutput = callType.output.map {
           case (name, t) => name -> TypeArray(t)
         }.toMap
         accu + (callName -> TypeCall(callType.name, callOutput))
 
-      case (accu: Context, subSct : Scatter) =>
+      case (accu: Context, subSct: Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, accu ++ ctxInner)
-        val sctBindings2 = sctBindings.map{
+        val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> TypeArray(typ)
         }.toMap
         accu ++ sctBindings2
 
-      case (accu: Context,cond : Conditional) =>
+      case (accu: Context, cond: Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, accu ++ ctxInner)
-        val condBindings2 = condBindings.map{
+        val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> TypeArray(typ)
         }.toMap
         accu ++ condBindings2
@@ -552,29 +547,29 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
 
     // Add an array type to all variables defined in the scatter body
     val bodyBindings = cond.body.foldLeft(Map.empty[String, Type]) {
-      case (accu: Context, decl : Declaration) =>
+      case (accu: Context, decl: Declaration) =>
         val (varName, typ) = applyDecl(decl, accu ++ ctxOuter)
         accu + (varName -> TypeOptional(typ))
 
       case (accu: Context, call: Call) =>
         val (callName, callType) = applyCall(call, accu ++ ctxOuter)
-        val callOutput = callType.output.map{
+        val callOutput = callType.output.map {
           case (name, t) => name -> TypeOptional(t)
         }.toMap
         accu + (callName -> TypeCall(callType.name, callOutput))
 
-      case (accu: Context, subSct : Scatter) =>
+      case (accu: Context, subSct: Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, accu ++ ctxOuter)
-        val sctBindings2 = sctBindings.map{
+        val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> TypeOptional(typ)
         }.toMap
         accu ++ sctBindings2
 
-      case (accu: Context,cond : Conditional) =>
+      case (accu: Context, cond: Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, accu ++ ctxOuter)
-        val condBindings2 = condBindings.map{
+        val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> TypeOptional(typ)
         }.toMap
         accu ++ condBindings2
@@ -628,8 +623,7 @@ case class Checker(stdlib: Stdlib, conf: Conf) {
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc: Document,
-            ctxOuter : Context = Map.empty): Context = {
+  def apply(doc: Document, ctxOuter: Context = Map.empty): Context = {
     val context: Context = doc.elements.foldLeft(ctxOuter) {
       case (accu: Context, task: Task) =>
         val tt = applyTask(task, accu)

@@ -1,10 +1,12 @@
-package wdlTools.syntax
+package wdlTools.util
 
-import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
+import java.net.URI
+import java.nio.file.{Files, Path, Paths}
+
+import wdlTools.util.Verbosity._
+
+import scala.collection.JavaConverters._
 import scala.io.Source
-
-import wdlTools.util.Util.Conf
 
 // a path to a file or an http location
 //
@@ -22,7 +24,7 @@ case class URL(addr: String)
 //   foo.txt
 //
 // Follow the URL and retrieve the content as a string.
-case class FetchURL(conf: Conf) {
+case class FetchURL(conf: Options) {
 
   private def read(p: Path): String = {
     Files.readAllLines(p).asScala.mkString(System.lineSeparator())
@@ -52,7 +54,7 @@ case class FetchURL(conf: Conf) {
 
   def apply(url: URL): String = {
     val p: String = url.addr
-    if (conf.verbose)
+    if (conf.verbosity > Normal)
       System.out.println(s"looking for ${p}")
 
     if (p contains "://") {
@@ -67,6 +69,24 @@ case class FetchURL(conf: Conf) {
     } else {
       // no recognizable protocol, assuming a file
       fetchLocalFile(p)
+    }
+  }
+}
+
+object FetchURL {
+
+  /**
+    * Reads the contents from a URI, which may be a local file or a remote (http(s)) URL.
+    * @param uri the URI to reAd
+    * @param conf the options
+    * @return a tuple (localPath, contents), where localPath is
+    */
+  def readFromUri(uri: URI, conf: Options): String = {
+    val uriLocalPath = Util.getLocalPath(uri)
+    uri.getScheme match {
+      case null | "" | "file" => Util.readFromFile(uriLocalPath)
+      case _ =>
+        FetchURL(conf).apply(URL(uri.toString))
     }
   }
 }

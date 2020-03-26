@@ -1,6 +1,5 @@
 import sbt.Keys._
 import sbtassembly.AssemblyPlugin.autoImport._
-import scoverage.ScoverageKeys._
 
 scalaVersion := "2.12.9"
 name := "wdlTools"
@@ -55,11 +54,14 @@ logLevel in assembly := Level.Info
 val antlr4Version = "4.8"
 //antlr4Version in Antlr4 := "4.7.2" // default: 4.7.2
 //antlr4GenVisitor in Antlr4 := true
+val scallopVersion = "3.4.0"
+val typesafeVersion = "1.3.3"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
-
+    "org.rogach" %% "scallop" % scallopVersion,
+    "com.typesafe" % "config" % typesafeVersion,
     //---------- Test libraries -------------------//
     "org.scalactic" %% "scalactic" % "3.0.1",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"

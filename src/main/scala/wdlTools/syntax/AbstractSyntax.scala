@@ -1,5 +1,7 @@
 package wdlTools.syntax
 
+import wdlTools.util.URL
+
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
   trait WorkflowElement
@@ -44,9 +46,9 @@ object AbstractSyntax {
 
   // These are expressions of kind:
   //
-  // ${true="--yes" false="--no" boolean_value}
-  // ${default="foo" optional_value}
-  // ${sep=", " array_value}
+  // ~{true="--yes" false="--no" boolean_value}
+  // ~{default="foo" optional_value}
+  // ~{sep=", " array_value}
   case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr) extends Expr
   case class ExprPlaceholderDefault(default: Expr, value: Expr) extends Expr
   case class ExprPlaceholderSep(sep: Expr, value: Expr) extends Expr
@@ -54,11 +56,11 @@ object AbstractSyntax {
   // operators on one argument
   case class ExprUniraryPlus(value: Expr) extends Expr
   case class ExprUniraryMinus(value: Expr) extends Expr
+  case class ExprNegate(value: Expr) extends Expr
 
   // operators on two arguments
   case class ExprLor(a: Expr, b: Expr) extends Expr
   case class ExprLand(a: Expr, b: Expr) extends Expr
-  case class ExprNegate(value: Expr) extends Expr
   case class ExprEqeq(a: Expr, b: Expr) extends Expr
   case class ExprLt(a: Expr, b: Expr) extends Expr
   case class ExprGte(a: Expr, b: Expr) extends Expr

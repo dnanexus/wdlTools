@@ -1,10 +1,10 @@
 package wdlTools.typechecker
 
-import wdlTools.util.Util.Conf
 import wdlTools.syntax.AbstractSyntax._
 import Base._
+import wdlTools.util.Options
 
-case class Stdlib(conf: Conf) {
+case class Stdlib(conf: Options) {
 
   private val stdlibV1_0: Vector[TypeStdlibFunc] = Vector(
       TypeFunctionUnit("stdout", TypeFile),
@@ -49,21 +49,21 @@ case class Stdlib(conf: Conf) {
       TypeFunction1Arg("range", TypeInt, TypeArray(TypeInt)),
       // functions that obay parametric polymorphism
       TypeFunctionParamPoly1Arg("transpose",
-                                ((x: Type) => (TypeArray(TypeArray(x)), TypeArray(TypeArray(x))))),
+                                (x: Type) => (TypeArray(TypeArray(x)), TypeArray(TypeArray(x)))),
       TypeFunctionParamPoly2Arg(
           "zip",
-          ((x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y))))
+          (x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y)))
       ),
       TypeFunctionParamPoly2Arg(
           "cross",
-          ((x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y))))
+          (x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y)))
       ),
-      TypeFunctionParamPoly1Arg("length", ((x: Type) => (TypeArray(x), TypeInt))),
-      TypeFunctionParamPoly1Arg("flatten", ((x: Type) => (TypeArray(TypeArray(x)), TypeArray(x)))),
+      TypeFunctionParamPoly1Arg("length", (x: Type) => (TypeArray(x), TypeInt)),
+      TypeFunctionParamPoly1Arg("flatten", (x: Type) => (TypeArray(TypeArray(x)), TypeArray(x))),
       // Shortcut, can we use an unknown here?
       TypeFunction2Arg("prefix", TypeString, TypeArray(TypeUnknown), TypeString),
-      TypeFunctionParamPoly1Arg("select_first", ((x: Type) => (TypeArray(x), x))),
-      TypeFunctionParamPoly1Arg("defined", ((x: Type) => (TypeOptional(x), TypeBoolean))),
+      TypeFunctionParamPoly1Arg("select_first", (x: Type) => (TypeArray(x), x)),
+      TypeFunctionParamPoly1Arg("defined", (x: Type) => (TypeOptional(x), TypeBoolean)),
       // simple functions again
       TypeFunction1Arg("basename", TypeString, TypeString),
       TypeFunction1Arg("floor", TypeFloat, TypeInt),

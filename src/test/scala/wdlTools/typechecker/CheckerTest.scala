@@ -4,16 +4,16 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 
-import wdlTools.util.Util.Conf
+import wdlTools.util.Options
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.ParseAll
 
 class CheckerTest extends FlatSpec with Matchers {
 
-  private val conf = Conf(antlr4Trace = false)
+  private val conf = Options(antlr4Trace = false)
   private val stdlib = Stdlib(conf)
   private val parser = new ParseAll(conf)
-  private val checker = new Checker(stdlib, conf)
+  private val checker = new Checker(stdlib)
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(dirname: String): Vector[Path] = {
