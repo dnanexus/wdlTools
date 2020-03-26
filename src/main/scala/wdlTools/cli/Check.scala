@@ -7,7 +7,7 @@ import wdlTools.typechecker.{Checker, Stdlib}
 
 import scala.language.reflectiveCalls
 
-case class Check(conf: Util.Conf) extends Command {
+case class Check(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val uri = new URI(conf.check.uri())
     val (uriLocalPath, sourceCode) = Util.readFromUri(uri, conf)

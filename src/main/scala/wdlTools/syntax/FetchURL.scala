@@ -3,7 +3,7 @@ package wdlTools.syntax
 import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
-import wdlTools.syntax.Util.Conf
+import wdlTools.syntax.Util.Options
 
 import scala.io.Source
 import wdlTools.util.Util.Verbosity._
@@ -24,7 +24,7 @@ case class URL(addr: String)
 //   foo.txt
 //
 // Follow the URL and retrieve the content as a string.
-case class FetchURL(conf: Conf) {
+case class FetchURL(conf: Options) {
 
   private def read(p: Path): String = {
     Files.readAllLines(p).asScala.mkString(System.lineSeparator())

@@ -12,11 +12,11 @@ import org.antlr.v4.runtime._
 import org.openwdl.wdl.parser._
 
 import ConcreteSyntax._
-import wdlTools.syntax.Util.Conf
+import wdlTools.syntax.Util.Options
 import wdlTools.util.Util.Verbosity.Quiet
 
 object ParseDocument {
-  private def getParser(inp: String, conf: Conf): (ErrorListener, WdlParser) = {
+  private def getParser(inp: String, conf: Options): (ErrorListener, WdlParser) = {
     val codePointBuffer: CodePointBuffer =
       CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
     val lexer: WdlLexer = new WdlLexer(CodePointCharStream.fromBuffer(codePointBuffer))
@@ -32,7 +32,7 @@ object ParseDocument {
     (errListener, parser)
   }
 
-  def apply(sourceCode: String, conf: Conf): Document = {
+  def apply(sourceCode: String, conf: Options): Document = {
     val (errListener, parser) = getParser(sourceCode, conf)
     if (conf.antlr4Trace)
       parser.setTrace(true)
@@ -53,7 +53,7 @@ object ParseDocument {
   }
 }
 
-case class ParseDocument(conf: Conf) extends WdlParserBaseVisitor[Element] {
+case class ParseDocument(conf: Options) extends WdlParserBaseVisitor[Element] {
 
   private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
     val tok = ctx.start

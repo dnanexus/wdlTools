@@ -1,9 +1,7 @@
 package wdlTools.cli
 
-import wdlTools.cli.Util.Conf
-
 object Main extends App {
-  val conf = new Conf(args)
+  val conf = new WdlToolsConf(args)
 
   conf.subcommand match {
     case None => conf.printHelp()

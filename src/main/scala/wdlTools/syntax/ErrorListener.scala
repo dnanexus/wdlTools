@@ -5,11 +5,11 @@ import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
 
-import wdlTools.syntax.Util.Conf
+import wdlTools.syntax.Util.Options
 
 case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
 
-case class ErrorListener(conf: Conf) extends BaseErrorListener {
+case class ErrorListener(conf: Options) extends BaseErrorListener {
   var errors = Vector.empty[SyntaxError]
 
   override def syntaxError(recognizer: Recognizer[_, _],

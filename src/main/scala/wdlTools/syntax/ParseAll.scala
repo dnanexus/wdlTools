@@ -1,11 +1,11 @@
 package wdlTools.syntax
 
-import wdlTools.syntax.Util.Conf
+import wdlTools.syntax.Util.Options
 
 import scala.collection.mutable
 
 // parse and follow imports
-case class ParseAll(conf: Conf) {
+case class ParseAll(conf: Options) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 
