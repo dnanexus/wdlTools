@@ -19,6 +19,6 @@ task wc {
     author : "Robin Hood"
   }
   parameter_meta {
-    reason : "just because"
+    inp_file : "just because"
   }
 }

@@ -1,17 +1,15 @@
-package wdlTools
-
-//import collection.JavaConverters._
-//import java.nio.ByteBuffer
-//import org.antlr.v4.runtime._
+package wdlTools.syntax
 
 import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
 
+import wdlTools.util.Util.Conf
+
 case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
 
-case class ErrorListener(assertNoErrors: Boolean, verbose: Boolean) extends BaseErrorListener {
+case class ErrorListener(conf: Conf) extends BaseErrorListener {
   var errors = Vector.empty[SyntaxError]
 
   override def syntaxError(recognizer: Recognizer[_, _],

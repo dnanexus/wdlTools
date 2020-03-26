@@ -1,12 +1,18 @@
-package wdlTools
+package wdlTools.syntax
 
-// An abstract syntax for the Workflow Description Language (WDL)
-object AbstractSyntax {
-  sealed trait WorkflowElement
-  sealed trait DocumentElement
+// A parser based on a WDL grammar written by Patrick Magee. The tool
+// underlying the grammar is Antlr4.
+//
+
+// A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
+// outside this package. Please use the abstract syntax instead.
+object ConcreteSyntax {
+  sealed trait Element
+  sealed trait WorkflowElement extends Element
+  sealed trait DocumentElement extends Element
 
   // type system
-  sealed trait Type
+  sealed trait Type extends Element
   case class TypeOptional(t: Type) extends Type
   case class TypeArray(t: Type, nonEmpty: Boolean) extends Type
   case class TypeMap(k: Type, v: Type) extends Type
@@ -21,27 +27,38 @@ object AbstractSyntax {
   case class TypeStruct(name: String, members: Map[String, Type]) extends Type with DocumentElement
 
   // expressions
-  sealed trait Expr
-
-  // values
-  sealed trait Value extends Expr
-  case class ValueString(value: String) extends Value
-  case class ValueFile(value: String) extends Value
-  case class ValueBoolean(value: Boolean) extends Value
-  case class ValueInt(value: Int) extends Value
-  case class ValueFloat(value: Double) extends Value
+  sealed trait Expr extends Element
+  case class ExprString(value: String) extends Expr
+  case class ExprFile(value: String) extends Expr
+  case class ExprBoolean(value: Boolean) extends Expr
+  case class ExprInt(value: Int) extends Expr
+  case class ExprFloat(value: Double) extends Expr
 
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprIdentifier(id: String) extends Expr
   case class ExprCompoundString(value: Vector[Expr]) extends Expr
-  case class ExprPair(l: Expr, r: Expr) extends Expr
-  case class ExprArray(value: Vector[Expr]) extends Expr
-  case class ExprMap(value: Map[Expr, Expr]) extends Expr
-  case class ExprObject(value: Map[String, Expr]) extends Expr
+  case class ExprMapLiteral(value: Map[Expr, Expr]) extends Expr
+  case class ExprObjectLiteral(value: Map[String, Expr]) extends Expr
+  case class ExprArrayLiteral(value: Vector[Expr]) extends Expr
 
-  // These are expressions of kind:
+  case class ExprIdentifier(id: String) extends Expr
+
+  // These are parts of string interpolation expressions like:
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  //
+  trait PlaceHolderPart extends Element
+  // true="--yes"    false="--no"
+  case class ExprPlaceholderPartEqual(b: Boolean, value: Expr) extends PlaceHolderPart
+  // default="foo"
+  case class ExprPlaceholderPartDefault(value: Expr) extends PlaceHolderPart
+  // sep=", "
+  case class ExprPlaceholderPartSep(value: Expr) extends PlaceHolderPart
+
+  // These are full expressions of the same kind
   //
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
@@ -50,11 +67,8 @@ object AbstractSyntax {
   case class ExprPlaceholderDefault(default: Expr, value: Expr) extends Expr
   case class ExprPlaceholderSep(sep: Expr, value: Expr) extends Expr
 
-  // operators on one argument
   case class ExprUniraryPlus(value: Expr) extends Expr
   case class ExprUniraryMinus(value: Expr) extends Expr
-
-  // operators on two arguments
   case class ExprLor(a: Expr, b: Expr) extends Expr
   case class ExprLand(a: Expr, b: Expr) extends Expr
   case class ExprNegate(value: Expr) extends Expr
@@ -69,27 +83,17 @@ object AbstractSyntax {
   case class ExprMod(a: Expr, b: Expr) extends Expr
   case class ExprMul(a: Expr, b: Expr) extends Expr
   case class ExprDivide(a: Expr, b: Expr) extends Expr
-
-  // Access an array element at [index]
+  case class ExprPair(l: Expr, r: Expr) extends Expr
   case class ExprAt(array: Expr, index: Expr) extends Expr
-
-  // conditional:
-  // if (x == 1) then "Sunday" else "Weekday"
-  case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) extends Expr
-
-  // Apply a standard library function to arguments. For example:
-  //   read_int("4")
   case class ExprApply(funcName: String, elements: Vector[Expr]) extends Expr
-
-  // Access a field in a struct or an object. For example:
-  //   Int z = x.a
+  case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) extends Expr
   case class ExprGetName(e: Expr, id: String) extends Expr
 
   case class Declaration(name: String, wdlType: Type, expr: Option[Expr]) extends WorkflowElement
 
   // sections
-  case class InputSection(declarations: Vector[Declaration])
-  case class OutputSection(declarations: Vector[Declaration])
+  case class InputSection(declarations: Vector[Declaration]) extends Element
+  case class OutputSection(declarations: Vector[Declaration]) extends Element
 
   // A command can be simple, with just one continuous string:
   //
@@ -104,22 +108,24 @@ object AbstractSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandSection(parts: Vector[Expr])
+  case class CommandSection(parts: Vector[Expr]) extends Element
 
-  case class RuntimeKV(id: String, expr: Expr)
-  case class RuntimeSection(kvs: Vector[RuntimeKV])
+  case class RuntimeKV(id: String, expr: Expr) extends Element
+  case class RuntimeSection(kvs: Vector[RuntimeKV]) extends Element
 
   // meta section
-  case class MetaKV(id: String, expr: Expr)
-  case class ParameterMetaSection(kvs: Vector[MetaKV])
-  case class MetaSection(kvs: Vector[MetaKV])
+  case class MetaKV(id: String, expr: Expr) extends Element
+  case class ParameterMetaSection(kvs: Vector[MetaKV]) extends Element
+  case class MetaSection(kvs: Vector[MetaKV]) extends Element
 
-  // import statement with the AST for the referenced document
-  case class ImportAlias(id1: String, id2: String)
-  case class ImportDoc(name: Option[String], aliases: Vector[ImportAlias], url: URL, doc: Document)
+  // imports
+  case class ImportAlias(id1: String, id2: String) extends Element
+
+  // import statement as read from the document
+  case class ImportDoc(name: Option[String], aliases: Vector[ImportAlias], url: URL)
       extends DocumentElement
 
-  // A task
+  // top level definitions
   case class Task(name: String,
                   input: Option[InputSection],
                   output: Option[OutputSection],
@@ -130,24 +136,26 @@ object AbstractSyntax {
                   runtime: Option[RuntimeSection])
       extends DocumentElement
 
+  case class CallAlias(name: String) extends Element
+  case class CallInput(name: String, expr: Expr) extends Element
+  case class CallInputs(value: Map[String, Expr]) extends Element
   case class Call(name: String, alias: Option[String], inputs: Map[String, Expr])
       extends WorkflowElement
-
   case class Scatter(identifier: String, expr: Expr, body: Vector[WorkflowElement])
       extends WorkflowElement
-
   case class Conditional(expr: Expr, body: Vector[WorkflowElement]) extends WorkflowElement
 
-  // A workflow
   case class Workflow(name: String,
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement])
+      extends Element
 
-  case class Version(value: String)
+  case class Version(value: String) extends Element
   case class Document(version: String,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow])
+      extends Element
 }

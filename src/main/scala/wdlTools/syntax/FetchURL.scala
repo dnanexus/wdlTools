@@ -1,8 +1,10 @@
-package wdlTools
+package wdlTools.syntax
 
 import collection.JavaConverters._
 import java.nio.file.{Path, Paths, Files}
 import scala.io.Source
+
+import wdlTools.util.Util.Conf
 
 // a path to a file or an http location
 //
@@ -20,7 +22,7 @@ case class URL(addr: String)
 //   foo.txt
 //
 // Follow the URL and retrieve the content as a string.
-case class FetchURL(verbose: Boolean, localDirectories: Vector[Path]) {
+case class FetchURL(conf: Conf) {
 
   private def read(p: Path): String = {
     Files.readAllLines(p).asScala.mkString(System.lineSeparator())
@@ -34,7 +36,7 @@ case class FetchURL(verbose: Boolean, localDirectories: Vector[Path]) {
       return read(path)
 
     // search in all directories where imports may be found
-    for (d <- localDirectories) {
+    for (d <- conf.localDirectories) {
       val fp: Path = d.resolve(filepath)
       if (Files.exists(fp))
         return read(fp)
@@ -50,7 +52,7 @@ case class FetchURL(verbose: Boolean, localDirectories: Vector[Path]) {
 
   def apply(url: URL): String = {
     val p: String = url.addr
-    if (verbose)
+    if (conf.verbose)
       System.out.println(s"looking for ${p}")
 
     if (p contains "://") {

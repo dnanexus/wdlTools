@@ -1,26 +1,19 @@
-package wdlTools
-
-//import ConcreteSyntax.{Document, URL, ImportDoc, ImportDocElaborated}
-
-import java.nio.file.Path
+package wdlTools.syntax
 
 import scala.collection.mutable
+import wdlTools.util.Util.Conf
 
 // parse and follow imports
-case class ParseAll(antlr4Trace: Boolean = false,
-                    verbose: Boolean = false,
-                    quiet: Boolean = false,
-                    localDirectories: Vector[Path] = Vector.empty) {
-
+case class ParseAll(conf: Conf) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val docText = FetchURL(verbose, localDirectories).apply(url)
+        val docText = FetchURL(conf).apply(url)
         val cDoc: ConcreteSyntax.Document =
-          ParseDocument.apply(docText, verbose, quiet, antlr4Trace)
+          ParseDocument.apply(docText, conf)
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -262,7 +255,7 @@ case class ParseAll(antlr4Trace: Boolean = false,
   // [dirs] : the directories where to search for imported documents
   //
   def apply(sourceCode: String): AbstractSyntax.Document = {
-    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, verbose, quiet, antlr4Trace)
+    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, conf)
     dfs(top)
   }
 }
