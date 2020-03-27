@@ -69,7 +69,7 @@ class CheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check correct workflows" in {
+  it should "type check workflows (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecking/workflows/positive")
     for (pc <- positiveCases) {
       val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())

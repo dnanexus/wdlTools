@@ -6,7 +6,47 @@ import Base._
 case class Checker(stdlib: Stdlib) {
 
   // An entire context
-  type Context = Map[String, Type]
+  private case class Context(declarations : Map[String, Type],
+                             structs : Map[String, TypeStruct],
+                             callables : Map[String, Type] /* tasks and workflows */ ) {
+    def bind(decl : Declaration) : Context = {
+      declarations.get(decl.name) match {
+        case None =>
+          this.copy(declarations = declarations + (decl.name -> decl.wdlType))
+        case Some(_) =>
+          throw new Exception(s"declaration ${decl} shadows an existing variable by the same name (${decl.name})")
+      }
+    }
+
+    def bind(s : TypeStruct) : Context = {
+      structs.get(s.name) match {
+        case None =>
+          this.copy(structs = structs + (s.name -> s))
+        case Some(_) =>
+          throw new Exception(s"struct ${s.name} is already declared")
+      }
+    }
+
+    def bind(taskSig : TypeTask) : Context = {
+      callables.get(taskSig.name) match {
+        case None =>
+          this.copy(callables = callables + (taskSig.name -> taskSig))
+        case Some(_) =>
+          throw new Exception(s"a callable named ${taskSig.name} is already declared")
+      }
+    }
+
+    def bind(wfSig : TypeWorkflow) : Context = {
+      callables.get(wfSig.name) match {
+        case None =>
+          this.copy(callables = callables + (wfSig.name -> wfSig))
+        case Some(_) =>
+          throw new Exception(s"a callable named ${wfSig.name} is already declared")
+      }
+    }
+
+  }
+  private val contextEmpty = Context(Map.empty, Map.empty, Map.empty)
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -109,9 +149,11 @@ case class Checker(stdlib: Stdlib) {
 
       // an identifier has to be bound to a known type
       case ExprIdentifier(id) =>
-        ctx.get(id) match {
-          case None    => throw new RuntimeException(s"Identifier ${id} is not defined")
-          case Some(t) => t
+        (ctx.declarations.get(id), ctx.structs.get(id)) match {
+          case (None, None)    => throw new RuntimeException(s"Identifier ${id} is not defined")
+          case (Some(t), None) => t
+          case (None, Some(t)) => t
+          case (Some(_), Some(_)) => throw new Exception(s"sanity: ${id} is both a struct and an identifier")
         }
 
       // All the sub-exressions have to be strings, or coercible to strings
@@ -299,7 +341,7 @@ case class Checker(stdlib: Stdlib) {
         if (!isCoercibleTo(decl.wdlType, rhsType))
           throw new Exception(s"declaration ${decl} is badly typed")
     }
-    ctx.get(decl.name) match {
+    ctx.declarations.get(decl.name) match {
       case None =>
         (decl.name, decl.wdlType)
       case Some(_) =>
@@ -393,16 +435,12 @@ case class Checker(stdlib: Stdlib) {
 
     // calculate the type signature of the task
     val (inputType, outputType) = calcSignature(task.input, task.output)
-    ctxOuter.get(task.name) match {
-      case None =>
-        TypeTask(task.name, inputType, outputType)
-      case Some(_) =>
-        throw new Exception(s"Redeclaration of task ${task.name}")
-    }
+    val taskSig = TypeTask(task.name, inputType, outputType)
+    ctxOuter.bind(taskSig)
   }
 
   private def applyStruct(struct: TypeStruct, ctx: Context): TypeStruct = {
-    ctx.get(struct.name) match {
+    ctx.structs.get(struct.name) match {
       case None =>
         struct
       case Some(_) =>
@@ -419,7 +457,7 @@ case class Checker(stdlib: Stdlib) {
       case (name, expr) => name -> typeEval(expr, ctx)
     }
 
-    val (calleeInputs, calleeOutputs) = ctx.get(call.name) match {
+    val (calleeInputs, calleeOutputs) = ctx.callables.get(call.name) match {
       case None =>
         throw new Exception(s"called task/workflow ${call.name} is not defined")
       case Some(TypeTask(_, input, output)) =>
@@ -610,13 +648,8 @@ case class Checker(stdlib: Stdlib) {
 
     // calculate the type signature of the workflow
     val (inputType, outputType) = calcSignature(wf.input, wf.output)
-    val wft = TypeWorkflow(wf.name, inputType, outputType)
-    ctxOuter.get(wf.name) match {
-      case None =>
-        ctxOuter + (wf.name -> wft)
-      case Some(_) =>
-        throw new Exception(s"Redeclaration of workflow ${wf.name}")
-    }
+    val wfSignature = TypeWorkflow(wf.name, inputType, outputType)
+    ctxOuter.bind(wf.name, wfSignature)
   }
 
   // Main entry point
