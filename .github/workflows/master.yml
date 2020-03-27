@@ -26,7 +26,7 @@ jobs:
           wget https://www.antlr.org/download/antlr-4.8-complete.jar
 
           # compile ANTLR sources
-          cd ${GITHUB_WORKSPACE}/src/main/antrl4
+          cd ${GITHUB_WORKSPACE}/src/main/antlr4
           java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
 
           # install sbt
