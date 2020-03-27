@@ -15,7 +15,6 @@ case class PrintAST(conf: WdlToolsConf) extends Command {
     val sourceCode = FetchURL.readFromUri(uri, opts)
     val parser = ParseAll(opts)
     val document = parser.apply(sourceCode)
-
-    println(s"$document")
+    pprint.pprintln(document)
   }
 }
