@@ -1,0 +1,39 @@
+name : Master Workflow
+on:
+  push:
+    branches:
+      - master
+      - github_cicd
+      - develop
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install & build
+        run: |
+          sudo apt-get update
+
+          # install java
+          sudo apt-get install wget
+          sudo apt-get install openjdk-8-jdk-headless
+
+          # download ANTLR
+          wget https://www.antlr.org/download/antlr-4.8-complete.jar
+
+          # compile ANTLR sources
+          cd ${GITHUB_WORKSPACE}/src/main/antlr4
+          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
+
+          # install sbt
+          echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+          sudo apt-get install -y sbt
+
+      - name: Unit Tests
+        run: |
+          sbt test
