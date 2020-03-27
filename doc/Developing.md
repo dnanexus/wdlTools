@@ -30,6 +30,7 @@
   * Running sbt for the first time takes several minutes, because it downloads all required packages.
 * We also recommend to install [Metals](https://scalameta.org/metals/), which enables better integration with your IDE
   * For VSCode, install the "Scala (Metals)" and "Scala Syntax (official)" plugins
+* You will also need Python installed (we recommend version 3.6+) and dx-toolkit (`pip install dxpy`)
 
 ## Getting the source code
 
@@ -82,6 +83,20 @@ If there are errors in your code, the compiler will fail with (hopefully useful)
 
 You should always run the unit tests after every successful compile. Generally, you want to run `sbt testQuick`, which only runs the tests that failed previously, as well as the tests for any code you've modified since the last time you ran the tests. However, the first time you checkout the code (to make sure your development environment is set up correctly) and then right before you push any changes to the repository, you should run the full test suite using `sbt test`.
 
+### Running the integration tests
+
+Integration tests actually build and run apps/workflows on DNAnexus. These tests take much longer to run than the unit tests, and so typically you only run them before submitting a pull request.
+
+First, you need to an account on the DNAnexus staging environment, and you need to be added to the projects that have been setup for testing; @orodeh can set this up for you. Next, log into the DNAnexus staging environment using dx-toolkit: `dx login --staging`. Note that very often your login will timeout while the integration tests are running unless you are actively using the platform in another session, and this will cause the tests to fail. To avoid, this, generate a token via the web UI and use that token to log in on the command line: `dx login --staging --token <token>`.
+
+Next, delete any existing build artifacts using the following commands:
+
+```
+$ sbt clean
+$ sbt cleanFiles
+$ find . -name target | xargs rm -rf
+```
+
 ### Other sbt tips
 
 #### Cache
@@ -96,8 +111,12 @@ sbt keeps the cache of downloaded jar files in `${HOME}/.ivy2/cache`. For exampl
 - Update release notes and README.md
 - Make sure the version number in `src/main/resources/application.conf` is correct. It is used
 when building the release.
-- Merge onto master branch, and make sure CI tests pass
+- Merge onto master branch, and make sure [travis tests](https://travis-ci.org/dnanexus-rnd/wdlTools) pass
 - Build new externally visible release
+  ```
+  ./scripts/build_all_releases.sh --staging-token XXX --production-token YYY --docker-user UUU --docker-password WWW
+  ```
+  this will take a while. It builds the release on staging, runs multi-region tests on staging, builds on production, and creates an easy to use docker image.
 - Update [releases](https://github.com/dnanexus-rnd/wdlTools/releases) github page, use the `Draft a new release` button, and upload a wdlTools.jar file.
 
 ### Post release
