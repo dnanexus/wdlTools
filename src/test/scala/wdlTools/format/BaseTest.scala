@@ -18,7 +18,6 @@ class BaseTest extends FlatSpec with Matchers {
   }
   private lazy val conf = Options(antlr4Trace = false)
 
-
   it should "handle the runtime section correctly" in {
     val doc = ParseDocument.apply(getWdlSource("simple.wdl"), conf)
     doc.version shouldBe ("1.0")

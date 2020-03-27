@@ -22,15 +22,9 @@ task B {
 }
 
 workflow linear {
-  call A { input: x = 3 }
-
   scatter (i in [1, 2, 3]) {
     call B
   }
 
-  Array[File] files = B.o
-
-  if (true == false) {
-    call A as A2 {input: x = 4 }
-  }
+  Array[Int] files = B.o
 }

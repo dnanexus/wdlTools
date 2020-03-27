@@ -8,10 +8,10 @@ case class Checker(stdlib: Stdlib) {
   // An entire context
   //
   // There separate namespaces for variables, struct definitions, and callables (tasks/workflows)
-  case class Context(declarations : Map[String, Type],
-                     structs : Map[String, TypeStruct],
-                     callables : Map[String, Type] /* tasks and workflows */ ) {
-    def bind(varName : String, wdlType : Type) : Context = {
+  case class Context(declarations: Map[String, Type],
+                     structs: Map[String, TypeStruct],
+                     callables: Map[String, Type] /* tasks and workflows */ ) {
+    def bind(varName: String, wdlType: Type): Context = {
       declarations.get(varName) match {
         case None =>
           this.copy(declarations = declarations + (varName -> wdlType))
@@ -20,16 +20,18 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(decl : Declaration) : Context = {
+    def bind(decl: Declaration): Context = {
       declarations.get(decl.name) match {
         case None =>
           this.copy(declarations = declarations + (decl.name -> decl.wdlType))
         case Some(_) =>
-          throw new Exception(s"declaration ${decl} shadows an existing variable by the same name (${decl.name})")
+          throw new Exception(
+              s"declaration ${decl} shadows an existing variable by the same name (${decl.name})"
+          )
       }
     }
 
-    def bind(s : TypeStruct) : Context = {
+    def bind(s: TypeStruct): Context = {
       structs.get(s.name) match {
         case None =>
           this.copy(structs = structs + (s.name -> s))
@@ -38,7 +40,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(taskSig : TypeTask) : Context = {
+    def bind(taskSig: TypeTask): Context = {
       callables.get(taskSig.name) match {
         case None =>
           this.copy(callables = callables + (taskSig.name -> taskSig))
@@ -47,7 +49,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(wfSig : TypeWorkflow) : Context = {
+    def bind(wfSig: TypeWorkflow): Context = {
       callables.get(wfSig.name) match {
         case None =>
           this.copy(callables = callables + (wfSig.name -> wfSig))
@@ -56,7 +58,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(bindings : Bindings) : Context = {
+    def bind(bindings: Bindings): Context = {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
@@ -173,7 +175,8 @@ case class Checker(stdlib: Stdlib) {
           case (None, None)    => throw new RuntimeException(s"Identifier ${id} is not defined")
           case (Some(t), None) => t
           case (None, Some(t)) => t
-          case (Some(_), Some(_)) => throw new Exception(s"sanity: ${id} is both a struct and an identifier")
+          case (Some(_), Some(_)) =>
+            throw new Exception(s"sanity: ${id} is both a struct and an identifier")
         }
 
       // All the sub-exressions have to be strings, or coercible to strings
@@ -423,7 +426,7 @@ case class Checker(stdlib: Stdlib) {
   // We can't check the validity of the command section.
   private def applyTask(task: Task, ctxOuter: Context): TypeTask = {
     val ctx: Context = task.input match {
-      case None             => ctxOuter
+      case None => ctxOuter
       case Some(inpSection) =>
         val bindings = applyInputSection(inpSection, ctxOuter)
         ctxOuter.bind(bindings)
@@ -614,7 +617,7 @@ case class Checker(stdlib: Stdlib) {
 
   private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
     val ctx: Context = wf.input match {
-      case None             => ctxOuter
+      case None => ctxOuter
       case Some(inpSection) =>
         val inputs = applyInputSection(inpSection, ctxOuter)
         ctxOuter.bind(inputs)
