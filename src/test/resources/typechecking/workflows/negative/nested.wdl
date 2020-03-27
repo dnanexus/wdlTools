@@ -12,8 +12,17 @@ task A {
   }
 }
 
+task B {
+  command {
+    echo "never say never"
+  }
+  output {
+    File o = stdout()
+  }
+}
+
 workflow linear {
-  call A { input: x = 3 }
-  call A as A2 { input : x = 4 }
-  call A as A3 { input : x = 10 }
+  scatter (i in [1, 2, 3]) {
+    call B { input: z = 3 }
+  }
 }

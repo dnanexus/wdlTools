@@ -14,6 +14,5 @@ task A {
 
 workflow linear {
   call A { input: x = 3 }
-  call A as A2 { input : x = 4 }
-  call A as A3 { input : x = 10 }
+  call A { input : x = 4 }
 }

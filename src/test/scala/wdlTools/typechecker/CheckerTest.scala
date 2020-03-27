@@ -5,7 +5,6 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 
 import wdlTools.util.Options
-import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.ParseAll
 
 class CheckerTest extends FlatSpec with Matchers {
@@ -26,14 +25,6 @@ class CheckerTest extends FlatSpec with Matchers {
       case p =>
         Files.isRegularFile(p) && p.toString.endsWith(".wdl")
     }
-  }
-
-  it should "type check simple declarations" in {
-    val decl = Declaration("a", TypeInt, None)
-    checker.applyDecl(decl, Map.empty)
-
-    val decl2 = Declaration("a", TypeInt, Some(ValueInt(13)))
-    checker.applyDecl(decl2, Map.empty)
   }
 
   it should "type check tasks (positive cases)" in {
@@ -58,14 +49,16 @@ class CheckerTest extends FlatSpec with Matchers {
       val checkVal =
         try {
           checker.apply(doc)
-          false
+          true
         } catch {
           case e: Throwable =>
-            // This file should NOT pass type validation
-            true
+            // This file should NOT pass type validation.
+            // The exception is expected at this point.
+            false
         }
-      if (!checkVal)
+      if (checkVal) {
         throw new RuntimeException(s"Type error missed in file ${pc}")
+      }
     }
   }
 
@@ -83,4 +76,25 @@ class CheckerTest extends FlatSpec with Matchers {
       }
     }
   }
+
+  it should "type check workflows (negative cases)" in {
+    val negativeCases = getWdlSourceFiles("/typechecking/workflows/negative")
+    for (nc <- negativeCases) {
+      val wdlSourceCode = Files.readAllLines(nc).asScala.mkString(System.lineSeparator())
+      val doc = parser.apply(wdlSourceCode)
+      val checkVal =
+        try {
+          checker.apply(doc)
+          true
+        } catch {
+          case e: Throwable =>
+            // This file should NOT pass type validation
+            // The exception is expected at this point.
+            false
+        }
+      if (checkVal)
+        throw new RuntimeException(s"Type error missed in file ${nc}")
+    }
+  }
+
 }
