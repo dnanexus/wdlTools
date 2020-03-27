@@ -1,0 +1,29 @@
+name : Master Workflow
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install & build
+        run: |
+          apt-get update
+
+          # install java
+          apt-get install openjdk-8-jdk-headless
+
+          # install sbt
+          echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list
+          apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+          apt-get install -y sbt
+
+      - name: Unit Tests
+        run: |
+          sbt test
