@@ -6,9 +6,6 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Verbosity
 import wdlTools.util.Verbosity._
 
-import wdlTools.util.Verbosity
-import wdlTools.util.Verbosity._
-
 import scala.collection.mutable
 
 case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
