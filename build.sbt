@@ -56,12 +56,14 @@ val antlr4Version = "4.8"
 //antlr4GenVisitor in Antlr4 := true
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
+val pprintVersion = "0.5.6"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
     "org.rogach" %% "scallop" % scallopVersion,
     "com.typesafe" % "config" % typesafeVersion,
+    "com.lihaoyi" %% "pprint" % pprintVersion,
     //---------- Test libraries -------------------//
     "org.scalactic" %% "scalactic" % "3.0.1",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
