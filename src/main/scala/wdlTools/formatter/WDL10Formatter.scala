@@ -15,7 +15,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                           documents: mutable.Map[URI, Seq[String]] = mutable.Map.empty) {
   object Indenting extends Enumeration {
     type Indenting = Value
-    val Always, IfNotIndented, Never = Value
+    val Always, IfNotIndented, Dedent, Never = Value
   }
   import Indenting.Indenting
 
@@ -25,7 +25,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   }
   import Wrapping.Wrapping
 
-  trait Wrapable {
+  trait Wrappable {
     def wrap(lineWrapper: LineFormatter): Unit
   }
 
@@ -41,20 +41,20 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                     lines = lines)
     }
 
-    def maybeIndent(indenting: Indenting = defaultIndenting): Unit = {
-      if (indenting == Indenting.Always || (
-              indenting == Indenting.IfNotIndented && indent.length == initialIndent.length
-          )) {
-        indent.append(indentation * indentStep)
-      }
-    }
-
     def atLineStart: Boolean = {
       currentLine.length == indent.length
     }
 
     def lengthRemaining: Int = {
       maxLineWidth - currentLine.length
+    }
+
+    def maybeIndent(indenting: Indenting = defaultIndenting): Unit = {
+      if (indenting == Indenting.Always || (
+              indenting == Indenting.IfNotIndented && indent.length == initialIndent.length
+          )) {
+        indent.append(indentation * indentStep)
+      }
     }
 
     def endLine(): Unit = {
@@ -71,18 +71,13 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           maybeIndent(indenting)
         }
       }
-    }
-
-    def endLineAndDedent(): Unit = {
-      if (!atLineStart) {
-        lines.append(currentLine.toString)
-        currentLine.clear()
-      }
-      val indentLength = indent.length
-      if (indentLength == indentStep) {
-        indent.clear()
-      } else if (indentLength > indentStep) {
-        indent.delete(indentLength - indentStep, indentLength)
+      if (indenting != Indenting.Dedent) {
+        val indentLength = indent.length
+        if (indentLength == indentStep) {
+          indent.clear()
+        } else if (indentLength > indentStep) {
+          indent.delete(indentLength - indentStep, indentLength)
+        }
       }
     }
 
@@ -99,6 +94,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       builder
     }
 
+    def append(value: String): Unit = {
+      currentLine.append(value)
+    }
+
     def append(atom: Atom): Unit = {
       buildSubstring(Vector(atom), currentLine)
     }
@@ -108,91 +107,36 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         buildSubstring(atoms, currentLine)
       } else {
         val substr = buildSubstring(atoms)
-        if (wrapping == Wrapping.Always || (wrapping == Wrapping.AsNeeded && lengthRemaining < substr.length + 1)) {
+        if (wrapping == Wrapping.Always) {
           endLineUnlessEmpty(wrap = true)
-          if (substr.length + indent.length <= maxLineWidth) {
-            currentLine.append(indent)
-            currentLine.append(substr)
-          } else {
-            appendWrapped(atoms)
+        }
+        val space = if (atLineStart) {
+          ""
+        } else {
+          " "
+        }
+        if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
+          atoms.foreach {
+            case wrappable: Wrappable => wrappable.wrap(lineWrapper = this)
+            case atom =>
+              val space = if (atLineStart) {
+                ""
+              } else {
+                " "
+              }
+              if (lengthRemaining < space.length + atom.length) {
+                endLineUnlessEmpty(wrap = true)
+                currentLine.append(atom)
+              } else {
+                currentLine.append(space)
+                currentLine.append(atom)
+              }
           }
         } else {
-          currentLine.append(" ")
+          currentLine.append(space)
           currentLine.append(substr)
         }
       }
-    }
-
-    /**
-      * Append a delimited sequence of atoms.
-      * @param wrapping how to wrap the delimited items
-      * @param items the delimited items
-      * @param prefix a prefix before the delimited items
-      * @param suffix a suffix after the delimited items
-      */
-    def appendDelimited(items: Seq[Atom],
-                        wrapping: Wrapping = Wrapping.AsNeeded,
-                        prefix: Option[Atom] = None,
-                        suffix: Option[Atom] = None,
-                        delimiter: Token = Token.ArrayDelimiter): Unit = {
-      val delimited = Delimited(items, delimiter)
-      val wrap = if (wrapping == Wrapping.Always) {
-        true
-      } else if (items.isEmpty) {
-        false
-      } else {
-        val prefixLength = prefix.map(_.length).getOrElse(0)
-        val suffixLength = suffix.map(_.length).getOrElse(0)
-        prefixLength + delimited.length + suffixLength > lengthRemaining
-      }
-      if (!wrap) {
-        append(Adjacent(Vector(prefix, Some(delimited), suffix).flatten))
-      } else {
-        if (prefix.isDefined) {
-          append(prefix.get)
-        }
-        endLineUnlessEmpty(wrap = true, indenting = Indenting.Always)
-        if (delimited.length + indent.length + indentStep <= maxLineWidth) {
-          appendWrapped(Vector(delimited))
-        }
-        if (suffix.isDefined) {
-          endLineAndDedent()
-          append(suffix.get)
-        }
-      }
-    }
-
-    def appendWrapped(atoms: Seq[Atom]): Unit = {
-      atoms.foreach {
-        case wrappable: Wrapable => wrappable.wrap(lineWrapper = this)
-        case atom =>
-          val space = if (atLineStart) {
-            ""
-          } else {
-            " "
-          }
-          if (lengthRemaining >= space.length + atom.length) {
-            currentLine.append(space)
-            currentLine.append(atom)
-          } else {
-            endLineUnlessEmpty(wrap = true)
-            currentLine.append(atom)
-          }
-      }
-    }
-  }
-
-  /**
-    * A sequence of atoms separated by a space
-    * @param atoms the atoms
-    */
-  case class Spaced(atoms: Atom*) extends Atom {
-    override def toString: String = {
-      atoms.mkString(" ")
-    }
-
-    override def length: Int = {
-      atoms.map(_.length).sum + atoms.length - 1
     }
   }
 
@@ -210,110 +154,126 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
   }
 
-  case class Delimited(items: Seq[Atom], delimiter: Token = Token.ArrayDelimiter)
+  /**
+    * A sequence of atoms separated by a space
+    * @param atoms the atoms
+    */
+  case class Spaced(atoms: Seq[Atom], wrapping: Wrapping = Wrapping.Never)
       extends Atom
-      with Wrapable {
+      with Wrappable {
     override def toString: String = {
-      items.mkString(s"${delimiter} ")
+      atoms.mkString(" ")
     }
 
     override def length: Int = {
-      items.map(_.length).sum + ((items.size - 1) * (delimiter.length + 1))
+      atoms.map(_.length).sum + atoms.length - 1
     }
 
     override def wrap(lineWrapper: LineFormatter): Unit = {
-      if (items.isEmpty) {
-        Unit
-      } else if (items.length == 1) {
-        lineWrapper.append(items.head)
+      lineWrapper.appendAll(atoms, wrapping = wrapping)
+    }
+  }
+
+  case class Container(items: Seq[Atom],
+                       delimiter: Token = Token.ArrayDelimiter,
+                       prefix: Option[Atom] = None,
+                       suffix: Option[Atom] = None,
+                       wrapAll: Boolean = false)
+      extends Atom
+      with Wrappable {
+    lazy val itemStr: String = items.mkString(s"${delimiter} ")
+    lazy val itemLength: Int = itemStr.length
+    lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
+    lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
+
+    override def toString: String = {
+      val open = prefix.map(_.toString).getOrElse("")
+      val close = prefix.map(_.toString).getOrElse("")
+      s"${open}${itemStr}${close}"
+    }
+
+    override def length: Int = {
+      itemLength + prefixLength + suffixLength
+    }
+
+    override def wrap(lineWrapper: LineFormatter): Unit = {
+      val wrapAndDedentSuffix = if (prefix.isEmpty) {
+        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        false
+      } else if (prefixLength < lineWrapper.lengthRemaining) {
+        lineWrapper.append(prefix.get)
+        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.Always)
+        true
       } else {
-        val delimitedItems =
-          items.slice(0, items.length - 1).map { item =>
-            Adjacent(Vector(item, delimiter))
-          }
-        if (length < lineWrapper.lengthRemaining) {
-          lineWrapper.appendAll(delimitedItems ++ Vector(items.last), Wrapping.Never)
+        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        val wrap = wrapAll || length > lineWrapper.lengthRemaining
+        lineWrapper.append(prefix.get)
+        if (wrap) {
+          lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.Always)
+          true
         } else {
-          delimitedItems.foreach { atom =>
-            lineWrapper.append(atom)
+          false
+        }
+      }
+      if (items.nonEmpty) {
+        if (wrapAll || (items.length > 1 && itemLength > lineWrapper.lengthRemaining)) {
+          items.foreach { atom =>
+            lineWrapper.append(Adjacent(Vector(atom, delimiter)))
             lineWrapper.endLineUnlessEmpty(wrap = true, indenting = Indenting.IfNotIndented)
           }
-          lineWrapper.append(items.last)
+        } else {
+          lineWrapper.append(itemStr)
         }
+      }
+      if (suffix.isDefined) {
+        if (wrapAndDedentSuffix || suffixLength > lineWrapper.lengthRemaining) {
+          val indenting = if (wrapAndDedentSuffix) {
+            Indenting.Dedent
+          } else {
+            Indenting.Never
+          }
+          lineWrapper.endLineUnlessEmpty(wrap = true, indenting = indenting)
+        }
+        lineWrapper.append(suffix.get)
       }
     }
   }
 
-  /**
-    * A data type.
-    * @param name data type name
-    * @param inner1 inner type 1
-    * @param inner2 innter type 2 (for Map, Pair)
-    * @param quantifier quantifier (? or +)
-    */
-  case class DataType(name: Token,
-                      inner1: Option[DataType] = None,
-                      inner2: Option[DataType] = None,
-                      quantifier: Option[Token] = None)
+  case class KeyValue(key: Atom, value: Atom, delimiter: Token = Token.KeyValueDelimiter)
       extends Atom
-      with Wrapable {
-    lazy val nameLength: Int = name.length
-    lazy val innerLength: Int = (inner1.isDefined, inner2.isDefined) match {
-      case (true, true)   => inner1.get.length + inner2.get.length + 4
-      case (true, false)  => inner1.get.length + 2
-      case (false, false) => 0
-      case _              => throw new Exception(s"Invalid DataType $name")
+      with Wrappable {
+    override def toString: String = {
+      s"${key}${delimiter.length} ${value}"
     }
-    lazy val quantifierLength: Int = quantifier.map(_.length).getOrElse(0)
 
     override def length: Int = {
-      nameLength + innerLength + quantifierLength
-    }
-
-    override def toString: String = {
-      val s = new StringBuilder()
-      s.append(name)
-      (inner1.isDefined, inner2.isDefined) match {
-        case (true, true) =>
-          s.append(Token.TypeParamOpen)
-            .append(inner1.toString)
-            .append(Token.TypeParamDelimiter)
-            .append(" ")
-            .append(inner2.toString)
-            .append(Token.TypeParamClose)
-        case (true, false) =>
-          s.append(Token.TypeParamOpen)
-            .append(inner1.toString)
-            .append(Token.TypeParamClose)
-        case (false, false) => Unit
-        case _              => throw new Exception(s"Invalid DataType $name")
-      }
-      if (quantifier.isDefined) {
-        s.append(quantifier)
-      }
-      s.toString
+      key.length + value.length + delimiter.length + 1
     }
 
     override def wrap(lineWrapper: LineFormatter): Unit = {
-      if (length <= lineWrapper.lengthRemaining || innerLength == 0) {
-        lineWrapper.append(this)
-      } else {
-        lineWrapper.appendDelimited(Vector(inner1, inner2).flatten,
-                                    Wrapping.Always,
-                                    prefix = Some(Adjacent(Vector(name, Token.TypeParamOpen))),
-                                    suffix = Some(Token.TypeParamClose))
-      }
+      lineWrapper.appendAll(Vector(Adjacent(Vector(key, delimiter)), value))
     }
   }
 
   object DataType {
-    val DataTypeObject: DataType = DataType(Token.Object)
-    val DataTypeString: DataType = DataType(Token.String)
-    val DataTypeBoolean: DataType = DataType(Token.Boolean)
-    val DataTypeInt: DataType = DataType(Token.Int)
-    val DataTypeFloat: DataType = DataType(Token.Float)
+    def buildDataType(name: Token,
+                      inner1: Option[Atom] = None,
+                      inner2: Option[Atom] = None,
+                      quantifier: Option[Token] = None): Atom = {
+      if (inner1.isDefined) {
+        Container(
+            Vector(inner1, inner2).flatten,
+            prefix = Some(Adjacent(Vector(name, Token.TypeParamOpen))),
+            suffix = Some(Adjacent(Vector(Some(Token.TypeParamClose), quantifier).flatten))
+        )
+      } else if (quantifier.isDefined) {
+        Adjacent(Vector(name, quantifier.get))
+      } else {
+        name
+      }
+    }
 
-    def fromWdlType(wdlType: Type, quantifier: Option[Token] = None): DataType = {
+    def fromWdlType(wdlType: Type, quantifier: Option[Token] = None): Atom = {
       wdlType match {
         case TypeOptional(inner) => fromWdlType(inner, quantifier = Some(Token.Optional))
         case TypeArray(inner, nonEmpty) =>
@@ -322,167 +282,222 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           } else {
             None
           }
-          DataType(Token.Array, Some(fromWdlType(inner)), quantifier = quantifier)
+          buildDataType(Token.ArrayType, Some(fromWdlType(inner)), quantifier = quantifier)
         case TypeMap(keyType @ (TypeString | TypeBoolean | TypeInt | TypeFloat | TypeFile),
                      valueType) =>
-          DataType(Token.Map, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
+          buildDataType(Token.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
         case TypePair(left, right) =>
-          DataType(Token.Pair, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case TypeStruct(name, _) => DataType(Token(name))
-        case TypeObject          => DataTypeObject
-        case TypeString          => DataTypeString
-        case TypeBoolean         => DataTypeBoolean
-        case TypeInt             => DataTypeInt
-        case TypeFloat           => DataTypeFloat
+          buildDataType(Token.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
+        case TypeStruct(name, _) => Token(name)
+        case TypeObject          => Token.ObjectType
+        case TypeString          => Token.StringType
+        case TypeBoolean         => Token.BooleanType
+        case TypeInt             => Token.IntType
+        case TypeFloat           => Token.FloatType
         case other               => throw new Exception(s"Unrecognized type $other")
       }
     }
   }
-//
-//  case class Unary(oper: Token, value: Atom) extends Atom with Wrapable {
-//    override def toString: String = {
-//      s"${oper}${value}"
-//    }
-//
-//    override def length: Int = {}
-//
-//    override def wrap(lineWrapper: LineFormatter): Unit = {}
-//  }
-//
-//  case class Operation(oper: Token, lhs: Atom, rhs: Atom) extends Atom with Wrapable {
-//    override def toString: String = {
-//      s"${lhs} ${oper} ${rhs}"
-//    }
-//
-//    override def length: Int = {}
-//
-//    override def wrap(lineWrapper: LineFormatter): Unit = {}
-//  }
-//
-//  def buildExpression(expr: Expr, placeholderOpen: Token = Token.PlaceholderOpenDollar): Atom = {
-//    def unary(oper: Token, value: Expr): Atom = {
-//      Unary(oper, buildExpression(value))
-//    }
-//
-//    def operation(oper: Token, lhs: Expr, rhs: Expr): Atom = {
-//      Operation(oper, buildExpression(lhs), buildExpression(rhs))
-//    }
-//
-//    expr match {
-//      // literal values
-//      case ValueString(value)  => StringLiteral(value)
-//      case ValueFile(value)    => StringLiteral(value)
-//      case ValueBoolean(value) => Token(value.toString)
-//      case ValueInt(value)     => Token(value.toString)
-//      case ValueFloat(value)   => Token(value.toString)
-//      // operators
-//      case ExprUnaryPlus(value)  => unary(Token.UnaryPlus, value)
-//      case ExprUnaryMinus(value) => unary(Token.UnaryMinus, value)
-//      case ExprNegate(value)     => unary(Token.LogicalNot, value)
-//      case ExprLor(a, b)         => operation(Token.LogicalOr, a, b)
-//      case ExprLand(a, b)        => operation(Token.LogicalAnd, a, b)
-//      case ExprEqeq(a, b)        => operation(Token.Equality, a, b)
-//      case ExprLt(a, b)          => operation(Token.LessThan, a, b)
-//      case ExprLte(a, b)         => operation(Token.LessThanOrEqual, a, b)
-//      case ExprGt(a, b)          => operation(Token.GreaterThan, a, b)
-//      case ExprGte(a, b)         => operation(Token.GreaterThanOrEqual, a, b)
-//      case ExprNeq(a, b)         => operation(Token.Inequality, a, b)
-//      case ExprAdd(a, b)         => operation(Token.Addition, a, b)
-//      case ExprSub(a, b)         => operation(Token.Subtraction, a, b)
-//      case ExprMul(a, b)         => operation(Token.Multiplication, a, b)
-//      case ExprDivide(a, b)      => operation(Token.Division, a, b)
-//      case ExprMod(a, b)         => operation(Token.Remainder, a, b)
-//      // interpolation
-//      case ExprIdentifier(id) => Interpolation(Vector(Token(id)), placeholderOpen)
-//      case ExprCompoundString(value) =>
-//        Interpolation(value.map(buildExpression(_, placeholderOpen)))
-//      case ExprPair(left, right) =>
-//        Token.GroupOpen.visit(atomizer, atoms)
-//        atomizeExpression(left)
-//        Token.ArrayDelimiter.visit(atomizer, atoms)
-//        atomizeExpression(right)
-//        Token.GroupClose.visit(atomizer, atoms)
-//      case ExprArray(value) =>
-//        Token.ArrayLiteralOpen.visit(atomizer, atoms)
-//        addDelimitedList(value)
-//        Token.ArrayLiteralClose.visit(atomizer, atoms)
-//      case ExprMap(value) =>
-//        Token.MapOpen.visit(atomizer, atoms)
-//        if (value.nonEmpty) {
-//          def addMapElement(element: (Expr, Expr)): Unit = {
-//            atomizeExpression(element._1)
-//            Token.KeyValueDelimiter.visit(atomizer, atoms)
-//            atomizeExpression(element._2)
-//          }
-//
-//          addMapElement(value.head)
-//          value.tail.foreach { element =>
-//            Token.MemberDelimiter.visit(atomizer, atoms)
-//            addMapElement(element)
-//          }
-//        }
-//        Token.MapClose.visit(atomizer, atoms)
-//      case ExprObject(value) =>
-//        Token.ObjectOpen.visit(atomizer, atoms)
-//        if (value.nonEmpty) {
-//          def addObjectElement(element: (String, Expr)): Unit = {
-//            Tokens(element._1).visit(atomizer, atoms)
-//            Token.KeyValueDelimiter.visit(atomizer, atoms)
-//            atomizeExpression(element._2)
-//          }
-//
-//          addObjectElement(value.head)
-//          value.tail.foreach { element =>
-//            Token.MemberDelimiter.visit(atomizer, atoms)
-//            addObjectElement(element)
-//          }
-//        }
-//        Token.ObjectClose.visit(atomizer, atoms)
-//      case ExprPlaceholderEqual(t, f, value) =>
-//        placeholderOpen.visit(atomizer, atoms)
-//        Token.TrueOption.visit(atomizer, atoms)
-//        atomizeExpression(t)
-//        Token.FalseOption.visit(atomizer, atoms)
-//        atomizeExpression(f)
-//        atomizeExpression(value)
-//        Token.PlaceholderClose.visit(atomizer, atoms)
-//      case ExprPlaceholderDefault(default, value) =>
-//        placeholderOpen.visit(atomizer, atoms)
-//        Token.DefaultOption.visit(atomizer, atoms)
-//        atomizeExpression(default)
-//        atomizeExpression(value)
-//        Token.PlaceholderClose.visit(atomizer, atoms)
-//      case ExprPlaceholderSep(sep, value) =>
-//        placeholderOpen.visit(atomizer, atoms)
-//        Token.SepOption.visit(atomizer, atoms)
-//        atomizeExpression(sep)
-//        atomizeExpression(value)
-//        Token.PlaceholderClose.visit(atomizer, atoms)
-//      // other expressions
-//      case ExprAt(array, index) =>
-//        atomizeExpression(array)
-//        Token.ArrayLiteralOpen.visit(atomizer, atoms)
-//        atomizeExpression(index)
-//        Token.ArrayLiteralClose.visit(atomizer, atoms)
-//      case ExprIfThenElse(cond, tBranch, fBranch) =>
-//        Token.If.visit(atomizer, atoms)
-//        atomizeExpression(cond)
-//        Token.Then.visit(atomizer, atoms)
-//        atomizeExpression(tBranch)
-//        Token.Else.visit(atomizer, atoms)
-//        atomizeExpression(fBranch)
-//      case ExprApply(funcName, elements) =>
-//        Tokens(funcName).visit(atomizer, atoms)
-//        Token.FunctionCallOpen.visit(atomizer, atoms)
-//        addDelimitedList(elements)
-//        Token.FunctionCallClose.visit(atomizer, atoms)
-//      case ExprGetName(e, id) =>
-//        atomizeExpression(e)
-//        Token.Access.visit(atomizer, atoms)
-//        Tokens(id).visit(atomizer, atoms)
-//      case other => throw new Exception(s"Unrecognized expression $other")
-//    }
-//  }
+
+  case class Unary(oper: Token, value: Atom) extends Atom {
+    override def toString: String = {
+      s"${oper}${value}"
+    }
+
+    override def length: Int = {
+      oper.length + value.length
+    }
+  }
+
+  case class Operation(oper: Token, lhs: Atom, rhs: Atom, grouped: Boolean = false)
+      extends Atom
+      with Wrappable {
+    override def toString: String = {
+      val str = s"${lhs} ${oper} ${rhs}"
+      if (grouped) {
+        s"${Token.GroupOpen}${str}${Token.GroupClose}"
+      } else {
+        str
+      }
+    }
+
+    override def length: Int = {
+      val parenLength = if (grouped) {
+        2
+      } else {
+        0
+      }
+      lhs.length + oper.length + rhs.length + 2 + parenLength
+    }
+
+    // TODO
+    override def wrap(lineWrapper: LineFormatter): Unit = {}
+  }
+
+  case class Placeholder(value: Atom,
+                         open: Token = Token.PlaceholderOpenDollar,
+                         options: Option[Seq[Atom]] = None)
+      extends Atom
+      with Wrappable {
+    val close: Token = Token.tokenPairs(open)
+
+    override def toString: String = {
+      val optionsStr = options
+        .map(_.map { opt =>
+          s"${opt} "
+        }.mkString)
+        .getOrElse("")
+      s"${open}${optionsStr}${value}${close}"
+    }
+
+    override def length: Int = {
+      value.length + open.length + close.length + options.map(_.map(_.length + 1).sum).getOrElse(0)
+    }
+
+    // TODO
+    override def wrap(lineWrapper: LineFormatter): Unit = {}
+  }
+
+  def buildExpression(expr: Expr,
+                      placeholderOpen: Token = Token.PlaceholderOpenDollar,
+                      inString: Boolean = false,
+                      inPlaceholder: Boolean = false,
+                      inOperation: Boolean = false): Atom = {
+    def stringOrToken(value: String): Atom = {
+      if (inString) {
+        Token(value)
+      } else {
+        StringAtom(value)
+      }
+    }
+
+    def nested(nestedExpression: Expr,
+               placeholderOpen: Token = placeholderOpen,
+               inString: Boolean = inString,
+               inPlaceholder: Boolean = inPlaceholder,
+               inOperation: Boolean = inOperation): Atom = {
+      buildExpression(nestedExpression,
+                      placeholderOpen = placeholderOpen,
+                      inString = inString,
+                      inPlaceholder = inPlaceholder,
+                      inOperation = inOperation)
+    }
+
+    def unirary(oper: Token, value: Expr): Atom = {
+      Unary(oper, nested(value))
+    }
+
+    def operation(oper: Token, lhs: Expr, rhs: Expr): Atom = {
+      Operation(oper, nested(lhs), nested(rhs))
+    }
+
+    def option(name: Token, value: Expr): Atom = {
+      Adjacent(Vector(name, Token.Assignment, nested(value, inPlaceholder = true)))
+    }
+
+    expr match {
+      // literal values
+      case ValueString(value)  => stringOrToken(value)
+      case ValueFile(value)    => stringOrToken(value)
+      case ValueBoolean(value) => Token(value.toString)
+      case ValueInt(value)     => Token(value.toString)
+      case ValueFloat(value)   => Token(value.toString)
+      // operators
+      case ExprUniraryPlus(value)  => unirary(Token.UnaryPlus, value)
+      case ExprUniraryMinus(value) => unirary(Token.UnaryMinus, value)
+      case ExprNegate(value)       => unirary(Token.LogicalNot, value)
+      case ExprLor(a, b)           => operation(Token.LogicalOr, a, b)
+      case ExprLand(a, b)          => operation(Token.LogicalAnd, a, b)
+      case ExprEqeq(a, b)          => operation(Token.Equality, a, b)
+      case ExprLt(a, b)            => operation(Token.LessThan, a, b)
+      case ExprLte(a, b)           => operation(Token.LessThanOrEqual, a, b)
+      case ExprGt(a, b)            => operation(Token.GreaterThan, a, b)
+      case ExprGte(a, b)           => operation(Token.GreaterThanOrEqual, a, b)
+      case ExprNeq(a, b)           => operation(Token.Inequality, a, b)
+      case ExprAdd(a, b)           => operation(Token.Addition, a, b)
+      case ExprSub(a, b)           => operation(Token.Subtraction, a, b)
+      case ExprMul(a, b)           => operation(Token.Multiplication, a, b)
+      case ExprDivide(a, b)        => operation(Token.Division, a, b)
+      case ExprMod(a, b)           => operation(Token.Remainder, a, b)
+      // interpolation
+      case ExprIdentifier(id) =>
+        if (inString && !inPlaceholder) {
+          Placeholder(Token(id), placeholderOpen)
+        } else {
+          Token(id)
+        }
+      case ExprCompoundString(value) if !(inString || inPlaceholder) =>
+        StringAtom(Adjacent(value.map(nested(_, inString = true))))
+      case ExprPair(left, right) if !(inString || inPlaceholder) =>
+        Container(
+            Vector(nested(left), nested(right)),
+            prefix = Some(Token.GroupOpen),
+            suffix = Some(Token.GroupClose)
+        )
+      case ExprArray(value) =>
+        Container(
+            value.map(nested(_)),
+            prefix = Some(Token.ArrayLiteralOpen),
+            suffix = Some(Token.ArrayLiteralClose)
+        )
+      case ExprMap(value) =>
+        Container(
+            value.map {
+              case (k, v) => KeyValue(nested(k), nested(v))
+            }.toVector,
+            prefix = Some(Token.MapOpen),
+            suffix = Some(Token.MapClose),
+            wrapAll = true
+        )
+      case ExprObject(value) =>
+        Container(
+            value.map {
+              case (k, v) => KeyValue(Token(k), nested(v))
+            }.toVector,
+            prefix = Some(Token.MapOpen),
+            suffix = Some(Token.MapClose),
+            wrapAll = true
+        )
+      case ExprPlaceholderEqual(t, f, value) =>
+        Placeholder(nested(value, inPlaceholder = true),
+                    placeholderOpen,
+                    Some(
+                        Vector(
+                            option(Token.TrueOption, t),
+                            option(Token.FalseOption, f)
+                        )
+                    ))
+      case ExprPlaceholderDefault(default, value) =>
+        Placeholder(nested(value, inPlaceholder = true),
+                    placeholderOpen,
+                    Some(Vector(option(Token.DefaultOption, default))))
+      case ExprPlaceholderSep(sep, value) =>
+        Placeholder(nested(value, inPlaceholder = true),
+                    placeholderOpen,
+                    Some(Vector(option(Token.SepOption, sep))))
+      // other expressions
+      case ExprAt(array, index) =>
+        Container(Vector(nested(index)),
+                  prefix = Some(Adjacent(Vector(nested(array), Token.IndexOpen))),
+                  suffix = Some(Token.IndexClose))
+      case ExprIfThenElse(cond, tBranch, fBranch) =>
+        Spaced(Vector(Token.If,
+                      nested(cond),
+                      Token.Then,
+                      nested(tBranch),
+                      Token.Else,
+                      nested(fBranch)),
+               Wrapping.AsNeeded)
+      case ExprApply(funcName, elements) =>
+        Container(
+            elements.map(nested(_)),
+            prefix = Some(Adjacent(Vector(Token(funcName), Token.FunctionCallOpen))),
+            suffix = Some(Token.FunctionCallClose)
+        )
+      case ExprGetName(e, id) => Adjacent(Vector(nested(e), Token.Access, Token(id)))
+      case other              => throw new Exception(s"Unrecognized expression $other")
+    }
+  }
 
   trait Statement {
     def format(lineFormatter: LineFormatter): Unit
@@ -525,7 +540,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
   case class ImportStatement(importDoc: ImportDoc) extends Statement {
     override def format(lineFormatter: LineFormatter): Unit = {
-      lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
+      lineFormatter.appendAll(Vector(Token.Import, StringAtom(importDoc.url.toString)),
                               Wrapping.Never)
 
       if (importDoc.name.isDefined) {
@@ -545,10 +560,6 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     override def statements: Seq[Statement] = {
       imports.map(ImportStatement)
     }
-  }
-
-  def buildExpression(expr: Expr, placeholderOpen: Token = Token.PlaceholderOpenDollar): Atom = {
-    Token("x")
   }
 
   case class DeclarationStatement(name: String, wdlType: Type, expr: Option[Expr] = None)
@@ -655,10 +666,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   case class CallInputsStatement(inputs: Map[String, Expr]) extends Statement {
     override def format(lineFormatter: LineFormatter): Unit = {
       val args = inputs.map {
-        case (lhs, rhs) => Spaced(Token(lhs), Token.Assignment, buildExpression(rhs))
+        case (lhs, rhs) => Spaced(Vector(Token(lhs), Token.Assignment, buildExpression(rhs)))
       }.toVector
       lineFormatter.appendAll(
-          Vector(Adjacent(Vector(Token.Input, Token.KeyValueDelimiter)), Delimited(args))
+          Vector(Adjacent(Vector(Token.Input, Token.KeyValueDelimiter)), Container(args))
       )
     }
   }
@@ -667,7 +678,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       extends BlockStatement(
           Token.Call,
           Some(if (call.alias.isDefined) {
-            Spaced(Token(call.name), Token.As, Token(call.alias.get))
+            Spaced(Vector(Token(call.name), Token.As, Token(call.alias.get)))
           } else {
             Token(call.name)
           }),
@@ -681,7 +692,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   case class ScatterBlock(scatter: Scatter)
       extends BlockStatement(
           Token.Scatter,
-          Some(Spaced(Token(scatter.identifier), Token.In, buildExpression(scatter.expr))),
+          Some(Spaced(Vector(Token(scatter.identifier), Token.In, buildExpression(scatter.expr)))),
           Some(WorkflowElementBody(scatter.body))
       )
 
@@ -717,11 +728,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
   case class CommandBlock(command: CommandSection) extends Statement {
     override def format(lineFormatter: LineFormatter): Unit = {
+      // For now, we treat the command block as pre-formatted
       lineFormatter.appendAll(Vector(Token.Command, Token.CommandOpen))
-      lineFormatter.endLine()
       command.parts.foreach { expr =>
-        lineFormatter.append(buildExpression(expr, Token.PlaceholderOpenTilde))
-        lineFormatter.endLine()
+        lineFormatter.append(buildExpression(expr, Token.PlaceholderOpenTilde, inString = true))
       }
       lineFormatter.append(Token.CommandClose)
     }

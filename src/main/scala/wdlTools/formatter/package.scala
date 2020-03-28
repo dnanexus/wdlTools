@@ -1,28 +1,16 @@
 package wdlTools.formatter
 
-import wdlTools.formatter.Util.BiMap
-
 trait Atom {
   def length: Int
 }
 
-case class Literal[T](value: T) extends Atom {
-  override def toString: String = {
-    value.toString
-  }
-
-  override def length: Int = {
-    toString.length()
-  }
-}
-
-case class StringLiteral(value: String) extends Atom {
+case class StringAtom(value: Any) extends Atom {
   override def toString: String = {
     s"${'"'}${value}${'"'}"
   }
 
   override def length: Int = {
-    value.length() + 2
+    toString.length
   }
 }
 
@@ -32,7 +20,7 @@ case class Token(value: String) extends Atom {
   }
 
   override def length: Int = {
-    value.length()
+    value.length
   }
 }
 
@@ -62,14 +50,14 @@ object Token {
   val Workflow: Token = Token("workflow")
 
   // data types
-  val Array: Token = Token("Array")
-  val Map: Token = Token("Map")
-  val Pair: Token = Token("Pair")
-  val Object: Token = Token("Object")
-  val String: Token = Token("String")
-  val Boolean: Token = Token("Boolean")
-  val Int: Token = Token("Int")
-  val Float: Token = Token("Float")
+  val ArrayType: Token = Token("Array")
+  val MapType: Token = Token("Map")
+  val PairType: Token = Token("Pair")
+  val ObjectType: Token = Token("Object")
+  val StringType: Token = Token("String")
+  val BooleanType: Token = Token("Boolean")
+  val IntType: Token = Token("Int")
+  val FloatType: Token = Token("Float")
 
   // symbols
   val Access: Token = Token(".")
@@ -126,7 +114,7 @@ object Token {
   val UnaryMinus: Token = Token("-")
   val UnaryPlus: Token = Token("+")
 
-  val tokenPairs: BiMap[Token, Token] = new BiMap(
+  val tokenPairs = Map(
       ArrayLiteralOpen -> ArrayLiteralClose,
       BlockOpen -> BlockClose,
       ClauseOpen -> ClauseClose,
