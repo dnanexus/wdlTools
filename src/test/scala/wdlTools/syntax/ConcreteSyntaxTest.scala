@@ -323,4 +323,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     doc.workflow should not be empty
   }
+
+  it should "correctly report an error" in {
+    val _ = ParseDocument.apply(getWdlSource("workflows", "bad_declaration.wdl"), conf)
+  }
 }

@@ -563,7 +563,7 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlParser.Bound_declsContext): Declaration = {
-    val wdlType: Type = visitAndSafeCast[Type](ctx.wdl_type())
+    val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     val expr: Expr = visitExpr(ctx.expr())
     Declaration(name, wdlType, Some(expr))
@@ -576,7 +576,11 @@ any_decls
 	;
    */
   override def visitAny_decls(ctx: WdlParser.Any_declsContext): Declaration = {
-    visitAndSafeCast[Declaration](ctx)
+    if (ctx.unbound_decls() != null)
+      return visitUnbound_decls(ctx.unbound_decls())
+    if (ctx.bound_decls() != null)
+      return visitBound_decls(ctx.bound_decls())
+    throw new Exception("sanity")
   }
 
   /* meta_kv
@@ -613,7 +617,7 @@ any_decls
  ; */
   override def visitTask_runtime_kv(ctx: WdlParser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
-    val expr: Expr = visitAndSafeCast[Expr](ctx.expr())
+    val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr)
   }
 
@@ -993,7 +997,15 @@ scatter
   override def visitInner_workflow_element(
       ctx: WdlParser.Inner_workflow_elementContext
   ): WorkflowElement = {
-    visitAndSafeCast[WorkflowElement](ctx)
+    if (ctx.bound_decls() != null)
+      return visitBound_decls(ctx.bound_decls())
+    if (ctx.call() != null)
+      return visitCall(ctx.call())
+    if (ctx.scatter() != null)
+      return visitScatter(ctx.scatter())
+    if (ctx.conditional() != null)
+      return visitConditional(ctx.conditional())
+    throw new Exception("sanity")
   }
 
   /*
