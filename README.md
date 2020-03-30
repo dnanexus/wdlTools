@@ -21,13 +21,14 @@ The typechecker is currently in development.
 The java code for the parser was generated with the [ANTRL4](https://www.antlr.org) tool.
 
 1. Download a jar file with the [instructions](https://www.antlr.org/download.html)
-2. `cd GIT_REPO_ROOT`
+2. `cd GIT_REPO`
 3. Assuming you downloaded the jar file to `$HOME/antlr-4.8-complete.jar` generated java code from the grammar in this way:
 
 ```
-cd GIT_REPO_ROOT/src/main/antrl4
+cd GIT_REPO/src/main/antrl4
 java -jar ~/antlr-4.8-complete.jar -o GIT_REPO_ROOT/src/main/java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
-cd GIT_REPO_ROOT
+mv src/main/java GIT_REPO/src/main/
+cd GIT_REPO
 ```
 
 4. Build the scala code:
