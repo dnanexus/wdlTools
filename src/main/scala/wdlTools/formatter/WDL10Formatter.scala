@@ -3,15 +3,12 @@ package wdlTools.formatter
 import java.net.URI
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.Verbosity
+import wdlTools.util.{Util, Verbosity}
 import wdlTools.util.Verbosity._
 
 import scala.collection.mutable
 
 case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
-                          indentation: String = " ",
-                          indentStep: Int = 2,
-                          maxLineWidth: Int = 100,
                           documents: mutable.Map[URI, Seq[String]] = mutable.Map.empty) {
 
   abstract class Group(prefix: Option[Atom] = None,
@@ -23,18 +20,18 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
     override def format(lineFormatter: LineFormatter): Unit = {
       val wrapAndDedentSuffix = if (prefix.isEmpty) {
-        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
         false
       } else if (prefixLength < lineFormatter.lengthRemaining) {
         lineFormatter.append(prefix.get)
-        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.Always)
+        lineFormatter.endLine(wrap = true, Indenting.Always)
         true
       } else {
-        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
         val wrap = wrapAll || length > lineFormatter.lengthRemaining
         lineFormatter.append(prefix.get)
         if (wrap) {
-          lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.Always)
+          lineFormatter.endLine(wrap = true, Indenting.Always)
           true
         } else {
           false
@@ -50,7 +47,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           } else {
             Indenting.Never
           }
-          lineFormatter.endLineUnlessEmpty(wrap = true, indenting = indenting)
+          lineFormatter.endLine(wrap = true, indenting = indenting)
         }
         lineFormatter.append(suffix.get)
       }
@@ -83,7 +80,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
           items.foreach { atom =>
             lineFormatter.append(Adjacent(Vector(atom, delimiter)))
-            lineFormatter.endLineUnlessEmpty(wrap = true, indenting = Indenting.IfNotIndented)
+            lineFormatter.endLine(wrap = true, indenting = Indenting.IfNotIndented)
           }
         } else {
           lineFormatter.append(itemStr)
@@ -305,8 +302,13 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         } else {
           Token(id)
         }
-      case ExprCompoundString(value) if !(inString || inPlaceholder) =>
-        StringLiteral(Adjacent(value.map(nested(_, inString = true))))
+      case ExprCompoundString(value) if !inPlaceholder =>
+        val atom = Adjacent(value.map(nested(_, inString = true)))
+        if (inString) {
+          atom
+        } else {
+          StringLiteral(atom)
+        }
       case ExprPair(left, right) if !(inString || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
@@ -378,60 +380,26 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
   }
 
-  /**
-    * Marker base class for Statements.
-    */
-  sealed abstract class Statement extends Chunk
-
-  sealed abstract class StatementGroup extends Statement {
-    def statements: Seq[Statement]
-
-    override def format(lineFormatter: LineFormatter): Unit = {
-      statements.foreach(_.format(lineFormatter))
-    }
-  }
-
-  sealed abstract class SectionsStatement extends Statement {
-    def sections: Seq[Statement]
-
-    override def format(lineFormatter: LineFormatter): Unit = {
-      if (sections.nonEmpty) {
-        sections.head.format(lineFormatter)
-        sections.tail.foreach { section =>
-          lineFormatter.lines.append("")
-          section.format(lineFormatter)
-        }
-      }
-    }
-  }
-
-  class Sections extends SectionsStatement {
-    val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
-
-    lazy override val sections: Seq[Statement] = statements.toVector
-  }
-
   case class VersionStatement(version: String) extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(Token.Version, Token(version)), Wrapping.Never)
       lineFormatter.endLine()
     }
   }
 
   case class ImportStatement(importDoc: ImportDoc) extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
                               Wrapping.Never)
-
       if (importDoc.name.isDefined) {
         lineFormatter.appendAll(Vector(Token.As, Token(importDoc.name.get)), Wrapping.AsNeeded)
       }
-
       importDoc.aliases.foreach { alias =>
         lineFormatter.appendAll(Vector(Token.Alias, Token(alias.id1), Token.As, Token(alias.id2)),
                                 Wrapping.Always)
       }
-
       lineFormatter.endLine()
     }
   }
@@ -444,7 +412,8 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
   case class DeclarationStatement(name: String, wdlType: Type, expr: Option[Expr] = None)
       extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(DataType.fromWdlType(wdlType), Token(name)))
       if (expr.isDefined) {
         lineFormatter.appendAll(Vector(Token.Assignment, buildExpression(expr.get)))
@@ -470,10 +439,12 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   }
 
   case class MetaKVStatement(id: String, expr: Expr) extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(
           Vector(Adjacent(Vector(Token(id), Token.KeyValueDelimiter)), buildExpression(expr))
       )
+      lineFormatter.endLine()
     }
   }
 
@@ -485,16 +456,18 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
   sealed abstract class BlockStatement(keyword: Token,
                                        clause: Option[Atom] = None,
-                                       body: Option[Statement])
+                                       body: Option[Chunk])
       extends Statement {
-
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(Some(keyword), clause, Some(Token.BlockOpen)).flatten)
       if (body.isDefined) {
         lineFormatter.endLine()
         body.get.format(lineFormatter.indented())
+        lineFormatter.beginLine()
       }
       lineFormatter.append(Token.BlockClose)
+      lineFormatter.endLine()
     }
   }
 
@@ -544,13 +517,15 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   }
 
   case class CallInputsStatement(inputs: Map[String, Expr]) extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
       val args = inputs.map {
         case (lhs, rhs) => Spaced(Vector(Token(lhs), Token.Assignment, buildExpression(rhs)))
       }.toVector
+      lineFormatter.beginLine()
       lineFormatter.appendAll(
           Vector(Adjacent(Vector(Token.Input, Token.KeyValueDelimiter)), Container(args))
       )
+      lineFormatter.endLine()
     }
   }
 
@@ -606,14 +581,72 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                              Some(Token(workflow.name)),
                              Some(WorkflowSections(workflow)))
 
+  private val commandStartRegexp = "^[\n\r]+".r
+  private val commandEndRegexp = "\\s+$".r
+  private val commandSingletonRegexp = "^[\n\r]*(.*?)\\s+$".r
+
   case class CommandBlock(command: CommandSection) extends Statement {
-    override def format(lineFormatter: LineFormatter): Unit = {
-      // For now, we treat the command block as pre-formatted
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(Token.Command, Token.CommandOpen))
-      command.parts.foreach { expr =>
-        lineFormatter.append(buildExpression(expr, Token.PlaceholderOpenTilde, inString = true))
+      lineFormatter.endLine()
+
+      val numParts = command.parts.size
+      if (numParts > 0) {
+        val bodyFormatter = lineFormatter.preformatted()
+        bodyFormatter.beginLine()
+        if (numParts == 1) {
+          bodyFormatter.append(
+              buildExpression(
+                  command.parts.head match {
+                    case s: ValueString =>
+                      s.value match {
+                        case commandSingletonRegexp(body) => ValueString(body)
+                        case _                            => s
+                      }
+                    case other => other
+                  },
+                  placeholderOpen = Token.PlaceholderOpenTilde,
+                  inString = true
+              )
+          )
+        } else if (numParts > 1) {
+          bodyFormatter.append(
+              buildExpression(
+                  command.parts.head match {
+                    case ValueString(s) => ValueString(commandStartRegexp.replaceFirstIn(s, ""))
+                    case other          => other
+                  },
+                  placeholderOpen = Token.PlaceholderOpenTilde,
+                  inString = true
+              )
+          )
+          if (numParts > 2) {
+            command.parts.slice(1, command.parts.size - 1).foreach { chunk =>
+              bodyFormatter.append(
+                  buildExpression(chunk,
+                                  placeholderOpen = Token.PlaceholderOpenTilde,
+                                  inString = true)
+              )
+            }
+          }
+          bodyFormatter.append(
+              buildExpression(
+                  command.parts.last match {
+                    case ValueString(s) => ValueString(commandEndRegexp.replaceFirstIn(s, ""))
+                    case other          => other
+                  },
+                  placeholderOpen = Token.PlaceholderOpenTilde,
+                  inString = true
+              )
+          )
+        }
+        bodyFormatter.endLine()
       }
+
+      lineFormatter.beginLine()
       lineFormatter.append(Token.CommandClose)
+      lineFormatter.endLine()
     }
   }
 
@@ -688,6 +721,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
       if (tasks.nonEmpty) {
         tasks.foreach(task => statements.append(TaskBlock(task)))
+      }
+
+      if (verbosity == Verbosity.Verbose) {
+        println(Util.prettyFormat(statements))
       }
 
       val lineFormatter = LineFormatter()

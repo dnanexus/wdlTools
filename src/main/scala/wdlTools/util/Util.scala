@@ -77,7 +77,7 @@ object Util {
   }
 
   /**
-    * Pretty prints a Scala value similar to its source represention.
+    * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
     * @param a - The value to pretty print.
@@ -86,14 +86,14 @@ object Util {
     * @param depth - Initial depth to pretty print indents.
     * @return
     */
-  def prettyPrint(a: Any,
-                  indentSize: Int = 2,
-                  maxElementWidth: Int = 30,
-                  depth: Int = 0): String = {
+  def prettyFormat(a: Any,
+                   indentSize: Int = 2,
+                   maxElementWidth: Int = 30,
+                   depth: Int = 0): String = {
     val indent = " " * depth * indentSize
     val fieldIndent = indent + (" " * indentSize)
-    val thisDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth)
-    val nextDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth + 1)
+    val thisDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth)
+    val nextDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth + 1)
     a match {
       // Make Strings look similar to their literal form.
       case s: String =>

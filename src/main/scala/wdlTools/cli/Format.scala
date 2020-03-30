@@ -12,7 +12,7 @@ import scala.language.reflectiveCalls
 
 case class Format(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val uri = new URI(conf.check.uri())
+    val uri = new URI(conf.format.uri())
     val uriLocalPath = Util.getLocalPath(uri)
     val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
     val sourceCode = FetchURL.readFromUri(uri, opts)
