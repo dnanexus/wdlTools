@@ -565,6 +565,8 @@ bound_decls
   override def visitBound_decls(ctx: WdlParser.Bound_declsContext): Declaration = {
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
+    if (ctx.expr() == null)
+      return Declaration(name, wdlType, None)
     val expr: Expr = visitExpr(ctx.expr())
     Declaration(name, wdlType, Some(expr))
   }
@@ -863,13 +865,6 @@ import_as
       .toVector
     ImportDoc(name, aliases, URL(url))
   }
-
-  /* inner_workflow_element
-	: bound_decls
-	| call
-	| scatter
-	| conditional
-	; */
 
   /* call_alias
 	: AS Identifier

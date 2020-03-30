@@ -15,7 +15,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
-  private lazy val conf = Options(antlr4Trace = false)
+  private lazy val conf = Options(antlr4Trace = false, verbosity= Quiet)
 
   it should "handle various types" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), conf)
@@ -325,6 +325,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "correctly report an error" in {
-    val _ = ParseDocument.apply(getWdlSource("workflows", "bad_declaration.wdl"), conf)
+    assertThrows[Exception] {
+      val _ = ParseDocument.apply(getWdlSource("workflows", "bad_declaration.wdl"), conf)
+    }
   }
 }
