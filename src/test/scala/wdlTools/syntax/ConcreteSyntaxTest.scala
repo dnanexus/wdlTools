@@ -324,9 +324,24 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     doc.workflow should not be empty
   }
 
+
   it should "correctly report an error" in {
     assertThrows[Exception] {
       val _ = ParseDocument.apply(getWdlSource("workflows", "bad_declaration.wdl"), conf)
     }
+
+  it should "handle chained operations" in {
+    val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"), conf)
+
+    doc.elements.size shouldBe 1
+    val elem = doc.elements(0)
+    elem shouldBe a[Task]
+    val task = elem.asInstanceOf[Task]
+
+    task.declarations.size shouldBe 1
+    val decl = task.declarations.head
+    decl.name shouldBe "j"
+    decl.expr shouldBe ExprAdd(ExprAdd(ExprIdentifier("i"), ExprIdentifier("i")),
+                               ExprIdentifier(""))
   }
 }
