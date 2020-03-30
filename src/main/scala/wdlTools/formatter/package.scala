@@ -1,16 +1,37 @@
 package wdlTools.formatter
 
-trait Atom {
-  def length: Int
+import wdlTools.formatter.Wrapping.Wrapping
+
+object Indenting extends Enumeration {
+  type Indenting = Value
+  val Always, IfNotIndented, Dedent, Never = Value
 }
 
-case class StringAtom(value: Any) extends Atom {
-  override def toString: String = {
-    s"${'"'}${value}${'"'}"
-  }
+object Wrapping extends Enumeration {
+  type Wrapping = Value
+  val Always, AsNeeded, Never = Value
+}
 
-  override def length: Int = {
-    toString.length
+trait Chunk {
+  def format(lineFormatter: LineFormatter): Unit
+}
+
+abstract class Atom extends Chunk {
+  def length: Int
+
+  def format(lineFormatter: LineFormatter): Unit = {
+    val space = if (lineFormatter.atLineStart) {
+      ""
+    } else {
+      " "
+    }
+    if (lineFormatter.lengthRemaining < space.length + this.length) {
+      lineFormatter.endLineUnlessEmpty(wrap = true)
+      lineFormatter.append(this)
+    } else {
+      lineFormatter.append(space)
+      lineFormatter.append(this)
+    }
   }
 }
 
@@ -131,10 +152,44 @@ object Token {
   )
 }
 
+case class StringLiteral(value: Any) extends Atom {
+  override def toString: String = {
+    s"${'"'}${value}${'"'}"
+  }
+
+  override def length: Int = {
+    toString.length
+  }
+}
+
 /**
-  * Pre-defined values for spacing between Atoms.
+  * A sequence of adjacent atoms (with no spacing or wrapping)
+  * @param atoms the atoms
   */
-object Spacing {
-  val Undefined: Int = 0
-  val None: Int = -1
+case class Adjacent(atoms: Seq[Atom]) extends Atom {
+  override def toString: String = {
+    atoms.mkString("")
+  }
+
+  override def length: Int = {
+    atoms.map(_.length).sum
+  }
+}
+
+/**
+  * A sequence of atoms separated by a space
+  * @param atoms the atoms
+  */
+case class Spaced(atoms: Seq[Atom], wrapping: Wrapping = Wrapping.Never) extends Atom {
+  override def toString: String = {
+    atoms.mkString(" ")
+  }
+
+  override def length: Int = {
+    atoms.map(_.length).sum + atoms.length - 1
+  }
+
+  override def format(lineFormatter: LineFormatter): Unit = {
+    lineFormatter.appendAll(atoms, wrapping = wrapping)
+  }
 }

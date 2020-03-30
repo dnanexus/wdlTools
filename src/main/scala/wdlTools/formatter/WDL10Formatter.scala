@@ -13,165 +13,50 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                           indentStep: Int = 2,
                           maxLineWidth: Int = 100,
                           documents: mutable.Map[URI, Seq[String]] = mutable.Map.empty) {
-  object Indenting extends Enumeration {
-    type Indenting = Value
-    val Always, IfNotIndented, Dedent, Never = Value
-  }
-  import Indenting.Indenting
 
-  object Wrapping extends Enumeration {
-    type Wrapping = Value
-    val Always, AsNeeded, Never = Value
-  }
-  import Wrapping.Wrapping
+  abstract class Group(prefix: Option[Atom] = None,
+                       suffix: Option[Atom] = None,
+                       wrapAll: Boolean = false)
+      extends Atom {
+    lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
+    lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
 
-  trait Wrappable {
-    def wrap(lineWrapper: LineFormatter): Unit
-  }
-
-  case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
-                           initialIndent: String = "",
-                           lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty) {
-    private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-    private val indent: mutable.StringBuilder = new mutable.StringBuilder("")
-
-    def indented(indenting: Indenting = defaultIndenting): LineFormatter = {
-      LineFormatter(defaultIndenting = indenting,
-                    initialIndent = initialIndent + (indentation * indentStep),
-                    lines = lines)
-    }
-
-    def atLineStart: Boolean = {
-      currentLine.length == indent.length
-    }
-
-    def lengthRemaining: Int = {
-      maxLineWidth - currentLine.length
-    }
-
-    def maybeIndent(indenting: Indenting = defaultIndenting): Unit = {
-      if (indenting == Indenting.Always || (
-              indenting == Indenting.IfNotIndented && indent.length == initialIndent.length
-          )) {
-        indent.append(indentation * indentStep)
-      }
-    }
-
-    def endLine(): Unit = {
-      endLineUnlessEmpty(wrap = false)
-      indent.clear()
-      indent.append(initialIndent)
-    }
-
-    def endLineUnlessEmpty(wrap: Boolean, indenting: Indenting = defaultIndenting): Unit = {
-      if (!atLineStart) {
-        lines.append(currentLine.toString)
-        currentLine.clear()
-        if (wrap) {
-          maybeIndent(indenting)
-        }
-      }
-      if (indenting != Indenting.Dedent) {
-        val indentLength = indent.length
-        if (indentLength == indentStep) {
-          indent.clear()
-        } else if (indentLength > indentStep) {
-          indent.delete(indentLength - indentStep, indentLength)
-        }
-      }
-    }
-
-    def buildSubstring(
-        atoms: Seq[Atom],
-        builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth)
-    ): StringBuilder = {
-      atoms.foreach { atom =>
-        if (builder.nonEmpty && !builder.last.isWhitespace) {
-          builder.append(" ")
-        }
-        builder.append(atom.toString)
-      }
-      builder
-    }
-
-    def append(value: String): Unit = {
-      currentLine.append(value)
-    }
-
-    def append(atom: Atom): Unit = {
-      buildSubstring(Vector(atom), currentLine)
-    }
-
-    def appendAll(atoms: Seq[Atom], wrapping: Wrapping = Wrapping.AsNeeded): Unit = {
-      if (wrapping == Wrapping.Never) {
-        buildSubstring(atoms, currentLine)
+    override def format(lineFormatter: LineFormatter): Unit = {
+      val wrapAndDedentSuffix = if (prefix.isEmpty) {
+        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        false
+      } else if (prefixLength < lineFormatter.lengthRemaining) {
+        lineFormatter.append(prefix.get)
+        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.Always)
+        true
       } else {
-        val substr = buildSubstring(atoms)
-        if (wrapping == Wrapping.Always) {
-          endLineUnlessEmpty(wrap = true)
-        }
-        val space = if (atLineStart) {
-          ""
+        lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
+        val wrap = wrapAll || length > lineFormatter.lengthRemaining
+        lineFormatter.append(prefix.get)
+        if (wrap) {
+          lineFormatter.endLineUnlessEmpty(wrap = true, Indenting.Always)
+          true
         } else {
-          " "
-        }
-        if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
-          atoms.foreach {
-            case wrappable: Wrappable => wrappable.wrap(lineWrapper = this)
-            case atom =>
-              val space = if (atLineStart) {
-                ""
-              } else {
-                " "
-              }
-              if (lengthRemaining < space.length + atom.length) {
-                endLineUnlessEmpty(wrap = true)
-                currentLine.append(atom)
-              } else {
-                currentLine.append(space)
-                currentLine.append(atom)
-              }
-          }
-        } else {
-          currentLine.append(space)
-          currentLine.append(substr)
+          false
         }
       }
-    }
-  }
 
-  /**
-    * A sequence of adjacent atoms (with no spacing or wrapping)
-    * @param atoms the atoms
-    */
-  case class Adjacent(atoms: Seq[Atom]) extends Atom {
-    override def toString: String = {
-      atoms.mkString("")
-    }
+      wrapBody(lineFormatter)
 
-    override def length: Int = {
-      atoms.map(_.length).sum
-    }
-  }
-
-  /**
-    * A sequence of atoms separated by a space
-    * @param atoms the atoms
-    */
-  case class Spaced(atoms: Seq[Atom], wrapping: Wrapping = Wrapping.Never)
-      extends Atom
-      with Wrappable {
-    override def toString: String = {
-      atoms.mkString(" ")
+      if (suffix.isDefined) {
+        if (wrapAndDedentSuffix || suffixLength > lineFormatter.lengthRemaining) {
+          val indenting = if (wrapAndDedentSuffix) {
+            Indenting.Dedent
+          } else {
+            Indenting.Never
+          }
+          lineFormatter.endLineUnlessEmpty(wrap = true, indenting = indenting)
+        }
+        lineFormatter.append(suffix.get)
+      }
     }
 
-    override def length: Int = {
-      atoms.map(_.length).sum + atoms.length - 1
-    }
-
-    override def wrap(lineWrapper: LineFormatter): Unit = {
-      lineWrapper.appendAll(atoms, wrapping = wrapping)
-    }
+    def wrapBody(lineFormatter: LineFormatter): Unit
   }
 
   case class Container(items: Seq[Atom],
@@ -179,12 +64,9 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                        prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
                        wrapAll: Boolean = false)
-      extends Atom
-      with Wrappable {
+      extends Group(prefix = prefix, suffix = suffix, wrapAll = wrapAll) {
     lazy val itemStr: String = items.mkString(s"${delimiter} ")
     lazy val itemLength: Int = itemStr.length
-    lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
-    lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
 
     override def toString: String = {
       val open = prefix.map(_.toString).getOrElse("")
@@ -196,52 +78,22 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       itemLength + prefixLength + suffixLength
     }
 
-    override def wrap(lineWrapper: LineFormatter): Unit = {
-      val wrapAndDedentSuffix = if (prefix.isEmpty) {
-        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
-        false
-      } else if (prefixLength < lineWrapper.lengthRemaining) {
-        lineWrapper.append(prefix.get)
-        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.Always)
-        true
-      } else {
-        lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.IfNotIndented)
-        val wrap = wrapAll || length > lineWrapper.lengthRemaining
-        lineWrapper.append(prefix.get)
-        if (wrap) {
-          lineWrapper.endLineUnlessEmpty(wrap = true, Indenting.Always)
-          true
-        } else {
-          false
-        }
-      }
+    def wrapBody(lineFormatter: LineFormatter): Unit = {
       if (items.nonEmpty) {
-        if (wrapAll || (items.length > 1 && itemLength > lineWrapper.lengthRemaining)) {
+        if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
           items.foreach { atom =>
-            lineWrapper.append(Adjacent(Vector(atom, delimiter)))
-            lineWrapper.endLineUnlessEmpty(wrap = true, indenting = Indenting.IfNotIndented)
+            lineFormatter.append(Adjacent(Vector(atom, delimiter)))
+            lineFormatter.endLineUnlessEmpty(wrap = true, indenting = Indenting.IfNotIndented)
           }
         } else {
-          lineWrapper.append(itemStr)
+          lineFormatter.append(itemStr)
         }
-      }
-      if (suffix.isDefined) {
-        if (wrapAndDedentSuffix || suffixLength > lineWrapper.lengthRemaining) {
-          val indenting = if (wrapAndDedentSuffix) {
-            Indenting.Dedent
-          } else {
-            Indenting.Never
-          }
-          lineWrapper.endLineUnlessEmpty(wrap = true, indenting = indenting)
-        }
-        lineWrapper.append(suffix.get)
       }
     }
   }
 
   case class KeyValue(key: Atom, value: Atom, delimiter: Token = Token.KeyValueDelimiter)
-      extends Atom
-      with Wrappable {
+      extends Atom {
     override def toString: String = {
       s"${key}${delimiter.length} ${value}"
     }
@@ -250,8 +102,8 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       key.length + value.length + delimiter.length + 1
     }
 
-    override def wrap(lineWrapper: LineFormatter): Unit = {
-      lineWrapper.appendAll(Vector(Adjacent(Vector(key, delimiter)), value))
+    override def format(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendAll(Vector(Adjacent(Vector(key, delimiter)), value))
     }
   }
 
@@ -299,7 +151,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
   }
 
-  case class Unary(oper: Token, value: Atom) extends Atom {
+  case class Unirary(oper: Token, value: Atom) extends Atom {
     override def toString: String = {
       s"${oper}${value}"
     }
@@ -310,8 +162,15 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   }
 
   case class Operation(oper: Token, lhs: Atom, rhs: Atom, grouped: Boolean = false)
-      extends Atom
-      with Wrappable {
+      extends Group(prefix = if (grouped) {
+        Some(Token.GroupOpen)
+      } else {
+        None
+      }, suffix = if (grouped) {
+        Some(Token.GroupClose)
+      } else {
+        None
+      }, wrapAll = false) {
     override def toString: String = {
       val str = s"${lhs} ${oper} ${rhs}"
       if (grouped) {
@@ -330,16 +189,16 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       lhs.length + oper.length + rhs.length + 2 + parenLength
     }
 
-    // TODO
-    override def wrap(lineWrapper: LineFormatter): Unit = {}
+    def wrapBody(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendAll(Vector(lhs, oper, rhs), Wrapping.AsNeeded)
+    }
   }
 
   case class Placeholder(value: Atom,
                          open: Token = Token.PlaceholderOpenDollar,
+                         close: Token = Token.PlaceholderClose,
                          options: Option[Seq[Atom]] = None)
-      extends Atom
-      with Wrappable {
-    val close: Token = Token.tokenPairs(open)
+      extends Group(prefix = Some(open), suffix = Some(close), wrapAll = false) {
 
     override def toString: String = {
       val optionsStr = options
@@ -354,8 +213,12 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       value.length + open.length + close.length + options.map(_.map(_.length + 1).sum).getOrElse(0)
     }
 
-    // TODO
-    override def wrap(lineWrapper: LineFormatter): Unit = {}
+    override def wrapBody(lineFormatter: LineFormatter): Unit = {
+      if (options.isDefined) {
+        lineFormatter.appendAll(options.get)
+      }
+      lineFormatter.append(value)
+    }
   }
 
   def buildExpression(expr: Expr,
@@ -363,14 +226,30 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
                       inString: Boolean = false,
                       inPlaceholder: Boolean = false,
                       inOperation: Boolean = false): Atom = {
+
+    /**
+      * Creates a Token or a StringLiteral, depending on whether we're already inside a string literal
+      * @param value the value to wrap
+      * @return an Atom
+      */
     def stringOrToken(value: String): Atom = {
       if (inString) {
         Token(value)
       } else {
-        StringAtom(value)
+        StringLiteral(value)
       }
     }
 
+    /**
+      * Builds an expression that occurs nested within another expression. By default, passes all the current
+      * parameter values to the nested call.
+      * @param nestedExpression the nested Expr
+      * @param placeholderOpen override the current value of `placeholderOpen`
+      * @param inString override the current value of `inString`
+      * @param inPlaceholder override the current value of `inPlaceholder`
+      * @param inOperation override the current value of `inOperation`
+      * @return an Atom
+      */
     def nested(nestedExpression: Expr,
                placeholderOpen: Token = placeholderOpen,
                inString: Boolean = inString,
@@ -384,11 +263,11 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
 
     def unirary(oper: Token, value: Expr): Atom = {
-      Unary(oper, nested(value))
+      Unirary(oper, nested(value, inOperation = true))
     }
 
     def operation(oper: Token, lhs: Expr, rhs: Expr): Atom = {
-      Operation(oper, nested(lhs), nested(rhs))
+      Operation(oper, nested(lhs, inOperation = true), nested(rhs, inOperation = true))
     }
 
     def option(name: Token, value: Expr): Atom = {
@@ -427,7 +306,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           Token(id)
         }
       case ExprCompoundString(value) if !(inString || inPlaceholder) =>
-        StringAtom(Adjacent(value.map(nested(_, inString = true))))
+        StringLiteral(Adjacent(value.map(nested(_, inString = true))))
       case ExprPair(left, right) if !(inString || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
@@ -461,7 +340,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       case ExprPlaceholderEqual(t, f, value) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
-                    Some(
+                    options = Some(
                         Vector(
                             option(Token.TrueOption, t),
                             option(Token.FalseOption, f)
@@ -470,11 +349,11 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       case ExprPlaceholderDefault(default, value) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
-                    Some(Vector(option(Token.DefaultOption, default))))
+                    options = Some(Vector(option(Token.DefaultOption, default))))
       case ExprPlaceholderSep(sep, value) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
-                    Some(Vector(option(Token.SepOption, sep))))
+                    options = Some(Vector(option(Token.SepOption, sep))))
       // other expressions
       case ExprAt(array, index) =>
         Container(Vector(nested(index)),
@@ -499,11 +378,12 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
   }
 
-  trait Statement {
-    def format(lineFormatter: LineFormatter): Unit
-  }
+  /**
+    * Marker base class for Statements.
+    */
+  sealed abstract class Statement extends Chunk
 
-  abstract class StatementGroup extends Statement {
+  sealed abstract class StatementGroup extends Statement {
     def statements: Seq[Statement]
 
     override def format(lineFormatter: LineFormatter): Unit = {
@@ -540,7 +420,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 
   case class ImportStatement(importDoc: ImportDoc) extends Statement {
     override def format(lineFormatter: LineFormatter): Unit = {
-      lineFormatter.appendAll(Vector(Token.Import, StringAtom(importDoc.url.toString)),
+      lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
                               Wrapping.Never)
 
       if (importDoc.name.isDefined) {
@@ -832,10 +712,8 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
   }
 }
-//package wdlTools.formatter
-//
-//import com.sun.tools.javac.parser.Tokens
-//
+
+// This stuff may be useful when re-writing
 //case class DefaultAtomizer(defaultSpacing: Int = 1) extends Atomizer {
 //  object Wrapping {
 //    val Undefined: Int = -1
@@ -984,8 +862,4 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
 //  ).map { tok: FormatterToken =>
 //    tok.token -> tok
 //  }.toMap
-//
-//  override def atomize(token: Token): Atom = {
-//    defaults.getOrElse(token, FormatterToken(token))
-//  }
 //}
