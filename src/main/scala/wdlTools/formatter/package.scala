@@ -19,131 +19,28 @@ trait Chunk {
   def format(lineFormatter: LineFormatter): Unit
 }
 
-case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
-                         initialIndent: String = "",
-                         indentation: String = " ",
-                         indentStep: Int = 2,
-                         spacing: String = " ",
-                         maxLineWidth: Int = 100,
-                         lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty) {
-  private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-  private val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
+abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented) {
+  def preformatted(): LineFormatter
 
-  def indented(indenting: Indenting = defaultIndenting): LineFormatter = {
-    LineFormatter(
-        defaultIndenting = indenting,
-        initialIndent = initialIndent + (indentation * indentStep),
-        indentation = indentation,
-        indentStep = indentStep,
-        maxLineWidth = maxLineWidth,
-        lines = lines
-    )
-  }
+  def indented(indenting: Indenting = defaultIndenting): LineFormatter
 
-  def preformatted(): LineFormatter = {
-    LineFormatter(
-        spacing = "",
-        maxLineWidth = maxLineWidth,
-        lines = lines
-    )
-  }
+  def atLineStart: Boolean
 
-  def atLineStart: Boolean = {
-    currentLine.length <= indent.length
-  }
+  def lengthRemaining: Int
 
-  def lengthRemaining: Int = {
-    if (atLineStart) {
-      maxLineWidth
-    } else {
-      maxLineWidth - currentLine.length
-    }
-  }
+  def emptyLine(): Unit
 
-  def dent(indenting: Indenting = defaultIndenting): Unit = {
-    indenting match {
-      case Indenting.Always => indent.append(indentation * indentStep)
-      case Indenting.IfNotIndented if indent.length == initialIndent.length =>
-        indent.append(indentation * indentStep)
-      case Indenting.Dedent =>
-        val indentLength = indent.length
-        if (indentLength > initialIndent.length) {
-          indent.delete(indentLength - indentStep, indentLength)
-        }
-      case Indenting.Reset =>
-        indent.clear()
-        indent.append(initialIndent)
-      case _ => Unit
-    }
-  }
+  def beginLine(): Unit
 
-  def emptyLine(): Unit = {
-    lines.append("")
-  }
+  def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
 
-  def beginLine(): Unit = {
-    require(atLineStart)
-    if (currentLine.isEmpty) {
-      currentLine.append(indent)
-    }
-  }
+  def appendString(value: String): Unit
 
-  def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit = {
-    if (!atLineStart) {
-      lines.append(currentLine.toString)
-      if (wrap) {
-        dent(indenting)
-      } else {
-        dent(Indenting.Reset)
-      }
-    }
-    currentLine.clear()
-  }
+  def appendChunk(chunk: Chunk): Unit
 
-  def buildSubstring(
-      chunks: Seq[Chunk],
-      builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth)
-  ): StringBuilder = {
-    chunks.foreach { chunk =>
-      if (builder.nonEmpty && !(builder.last.isWhitespace || builder.last == indentation.last)) {
-        builder.append(spacing)
-      }
-      builder.append(chunk.toString)
-    }
-    builder
-  }
+  def appendAll(chunks: Seq[Chunk], wrapping: Wrapping = Wrapping.AsNeeded): Unit
 
-  def appendString(value: String): Unit = {
-    currentLine.append(value)
-  }
-
-  def appendChunk(chunk: Chunk): Unit = {
-    buildSubstring(Vector(chunk), currentLine)
-  }
-
-  def appendAll(chunks: Seq[Chunk], wrapping: Wrapping = Wrapping.AsNeeded): Unit = {
-    if (wrapping == Wrapping.Never) {
-      buildSubstring(chunks, currentLine)
-    } else {
-      val substr = buildSubstring(chunks)
-      if (wrapping == Wrapping.Always) {
-        endLine(wrap = true)
-      }
-      val space = if (atLineStart) {
-        ""
-      } else {
-        spacing
-      }
-      if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
-        chunks.foreach { chunk =>
-          chunk.format(lineFormatter = this)
-        }
-      } else {
-        currentLine.append(space)
-        currentLine.append(substr)
-      }
-    }
-  }
+  def toSeq: Seq[String]
 }
 
 abstract class Atom extends Chunk {

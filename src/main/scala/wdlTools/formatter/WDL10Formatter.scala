@@ -742,10 +742,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         println(Util.prettyFormat(statements))
       }
 
-      val lineFormatter = LineFormatter()
+      val lineFormatter = DefaultLineFormatter()
       format(lineFormatter)
 
-      documents(uri) = lineFormatter.lines.toVector
+      documents(uri) = lineFormatter.toSeq
     }
   }
 
