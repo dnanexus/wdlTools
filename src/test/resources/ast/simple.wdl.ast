@@ -2,7 +2,7 @@ Document(
   version = "1.0",
   elements = Vector(
     Task(
-      name = "foo",le / packageBin 0s
+      name = "foo",
       input = Some(InputSection(Vector(Declaration(s,TypeString,None), Declaration(i,TypeInt,None)))),
       output = Some(OutputSection(Vector(Declaration(sout,TypeString,Some(ExprIdentifier(x)))))),
       command = CommandSection(Vector(
