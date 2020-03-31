@@ -4,8 +4,7 @@ import java.net.URI
 import java.nio.file.Files
 
 import wdlTools.formatter._
-import wdlTools.syntax.ParseAll
-import wdlTools.util.{FetchURL, Util}
+import wdlTools.util.Util
 
 import collection.JavaConverters._
 import scala.language.reflectiveCalls
@@ -15,13 +14,9 @@ case class Format(conf: WdlToolsConf) extends Command {
     val uri = new URI(conf.format.uri())
     val uriLocalPath = Util.getLocalPath(uri)
     val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
-    val sourceCode = FetchURL.readFromUri(uri, opts)
-    val parser = ParseAll(opts)
-    val document = parser.apply(sourceCode)
+    val formatter = WDL10Formatter(opts)
 
-    val formatter = WDL10Formatter(conf.verbosity)
-    formatter.formatDocument(uri, document, followImports = conf.format.followImports())
-
+    formatter.formatDocuments(uri, followImports = conf.format.followImports())
     formatter.documents.foreach {
       case (uri, lines) =>
         val outputPath =

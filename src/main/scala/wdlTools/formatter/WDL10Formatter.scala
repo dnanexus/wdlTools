@@ -3,15 +3,15 @@ package wdlTools.formatter
 import java.net.URI
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.{Util, Verbosity}
-import wdlTools.util.Verbosity._
+import wdlTools.syntax.walkDocuments
+import wdlTools.util.{Options, Util, Verbosity}
 
 import wdlTools.util.Verbosity
 import wdlTools.util.Verbosity._
 
 import scala.collection.mutable
 
-case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
+case class WDL10Formatter(opts: Options,
                           documents: mutable.Map[URI, Seq[String]] = mutable.Map.empty) {
 
   abstract class Group(prefix: Option[Atom] = None,
@@ -708,19 +708,14 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
   case class TaskBlock(task: Task)
       extends BlockStatement(Token.Task, Some(Token(task.name)), Some(TaskSections(task)))
 
-  case class FormattedDocument(uri: URI,
-                               document: Document,
-                               dependencies: mutable.Map[String, Document] = mutable.Map.empty)
-      extends Sections {
-    def apply(): Unit = {
+  case class FormatterDocument(document: Document) extends Sections {
+    def format(): Seq[String] = {
       val imports: mutable.ArrayBuffer[ImportDoc] = mutable.ArrayBuffer.empty
       val structs: mutable.ArrayBuffer[TypeStruct] = mutable.ArrayBuffer.empty
       val tasks: mutable.ArrayBuffer[Task] = mutable.ArrayBuffer.empty
 
       document.elements.foreach {
-        case imp: ImportDoc =>
-          imports.append(imp)
-          dependencies(imp.url.addr) = imp.doc
+        case imp: ImportDoc     => imports.append(imp)
         case struct: TypeStruct => structs.append(struct)
         case task: Task         => tasks.append(task)
       }
@@ -741,29 +736,21 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         tasks.foreach(task => statements.append(TaskBlock(task)))
       }
 
-      if (verbosity == Verbosity.Verbose) {
+      if (opts.verbosity == Verbosity.Verbose) {
         println(Util.prettyFormat(statements))
       }
 
       val lineFormatter = DefaultLineFormatter()
+
       format(lineFormatter)
 
-      documents(uri) = lineFormatter.toSeq
+      lineFormatter.toSeq
     }
   }
 
-  def formatDocument(uri: URI, document: Document, followImports: Boolean = true): Unit = {
-    val formattedDocument = FormattedDocument(uri, document)
-    formattedDocument.apply()
-
-    if (followImports && formattedDocument.dependencies.nonEmpty) {
-      formattedDocument.dependencies.foreach {
-        case (uriStr: String, document: Document) =>
-          val uri = new URI(uriStr)
-          if (!documents.contains(uri)) {
-            formatDocument(uri, document, followImports)
-          }
-      }
+  def formatDocuments(uri: URI, followImports: Boolean = true): Unit = {
+    walkDocuments(uri, opts, followImports, documents) { doc: Document =>
+      FormatterDocument(doc).format()
     }
   }
 }
