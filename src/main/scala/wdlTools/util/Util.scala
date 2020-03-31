@@ -1,7 +1,7 @@
 package wdlTools.util
 
 import java.net.URI
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import com.typesafe.config.ConfigFactory
 
@@ -74,6 +74,16 @@ object Util {
     val source = io.Source.fromFile(path.toString)
     try source.getLines.mkString(System.lineSeparator())
     finally source.close()
+  }
+
+  def writeFiles(docs: Map[URI, Seq[String]],
+                 outputDir: Option[Path],
+                 overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, lines) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, lines.asJava)
+    }
   }
 
   /**
