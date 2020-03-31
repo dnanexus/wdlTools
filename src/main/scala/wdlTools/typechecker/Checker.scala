@@ -62,7 +62,7 @@ case class Checker(stdlib: Stdlib) {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
-      if (!both.isEmpty)
+      if (both.nonEmpty)
         throw new Exception(s"Variables ${both} are being redeclared")
       this.copy(declarations = declarations ++ bindings)
     }
@@ -494,7 +494,7 @@ case class Checker(stdlib: Stdlib) {
 
     // check that all the compulsory arguments are provided
     calleeInputs.foreach {
-      case (argName, (wdlType, false)) =>
+      case (argName, (_, false)) =>
         callerInputs.get(argName) match {
           case None =>
             throw new Exception(
@@ -512,7 +512,7 @@ case class Checker(stdlib: Stdlib) {
 
     if (ctx.declarations contains callName)
       throw new Exception(s"call ${callName} shadows an existing definition")
-    (callName -> TypeCall(callName, calleeOutputs))
+    callName -> TypeCall(callName, calleeOutputs)
   }
 
   // The body of the scatter becomes accessible to statements that come after it.
@@ -544,7 +544,7 @@ case class Checker(stdlib: Stdlib) {
         val (callName, callType) = applyCall(call, ctxInner.bind(accu))
         val callOutput = callType.output.map {
           case (name, t) => name -> TypeArray(t)
-        }.toMap
+        }
         accu + (callName -> TypeCall(callType.name, callOutput))
 
       case (accu: Bindings, subSct: Scatter) =>
@@ -552,7 +552,7 @@ case class Checker(stdlib: Stdlib) {
         val sctBindings = applyScatter(subSct, ctxInner.bind(accu))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> TypeArray(typ)
-        }.toMap
+        }
         accu ++ sctBindings2
 
       case (accu: Bindings, cond: Conditional) =>
@@ -560,7 +560,7 @@ case class Checker(stdlib: Stdlib) {
         val condBindings = applyConditional(cond, ctxInner.bind(accu))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> TypeArray(typ)
-        }.toMap
+        }
         accu ++ condBindings2
 
       case (_, other) =>
@@ -589,7 +589,7 @@ case class Checker(stdlib: Stdlib) {
         val (callName, callType) = applyCall(call, ctxOuter.bind(accu))
         val callOutput = callType.output.map {
           case (name, t) => name -> TypeOptional(t)
-        }.toMap
+        }
         accu + (callName -> TypeCall(callType.name, callOutput))
 
       case (accu: Bindings, subSct: Scatter) =>
@@ -597,7 +597,7 @@ case class Checker(stdlib: Stdlib) {
         val sctBindings = applyScatter(subSct, ctxOuter.bind(accu))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> TypeOptional(typ)
-        }.toMap
+        }
         accu ++ sctBindings2
 
       case (accu: Bindings, cond: Conditional) =>
@@ -605,7 +605,7 @@ case class Checker(stdlib: Stdlib) {
         val condBindings = applyConditional(cond, ctxOuter.bind(accu))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> TypeOptional(typ)
-        }.toMap
+        }
         accu ++ condBindings2
 
       case (_, other) =>
@@ -663,7 +663,7 @@ case class Checker(stdlib: Stdlib) {
         val tt = applyTask(task, accu)
         accu.bind(tt)
 
-      case (accu, importDoc: ImportDoc) =>
+      case (_, _: ImportDoc) =>
         throw new Exception("imports not implemented yet")
 
       case (accu: Context, struct: TypeStruct) =>
@@ -671,7 +671,7 @@ case class Checker(stdlib: Stdlib) {
         accu.bind(struct)
 
       case (_, other) =>
-        throw new Exception("sanity: wrong element type in workflow")
+        throw new Exception(s"sanity: wrong element type in workflow $other")
     }
 
     // now that we have types for everything else, we can check the workflow
