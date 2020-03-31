@@ -1,5 +1,6 @@
 package wdlTools.format
 
+import java.net.URI
 import java.nio.file.{Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
