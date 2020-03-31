@@ -12,10 +12,10 @@ case class ReadmeGenerator(uri: URI,
                            renderer: Renderer = SspRenderer(),
                            readmes: mutable.Map[URI, String] = mutable.HashMap.empty) {
 
-  val WORKFLOW_README_TEMPLATE = "wdlTools/templates/WorkflowReadme.md"
-  val TASK_README_TEMPLATE = "wdlTools/templates/TaskReadme.md"
-  val WORKFLOW_README_DEVELOPER_TEMPLATE = "wdlTools/templates/WorkflowReadme.developer.md"
-  val TASK_README_DEVELOPER_TEMPLATE = "wdlTools/templates/TaskReadme.developer.md"
+  val WORKFLOW_README_TEMPLATE = "/templates/WorkflowReadme.md.ssp"
+  val TASK_README_TEMPLATE = "/templates/TaskReadme.md.ssp"
+  val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/WorkflowReadme.developer.md.ssp"
+  val TASK_README_DEVELOPER_TEMPLATE = "/templates/TaskReadme.developer.md.ssp"
 
   val parts: Seq[String] = uri.getPath.split("/")
   require(parts.last.endsWith(".wdl"))
@@ -27,7 +27,7 @@ case class ReadmeGenerator(uri: URI,
     } else {
       ""
     }
-    val newName = s"Readme.${devStr}${wdlName}.${elementName}.wdl"
+    val newName = s"Readme.${devStr}${wdlName}.${elementName}.md"
     val newPath = (parts.slice(0, parts.size - 1) ++ Vector(newName)).mkString("/")
     val newURI = new URI(uri.getScheme,
                          uri.getUserInfo,
@@ -40,7 +40,7 @@ case class ReadmeGenerator(uri: URI,
   }
 
   def generateWorkflowReadme(workflow: Workflow,
-                             tasks: Map[String, String],
+                             tasks: Seq[(String, String)],
                              developer: Boolean): Unit = {
     val (uri, _) = getURI(workflow.name, developer = developer)
     val templateName = if (developer) {

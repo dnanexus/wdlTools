@@ -101,6 +101,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     val uri: ScallopOption[String] =
       trailArg[String](descr = "path or URI (file:// or http(s)://) to the main WDL file")
   }
+  addSubcommand(readmes)
 
   val printAST = new Subcommand("printAST") {
     banner("""Usage: wdlTools printAST [OPTIONS] <path|uri>
