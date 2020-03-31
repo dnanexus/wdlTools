@@ -85,6 +85,15 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "only format the main file",
         default = Some(true)
     )
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+    validateOpt(outputDir, overwrite) {
+      case (None, Some(false) | None) =>
+        Left("--outputDir is required unless --overwrite is specified")
+      case _ => Right(Unit)
+    }
     val uri: ScallopOption[String] =
       trailArg[String](descr = "path or URI (file:// or http(s)://) to the main WDL file")
   }

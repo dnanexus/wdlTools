@@ -1,5 +1,6 @@
 package wdlTools.util
 
+import collection.JavaConverters._
 import java.net.URI
 import java.nio.file.{Files, Path, Paths}
 
@@ -55,7 +56,7 @@ object Util {
 
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
-        } else if (selfOk) {
+        } else if (selfOk || !Files.exists(path)) {
           path.toAbsolutePath
         } else {
           Paths.get("").toAbsolutePath.resolve(path.getFileName)
@@ -76,6 +77,13 @@ object Util {
     finally source.close()
   }
 
+  /**
+    * Write a collection of documents, which is a map of URIs to sequences of lines, to
+    * disk by converting each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
   def writeFiles(docs: Map[URI, Seq[String]],
                  outputDir: Option[Path],
                  overwrite: Boolean = false): Unit = {
