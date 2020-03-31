@@ -3,7 +3,7 @@ package wdlTools.syntax
 // Parse one document. Do not follow imports.
 
 // we need these for safe casting, and reporting on errors
-import reflect.ClassTag
+//import reflect.ClassTag
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
 import collection.JavaConverters._
 import java.nio.ByteBuffer
@@ -59,26 +59,6 @@ case class ParseDocument(conf: Options) extends WdlParserBaseVisitor[Element] {
     val line = tok.getLine
     val col = tok.getCharPositionInLine
     new RuntimeException(s"${msg}  in line ${line} col ${col}")
-  }
-
-  // visit the children of [ctx], and cast to the expected type [T]. Provide a reasonable
-  // report if there is an error.
-  //
-  // The complex construction with the implicit "tt" is so that we could print the class of the
-  // expected class T.
-  private def visitAndSafeCast[T: ClassTag](ctx: ParserRuleContext)(implicit tt: TypeTag[T]): T = {
-    val child = visitChildren(ctx)
-    if (child == null) {
-      throw makeWdlException(s"child is null, expecting child of type ${typeOf[T]}", ctx)
-    }
-
-    val ct = implicitly[ClassTag[T]]
-    child match {
-      case ct(x) => x
-      case _ =>
-        val msg = s"${child} has wrong type ${child.getClass.getSimpleName}, expecting ${typeOf[T]}"
-        throw makeWdlException(msg, ctx)
-    }
   }
 
   /*
@@ -181,7 +161,7 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlParser.Wdl_typeContext): Type = {
-    visitAndSafeCast[Type](ctx)
+    visitChildren(ctx).asInstanceOf[Type]
   }
 
   // EXPRESSIONS
@@ -354,79 +334,79 @@ string
   }
 
   override def visitLor(ctx: WdlParser.LorContext): Expr = {
-    val arg0: Expr = visitAndSafeCast[Expr](ctx.expr_infix0())
-    val arg1: Expr = visitAndSafeCast[Expr](ctx.expr_infix1())
+    val arg0: Expr = visitExpr_infix0(ctx.expr_infix0())
+    val arg1: Expr = visitExpr_infix1(ctx.expr_infix1())
     ExprLor(arg0, arg1)
   }
 
   override def visitLand(ctx: WdlParser.LandContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix1())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix2())
+    val arg0 = visitExpr_infix1(ctx.expr_infix1())
+    val arg1 = visitExpr_infix2(ctx.expr_infix2())
     ExprLand(arg0, arg1)
   }
 
   override def visitEqeq(ctx: WdlParser.EqeqContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprEqeq(arg0, arg1)
   }
   override def visitLt(ctx: WdlParser.LtContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprLt(arg0, arg1)
   }
 
   override def visitGte(ctx: WdlParser.GteContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprGte(arg0, arg1)
   }
 
   override def visitNeq(ctx: WdlParser.NeqContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprNeq(arg0, arg1)
   }
 
   override def visitLte(ctx: WdlParser.LteContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprLte(arg0, arg1)
   }
 
   override def visitGt(ctx: WdlParser.GtContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix2())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix3())
+    val arg0 = visitExpr_infix2(ctx.expr_infix2())
+    val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprGt(arg0, arg1)
   }
 
   override def visitAdd(ctx: WdlParser.AddContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix3())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix4())
+    val arg0 = visitExpr_infix3(ctx.expr_infix3())
+    val arg1 = visitExpr_infix4(ctx.expr_infix4())
     ExprAdd(arg0, arg1)
   }
 
   override def visitSub(ctx: WdlParser.SubContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix3())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix4())
+    val arg0 = visitExpr_infix3(ctx.expr_infix3())
+    val arg1 = visitExpr_infix4(ctx.expr_infix4())
     ExprSub(arg0, arg1)
   }
 
   override def visitMod(ctx: WdlParser.ModContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix4())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix5())
+    val arg0 = visitExpr_infix4(ctx.expr_infix4())
+    val arg1 = visitExpr_infix5(ctx.expr_infix5())
     ExprMod(arg0, arg1)
   }
 
   override def visitMul(ctx: WdlParser.MulContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix4())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix5())
+    val arg0 = visitExpr_infix4(ctx.expr_infix4())
+    val arg1 = visitExpr_infix5(ctx.expr_infix5())
     ExprMul(arg0, arg1)
   }
 
   override def visitDivide(ctx: WdlParser.DivideContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr_infix4())
-    val arg1 = visitAndSafeCast[Expr](ctx.expr_infix5())
+    val arg0 = visitExpr_infix4(ctx.expr_infix4())
+    val arg1 = visitExpr_infix5(ctx.expr_infix5())
     ExprDivide(arg0, arg1)
   }
 
@@ -447,8 +427,8 @@ string
 
   // | LPAREN expr COMMA expr RPAREN #pair_literal
   override def visitPair_literal(ctx: WdlParser.Pair_literalContext): Expr = {
-    val arg0 = visitAndSafeCast[Expr](ctx.expr(0))
-    val arg1 = visitAndSafeCast[Expr](ctx.expr(1))
+    val arg0 = visitExpr(ctx.expr(0))
+    val arg1 = visitExpr(ctx.expr(1))
     ExprPair(arg0, arg1)
   }
 
@@ -457,7 +437,7 @@ string
     val elements = ctx
       .expr()
       .asScala
-      .map(x => visitAndSafeCast[Expr](x))
+      .map(x => visitExpr(x))
       .toVector
 
     val n = elements.size
@@ -504,7 +484,7 @@ string
 
   // | expr_core LBRACK expr RBRACK #at
   override def visitAt(ctx: WdlParser.AtContext): Expr = {
-    val array = visitAndSafeCast[Expr](ctx.expr_core())
+    val array = visitExpr_core(ctx.expr_core())
     val index = visitExpr(ctx.expr())
     ExprAt(array, index)
   }
@@ -537,13 +517,136 @@ string
 
   // | expr_core DOT Identifier #get_name
   override def visitGet_name(ctx: WdlParser.Get_nameContext): Expr = {
-    val e = visitAndSafeCast[Expr](ctx.expr_core())
+    val e = visitExpr_core(ctx.expr_core())
     val id = ctx.Identifier.getText
     ExprGetName(e, id)
   }
 
+  /*expr_infix0
+	: expr_infix0 OR expr_infix1 #lor
+	| expr_infix1 #infix1
+	; */
+
+  private def visitExpr_infix0(ctx: WdlParser.Expr_infix0Context): Expr = {
+    ctx match {
+      case lor: WdlParser.LorContext       => visitLor(lor)
+      case infix1: WdlParser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
+    }
+  }
+
+  /* expr_infix1
+	: expr_infix1 AND expr_infix2 #land
+	| expr_infix2 #infix2
+	; */
+  private def visitExpr_infix1(ctx: WdlParser.Expr_infix1Context): Expr = {
+    ctx match {
+      case land: WdlParser.LandContext     => visitLand(land)
+      case infix2: WdlParser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
+    }
+  }
+
+  /* expr_infix2
+	: expr_infix2 EQUALITY expr_infix3 #eqeq
+	| expr_infix2 NOTEQUAL expr_infix3 #neq
+	| expr_infix2 LTE expr_infix3 #lte
+	| expr_infix2 GTE expr_infix3 #gte
+	| expr_infix2 LT expr_infix3 #lt
+	| expr_infix2 GT expr_infix3 #gt
+	| expr_infix3 #infix3
+	; */
+
+  private def visitExpr_infix2(ctx: WdlParser.Expr_infix2Context): Expr = {
+    ctx match {
+      case eqeq: WdlParser.EqeqContext     => visitEqeq(eqeq)
+      case neq: WdlParser.NeqContext       => visitNeq(neq)
+      case lte: WdlParser.LteContext       => visitLte(lte)
+      case gte: WdlParser.GteContext       => visitGte(gte)
+      case lt: WdlParser.LtContext         => visitLt(lt)
+      case gt: WdlParser.GtContext         => visitGt(gt)
+      case infix3: WdlParser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
+    }
+  }
+
+  /* expr_infix3
+	: expr_infix3 PLUS expr_infix4 #add
+	| expr_infix3 MINUS expr_infix4 #sub
+	| expr_infix4 #infix4
+	; */
+  private def visitExpr_infix3(ctx: WdlParser.Expr_infix3Context): Expr = {
+    ctx match {
+      case add: WdlParser.AddContext       => visitAdd(add)
+      case sub: WdlParser.SubContext       => visitSub(sub)
+      case infix4: WdlParser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
+    }
+  }
+
+  /* expr_infix4
+	: expr_infix4 STAR expr_infix5 #mul
+	| expr_infix4 DIVIDE expr_infix5 #divide
+	| expr_infix4 MOD expr_infix5 #mod
+	| expr_infix5 #infix5
+	;  */
+  private def visitExpr_infix4(ctx: WdlParser.Expr_infix4Context): Expr = {
+    ctx match {
+      case mul: WdlParser.MulContext       => visitMul(mul)
+      case divide: WdlParser.DivideContext => visitDivide(divide)
+      case mod: WdlParser.ModContext       => visitMod(mod)
+      case infix5: WdlParser.Infix5Context => visitInfix5(infix5).asInstanceOf[Expr]
+//      case _ => visitChildren(ctx).asInstanceOf[Expr]
+    }
+  }
+
+  /* expr_infix5
+	: expr_core
+	; */
+
+  override def visitExpr_infix5(ctx: WdlParser.Expr_infix5Context): Expr = {
+    visitExpr_core(ctx.expr_core())
+  }
+
+  /* expr
+	: expr_infix
+	; */
   override def visitExpr(ctx: WdlParser.ExprContext): Expr = {
-    visitAndSafeCast[Expr](ctx)
+    visitChildren(ctx).asInstanceOf[Expr]
+  }
+
+  /* expr_core
+	: LPAREN expr RPAREN #expression_group
+	| primitive_literal #primitives
+	| LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
+	| LPAREN expr COMMA expr RPAREN #pair_literal
+	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
+	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+	| NOT expr #negate
+	| (PLUS | MINUS) expr #unirarysigned
+	| expr_core LBRACK expr RBRACK #at
+	| IF expr THEN expr ELSE expr #ifthenelse
+	| Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
+	| Identifier #left_name
+	| expr_core DOT Identifier #get_name
+	; */
+  private def visitExpr_core(ctx: WdlParser.Expr_coreContext): Expr = {
+    ctx match {
+      case group: WdlParser.Expression_groupContext      => visitExpression_group(group)
+      case primitives: WdlParser.PrimitivesContext       => visitChildren(primitives).asInstanceOf[Expr]
+      case array_literal: WdlParser.Array_literalContext => visitArray_literal(array_literal)
+      case pair_literal: WdlParser.Pair_literalContext   => visitPair_literal(pair_literal)
+      case map_literal: WdlParser.Map_literalContext     => visitMap_literal(map_literal)
+      case obj_literal: WdlParser.Object_literalContext  => visitObject_literal(obj_literal)
+      case negate: WdlParser.NegateContext               => visitNegate(negate)
+      case unirarysigned: WdlParser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
+      case at: WdlParser.AtContext                       => visitAt(at)
+      case ifthenelse: WdlParser.IfthenelseContext       => visitIfthenelse(ifthenelse)
+      case apply: WdlParser.ApplyContext                 => visitApply(apply)
+      case left_name: WdlParser.Left_nameContext         => visitLeft_name(left_name)
+      case get_name: WdlParser.Get_nameContext           => visitGet_name(get_name)
+//      case _ => visitChildren(ctx).asInstanceOf[Expr]
+    }
   }
 
   /*
@@ -563,8 +666,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlParser.Bound_declsContext): Declaration = {
-    val wdlType: Type = visitAndSafeCast[Type](ctx.wdl_type())
+    val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
+    if (ctx.expr() == null)
+      return Declaration(name, wdlType, None)
     val expr: Expr = visitExpr(ctx.expr())
     Declaration(name, wdlType, Some(expr))
   }
@@ -576,7 +681,11 @@ any_decls
 	;
    */
   override def visitAny_decls(ctx: WdlParser.Any_declsContext): Declaration = {
-    visitAndSafeCast[Declaration](ctx)
+    if (ctx.unbound_decls() != null)
+      return visitUnbound_decls(ctx.unbound_decls())
+    if (ctx.bound_decls() != null)
+      return visitBound_decls(ctx.bound_decls())
+    throw new Exception("sanity")
   }
 
   /* meta_kv
@@ -613,7 +722,7 @@ any_decls
  ; */
   override def visitTask_runtime_kv(ctx: WdlParser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
-    val expr: Expr = visitAndSafeCast[Expr](ctx.expr())
+    val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr)
   }
 
@@ -860,13 +969,6 @@ import_as
     ImportDoc(name, aliases, URL(url))
   }
 
-  /* inner_workflow_element
-	: bound_decls
-	| call
-	| scatter
-	| conditional
-	; */
-
   /* call_alias
 	: AS Identifier
 	; */
@@ -993,7 +1095,15 @@ scatter
   override def visitInner_workflow_element(
       ctx: WdlParser.Inner_workflow_elementContext
   ): WorkflowElement = {
-    visitAndSafeCast[WorkflowElement](ctx)
+    if (ctx.bound_decls() != null)
+      return visitBound_decls(ctx.bound_decls())
+    if (ctx.call() != null)
+      return visitCall(ctx.call())
+    if (ctx.scatter() != null)
+      return visitScatter(ctx.scatter())
+    if (ctx.conditional() != null)
+      return visitConditional(ctx.conditional())
+    throw new Exception("sanity")
   }
 
   /*
