@@ -9,5 +9,6 @@ workflow w {
 
   #  Int b = a + a + a
 
-  Int b = 1 - 2 + 3 + 4
+  #  Int b = (1 + 2) + (3 + 4)
+    Int b = 1 + 2 + 3
 }

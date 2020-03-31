@@ -331,10 +331,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "handle chained operations" taggedAs(Edge) in {
-    val confWithTrace = conf.copy(antlr4Trace = true)
+  it should "handle chained operations" taggedAs(Edge) in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"),
-                                  confWithTrace)
+                                  conf)
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -344,15 +343,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.declarations.size shouldBe 1
     val decl = task.declarations.head
     decl.name shouldBe "j"
-    decl.expr shouldBe ExprAdd(ExprAdd(ExprIdentifier("i"), ExprIdentifier("i")),
+    decl.expr.get shouldBe ExprAdd(ExprAdd(ExprIdentifier("i"), ExprIdentifier("i")),
                                ExprIdentifier("i"))
   }
 
   it should "handle chained operations in a workflow" taggedAs(Edge) in {
-    val confWithTrace = conf.copy(antlr4Trace = true)
     val doc = ParseDocument.apply(getWdlSource("workflows", "chained_expr.wdl"),
-                                  confWithTrace)
-
+                                  conf)
     doc.elements.size shouldBe (0)
 
     doc.version shouldBe ("1.0")
@@ -362,9 +359,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.body.size shouldBe 1
     val decl = wf.body.head.asInstanceOf[Declaration]
     decl.name shouldBe "b"
-//    decl.expr shouldBe ExprAdd(ExprAdd(ExprIdentifier("a"), ExprIdentifier("a")),
-//                               ExprIdentifier("a"))
-
     decl.expr.get shouldBe ExprAdd(ExprAdd(ExprInt(1), ExprInt(2)),
                                    ExprInt(3))
   }
