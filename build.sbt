@@ -56,11 +56,15 @@ val antlr4Version = "4.8"
 //antlr4GenVisitor in Antlr4 := true
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
+val scalateVersion = "1.9.5"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
+    // command line parser
     "org.rogach" %% "scallop" % scallopVersion,
+    // template engine
+    "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
     "com.typesafe" % "config" % typesafeVersion,
     //---------- Test libraries -------------------//
     "org.scalactic" %% "scalactic" % "3.0.1",

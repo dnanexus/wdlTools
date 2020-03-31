@@ -74,6 +74,21 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(format)
 
+  val readmes = new Subcommand("readmes") {
+    banner("""Usage: wdlTools readmes [OPTIONS] <path|uri>
+             |Print the Abstract Syntax Tree for a WDL file.
+             |
+             |Options:
+             |""".stripMargin)
+    val followImports: ScallopOption[Boolean] = toggle(
+        descrYes = "format imported files in addition to the main file",
+        descrNo = "only format the main file",
+        default = Some(true)
+    )
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or URI (file:// or http(s)://) to the main WDL file")
+  }
+
   val printAST = new Subcommand("printAST") {
     banner("""Usage: wdlTools printAST [OPTIONS] <path|uri>
              |Print the Abstract Syntax Tree for a WDL file.
