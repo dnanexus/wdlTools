@@ -746,7 +746,7 @@ case class WDL10Formatter(opts: Options,
   }
 
   def formatDocuments(uri: URI, followImports: Boolean = true): Unit = {
-    WalkDocuments(uri, opts, followImports, documents) { (uri, doc, results) =>
+    WalkDocuments(uri, opts, followImports, documents).apply { (uri, doc, results) =>
       results(uri) = FormatterDocument(doc).format()
     }
   }
