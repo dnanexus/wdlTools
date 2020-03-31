@@ -84,13 +84,30 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeFiles(docs: Map[URI, Seq[String]],
-                 outputDir: Option[Path],
-                 overwrite: Boolean = false): Unit = {
+  def writeLinesToFiles(docs: Map[URI, Seq[String]],
+                        outputDir: Option[Path],
+                        overwrite: Boolean = false): Unit = {
     docs.foreach {
       case (uri, lines) =>
         val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
         Files.write(outputPath, lines.asJava)
+    }
+  }
+
+  /**
+    * Write a collection of documents, which is a map of URIs to contents, to disk by converting
+    * each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeContentsToFiles(docs: Map[URI, String],
+                           outputDir: Option[Path],
+                           overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, contents) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, contents.getBytes())
     }
   }
 

@@ -12,7 +12,7 @@ package object syntax {
                        opts: Options,
                        followImports: Boolean = true,
                        results: mutable.Map[URI, T] = mutable.HashMap.empty)(
-      visit: Document => T
+      visit: (URI, Document, mutable.Map[URI, T]) => Unit
   ): Map[URI, T] = {
     def extractDependencies(document: AbstractSyntax.Document): Map[URI, Document] = {
       document.elements.flatMap {
@@ -23,7 +23,7 @@ package object syntax {
 
     def addDocument(uri: URI, doc: Document): Unit = {
       if (!results.contains(uri)) {
-        results(uri) = visit(doc)
+        visit(uri, doc, results)
         if (followImports) {
           extractDependencies(doc).foreach {
             case (uri, doc) => addDocument(uri, doc)

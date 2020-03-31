@@ -76,10 +76,14 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
   val readmes = new Subcommand("readmes") {
     banner("""Usage: wdlTools readmes [OPTIONS] <path|uri>
-             |Print the Abstract Syntax Tree for a WDL file.
+             |Generate README file stubs for tasks and workflows.
              |
              |Options:
              |""".stripMargin)
+    val developerReadmes: ScallopOption[Boolean] = toggle(
+        descrYes = "also generate developer READMEs",
+        default = Some(false)
+    )
     val followImports: ScallopOption[Boolean] = toggle(
         descrYes = "format imported files in addition to the main file",
         descrNo = "only format the main file",
