@@ -1,15 +1,20 @@
 version 1.0
 
-task foo {
+  task foo {
+
+
     input {
         String s
         Int i
     }
 
     String x = "${s}.txt"
-    String y = "foo"
-    Int z = i + i + i
-    Int a = if (i > 1) then 2 else 3
+      String y = "foo"
+    Int z =
+      i + i + i
+    Int a = if i > 1 then 2
+    else 3
+
 
     command <<<
     echo ~{x}
@@ -20,6 +25,7 @@ task foo {
     output {
         String sout = x
     }
+
 
     runtime {
         docker: "debian:stretch-slim"

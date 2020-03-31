@@ -23,6 +23,7 @@ case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
                          initialIndent: String = "",
                          indentation: String = " ",
                          indentStep: Int = 2,
+                         spacing: String = " ",
                          maxLineWidth: Int = 100,
                          lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty) {
   private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
@@ -41,6 +42,7 @@ case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
 
   def preformatted(): LineFormatter = {
     LineFormatter(
+        spacing = "",
         maxLineWidth = maxLineWidth,
         lines = lines
     )
@@ -104,18 +106,18 @@ case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
   ): StringBuilder = {
     chunks.foreach { chunk =>
       if (builder.nonEmpty && !(builder.last.isWhitespace || builder.last == indentation.last)) {
-        builder.append(" ")
+        builder.append(spacing)
       }
       builder.append(chunk.toString)
     }
     builder
   }
 
-  def append(value: String): Unit = {
+  def appendString(value: String): Unit = {
     currentLine.append(value)
   }
 
-  def append(chunk: Chunk): Unit = {
+  def appendChunk(chunk: Chunk): Unit = {
     buildSubstring(Vector(chunk), currentLine)
   }
 
@@ -130,7 +132,7 @@ case class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
       val space = if (atLineStart) {
         ""
       } else {
-        " "
+        spacing
       }
       if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
         chunks.foreach { chunk =>
@@ -155,10 +157,10 @@ abstract class Atom extends Chunk {
     }
     if (lineFormatter.lengthRemaining < space.length + this.length) {
       lineFormatter.endLine(wrap = true)
-      lineFormatter.append(this)
+      lineFormatter.appendChunk(this)
     } else {
-      lineFormatter.append(space)
-      lineFormatter.append(this)
+      lineFormatter.appendString(space)
+      lineFormatter.appendChunk(this)
     }
   }
 }

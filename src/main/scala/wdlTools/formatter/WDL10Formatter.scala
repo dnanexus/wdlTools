@@ -23,13 +23,13 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
         false
       } else if (prefixLength < lineFormatter.lengthRemaining) {
-        lineFormatter.append(prefix.get)
+        lineFormatter.appendChunk(prefix.get)
         lineFormatter.endLine(wrap = true, Indenting.Always)
         true
       } else {
         lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
         val wrap = wrapAll || length > lineFormatter.lengthRemaining
-        lineFormatter.append(prefix.get)
+        lineFormatter.appendChunk(prefix.get)
         if (wrap) {
           lineFormatter.endLine(wrap = true, Indenting.Always)
           true
@@ -49,7 +49,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           }
           lineFormatter.endLine(wrap = true, indenting = indenting)
         }
-        lineFormatter.append(suffix.get)
+        lineFormatter.appendChunk(suffix.get)
       }
     }
 
@@ -79,11 +79,11 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       if (items.nonEmpty) {
         if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
           items.foreach { atom =>
-            lineFormatter.append(Adjacent(Vector(atom, delimiter)))
+            lineFormatter.appendChunk(Adjacent(Vector(atom, delimiter)))
             lineFormatter.endLine(wrap = true, indenting = Indenting.IfNotIndented)
           }
         } else {
-          lineFormatter.append(itemStr)
+          lineFormatter.appendString(itemStr)
         }
       }
     }
@@ -214,7 +214,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       if (options.isDefined) {
         lineFormatter.appendAll(options.get)
       }
-      lineFormatter.append(value)
+      lineFormatter.appendChunk(value)
     }
   }
 
@@ -230,7 +230,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       * @return an Atom
       */
     def stringOrToken(value: String): Atom = {
-      if (inString) {
+      if (inString && !inPlaceholder) {
         Token(value)
       } else {
         StringLiteral(value)
@@ -264,7 +264,10 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
     }
 
     def operation(oper: Token, lhs: Expr, rhs: Expr): Atom = {
-      Operation(oper, nested(lhs, inOperation = true), nested(rhs, inOperation = true))
+      Operation(oper,
+                nested(lhs, inPlaceholder = inString, inOperation = true),
+                nested(rhs, inPlaceholder = inString, inOperation = true),
+                grouped = inOperation)
     }
 
     def option(name: Token, value: Expr): Atom = {
@@ -278,37 +281,6 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       case ValueBoolean(value) => Token(value.toString)
       case ValueInt(value)     => Token(value.toString)
       case ValueFloat(value)   => Token(value.toString)
-      // operators
-      case ExprUniraryPlus(value)  => unirary(Token.UnaryPlus, value)
-      case ExprUniraryMinus(value) => unirary(Token.UnaryMinus, value)
-      case ExprNegate(value)       => unirary(Token.LogicalNot, value)
-      case ExprLor(a, b)           => operation(Token.LogicalOr, a, b)
-      case ExprLand(a, b)          => operation(Token.LogicalAnd, a, b)
-      case ExprEqeq(a, b)          => operation(Token.Equality, a, b)
-      case ExprLt(a, b)            => operation(Token.LessThan, a, b)
-      case ExprLte(a, b)           => operation(Token.LessThanOrEqual, a, b)
-      case ExprGt(a, b)            => operation(Token.GreaterThan, a, b)
-      case ExprGte(a, b)           => operation(Token.GreaterThanOrEqual, a, b)
-      case ExprNeq(a, b)           => operation(Token.Inequality, a, b)
-      case ExprAdd(a, b)           => operation(Token.Addition, a, b)
-      case ExprSub(a, b)           => operation(Token.Subtraction, a, b)
-      case ExprMul(a, b)           => operation(Token.Multiplication, a, b)
-      case ExprDivide(a, b)        => operation(Token.Division, a, b)
-      case ExprMod(a, b)           => operation(Token.Remainder, a, b)
-      // interpolation
-      case ExprIdentifier(id) =>
-        if (inString && !inPlaceholder) {
-          Placeholder(Token(id), placeholderOpen)
-        } else {
-          Token(id)
-        }
-      case ExprCompoundString(value) if !inPlaceholder =>
-        val atom = Adjacent(value.map(nested(_, inString = true)))
-        if (inString) {
-          atom
-        } else {
-          StringLiteral(atom)
-        }
       case ExprPair(left, right) if !(inString || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
@@ -339,6 +311,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
             suffix = Some(Token.MapClose),
             wrapAll = true
         )
+      // placeholders
       case ExprPlaceholderEqual(t, f, value) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
@@ -356,27 +329,69 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Token.SepOption, sep))))
-      // other expressions
-      case ExprAt(array, index) =>
-        Container(Vector(nested(index)),
-                  prefix = Some(Adjacent(Vector(nested(array), Token.IndexOpen))),
-                  suffix = Some(Token.IndexClose))
-      case ExprIfThenElse(cond, tBranch, fBranch) =>
-        Spaced(Vector(Token.If,
-                      nested(cond),
-                      Token.Then,
-                      nested(tBranch),
-                      Token.Else,
-                      nested(fBranch)),
-               Wrapping.AsNeeded)
-      case ExprApply(funcName, elements) =>
-        Container(
-            elements.map(nested(_)),
-            prefix = Some(Adjacent(Vector(Token(funcName), Token.FunctionCallOpen))),
-            suffix = Some(Token.FunctionCallClose)
-        )
-      case ExprGetName(e, id) => Adjacent(Vector(nested(e), Token.Access, Token(id)))
-      case other              => throw new Exception(s"Unrecognized expression $other")
+      case ExprCompoundString(value) if !inPlaceholder =>
+        val atom = Adjacent(value.map(nested(_, inString = true)))
+        if (inString) {
+          atom
+        } else {
+          StringLiteral(atom)
+        }
+      // other expressions need to be wrapped in a placeholder if they
+      // appear in a string or command block
+      case other =>
+        val atom = other match {
+          case ExprUniraryPlus(value)  => unirary(Token.UnaryPlus, value)
+          case ExprUniraryMinus(value) => unirary(Token.UnaryMinus, value)
+          case ExprNegate(value)       => unirary(Token.LogicalNot, value)
+          case ExprLor(a, b)           => operation(Token.LogicalOr, a, b)
+          case ExprLand(a, b)          => operation(Token.LogicalAnd, a, b)
+          case ExprEqeq(a, b)          => operation(Token.Equality, a, b)
+          case ExprLt(a, b)            => operation(Token.LessThan, a, b)
+          case ExprLte(a, b)           => operation(Token.LessThanOrEqual, a, b)
+          case ExprGt(a, b)            => operation(Token.GreaterThan, a, b)
+          case ExprGte(a, b)           => operation(Token.GreaterThanOrEqual, a, b)
+          case ExprNeq(a, b)           => operation(Token.Inequality, a, b)
+          case ExprAdd(a, b)           => operation(Token.Addition, a, b)
+          case ExprSub(a, b)           => operation(Token.Subtraction, a, b)
+          case ExprMul(a, b)           => operation(Token.Multiplication, a, b)
+          case ExprDivide(a, b)        => operation(Token.Division, a, b)
+          case ExprMod(a, b)           => operation(Token.Remainder, a, b)
+          case ExprIdentifier(id) =>
+            Token(id)
+          case ExprAt(array, index) =>
+            Container(
+                Vector(nested(index, inPlaceholder = inString)),
+                prefix =
+                  Some(Adjacent(Vector(nested(array, inPlaceholder = inString), Token.IndexOpen))),
+                suffix = Some(Token.IndexClose)
+            )
+          case ExprIfThenElse(cond, tBranch, fBranch) =>
+            Spaced(
+                Vector(
+                    Token.If,
+                    nested(cond, inOperation = true, inPlaceholder = inString),
+                    Token.Then,
+                    nested(tBranch, inOperation = true, inPlaceholder = inString),
+                    Token.Else,
+                    nested(fBranch, inOperation = true, inPlaceholder = inString)
+                ),
+                Wrapping.AsNeeded
+            )
+          case ExprApply(funcName, elements) =>
+            Container(
+                elements.map(nested(_, inPlaceholder = inString)),
+                prefix = Some(Adjacent(Vector(Token(funcName), Token.FunctionCallOpen))),
+                suffix = Some(Token.FunctionCallClose)
+            )
+          case ExprGetName(e, id) =>
+            Adjacent(Vector(nested(e, inPlaceholder = inString), Token.Access, Token(id)))
+          case other => throw new Exception(s"Unrecognized expression $other")
+        }
+        if (inString && !inPlaceholder) {
+          Placeholder(atom, placeholderOpen)
+        } else {
+          atom
+        }
     }
   }
 
@@ -466,7 +481,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         body.get.format(lineFormatter.indented())
         lineFormatter.beginLine()
       }
-      lineFormatter.append(Token.BlockClose)
+      lineFormatter.appendChunk(Token.BlockClose)
       lineFormatter.endLine()
     }
   }
@@ -596,7 +611,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
         val bodyFormatter = lineFormatter.preformatted()
         bodyFormatter.beginLine()
         if (numParts == 1) {
-          bodyFormatter.append(
+          bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.head match {
                     case s: ValueString =>
@@ -611,7 +626,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
               )
           )
         } else if (numParts > 1) {
-          bodyFormatter.append(
+          bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.head match {
                     case ValueString(s) => ValueString(commandStartRegexp.replaceFirstIn(s, ""))
@@ -623,14 +638,14 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
           )
           if (numParts > 2) {
             command.parts.slice(1, command.parts.size - 1).foreach { chunk =>
-              bodyFormatter.append(
+              bodyFormatter.appendChunk(
                   buildExpression(chunk,
                                   placeholderOpen = Token.PlaceholderOpenTilde,
                                   inString = true)
               )
             }
           }
-          bodyFormatter.append(
+          bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.last match {
                     case ValueString(s) => ValueString(commandEndRegexp.replaceFirstIn(s, ""))
@@ -645,7 +660,7 @@ case class WDL10Formatter(verbosity: Verbosity = Verbosity.Normal,
       }
 
       lineFormatter.beginLine()
-      lineFormatter.append(Token.CommandClose)
+      lineFormatter.appendChunk(Token.CommandClose)
       lineFormatter.endLine()
     }
   }
