@@ -1,4 +1,4 @@
-# WDLkit Style
+# WDL Style
 
 Style decisions are made with the following goals in mind:
 
