@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.net.URI
 
 import wdlTools.generators.{ReadmeGenerator, SspRenderer}
-import wdlTools.syntax.walkDocuments
+import wdlTools.syntax.{WalkDocuments, walkDocuments}
 import wdlTools.util.Util
 
 class Readmes(conf: WdlToolsConf) extends Command {
@@ -12,9 +12,8 @@ class Readmes(conf: WdlToolsConf) extends Command {
     val uriLocalPath = Util.getLocalPath(uri)
     val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
     val renderer = SspRenderer()
-    val readmes = walkDocuments[String](uri, opts, conf.readmes.followImports()) {
-      (uri, doc, results) =>
-        ReadmeGenerator(uri, doc, conf.readmes.developerReadmes(), renderer, results).apply()
+    WalkDocuments[String](uri, opts, conf.readmes.followImports()) { (uri, doc, results) =>
+      ReadmeGenerator(uri, doc, conf.readmes.developerReadmes(), renderer, results).apply()
     }
     Util.writeContentsToFiles(readmes,
                               outputDir = conf.readmes.outputDir.toOption,
