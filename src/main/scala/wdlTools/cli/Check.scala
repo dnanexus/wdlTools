@@ -15,11 +15,10 @@ case class Check(conf: WdlToolsConf) extends Command {
     val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
     val checker = Checker(Stdlib(opts))
     // TODO: once imports are supported, set followImports to true or allow user to set on the command line
-    walkDocuments(uri, opts, followImports = false) { doc =>
+    walkDocuments(uri, opts, followImports = false) { (uri, doc, results) =>
       // TODO: rather than throw an exception as soon as a type error is encountered, accumulate all errors
       // and print them out at the end
       checker.apply(doc)
-      true
     }
   }
 }
