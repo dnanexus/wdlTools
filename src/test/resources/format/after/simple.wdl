@@ -8,7 +8,7 @@ task foo {
 
   String x = "${s}.txt"
   String y = "foo"
-  Int z = i + i
+  Int z = (i + i) + i
   Int a = if (i > 1) then 2 else 3
 
   command <<<

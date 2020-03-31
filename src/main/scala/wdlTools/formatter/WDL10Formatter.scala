@@ -6,9 +6,6 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.WalkDocuments
 import wdlTools.util.{Options, Util, Verbosity}
 
-import wdlTools.util.Verbosity
-import wdlTools.util.Verbosity._
-
 import scala.collection.mutable
 
 case class WDL10Formatter(opts: Options,
