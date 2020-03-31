@@ -3,7 +3,7 @@ package wdlTools.formatter
 import java.net.URI
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.walkDocuments
+import wdlTools.syntax.WalkDocuments
 import wdlTools.util.{Options, Util, Verbosity}
 
 import wdlTools.util.Verbosity
@@ -749,7 +749,7 @@ case class WDL10Formatter(opts: Options,
   }
 
   def formatDocuments(uri: URI, followImports: Boolean = true): Unit = {
-    walkDocuments(uri, opts, followImports, documents) { (uri, doc, results) =>
+    WalkDocuments(uri, opts, followImports, documents) { (uri, doc, results) =>
       results(uri) = FormatterDocument(doc).format()
     }
   }
