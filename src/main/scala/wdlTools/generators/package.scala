@@ -1,5 +1,5 @@
-package wdlTools.generator
+package wdlTools.generators
 
-trait Generator {
+trait Renderer {
   def generate(templateName: String, attrs: Map[String, Any]): String
 }
