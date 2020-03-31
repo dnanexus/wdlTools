@@ -398,7 +398,7 @@ string
     ExprMod(arg0, arg1)
   }
 
-  override def visitMul(ctx : WdlParser.MulContext): Expr = {
+  override def visitMul(ctx: WdlParser.MulContext): Expr = {
     val arg0 = visitExpr_infix4(ctx.expr_infix4())
     val arg1 = visitExpr_infix5(ctx.expr_infix5())
     ExprMul(arg0, arg1)
@@ -522,32 +522,32 @@ string
     ExprGetName(e, id)
   }
 
-/*expr_infix0
+  /*expr_infix0
 	: expr_infix0 OR expr_infix1 #lor
 	| expr_infix1 #infix1
 	; */
 
-  private def visitExpr_infix0(ctx : WdlParser.Expr_infix0Context) : Expr = {
+  private def visitExpr_infix0(ctx: WdlParser.Expr_infix0Context): Expr = {
     ctx match {
-      case lor : WdlParser.LorContext => visitLor(lor)
-      case infix1 : WdlParser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
-      case _ => visitChildren(ctx).asInstanceOf[Expr]
+      case lor: WdlParser.LorContext       => visitLor(lor)
+      case infix1: WdlParser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
-/* expr_infix1
+  /* expr_infix1
 	: expr_infix1 AND expr_infix2 #land
 	| expr_infix2 #infix2
 	; */
-  private def visitExpr_infix1(ctx : WdlParser.Expr_infix1Context) : Expr = {
+  private def visitExpr_infix1(ctx: WdlParser.Expr_infix1Context): Expr = {
     ctx match {
-      case land : WdlParser.LandContext => visitLand(land)
-      case infix2 : WdlParser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
-      case _ => visitChildren(ctx).asInstanceOf[Expr]
+      case land: WdlParser.LandContext     => visitLand(land)
+      case infix2: WdlParser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
-/* expr_infix2
+  /* expr_infix2
 	: expr_infix2 EQUALITY expr_infix3 #eqeq
 	| expr_infix2 NOTEQUAL expr_infix3 #neq
 	| expr_infix2 LTE expr_infix3 #lte
@@ -557,65 +557,65 @@ string
 	| expr_infix3 #infix3
 	; */
 
-  private def visitExpr_infix2(ctx : WdlParser.Expr_infix2Context) : Expr = {
+  private def visitExpr_infix2(ctx: WdlParser.Expr_infix2Context): Expr = {
     ctx match {
-      case eqeq : WdlParser.EqeqContext => visitEqeq(eqeq)
-      case neq : WdlParser.NeqContext => visitNeq(neq)
-      case lte : WdlParser.LteContext => visitLte(lte)
-      case gte : WdlParser.GteContext => visitGte(gte)
-      case lt : WdlParser.LtContext => visitLt(lt)
-      case gt : WdlParser.GtContext => visitGt(gt)
-      case infix3 : WdlParser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
-      case _ => visitChildren(ctx).asInstanceOf[Expr]
+      case eqeq: WdlParser.EqeqContext     => visitEqeq(eqeq)
+      case neq: WdlParser.NeqContext       => visitNeq(neq)
+      case lte: WdlParser.LteContext       => visitLte(lte)
+      case gte: WdlParser.GteContext       => visitGte(gte)
+      case lt: WdlParser.LtContext         => visitLt(lt)
+      case gt: WdlParser.GtContext         => visitGt(gt)
+      case infix3: WdlParser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
-/* expr_infix3
+  /* expr_infix3
 	: expr_infix3 PLUS expr_infix4 #add
 	| expr_infix3 MINUS expr_infix4 #sub
 	| expr_infix4 #infix4
 	; */
-  private def visitExpr_infix3(ctx : WdlParser.Expr_infix3Context) : Expr = {
+  private def visitExpr_infix3(ctx: WdlParser.Expr_infix3Context): Expr = {
     ctx match {
-      case add : WdlParser.AddContext => visitAdd(add)
-      case sub : WdlParser.SubContext => visitSub(sub)
-      case infix4 :  WdlParser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
-      case _ => visitChildren(ctx).asInstanceOf[Expr]
+      case add: WdlParser.AddContext       => visitAdd(add)
+      case sub: WdlParser.SubContext       => visitSub(sub)
+      case infix4: WdlParser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
+      case _                               => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
-/* expr_infix4
+  /* expr_infix4
 	: expr_infix4 STAR expr_infix5 #mul
 	| expr_infix4 DIVIDE expr_infix5 #divide
 	| expr_infix4 MOD expr_infix5 #mod
 	| expr_infix5 #infix5
 	;  */
-  private def visitExpr_infix4(ctx : WdlParser.Expr_infix4Context) : Expr = {
+  private def visitExpr_infix4(ctx: WdlParser.Expr_infix4Context): Expr = {
     ctx match {
-      case mul : WdlParser.MulContext => visitMul(mul)
-      case divide : WdlParser.DivideContext => visitDivide(divide)
-      case mod : WdlParser.ModContext => visitMod(mod)
-      case infix5 : WdlParser.Infix5Context => visitInfix5(infix5).asInstanceOf[Expr]
+      case mul: WdlParser.MulContext       => visitMul(mul)
+      case divide: WdlParser.DivideContext => visitDivide(divide)
+      case mod: WdlParser.ModContext       => visitMod(mod)
+      case infix5: WdlParser.Infix5Context => visitInfix5(infix5).asInstanceOf[Expr]
 //      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
-/* expr_infix5
+  /* expr_infix5
 	: expr_core
 	; */
 
-  override def visitExpr_infix5(ctx : WdlParser.Expr_infix5Context) : Expr = {
+  override def visitExpr_infix5(ctx: WdlParser.Expr_infix5Context): Expr = {
     visitExpr_core(ctx.expr_core())
   }
 
-/* expr
+  /* expr
 	: expr_infix
 	; */
-  override def visitExpr(ctx : WdlParser.ExprContext) : Expr = {
+  override def visitExpr(ctx: WdlParser.ExprContext): Expr = {
     visitChildren(ctx).asInstanceOf[Expr]
   }
 
-/* expr_core
+  /* expr_core
 	: LPAREN expr RPAREN #expression_group
 	| primitive_literal #primitives
 	| LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
@@ -630,21 +630,21 @@ string
 	| Identifier #left_name
 	| expr_core DOT Identifier #get_name
 	; */
-  private def visitExpr_core(ctx : WdlParser.Expr_coreContext) : Expr = {
+  private def visitExpr_core(ctx: WdlParser.Expr_coreContext): Expr = {
     ctx match {
-      case group : WdlParser.Expression_groupContext => visitExpression_group(group)
-      case primitives : WdlParser.PrimitivesContext => visitChildren(primitives).asInstanceOf[Expr]
-      case array_literal : WdlParser.Array_literalContext => visitArray_literal(array_literal)
-      case pair_literal : WdlParser.Pair_literalContext => visitPair_literal(pair_literal)
-      case map_literal : WdlParser.Map_literalContext => visitMap_literal(map_literal)
-      case obj_literal : WdlParser.Object_literalContext => visitObject_literal(obj_literal)
-      case negate : WdlParser.NegateContext => visitNegate(negate)
-      case unirarysigned : WdlParser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
-      case at : WdlParser.AtContext => visitAt(at)
-      case ifthenelse : WdlParser.IfthenelseContext => visitIfthenelse(ifthenelse)
-      case apply : WdlParser.ApplyContext => visitApply(apply)
-      case left_name : WdlParser.Left_nameContext => visitLeft_name(left_name)
-      case get_name : WdlParser.Get_nameContext => visitGet_name(get_name)
+      case group: WdlParser.Expression_groupContext      => visitExpression_group(group)
+      case primitives: WdlParser.PrimitivesContext       => visitChildren(primitives).asInstanceOf[Expr]
+      case array_literal: WdlParser.Array_literalContext => visitArray_literal(array_literal)
+      case pair_literal: WdlParser.Pair_literalContext   => visitPair_literal(pair_literal)
+      case map_literal: WdlParser.Map_literalContext     => visitMap_literal(map_literal)
+      case obj_literal: WdlParser.Object_literalContext  => visitObject_literal(obj_literal)
+      case negate: WdlParser.NegateContext               => visitNegate(negate)
+      case unirarysigned: WdlParser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
+      case at: WdlParser.AtContext                       => visitAt(at)
+      case ifthenelse: WdlParser.IfthenelseContext       => visitIfthenelse(ifthenelse)
+      case apply: WdlParser.ApplyContext                 => visitApply(apply)
+      case left_name: WdlParser.Left_nameContext         => visitLeft_name(left_name)
+      case get_name: WdlParser.Get_nameContext           => visitGet_name(get_name)
 //      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }

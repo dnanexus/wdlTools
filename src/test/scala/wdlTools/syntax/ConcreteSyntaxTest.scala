@@ -15,7 +15,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val path: Path = Paths.get(p)
     Files.readAllLines(path).asScala.mkString(System.lineSeparator())
   }
-  private lazy val conf = Options(antlr4Trace = false, verbosity= Quiet)
+  private lazy val conf = Options(antlr4Trace = false, verbosity = Quiet)
 
   it should "handle various types" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), conf)
@@ -324,16 +324,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     doc.workflow should not be empty
   }
 
-
   it should "correctly report an error" in {
     assertThrows[Exception] {
       val _ = ParseDocument.apply(getWdlSource("workflows", "bad_declaration.wdl"), conf)
     }
   }
 
-  it should "handle chained operations" taggedAs(Edge) in {
-    val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"),
-                                  conf)
+  it should "handle chained operations" taggedAs (Edge) in {
+    val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"), conf)
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -344,12 +342,11 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val decl = task.declarations.head
     decl.name shouldBe "j"
     decl.expr.get shouldBe ExprAdd(ExprAdd(ExprIdentifier("i"), ExprIdentifier("i")),
-                               ExprIdentifier("i"))
+                                   ExprIdentifier("i"))
   }
 
-  it should "handle chained operations in a workflow" taggedAs(Edge) in {
-    val doc = ParseDocument.apply(getWdlSource("workflows", "chained_expr.wdl"),
-                                  conf)
+  it should "handle chained operations in a workflow" taggedAs (Edge) in {
+    val doc = ParseDocument.apply(getWdlSource("workflows", "chained_expr.wdl"), conf)
     doc.elements.size shouldBe (0)
 
     doc.version shouldBe ("1.0")
@@ -359,8 +356,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.body.size shouldBe 1
     val decl = wf.body.head.asInstanceOf[Declaration]
     decl.name shouldBe "b"
-    decl.expr.get shouldBe ExprAdd(ExprAdd(ExprInt(1), ExprInt(2)),
-                                   ExprInt(3))
+    decl.expr.get shouldBe ExprAdd(ExprAdd(ExprInt(1), ExprInt(2)), ExprInt(3))
   }
 
 }
