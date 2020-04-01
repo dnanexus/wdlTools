@@ -299,20 +299,28 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case OutputSection(Vector(Declaration("num_lines", _ : TypeInt, Some(ExprInt(3, _)), _)), _) =>
     }
     task.command shouldBe a[CommandSection]
-
-    // TODO
-//    task.command.parts should contain(ExprIdentifier("inp_file"))
-//    task.command.parts should contain(ExprString("\n    wc -l "))
-    //task.command.parts should contain(ExprString("\n"))
+    task.command.parts.size shouldBe(3)
+    task.command.parts(0) should matchPattern {
+      case ExprString("\n    wc -l ", _) =>
+    }
+    task.command.parts(1) should matchPattern {
+      case ExprIdentifier("inp_file", _) =>
+    }
 
     task.meta.get shouldBe a[MetaSection]
-    task.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", ExprString("Robin Hood", _), _)) =>
+    task.meta.get.kvs.size shouldBe(1)
+    val mkv = task.meta.get.kvs.head
+    mkv should matchPattern {
+      case MetaKV("author", ExprString("Robin Hood", _), _) =>
     }
+
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
-    task.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("inp_file", ExprString("just because", _), _)) =>
+    task.parameterMeta.get.kvs.size shouldBe(1)
+    val mpkv = task.parameterMeta.get.kvs.head
+    mpkv should matchPattern {
+      case MetaKV("inp_file", ExprString("just because", _), _) =>
     }
+
     task.declarations(0) should matchPattern {
       case Declaration("i",
                        TypeInt(_),
@@ -327,7 +335,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-/*
+
   it should "handle string interpolation" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "interpolation.wdl"), conf)
 
@@ -338,17 +346,22 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val task = elem.asInstanceOf[Task]
 
     task.name shouldBe ("foo")
-    task.input shouldBe (Some(
-        InputSection(
-            Vector(Declaration("min_std_max_min", TypeInt, None),
-                   Declaration("prefix", TypeString, None))
-        )
-    ))
+    task.input.get shouldBe a[InputSection]
+    task.input.get.declarations.size shouldBe(2)
+    task.input.get.declarations(0) should matchPattern {
+      case Declaration("min_std_max_min", TypeInt(_), None, _) =>
+    }
+    task.input.get.declarations(1) should matchPattern {
+      case Declaration("prefix", TypeString(_), None, _) =>
+  }
+
     task.command shouldBe a[CommandSection]
-    task.command.parts should contain(ExprString("\n    echo "))
-    task.command.parts should contain(
-        ExprPlaceholderSep(ExprString(","), ExprIdentifier("min_std_max_min"))
-    )
+    task.command.parts(0) should matchPattern {
+      case ExprString("\n    echo ", _) =>
+    }
+    task.command.parts(1) should matchPattern {
+      case ExprPlaceholderSep(ExprString(",", _), ExprIdentifier("min_std_max_min", _), _) =>
+    }
   }
 
   it should "parse structs" in {
@@ -359,14 +372,20 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case x: TypeStruct => x
     }
     structs.size shouldBe (2)
-    structs(0) shouldBe TypeStruct(
-        "Address",
-        Map("street" -> TypeString, "city" -> TypeString, "zipcode" -> TypeInt)
-    )
-    structs(1) shouldBe TypeStruct(
-        "Data",
-        Map("history" -> TypeFile, "date" -> TypeInt, "month" -> TypeString)
-    )
+    structs(0).name shouldBe("Address")
+    structs(0).members.size shouldBe(3)
+    structs(0).members.toVector should matchPattern {
+      case Vector(("street", TypeString(_)),
+                  ("city", TypeString(_)),
+                  ("zipcode", TypeInt(_))) =>
+    }
+
+    structs(1).name shouldBe("Data")
+    structs(1).members.toVector should matchPattern {
+      case Vector(("history", TypeFile(_)),
+                  ("date", TypeInt(_)),
+                  ("month", TypeString(_))) =>
+    }
   }
 
   it should "parse a simple workflow" taggedAs (Edge) in {
@@ -384,28 +403,46 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case x: Call => x
     }
     calls.size shouldBe (1)
-    calls(0) shouldBe (Call(name = "bar",
-                            alias = Some("boz"),
-                            inputs = Map("i" -> ExprIdentifier("s"))))
+    calls(0) should matchPattern {
+      case Call("bar", Some("boz"), _, _) =>
+    }
+    calls(0).inputs.toVector should matchPattern {
+      case Vector(("i", ExprIdentifier("s", _))) =>
+    }
 
     val scatters = wf.body.collect {
       case x: Scatter => x
     }
     scatters.size shouldBe (1)
     scatters(0).identifier shouldBe ("i")
-    scatters(0).expr shouldBe (ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
-    scatters(0).body shouldBe (Vector(
-        Call(name = "add", alias = None, inputs = Map("x" -> ExprIdentifier("i")))
-    ))
+    scatters(0).expr should matchPattern {
+      case ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _) =>
+    }
+    scatters(0).body.size shouldBe(1)
+    scatters(0).body(0) should matchPattern {
+      case Call("add", None, _, _) =>
+    }
+    val call = scatters(0).body(0).asInstanceOf[Call]
+    call.inputs.toVector should matchPattern {
+      case Vector(("x", ExprIdentifier("i", _))) =>
+    }
 
     val conditionals = wf.body.collect {
       case x: Conditional => x
     }
     conditionals.size shouldBe (1)
-    conditionals(0).expr shouldBe (ExprEqeq(ExprBoolean(true), ExprBoolean(false)))
-    conditionals(0).body shouldBe (Vector(Call("sub", None, Map.empty)))
+    conditionals(0).expr should matchPattern {
+      case ExprEqeq(ExprBoolean(true, _), ExprBoolean(false, _), _) =>
+    }
+    conditionals(0).body should matchPattern {
+      case Vector(Call("sub", None, _, _)) =>
+    }
+    conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe(0)
 
-    wf.meta shouldBe (Some(MetaSection(Vector(MetaKV("author", ExprString("Robert Heinlein"))))))
+    wf.meta.get shouldBe a[MetaSection]
+    wf.meta.get.kvs should matchPattern {
+      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _)) =>
+    }
   }
 
   it should "handle import statements" in {
@@ -441,6 +478,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.expr.get should matchPattern {
       case ExprAdd(ExprAdd(ExprIdentifier("i", _), ExprIdentifier("i", _), _),
                    ExprIdentifier("i", _), _) =>
+    }
   }
 
   it should "handle chained operations in a workflow" taggedAs (Edge) in {
@@ -457,5 +495,5 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.expr.get should matchPattern {
       case ExprAdd(ExprAdd(ExprInt(1, _), ExprInt(2, _), _), ExprInt(3, _), _) =>
     }
- */
+  }
 }
