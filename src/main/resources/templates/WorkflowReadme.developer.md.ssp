@@ -1,0 +1,3 @@
+<%@ import val workflow: wdlTools.syntax.AbstractSyntax.Workflow %>
+<%@ val tasks: Map[String, String] %>
+# Workflow ${name} Developer Notes

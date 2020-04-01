@@ -1,7 +1,8 @@
 package wdlTools.util
 
+import collection.JavaConverters._
 import java.net.URI
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import com.typesafe.config.ConfigFactory
 
@@ -55,7 +56,7 @@ object Util {
 
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
-        } else if (selfOk) {
+        } else if (selfOk || !Files.exists(path)) {
           path.toAbsolutePath
         } else {
           Paths.get("").toAbsolutePath.resolve(path.getFileName)
@@ -74,6 +75,40 @@ object Util {
     val source = io.Source.fromFile(path.toString)
     try source.getLines.mkString(System.lineSeparator())
     finally source.close()
+  }
+
+  /**
+    * Write a collection of documents, which is a map of URIs to sequences of lines, to
+    * disk by converting each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeLinesToFiles(docs: Map[URI, Seq[String]],
+                        outputDir: Option[Path],
+                        overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, lines) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, lines.asJava)
+    }
+  }
+
+  /**
+    * Write a collection of documents, which is a map of URIs to contents, to disk by converting
+    * each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeContentsToFiles(docs: Map[URI, String],
+                           outputDir: Option[Path],
+                           overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, contents) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, contents.getBytes())
+    }
   }
 
   /**
