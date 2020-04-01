@@ -8,10 +8,10 @@ case class Checker(stdlib: Stdlib) {
   // An entire context
   //
   // There separate namespaces for variables, struct definitions, and callables (tasks/workflows)
-  case class Context(declarations: Map[String, Type],
-                     structs: Map[String, TypeStruct],
-                     callables: Map[String, Type] /* tasks and workflows */ ) {
-    def bind(varName: String, wdlType: Type): Context = {
+  case class Context(declarations: Map[String, WdlType],
+                     structs: Map[String, WdlTypeStruct],
+                     callables: Map[String, WdlType] /* tasks and workflows */ ) {
+    def bind(varName: String, wdlType: WdlType): Context = {
       declarations.get(varName) match {
         case None =>
           this.copy(declarations = declarations + (varName -> wdlType))

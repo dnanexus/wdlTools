@@ -1,6 +1,5 @@
 package wdlTools.typechecker
 
-import wdlTools.syntax.AbstractSyntax._
 import Base._
 import wdlTools.util.Options
 

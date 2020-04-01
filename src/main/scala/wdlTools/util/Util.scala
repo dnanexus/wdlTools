@@ -16,6 +16,26 @@ object Verbosity extends Enumeration {
 }
 import Verbosity._
 
+// a path to a file or an http location
+//
+// examples:
+//   http://google.com/A.txt
+//   https://google.com/A.txt
+//   file://A/B.txt
+//   foo.txt
+case class URL(addr: String)
+
+// source location in a WDL program. We add it to each syntax element
+// so we could do accurate error reporting.
+//
+// line: line number
+// col : column number
+// URL:  original file or web URL
+//
+case class TextSource(line : Int,
+                      col : Int,
+                      url : URL)
+
 /**
   * Common configuration options used by syntax classes.
   * @param localDirectories local directories to search for imports.
