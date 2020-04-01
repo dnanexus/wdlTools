@@ -8,15 +8,6 @@ import wdlTools.util.Verbosity._
 import scala.collection.JavaConverters._
 import scala.io.Source
 
-// a path to a file or an http location
-//
-// examples:
-//   http://google.com/A.txt
-//   https://google.com/A.txt
-//   file://A/B.txt
-//   foo.txt
-case class URL(addr: String)
-
 // Examples for URLs:
 //   http://google.com/A.txt
 //   https://google.com/A.txt
