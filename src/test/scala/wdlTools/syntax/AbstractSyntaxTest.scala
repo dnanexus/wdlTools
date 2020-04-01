@@ -1,10 +1,9 @@
 package wdlTools.syntax
 
 import AbstractSyntax._
-import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
+import java.nio.file.{Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.util.Options
+import wdlTools.util.{Options, URL}
 
 class AbstractSyntaxTest extends FlatSpec with Matchers {
 
@@ -15,10 +14,10 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
   private lazy val conf = Options(antlr4Trace = false, localDirectories = wdlSourceDirs)
 
-  private def getWdlSource(dirname: String, fname: String): String = {
+  private def getWdlSource(dirname: String, fname: String): URL = {
     val p: String = getClass.getResource(s"/syntax/${dirname}/${fname}").getPath
     val path: Path = Paths.get(p)
-    Files.readAllLines(path).asScala.mkString(System.lineSeparator())
+    URL(path.toString)
   }
 
   it should "handle import statements" in {
