@@ -1,20 +1,18 @@
 package wdlTools.format
 
-import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
+import java.nio.file.{Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 
-//import wdlTools.syntax.ConcreteSyntax._
 import wdlTools.syntax.ParseDocument
 import wdlTools.util.Options
-//import wdlTools.util.Verbosity.Quiet
+import wdlTools.util.URL
 
 class BaseTest extends FlatSpec with Matchers {
 
-  private def getWdlSource(fname: String): String = {
+  private def getWdlSource(fname: String): URL = {
     val p: String = getClass.getResource(s"/format/${fname}").getPath
     val path: Path = Paths.get(p)
-    Files.readAllLines(path).asScala.mkString(System.lineSeparator())
+    URL(path.toString)
   }
   private lazy val conf = Options(antlr4Trace = false)
 

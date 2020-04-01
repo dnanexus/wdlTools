@@ -1,84 +1,85 @@
 package wdlTools.typechecker
 
-import Base._
+import WdlTypes._
 import wdlTools.util.Options
+import wdlTools.syntax.AbstractSyntax
 
 case class Stdlib(conf: Options) {
 
-  private val stdlibV1_0: Vector[TypeStdlibFunc] = Vector(
-      TypeFunctionUnit("stdout", TypeFile),
-      TypeFunctionUnit("stderr", TypeFile),
-      TypeFunction1Arg("read_lines", TypeString, TypeArray(TypeString)),
-      TypeFunction1Arg("read_lines", TypeFile, TypeArray(TypeString)),
-      TypeFunction1Arg("read_tsv", TypeString, TypeArray(TypeArray(TypeString))),
-      TypeFunction1Arg("read_tsv", TypeFile, TypeArray(TypeArray(TypeString))),
-      TypeFunction1Arg("read_map", TypeString, TypeArray(TypeArray(TypeString))),
-      TypeFunction1Arg("read_map", TypeFile, TypeArray(TypeArray(TypeString))),
-      TypeFunction1Arg("read_object", TypeString, TypeObject),
-      TypeFunction1Arg("read_object", TypeFile, TypeObject),
-      TypeFunction1Arg("read_objects", TypeString, TypeArray(TypeObject)),
-      TypeFunction1Arg("read_objects", TypeFile, TypeArray(TypeObject)),
-      TypeFunction1Arg("read_json", TypeString, TypeUnknown),
-      TypeFunction1Arg("read_json", TypeFile, TypeUnknown),
-      TypeFunction1Arg("read_int", TypeString, TypeInt),
-      TypeFunction1Arg("read_int", TypeFile, TypeInt),
-      TypeFunction1Arg("read_string", TypeString, TypeString),
-      TypeFunction1Arg("read_string", TypeFile, TypeString),
-      TypeFunction1Arg("read_float", TypeString, TypeFloat),
-      TypeFunction1Arg("read_float", TypeFile, TypeFloat),
-      TypeFunction1Arg("read_boolean", TypeString, TypeBoolean),
-      TypeFunction1Arg("read_boolean", TypeFile, TypeBoolean),
-      TypeFunction1Arg("write_lines", TypeArray(TypeString), TypeFile),
-      TypeFunction1Arg("write_tsv", TypeArray(TypeArray(TypeString)), TypeFile),
-      TypeFunction1Arg("write_map", TypeMap(TypeString, TypeString), TypeFile),
-      TypeFunction1Arg("write_object", TypeObject, TypeFile),
-      TypeFunction1Arg("write_objects", TypeFile, TypeArray(TypeFile)),
-      TypeFunction1Arg("write_json", TypeUnknown, TypeFile),
+  private val stdlibV1_0: Vector[WT_StdlibFunc] = Vector(
+      WT_FunctionUnit("stdout", WT_File),
+      WT_FunctionUnit("stderr", WT_File),
+      WT_Function1Arg("read_lines", WT_String, WT_Array(WT_String)),
+      WT_Function1Arg("read_lines", WT_File, WT_Array(WT_String)),
+      WT_Function1Arg("read_tsv", WT_String, WT_Array(WT_Array(WT_String))),
+      WT_Function1Arg("read_tsv", WT_File, WT_Array(WT_Array(WT_String))),
+      WT_Function1Arg("read_map", WT_String, WT_Array(WT_Array(WT_String))),
+      WT_Function1Arg("read_map", WT_File, WT_Array(WT_Array(WT_String))),
+      WT_Function1Arg("read_object", WT_String, WT_Object),
+      WT_Function1Arg("read_object", WT_File, WT_Object),
+      WT_Function1Arg("read_objects", WT_String, WT_Array(WT_Object)),
+      WT_Function1Arg("read_objects", WT_File, WT_Array(WT_Object)),
+      WT_Function1Arg("read_json", WT_String, WT_Unknown),
+      WT_Function1Arg("read_json", WT_File, WT_Unknown),
+      WT_Function1Arg("read_int", WT_String, WT_Int),
+      WT_Function1Arg("read_int", WT_File, WT_Int),
+      WT_Function1Arg("read_string", WT_String, WT_String),
+      WT_Function1Arg("read_string", WT_File, WT_String),
+      WT_Function1Arg("read_float", WT_String, WT_Float),
+      WT_Function1Arg("read_float", WT_File, WT_Float),
+      WT_Function1Arg("read_boolean", WT_String, WT_Boolean),
+      WT_Function1Arg("read_boolean", WT_File, WT_Boolean),
+      WT_Function1Arg("write_lines", WT_Array(WT_String), WT_File),
+      WT_Function1Arg("write_tsv", WT_Array(WT_Array(WT_String)), WT_File),
+      WT_Function1Arg("write_map", WT_Map(WT_String, WT_String), WT_File),
+      WT_Function1Arg("write_object", WT_Object, WT_File),
+      WT_Function1Arg("write_objects", WT_File, WT_Array(WT_File)),
+      WT_Function1Arg("write_json", WT_Unknown, WT_File),
       // Size can take several kinds of arguments.
-      TypeFunction1Arg("size", TypeFile, TypeFloat),
-      TypeFunction1Arg("size", TypeOptional(TypeFile), TypeFloat),
-      TypeFunction1Arg("size", TypeArray(TypeFile), TypeFloat),
-      TypeFunction1Arg("size", TypeArray(TypeOptional(TypeFile)), TypeFloat),
+      WT_Function1Arg("size", WT_File, WT_Float),
+      WT_Function1Arg("size", WT_Optional(WT_File), WT_Float),
+      WT_Function1Arg("size", WT_Array(WT_File), WT_Float),
+      WT_Function1Arg("size", WT_Array(WT_Optional(WT_File)), WT_Float),
       // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      TypeFunction2Arg("size", TypeFile, TypeString, TypeFloat),
-      TypeFunction2Arg("size", TypeOptional(TypeFile), TypeString, TypeFloat),
-      TypeFunction2Arg("size", TypeArray(TypeFile), TypeString, TypeFloat),
-      TypeFunction2Arg("size", TypeArray(TypeOptional(TypeFile)), TypeString, TypeFloat),
-      TypeFunction3Arg("sub", TypeString, TypeString, TypeString, TypeString),
-      TypeFunction1Arg("range", TypeInt, TypeArray(TypeInt)),
+      WT_Function2Arg("size", WT_File, WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Optional(WT_File), WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Array(WT_File), WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Array(WT_Optional(WT_File)), WT_String, WT_Float),
+      WT_Function3Arg("sub", WT_String, WT_String, WT_String, WT_String),
+      WT_Function1Arg("range", WT_Int, WT_Array(WT_Int)),
       // functions that obay parametric polymorphism
-      TypeFunctionParamPoly1Arg("transpose",
-                                (x: Type) => (TypeArray(TypeArray(x)), TypeArray(TypeArray(x)))),
-      TypeFunctionParamPoly2Arg(
+      WT_FunctionParamPoly1Arg("transpose",
+                               (x: WT) => (WT_Array(WT_Array(x)), WT_Array(WT_Array(x)))),
+      WT_FunctionParamPoly2Arg(
           "zip",
-          (x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y)))
+          (x: WT, y: WT) => ((WT_Array(x), WT_Array(y)), WT_Array(WT_Pair(x, y)))
       ),
-      TypeFunctionParamPoly2Arg(
+      WT_FunctionParamPoly2Arg(
           "cross",
-          (x: Type, y: Type) => ((TypeArray(x), TypeArray(y)), TypeArray(TypePair(x, y)))
+          (x: WT, y: WT) => ((WT_Array(x), WT_Array(y)), WT_Array(WT_Pair(x, y)))
       ),
-      TypeFunctionParamPoly1Arg("length", (x: Type) => (TypeArray(x), TypeInt)),
-      TypeFunctionParamPoly1Arg("flatten", (x: Type) => (TypeArray(TypeArray(x)), TypeArray(x))),
+      WT_FunctionParamPoly1Arg("length", (x: WT) => (WT_Array(x), WT_Int)),
+      WT_FunctionParamPoly1Arg("flatten", (x: WT) => (WT_Array(WT_Array(x)), WT_Array(x))),
       // Shortcut, can we use an unknown here?
-      TypeFunction2Arg("prefix", TypeString, TypeArray(TypeUnknown), TypeString),
-      TypeFunctionParamPoly1Arg("select_first", (x: Type) => (TypeArray(x), x)),
-      TypeFunctionParamPoly1Arg("defined", (x: Type) => (TypeOptional(x), TypeBoolean)),
+      WT_Function2Arg("prefix", WT_String, WT_Array(WT_Unknown), WT_String),
+      WT_FunctionParamPoly1Arg("select_first", (x: WT) => (WT_Array(x), x)),
+      WT_FunctionParamPoly1Arg("defined", (x: WT) => (WT_Optional(x), WT_Boolean)),
       // simple functions again
-      TypeFunction1Arg("basename", TypeString, TypeString),
-      TypeFunction1Arg("floor", TypeFloat, TypeInt),
-      TypeFunction1Arg("ceil", TypeFloat, TypeInt),
-      TypeFunction1Arg("round", TypeFloat, TypeInt)
+      WT_Function1Arg("basename", WT_String, WT_String),
+      WT_Function1Arg("floor", WT_Float, WT_Int),
+      WT_Function1Arg("ceil", WT_Float, WT_Int),
+      WT_Function1Arg("round", WT_Float, WT_Int)
   )
 
   // build a mapping from a function name to all of its prototypes.
   // Some functions are overloaded, so they may have several.
-  private val funcProtoMap: Map[String, Vector[TypeStdlibFunc]] = {
-    stdlibV1_0.foldLeft(Map.empty[String, Vector[TypeStdlibFunc]]) {
-      case (accu, funcDesc: TypeStdlibFunc) =>
+  private val funcProtoMap: Map[String, Vector[WT_StdlibFunc]] = {
+    stdlibV1_0.foldLeft(Map.empty[String, Vector[WT_StdlibFunc]]) {
+      case (accu, funcDesc: WT_StdlibFunc) =>
         accu.get(funcDesc.name) match {
           case None =>
             accu + (funcDesc.name -> Vector(funcDesc))
-          case Some(protoVec: Vector[TypeStdlibFunc]) =>
+          case Some(protoVec: Vector[WT_StdlibFunc]) =>
             accu + (funcDesc.name -> (protoVec :+ funcDesc))
         }
     }
@@ -86,23 +87,23 @@ case class Stdlib(conf: Options) {
 
   // evaluate the output type of a function. This may require calculation because
   // some functions are polymorphic in their inputs.
-  private def evalOnePrototype(funcDesc: TypeStdlibFunc, inputArgs: Vector[Type]): Option[Type] = {
+  private def evalOnePrototype(funcDesc: WT_StdlibFunc, inputArgs: Vector[WT]): Option[WT] = {
     funcDesc match {
-      case TypeFunctionUnit(_, tOutput) if inputArgs.isEmpty =>
+      case WT_FunctionUnit(_, tOutput) if inputArgs.isEmpty =>
         Some(tOutput)
-      case TypeFunction1Arg(_, arg1, tOutput) if inputArgs == Vector(arg1) =>
+      case WT_Function1Arg(_, arg1, tOutput) if inputArgs == Vector(arg1) =>
         Some(tOutput)
-      case TypeFunction2Arg(_, arg1, arg2, tOutput) if inputArgs == Vector(arg1, arg2) =>
+      case WT_Function2Arg(_, arg1, arg2, tOutput) if inputArgs == Vector(arg1, arg2) =>
         Some(tOutput)
-      case TypeFunction3Arg(_, arg1, arg2, arg3, tOutput)
+      case WT_Function3Arg(_, arg1, arg2, arg3, tOutput)
           if inputArgs == Vector(arg1, arg2, arg3) =>
         Some(tOutput)
-      case TypeFunctionParamPoly1Arg(_, io) if inputArgs.size == 1 =>
+      case WT_FunctionParamPoly1Arg(_, io) if inputArgs.size == 1 =>
         val typeParam = inputArgs.head
         val (funcIn, funcOut) = io(typeParam)
         if (funcIn == inputArgs.head) Some(funcOut)
         else None
-      case TypeFunctionParamPoly2Arg(_, io) if inputArgs.size == 2 =>
+      case WT_FunctionParamPoly2Arg(_, io) if inputArgs.size == 2 =>
         val (param1, param2) = (inputArgs(0), inputArgs(1))
         val (funcIn, funcOut) = io(param1, param2)
         if (funcIn == (inputArgs(0), inputArgs(1))) Some(funcOut)
@@ -112,27 +113,29 @@ case class Stdlib(conf: Options) {
     }
   }
 
-  def apply(funcName: String, inputArgs: Vector[Type]): Type = {
+  def apply(funcName: String,
+            inputArgs: Vector[WT],
+            expr : AbstractSyntax.Expr): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
-        throw new Exception(s"No function named ${funcName} in the standard library")
+        throw new TypeException(s"No function named ${funcName} in the standard library", expr.text)
       case Some(protoVec) =>
         protoVec
     }
 
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
-    val allCandidatePrototypes: Vector[Option[Type]] = candidates.map {
+    val allCandidatePrototypes: Vector[Option[WT]] = candidates.map {
       evalOnePrototype(_, inputArgs)
     }
-    val result: Vector[Type] = allCandidatePrototypes.flatten
+    val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        throw new Exception(s"Call to ${funcName} is badly typed")
+        throw new TypeException(s"Call to ${funcName} is badly typed", expr.text)
       case 1 =>
         result.head
       case _ =>
-        throw new Exception(s"Sanity, call to ${funcName} matches at least two prototypes")
+        throw new TypeException(s"Sanity, call to ${funcName} matches at least two prototypes", expr.text)
     }
   }
 }
