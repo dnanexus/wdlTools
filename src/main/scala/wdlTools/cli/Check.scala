@@ -12,7 +12,7 @@ case class Check(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val uri = new URI(conf.check.uri())
     val uriLocalPath = Util.getLocalPath(uri)
-    val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
+    val opts = conf.check.getSyntaxOptions(Set(uriLocalPath.getParent))
     val checker = Checker(Stdlib(opts))
     // TODO: once imports are supported, set followImports to true or allow user to set on the command line
     WalkDocuments[Boolean](uri, opts, followImports = false).apply { (_, doc, _) =>

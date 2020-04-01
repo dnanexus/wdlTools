@@ -12,10 +12,10 @@ case class ReadmeGenerator(uri: URI,
                            renderer: Renderer = SspRenderer(),
                            readmes: mutable.Map[URI, String] = mutable.HashMap.empty) {
 
-  val WORKFLOW_README_TEMPLATE = "/templates/WorkflowReadme.md.ssp"
-  val TASK_README_TEMPLATE = "/templates/TaskReadme.md.ssp"
-  val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/WorkflowReadme.developer.md.ssp"
-  val TASK_README_DEVELOPER_TEMPLATE = "/templates/TaskReadme.developer.md.ssp"
+  val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
+  val TASK_README_TEMPLATE = "/templates/readme/TaskReadme.md.ssp"
+  val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/readme/WorkflowReadme.developer.md.ssp"
+  val TASK_README_DEVELOPER_TEMPLATE = "/templates/readme/TaskReadme.developer.md.ssp"
 
   val parts: Seq[String] = uri.getPath.split("/")
   require(parts.last.endsWith(".wdl"))

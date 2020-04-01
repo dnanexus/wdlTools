@@ -12,7 +12,7 @@ case class Readmes(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val uri = new URI(conf.readmes.uri())
     val uriLocalPath = Util.getLocalPath(uri)
-    val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
+    val opts = conf.readmes.getSyntaxOptions(Set(uriLocalPath.getParent))
     val renderer = SspRenderer()
     val readmes = WalkDocuments[String](uri, opts, conf.readmes.followImports()).apply {
       (uri, doc, results) =>
