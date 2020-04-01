@@ -74,6 +74,35 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(format)
 
+  val readmes = new Subcommand("readmes") {
+    banner("""Usage: wdlTools readmes [OPTIONS] <path|uri>
+             |Generate README file stubs for tasks and workflows.
+             |
+             |Options:
+             |""".stripMargin)
+    val developerReadmes: ScallopOption[Boolean] = toggle(
+        descrYes = "also generate developer READMEs",
+        default = Some(false)
+    )
+    val followImports: ScallopOption[Boolean] = toggle(
+        descrYes = "format imported files in addition to the main file",
+        descrNo = "only format the main file",
+        default = Some(true)
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+    validateOpt(outputDir, overwrite) {
+      case (None, Some(false) | None) =>
+        Left("--outputDir is required unless --overwrite is specified")
+      case _ => Right(Unit)
+    }
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or URI (file:// or http(s)://) to the main WDL file")
+  }
+  addSubcommand(readmes)
+
   val printAST = new Subcommand("printAST") {
     banner("""Usage: wdlTools printAST [OPTIONS] <path|uri>
              |Print the Abstract Syntax Tree for a WDL file.

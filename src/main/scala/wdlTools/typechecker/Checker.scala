@@ -70,7 +70,7 @@ case class Checker(stdlib: Stdlib) {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
-      if (!both.isEmpty)
+      if (both.nonEmpty)
         throw new TypeException(s"Variables ${both} are being redeclared", srcText)
       this.copy(declarations = declarations ++ bindings)
     }
@@ -525,7 +525,7 @@ case class Checker(stdlib: Stdlib) {
 
     // check that all the compulsory arguments are provided
     calleeInputs.foreach {
-      case (argName, (wdlType, false)) =>
+      case (argName, (_, false)) =>
         callerInputs.get(argName) match {
           case None =>
             throw new TypeException(
@@ -694,7 +694,7 @@ case class Checker(stdlib: Stdlib) {
         val tt = applyTask(task, accu)
         accu.bind(tt, task.text)
 
-      case (accu, importDoc: ImportDoc) =>
+      case (_, _: ImportDoc) =>
         throw new Exception("imports not implemented yet")
 
       case (accu: Context, struct: TypeStruct) =>
@@ -702,7 +702,7 @@ case class Checker(stdlib: Stdlib) {
         accu.bind(typeTranslate(struct).asInstanceOf[WT_Struct], struct.text)
 
       case (_, other) =>
-        throw new Exception("sanity: wrong element type in workflow")
+        throw new Exception(s"sanity: wrong element type in workflow $other")
     }
 
     // now that we have types for everything else, we can check the workflow

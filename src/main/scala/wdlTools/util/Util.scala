@@ -1,7 +1,8 @@
 package wdlTools.util
 
+import collection.JavaConverters._
 import java.net.URI
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import com.typesafe.config.ConfigFactory
 
@@ -42,7 +43,7 @@ case class TextSource(line : Int,
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Seq[Path] = Seq.empty,
+case class Options(localDirectories: Seq[Path] = Vector.empty,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false)
 
@@ -75,7 +76,7 @@ object Util {
 
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
-        } else if (selfOk) {
+        } else if (selfOk || !Files.exists(path)) {
           path.toAbsolutePath
         } else {
           Paths.get("").toAbsolutePath.resolve(path.getFileName)
@@ -97,7 +98,41 @@ object Util {
   }
 
   /**
-    * Pretty prints a Scala value similar to its source represention.
+    * Write a collection of documents, which is a map of URIs to sequences of lines, to
+    * disk by converting each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeLinesToFiles(docs: Map[URI, Seq[String]],
+                        outputDir: Option[Path],
+                        overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, lines) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, lines.asJava)
+    }
+  }
+
+  /**
+    * Write a collection of documents, which is a map of URIs to contents, to disk by converting
+    * each URI to a local path.
+    * @param docs the documents to write
+    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeContentsToFiles(docs: Map[URI, String],
+                           outputDir: Option[Path],
+                           overwrite: Boolean = false): Unit = {
+    docs.foreach {
+      case (uri, contents) =>
+        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+        Files.write(outputPath, contents.getBytes())
+    }
+  }
+
+  /**
+    * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
     * @param a - The value to pretty print.
@@ -106,14 +141,14 @@ object Util {
     * @param depth - Initial depth to pretty print indents.
     * @return
     */
-  def prettyPrint(a: Any,
-                  indentSize: Int = 2,
-                  maxElementWidth: Int = 30,
-                  depth: Int = 0): String = {
+  def prettyFormat(a: Any,
+                   indentSize: Int = 2,
+                   maxElementWidth: Int = 30,
+                   depth: Int = 0): String = {
     val indent = " " * depth * indentSize
     val fieldIndent = indent + (" " * indentSize)
-    val thisDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth)
-    val nextDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth + 1)
+    val thisDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth)
+    val nextDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth + 1)
     a match {
       // Make Strings look similar to their literal form.
       case s: String =>
