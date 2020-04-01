@@ -13,8 +13,8 @@ case class WalkDocuments[T](rootURI: URI,
                             results: mutable.Map[URI, T] = mutable.HashMap.empty[URI, T]) {
   def extractDependencies(document: AbstractSyntax.Document): Map[URI, Document] = {
     document.elements.flatMap {
-      case ImportDoc(_, _, url, doc) => Some(new URI(url.addr) -> doc)
-      case _                         => None
+      case ImportDoc(_, _, url, doc, _) => Some(new URI(url.addr) -> doc)
+      case _                            => None
     }.toMap
   }
 
@@ -32,9 +32,9 @@ case class WalkDocuments[T](rootURI: URI,
   }
 
   def apply(visit: (URI, Document, mutable.Map[URI, T]) => Unit): Map[URI, T] = {
-    val sourceCode = FetchURL.readFromUri(rootURI, opts)
+    val sourceCodeUrl = FetchURL.fromUri(rootURI, opts)
     val parser = ParseAll(opts)
-    val document = parser.apply(sourceCode)
+    val document = parser.apply(sourceCodeUrl)
     addDocument(rootURI, document, visit)
     results.toMap
   }

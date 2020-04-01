@@ -95,8 +95,7 @@ case class Stdlib(conf: Options) {
         Some(tOutput)
       case WT_Function2Arg(_, arg1, arg2, tOutput) if inputArgs == Vector(arg1, arg2) =>
         Some(tOutput)
-      case WT_Function3Arg(_, arg1, arg2, arg3, tOutput)
-          if inputArgs == Vector(arg1, arg2, arg3) =>
+      case WT_Function3Arg(_, arg1, arg2, arg3, tOutput) if inputArgs == Vector(arg1, arg2, arg3) =>
         Some(tOutput)
       case WT_FunctionParamPoly1Arg(_, io) if inputArgs.size == 1 =>
         val typeParam = inputArgs.head
@@ -113,9 +112,7 @@ case class Stdlib(conf: Options) {
     }
   }
 
-  def apply(funcName: String,
-            inputArgs: Vector[WT],
-            expr : AbstractSyntax.Expr): WT = {
+  def apply(funcName: String, inputArgs: Vector[WT], expr: AbstractSyntax.Expr): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library", expr.text)
@@ -135,7 +132,8 @@ case class Stdlib(conf: Options) {
       case 1 =>
         result.head
       case _ =>
-        throw new TypeException(s"Sanity, call to ${funcName} matches at least two prototypes", expr.text)
+        throw new TypeException(s"Sanity, call to ${funcName} matches at least two prototypes",
+                                expr.text)
     }
   }
 }

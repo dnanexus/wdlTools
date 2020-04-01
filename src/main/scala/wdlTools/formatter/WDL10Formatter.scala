@@ -122,6 +122,17 @@ case class WDL10Formatter(opts: Options,
       }
     }
 
+    private def isPrimitiveType(wdlType: Type): Boolean = {
+      wdlType match {
+        case _: TypeString  => true
+        case _: TypeBoolean => true
+        case _: TypeInt     => true
+        case _: TypeFloat   => true
+        case _: TypeFile    => true
+        case _              => false
+      }
+    }
+
     def fromWdlType(wdlType: Type, quantifier: Option[Token] = None): Atom = {
       wdlType match {
         case TypeOptional(inner) => fromWdlType(inner, quantifier = Some(Token.Optional))
@@ -137,13 +148,13 @@ case class WDL10Formatter(opts: Options,
           buildDataType(Token.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
         case TypePair(left, right) =>
           buildDataType(Token.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case TypeStruct(name, _) => Token(name)
-        case TypeObject          => Token.ObjectType
-        case TypeString          => Token.StringType
-        case TypeBoolean         => Token.BooleanType
-        case TypeInt             => Token.IntType
-        case TypeFloat           => Token.FloatType
-        case other               => throw new Exception(s"Unrecognized type $other")
+        case TypeStruct(name, _, _) => Token(name)
+        case TypeObject(_)          => Token.ObjectType
+        case TypeString(_)          => Token.StringType
+        case TypeBoolean(_)         => Token.BooleanType
+        case TypeInt(_)             => Token.IntType
+        case TypeFloat(_)           => Token.FloatType
+        case other                  => throw new Exception(s"Unrecognized type $other")
       }
     }
   }
@@ -616,8 +627,8 @@ case class WDL10Formatter(opts: Options,
                   command.parts.head match {
                     case s: ValueString =>
                       s.value match {
-                        case commandSingletonRegexp(body) => ValueString(body)
-                        case _                            => s
+                        case commandSingletonRegexp(body, _) => ValueString(body, s.text)
+                        case _                               => s
                       }
                     case other => other
                   },
@@ -629,8 +640,9 @@ case class WDL10Formatter(opts: Options,
           bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.head match {
-                    case ValueString(s) => ValueString(commandStartRegexp.replaceFirstIn(s, ""))
-                    case other          => other
+                    case ValueString(s, text) =>
+                      ValueString(commandStartRegexp.replaceFirstIn(s, ""), text)
+                    case other => other
                   },
                   placeholderOpen = Token.PlaceholderOpenTilde,
                   inString = true
@@ -648,8 +660,9 @@ case class WDL10Formatter(opts: Options,
           bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.last match {
-                    case ValueString(s) => ValueString(commandEndRegexp.replaceFirstIn(s, ""))
-                    case other          => other
+                    case ValueString(s, text) =>
+                      ValueString(commandEndRegexp.replaceFirstIn(s, ""), text)
+                    case other => other
                   },
                   placeholderOpen = Token.PlaceholderOpenTilde,
                   inString = true

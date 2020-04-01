@@ -98,14 +98,16 @@ case class ParseAll(conf: Options) {
         AbstractSyntax.ExprLand(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprEqeq(a, b, srcText) =>
         AbstractSyntax.ExprEqeq(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprLt(a, b, srcText) => AbstractSyntax.ExprLt(translateExpr(a), translateExpr(b), srcText)
+      case ConcreteSyntax.ExprLt(a, b, srcText) =>
+        AbstractSyntax.ExprLt(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprGte(a, b, srcText) =>
         AbstractSyntax.ExprGte(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprNeq(a, b, srcText) =>
         AbstractSyntax.ExprNeq(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprLte(a, b, srcText) =>
         AbstractSyntax.ExprLte(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprGt(a, b, srcText) => AbstractSyntax.ExprGt(translateExpr(a), translateExpr(b), srcText)
+      case ConcreteSyntax.ExprGt(a, b, srcText) =>
+        AbstractSyntax.ExprGt(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprAdd(a, b, srcText) =>
         AbstractSyntax.ExprAdd(translateExpr(a), translateExpr(b), srcText)
       case ConcreteSyntax.ExprSub(a, b, srcText) =>
@@ -124,7 +126,8 @@ case class ParseAll(conf: Options) {
       case ConcreteSyntax.ExprIfThenElse(cond, tBranch, fBranch, srcText) =>
         AbstractSyntax.ExprIfThenElse(translateExpr(cond),
                                       translateExpr(tBranch),
-                                      translateExpr(fBranch), srcText)
+                                      translateExpr(fBranch),
+                                      srcText)
       case ConcreteSyntax.ExprApply(funcName, elements, srcText) =>
         AbstractSyntax.ExprApply(funcName, elements.map(translateExpr), srcText)
       case ConcreteSyntax.ExprGetName(e, id, srcText) =>
@@ -178,7 +181,8 @@ case class ParseAll(conf: Options) {
       runtime: ConcreteSyntax.RuntimeSection
   ): AbstractSyntax.RuntimeSection = {
     AbstractSyntax.RuntimeSection(runtime.kvs.map {
-      case ConcreteSyntax.RuntimeKV(id, expr, text) => AbstractSyntax.RuntimeKV(id, translateExpr(expr), text)
+      case ConcreteSyntax.RuntimeKV(id, expr, text) =>
+        AbstractSyntax.RuntimeKV(id, translateExpr(expr), text)
     }, runtime.text)
   }
 
@@ -201,9 +205,7 @@ case class ParseAll(conf: Options) {
                                text)
 
       case ConcreteSyntax.Conditional(expr, body, text) =>
-        AbstractSyntax.Conditional(translateExpr(expr),
-                                   body.map(translateWorkflowElement),
-                                   text)
+        AbstractSyntax.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text)
     }
   }
 
