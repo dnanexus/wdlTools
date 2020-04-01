@@ -29,26 +29,22 @@ object WdlTypes {
   case class WT_Optional(t: WT) extends WT
 
   // a user defined structure
-  case class WT_Struct(name: String,
-                        members: Map[String, WT]) extends WT
+  case class WT_Struct(name: String, members: Map[String, WT]) extends WT
 
   // The type of a task.
   //
   // It takes typed-inputs and returns typed-outputs. The boolean flag denotes
   // if input is optional
-  case class WT_Task(name: String,
-                      input: Map[String, (WT, Boolean)],
-                      output: Map[String, WT]) extends WT
+  case class WT_Task(name: String, input: Map[String, (WT, Boolean)], output: Map[String, WT])
+      extends WT
 
   // The type of a workflow.
   // It takes typed-inputs and returns typed-outputs.
-  case class WT_Workflow(name: String,
-                          input: Map[String, (WT, Boolean)],
-                          output: Map[String, WT]) extends WT
+  case class WT_Workflow(name: String, input: Map[String, (WT, Boolean)], output: Map[String, WT])
+      extends WT
 
   // The type of a call to a task or a workflow.
-  case class WT_Call(name: String,
-                      output: Map[String, WT]) extends WT
+  case class WT_Call(name: String, output: Map[String, WT]) extends WT
 
   // A standard library function implemented by the engine.
   sealed trait WT_StdlibFunc extends WT {
@@ -65,8 +61,7 @@ object WdlTypes {
 
   // A function with two arguments. For example:
   // Float size(File, [String])
-  case class WT_Function2Arg(name: String, arg1: WT, arg2: WT, output: WT)
-      extends WT_StdlibFunc
+  case class WT_Function2Arg(name: String, arg1: WT, arg2: WT, output: WT) extends WT_StdlibFunc
 
   // A function with three arguments. For example:
   // String sub(String, String, String)
@@ -77,8 +72,7 @@ object WdlTypes {
   //
   // Array[Array[X]] transpose(Array[Array[X]])
   //
-  case class WT_FunctionParamPoly1Arg(name: String, io: WT => (WT, WT))
-      extends WT_StdlibFunc
+  case class WT_FunctionParamPoly1Arg(name: String, io: WT => (WT, WT)) extends WT_StdlibFunc
 
   // A function that obays parametric polymorphism with two inputs.
   //
@@ -100,15 +94,15 @@ object WdlTypes {
   def isCoercibleTo(left: WT, right: WT): Boolean = {
     (left, right) match {
       case (WT_String, WT_String | WT_File | WT_Boolean | WT_Int | WT_Float) => true
-      case (WT_File, WT_String | WT_File)                                       => true
-      case (WT_Boolean, WT_Boolean)                                              => true
-      case (WT_Int, WT_Int)                                                      => true
-      case (WT_Float, WT_Int | WT_Float)                                        => true
+      case (WT_File, WT_String | WT_File)                                    => true
+      case (WT_Boolean, WT_Boolean)                                          => true
+      case (WT_Int, WT_Int)                                                  => true
+      case (WT_Float, WT_Int | WT_Float)                                     => true
 
       case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo(l, r)
-      case (WT_Optional(l), r)               => isCoercibleTo(l, r)
+      case (WT_Optional(l), r)              => isCoercibleTo(l, r)
 
-      case (WT_Array(l), WT_Array(r))   => isCoercibleTo(l, r)
+      case (WT_Array(l), WT_Array(r))         => isCoercibleTo(l, r)
       case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
       case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
 

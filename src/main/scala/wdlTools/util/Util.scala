@@ -33,9 +33,7 @@ case class URL(addr: String)
 // col : column number
 // URL:  original file or web URL
 //
-case class TextSource(line : Int,
-                      col : Int,
-                      url : URL)
+case class TextSource(line: Int, col: Int, url: URL)
 
 /**
   * Common configuration options used by syntax classes.

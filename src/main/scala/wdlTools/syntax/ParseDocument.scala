@@ -62,21 +62,16 @@ case class ParseDocument(docSourceURL: URL, conf: Options) extends WdlParserBase
     new RuntimeException(s"${msg}  in line ${line} col ${col}")
   }
 
-  private def getSourceText(ctx : ParserRuleContext) : TextSource = {
+  private def getSourceText(ctx: ParserRuleContext): TextSource = {
     val tok = ctx.start
     val line = tok.getLine
     val col = tok.getCharPositionInLine
-    TextSource(line = line,
-               col = col,
-               url = docSourceURL)
+    TextSource(line = line, col = col, url = docSourceURL)
   }
-  private def getSourceText(symbol : TerminalNode) : TextSource = {
+  private def getSourceText(symbol: TerminalNode): TextSource = {
     val tok = symbol.getSymbol()
-    TextSource(line = tok.getLine,
-               col = tok.getCharPositionInLine,
-               url = docSourceURL)
+    TextSource(line = tok.getLine, col = tok.getCharPositionInLine, url = docSourceURL)
   }
-
 
   /*
 struct
@@ -259,7 +254,7 @@ wdl_type
           return ExprPlaceholderEqual(x, y, expr, source)
         case (ExprPlaceholderPartEqual(false, x, _), ExprPlaceholderPartEqual(true, y, _)) =>
           return ExprPlaceholderEqual(y, x, expr, source)
-        case (_ : ExprPlaceholderPartEqual, _ : ExprPlaceholderPartEqual) =>
+        case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
           throw makeWdlException("invalid boolean place holder", ctx)
         case (_, _) =>
           throw makeWdlException("invalid place holder", ctx)
@@ -842,7 +837,7 @@ task_input
     val cleanedParts = allParts.flatMap {
       case ExprString(x, _) if x.isEmpty => Vector.empty
       case ExprCompoundString(v, _)      => v
-      case other                      => Vector(other)
+      case other                         => Vector(other)
     }
 
     // TODO: do the above until reaching a fixed point
@@ -852,7 +847,7 @@ task_input
 
   // A that should appear zero or once. Make sure this is the case.
   private def atMostOneSection[T](sections: Vector[T],
-                                  sectionName : String,
+                                  sectionName: String,
                                   ctx: ParserRuleContext): Option[T] = {
     sections.size match {
       case 0 => None
@@ -867,8 +862,8 @@ task_input
 
   // A section that must appear exactly once
   private def exactlyOneSection[T](sections: Vector[T],
-                                   sectionName : String,
-                                   ctx: ParserRuleContext) : T = {
+                                   sectionName: String,
+                                   ctx: ParserRuleContext): T = {
     sections.size match {
       case 1 => sections.head
       case n =>

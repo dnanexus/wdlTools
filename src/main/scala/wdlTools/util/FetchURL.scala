@@ -80,4 +80,12 @@ object FetchURL {
         FetchURL(conf).apply(URL(uri.toString))
     }
   }
+
+  def fromUri(uri: URI, conf: Options): URL = {
+    val uriLocalPath = Util.getLocalPath(uri)
+    uri.getScheme match {
+      case null | "" | "file" => URL(uriLocalPath.toString)
+      case _                  => URL(uri.toString)
+    }
+  }
 }

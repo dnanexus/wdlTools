@@ -10,16 +10,13 @@ case class Checker(stdlib: Stdlib) {
   // the body of a scatter.
   type Bindings = Map[String, WT]
 
-
   // An entire context
   //
   // There separate namespaces for variables, struct definitions, and callables (tasks/workflows)
   case class Context(declarations: Map[String, WT],
                      structs: Map[String, WT_Struct],
                      callables: Map[String, WT] /* tasks and workflows */ ) {
-    def bind(varName: String,
-             wdlType: WT,
-             srcText : TextSource): Context = {
+    def bind(varName: String, wdlType: WT, srcText: TextSource): Context = {
       declarations.get(varName) match {
         case None =>
           this.copy(declarations = declarations + (varName -> wdlType))
@@ -28,7 +25,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-/*    def bind(decl: Declaration): Context = {
+    /*    def bind(decl: Declaration): Context = {
       declarations.get(decl.name) match {
         case None =>
           this.copy(declarations = declarations + (decl.name -> decl.wdlType))
@@ -39,7 +36,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }*/
 
-    def bind(s: WT_Struct, srcText : TextSource): Context = {
+    def bind(s: WT_Struct, srcText: TextSource): Context = {
       structs.get(s.name) match {
         case None =>
           this.copy(structs = structs + (s.name -> s))
@@ -48,7 +45,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(taskSig: WT_Task, srcText : TextSource): Context = {
+    def bind(taskSig: WT_Task, srcText: TextSource): Context = {
       callables.get(taskSig.name) match {
         case None =>
           this.copy(callables = callables + (taskSig.name -> taskSig))
@@ -57,7 +54,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(wfSig: WT_Workflow, srcText : TextSource): Context = {
+    def bind(wfSig: WT_Workflow, srcText: TextSource): Context = {
       callables.get(wfSig.name) match {
         case None =>
           this.copy(callables = callables + (wfSig.name -> wfSig))
@@ -66,7 +63,7 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(bindings: Bindings, srcText : TextSource): Context = {
+    def bind(bindings: Bindings, srcText: TextSource): Context = {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
@@ -78,13 +75,12 @@ case class Checker(stdlib: Stdlib) {
 
   private val contextEmpty = Context(Map.empty, Map.empty, Map.empty)
 
-
   private def typeEvalMathOp(expr: Expr, ctx: Context): WT = {
     val t = typeEval(expr, ctx)
     t match {
-      case _ : TypeInt   => WT_Int
-      case _ : TypeFloat => WT_Float
-      case _         => throw new TypeException(s"${expr} must be an integer or a float", expr.text)
+      case _: TypeInt   => WT_Int
+      case _: TypeFloat => WT_Float
+      case _            => throw new TypeException(s"${expr} must be an integer or a float", expr.text)
     }
   }
 
@@ -123,7 +119,7 @@ case class Checker(stdlib: Stdlib) {
       case (WT_Float, WT_Int)   => WT_Float
       case (WT_Int, WT_Float)   => WT_Float
       case (WT_Float, WT_Float) => WT_Float
-      case (_, _)                 =>
+      case (_, _) =>
         throw new TypeException(s"Expressions ${a} and ${b} must be integers or floats", a.text)
     }
   }
@@ -142,7 +138,7 @@ case class Checker(stdlib: Stdlib) {
     val bt = typeEval(b, ctx)
     (at, bt) match {
       case (WT_Boolean, WT_Boolean) => WT_Boolean
-      case (_, _)                     =>
+      case (_, _) =>
         throw new TypeException(s"${a} and ${b} must have boolean type", a.text)
     }
   }
@@ -167,20 +163,19 @@ case class Checker(stdlib: Stdlib) {
 
   private def typeTranslate(t: Type): WT = {
     t match {
-      case TypeOptional(t, _) => WT_Optional(typeTranslate(t))
-      case TypeArray(t, _, _) => WT_Array(typeTranslate(t))
-      case TypeMap(k, v, _) => WT_Map(typeTranslate(k), typeTranslate(v))
-      case TypePair(l, r, _) => WT_Pair(typeTranslate(l), typeTranslate(r))
-      case _ : TypeString => WT_String
-      case _ : TypeFile => WT_File
-      case _ : TypeBoolean => WT_Boolean
-      case _ : TypeInt => WT_Int
-      case _ : TypeFloat => WT_Float
+      case TypeOptional(t, _)    => WT_Optional(typeTranslate(t))
+      case TypeArray(t, _, _)    => WT_Array(typeTranslate(t))
+      case TypeMap(k, v, _)      => WT_Map(typeTranslate(k), typeTranslate(v))
+      case TypePair(l, r, _)     => WT_Pair(typeTranslate(l), typeTranslate(r))
+      case _: TypeString         => WT_String
+      case _: TypeFile           => WT_File
+      case _: TypeBoolean        => WT_Boolean
+      case _: TypeInt            => WT_Int
+      case _: TypeFloat          => WT_Float
       case TypeIdentifier(id, _) => WT_Identifier(id)
-      case _ : TypeObject => WT_Object
+      case _: TypeObject         => WT_Object
       case TypeStruct(name, members, _) =>
-        WT_Struct(name,
-                  members.map{ case (name, t2) => name -> typeTranslate(t2) })
+        WT_Struct(name, members.map { case (name, t2) => name -> typeTranslate(t2) })
     }
   }
 
@@ -249,11 +244,15 @@ case class Checker(stdlib: Stdlib) {
         val tType = typeEval(t, ctx)
         val fType = typeEval(f, ctx)
         if (fType != tType)
-          throw new TypeException(s"subexpressions ${t} and ${f} in ${expr} must have the same type", expr.text)
+          throw new TypeException(
+              s"subexpressions ${t} and ${f} in ${expr} must have the same type",
+              expr.text
+          )
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
-              s"${value} in ${expr} should have boolean type, it has type ${tv} instead", expr.text
+              s"${value} in ${expr} should have boolean type, it has type ${tv} instead",
+              expr.text
           )
         tType
 
@@ -265,9 +264,12 @@ case class Checker(stdlib: Stdlib) {
         vt match {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
-            throw new TypeException(s"""|Subxpression ${value} in ${expr} must have type optional(${dt})
-                                        |it has type ${vt} instead""".stripMargin.replaceAll("\n", " "),
-                                    expr.text)
+            throw new TypeException(
+                s"""|Subxpression ${value} in ${expr} must have type optional(${dt})
+                    |it has type ${vt} instead""".stripMargin
+                  .replaceAll("\n", " "),
+                expr.text
+            )
         }
 
       // An expression like:
@@ -282,7 +284,8 @@ case class Checker(stdlib: Stdlib) {
             WT_String
           case other =>
             throw new TypeException(
-                s"expression ${value} should be of type Array[String], but it is ${other}", expr.text
+                s"expression ${value} should be of type Array[String], but it is ${other}",
+                expr.text
             )
         }
 
@@ -320,8 +323,9 @@ case class Checker(stdlib: Stdlib) {
         val arrayt = typeEval(array, ctx)
         arrayt match {
           case WT_Array(elemType) => elemType
-          case _                      =>
-            throw new TypeException(s"subexpression ${array} in (${expr}) must be an array", expr.text)
+          case _ =>
+            throw new TypeException(s"subexpression ${array} in (${expr}) must be an array",
+                                    expr.text)
         }
 
       // conditional:
@@ -334,7 +338,8 @@ case class Checker(stdlib: Stdlib) {
         val fBranchT = typeEval(fBranch, ctx)
         if (tBranchT != fBranchT)
           throw new TypeException(
-              s"The branches of conditional (${expr}) expression must the same type", expr.text
+              s"The branches of conditional (${expr}) expression must the same type",
+              expr.text
           )
         tBranchT
 
@@ -353,7 +358,8 @@ case class Checker(stdlib: Stdlib) {
             members.get(id) match {
               case None =>
                 throw new TypeException(
-                    s"Struct ${name} does not have member ${id} in expression ${expr}", expr.text
+                    s"Struct ${name} does not have member ${id} in expression ${expr}",
+                    expr.text
                 )
               case Some(t) =>
                 t
@@ -362,7 +368,8 @@ case class Checker(stdlib: Stdlib) {
             members.get(id) match {
               case None =>
                 throw new TypeException(
-                    s"Call object ${name} does not have member ${id} in expression ${expr}", expr.text
+                    s"Call object ${name} does not have member ${id} in expression ${expr}",
+                    expr.text
                 )
               case Some(t) =>
                 t
@@ -474,8 +481,9 @@ case class Checker(stdlib: Stdlib) {
       val t = typeEval(expr, ctxDecl)
       if (!isCoercibleTo(WT_String, t))
         throw new TypeException(
-          s"Expression ${expr} in the command section is coercible to a string",
-          expr.text)
+            s"Expression ${expr} in the command section is coercible to a string",
+            expr.text
+        )
     }
 
     // check the output section. We don't need the returned context.
@@ -512,13 +520,14 @@ case class Checker(stdlib: Stdlib) {
         calleeInputs.get(argName) match {
           case None =>
             throw new TypeException(
-              s"call ${call} has argument ${argName} that does not exist in the callee", call.text
+                s"call ${call} has argument ${argName} that does not exist in the callee",
+                call.text
             )
           case Some((calleeType, _)) =>
             if (!isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
-                s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
-                call.text
+                  s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
+                  call.text
               )
         }
     }
@@ -529,7 +538,8 @@ case class Checker(stdlib: Stdlib) {
         callerInputs.get(argName) match {
           case None =>
             throw new TypeException(
-                s"compulsory argument ${argName} to task/workflow ${call.name} is missing", call.text
+                s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
+                call.text
             )
           case Some(_) => ()
         }
