@@ -15,6 +15,6 @@ case class PrintAST(conf: WdlToolsConf) extends Command {
     val sourceUrl = URL("file://" + uriLocalPath.toString)
     val parser = ParseAll(opts)
     val document = parser.apply(sourceUrl)
-    println(Util.prettyPrint(document))
+    println(Util.prettyFormat(document))
   }
 }
