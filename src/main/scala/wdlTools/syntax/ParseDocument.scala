@@ -69,7 +69,7 @@ case class ParseDocument(docSourceURL: URL, conf: Options) extends WdlParserBase
     TextSource(line = line, col = col, url = docSourceURL)
   }
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    val tok = symbol.getSymbol()
+    val tok = symbol.getSymbol
     TextSource(line = tok.getLine, col = tok.getCharPositionInLine, url = docSourceURL)
   }
 
