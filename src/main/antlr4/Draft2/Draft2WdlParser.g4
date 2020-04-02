@@ -1,7 +1,7 @@
-parser grammar Draft2WdlParser;
+parser grammar WdlParser;
 
 
-options { tokenVocab=Draft2WdlLexer; }
+options { tokenVocab=WdlLexer; }
 
 
 map_type
@@ -20,7 +20,7 @@ type_base
 	: array_type
 	| map_type
 	| pair_type
-	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT)
+	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT | Identifier)
 	;
 
 wdl_type
@@ -138,6 +138,10 @@ expr_core
 	| expr_core DOT Identifier #get_name
 	;
 
+version
+	: VERSION RELEASE_VERSION
+	;
+
 import_alias
 	: ALIAS Identifier AS Identifier
 	;
@@ -149,9 +153,12 @@ import_as
 import_doc
 	: IMPORT string import_as? (import_alias)*
 	;
+struct
+	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
+	;
 
 meta_kv
-	: Identifier COLON string
+	: Identifier COLON expr
 	;
 
 
@@ -169,6 +176,10 @@ task_runtime_kv
 
 task_runtime
 	: RUNTIME LBRACE (task_runtime_kv)* RBRACE
+	;
+
+task_input
+	: INPUT LBRACE (any_decls)* RBRACE
 	;
 
 task_output
@@ -194,10 +205,11 @@ task_command
 
 
 task_element
-	: any_decls
+	: task_input
 	| task_output
 	| task_command
 	| task_runtime
+	| bound_decls
 	| parameter_meta
 	| meta
 	;
@@ -243,12 +255,17 @@ conditional
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	;
 
+
+workflow_input
+	: INPUT LBRACE (any_decls)* RBRACE
+	;
+
 workflow_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	;
 
 workflow_element
-	: any_decls #input
+	: workflow_input #input
 	| workflow_output #output
 	| inner_workflow_element #inner_element
 	| parameter_meta #parameter_meta_element
@@ -262,9 +279,10 @@ workflow
 
 document_element
 	: import_doc
+	| struct
 	| task
 	;
 
 document
-	: document_element* (workflow document_element*)? EOF
+	: version document_element* (workflow document_element*)? EOF
 	;

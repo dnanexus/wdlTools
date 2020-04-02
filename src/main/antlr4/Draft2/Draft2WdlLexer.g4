@@ -1,11 +1,13 @@
-lexer grammar Draft2WdlLexer;
+lexer grammar WdlLexer;
 
 channels { WdlComments, SkipChannel }
 
 // Keywords
+VERSION: 'version' -> pushMode(Version);
 IMPORT: 'import';
 WORKFLOW: 'workflow';
 TASK: 'task';
+STRUCT: 'struct';
 SCATTER: 'scatter';
 CALL: 'call';
 IF: 'if';
@@ -79,6 +81,7 @@ COMMA: ',';
 SEMI: ';';
 DOT: '.';
 NOT: '!';
+TILDE: '~';
 DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
@@ -100,42 +103,55 @@ mode SquoteInterpolatedString;
 
 SQuoteEscapedChar: '\\' . -> type(StringPart);
 SQuoteDollarString: '$'  -> type(StringPart);
+SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
-SQuoteCommandStart: ('${') -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
+SQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
 SQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(StringPart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[${\r\n']+;
+StringPart: ~[$~{\r\n']+;
 
 mode DquoteInterpolatedString;
 
 DQuoteEscapedChar: '\\' . -> type(StringPart);
+DQuoteTildeString: '~' -> type(StringPart);
 DQuoteDollarString: '$' -> type(StringPart);
 DQUoteCurlString: '{' -> type(StringPart);
-DQuoteCommandStart: ('${') -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(StringPart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[${\r\n"]+ -> type(StringPart);
+DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
 
 
 mode HereDocCommand;
 
 HereDocUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
 HereDocEscapedChar: '\\' . -> type(CommandStringPart);
+HereDocTildeString: '~' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
+HereDocCurlyStringCommand: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
 EndHereDocCommand: '>>>' -> popMode, type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
-HereDocStringPart: ~[{>]+ -> type(CommandStringPart);
+HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 
 mode Command;
 
 CommandEscapedChar: '\\' . -> type(CommandStringPart);
 CommandUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
+CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
-StringCommandStart:  ('${') -> pushMode(DEFAULT_MODE);
+StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
 EndCommand: '}' -> popMode;
-CommandStringPart: ~[${}]+;
+CommandStringPart: ~[$~{}]+;
+
+mode Version;
+
+VERSION_WHITESPACE
+	: [ \t]+ -> channel(HIDDEN)
+	;
+RELEASE_VERSION: [a-zA-Z0-9.-]+ -> popMode;
+
 
 // Fragments
 
