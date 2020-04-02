@@ -67,7 +67,7 @@ case class Checker(stdlib: Stdlib) {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
-      if (!both.isEmpty)
+      if (both.nonEmpty)
         throw new TypeException(s"Variables ${both} are being redeclared", srcText)
       this.copy(declarations = declarations ++ bindings)
     }
@@ -553,7 +553,7 @@ case class Checker(stdlib: Stdlib) {
 
     if (ctx.declarations contains callName)
       throw new TypeException(s"call ${callName} shadows an existing definition", call.text)
-    (callName -> WT_Call(callName, calleeOutputs))
+    callName -> WT_Call(callName, calleeOutputs)
   }
 
   // The body of the scatter becomes accessible to statements that come after it.
@@ -585,7 +585,7 @@ case class Checker(stdlib: Stdlib) {
         val (callName, callType) = applyCall(call, ctxInner.bind(accu, call.text))
         val callOutput = callType.output.map {
           case (name, t) => name -> WT_Array(t)
-        }.toMap
+        }
         accu + (callName -> WT_Call(callType.name, callOutput))
 
       case (accu: Bindings, subSct: Scatter) =>
@@ -593,7 +593,7 @@ case class Checker(stdlib: Stdlib) {
         val sctBindings = applyScatter(subSct, ctxInner.bind(accu, subSct.text))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> WT_Array(typ)
-        }.toMap
+        }
         accu ++ sctBindings2
 
       case (accu: Bindings, cond: Conditional) =>
@@ -601,7 +601,7 @@ case class Checker(stdlib: Stdlib) {
         val condBindings = applyConditional(cond, ctxInner.bind(accu, cond.text))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> WT_Array(typ)
-        }.toMap
+        }
         accu ++ condBindings2
 
       case (_, other) =>
@@ -630,7 +630,7 @@ case class Checker(stdlib: Stdlib) {
         val (callName, callType) = applyCall(call, ctxOuter.bind(accu, call.text))
         val callOutput = callType.output.map {
           case (name, t) => name -> WT_Optional(t)
-        }.toMap
+        }
         accu + (callName -> WT_Call(callType.name, callOutput))
 
       case (accu: Bindings, subSct: Scatter) =>
@@ -638,7 +638,7 @@ case class Checker(stdlib: Stdlib) {
         val sctBindings = applyScatter(subSct, ctxOuter.bind(accu, subSct.text))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> WT_Optional(typ)
-        }.toMap
+        }
         accu ++ sctBindings2
 
       case (accu: Bindings, cond: Conditional) =>
@@ -646,7 +646,7 @@ case class Checker(stdlib: Stdlib) {
         val condBindings = applyConditional(cond, ctxOuter.bind(accu, cond.text))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> WT_Optional(typ)
-        }.toMap
+        }
         accu ++ condBindings2
 
       case (_, other) =>
