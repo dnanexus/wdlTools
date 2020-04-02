@@ -3,8 +3,11 @@ on:
   push:
     branches:
       - master
-      - github_cicd
-      - develop
+      - test
+  pull_request:
+    branches:
+      - master
+      - test
 
 jobs:
   test:
