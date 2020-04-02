@@ -38,3 +38,7 @@ jobs:
       - name: Unit Tests
         run: |
           sbt test
+
+      - name: Scala formatting
+        run: |
+          sbt scalafmtCheckAll
