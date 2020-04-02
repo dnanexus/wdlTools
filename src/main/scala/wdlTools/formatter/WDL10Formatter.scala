@@ -122,28 +122,38 @@ case class WDL10Formatter(opts: Options,
       }
     }
 
+    private def isPrimitiveType(wdlType: Type): Boolean = {
+      wdlType match {
+        case _: TypeString  => true
+        case _: TypeBoolean => true
+        case _: TypeInt     => true
+        case _: TypeFloat   => true
+        case _: TypeFile    => true
+        case _              => false
+      }
+    }
+
     def fromWdlType(wdlType: Type, quantifier: Option[Token] = None): Atom = {
       wdlType match {
-        case TypeOptional(inner) => fromWdlType(inner, quantifier = Some(Token.Optional))
-        case TypeArray(inner, nonEmpty) =>
+        case TypeOptional(inner, _) => fromWdlType(inner, quantifier = Some(Token.Optional))
+        case TypeArray(inner, nonEmpty, _) =>
           val quantifier = if (nonEmpty) {
             Some(Token.NonEmpty)
           } else {
             None
           }
           buildDataType(Token.ArrayType, Some(fromWdlType(inner)), quantifier = quantifier)
-        case TypeMap(keyType @ (TypeString | TypeBoolean | TypeInt | TypeFloat | TypeFile),
-                     valueType) =>
+        case TypeMap(keyType, valueType, _) if isPrimitiveType(keyType) =>
           buildDataType(Token.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
-        case TypePair(left, right) =>
+        case TypePair(left, right, _) =>
           buildDataType(Token.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case TypeStruct(name, _) => Token(name)
-        case TypeObject          => Token.ObjectType
-        case TypeString          => Token.StringType
-        case TypeBoolean         => Token.BooleanType
-        case TypeInt             => Token.IntType
-        case TypeFloat           => Token.FloatType
-        case other               => throw new Exception(s"Unrecognized type $other")
+        case TypeStruct(name, _, _) => Token(name)
+        case TypeObject(_)          => Token.ObjectType
+        case TypeString(_)          => Token.StringType
+        case TypeBoolean(_)         => Token.BooleanType
+        case TypeInt(_)             => Token.IntType
+        case TypeFloat(_)           => Token.FloatType
+        case other                  => throw new Exception(s"Unrecognized type $other")
       }
     }
   }
@@ -276,24 +286,24 @@ case class WDL10Formatter(opts: Options,
 
     expr match {
       // literal values
-      case ValueString(value)  => stringOrToken(value)
-      case ValueFile(value)    => stringOrToken(value)
-      case ValueBoolean(value) => Token(value.toString)
-      case ValueInt(value)     => Token(value.toString)
-      case ValueFloat(value)   => Token(value.toString)
-      case ExprPair(left, right) if !(inString || inPlaceholder) =>
+      case ValueString(value, _)  => stringOrToken(value)
+      case ValueFile(value, _)    => stringOrToken(value)
+      case ValueBoolean(value, _) => Token(value.toString)
+      case ValueInt(value, _)     => Token(value.toString)
+      case ValueFloat(value, _)   => Token(value.toString)
+      case ExprPair(left, right, _) if !(inString || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
             prefix = Some(Token.GroupOpen),
             suffix = Some(Token.GroupClose)
         )
-      case ExprArray(value) =>
+      case ExprArray(value, _) =>
         Container(
             value.map(nested(_)),
             prefix = Some(Token.ArrayLiteralOpen),
             suffix = Some(Token.ArrayLiteralClose)
         )
-      case ExprMap(value) =>
+      case ExprMap(value, _) =>
         Container(
             value.map {
               case (k, v) => KeyValue(nested(k), nested(v))
@@ -302,7 +312,7 @@ case class WDL10Formatter(opts: Options,
             suffix = Some(Token.MapClose),
             wrapAll = true
         )
-      case ExprObject(value) =>
+      case ExprObject(value, _) =>
         Container(
             value.map {
               case (k, v) => KeyValue(Token(k), nested(v))
@@ -312,7 +322,7 @@ case class WDL10Formatter(opts: Options,
             wrapAll = true
         )
       // placeholders
-      case ExprPlaceholderEqual(t, f, value) =>
+      case ExprPlaceholderEqual(t, f, value, _) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(
@@ -321,15 +331,15 @@ case class WDL10Formatter(opts: Options,
                             option(Token.FalseOption, f)
                         )
                     ))
-      case ExprPlaceholderDefault(default, value) =>
+      case ExprPlaceholderDefault(default, value, _) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Token.DefaultOption, default))))
-      case ExprPlaceholderSep(sep, value) =>
+      case ExprPlaceholderSep(sep, value, _) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Token.SepOption, sep))))
-      case ExprCompoundString(value) if !inPlaceholder =>
+      case ExprCompoundString(value, _) if !inPlaceholder =>
         val atom = Adjacent(value.map(nested(_, inString = true)))
         if (inString) {
           atom
@@ -340,32 +350,32 @@ case class WDL10Formatter(opts: Options,
       // appear in a string or command block
       case other =>
         val atom = other match {
-          case ExprUniraryPlus(value)  => unirary(Token.UnaryPlus, value)
-          case ExprUniraryMinus(value) => unirary(Token.UnaryMinus, value)
-          case ExprNegate(value)       => unirary(Token.LogicalNot, value)
-          case ExprLor(a, b)           => operation(Token.LogicalOr, a, b)
-          case ExprLand(a, b)          => operation(Token.LogicalAnd, a, b)
-          case ExprEqeq(a, b)          => operation(Token.Equality, a, b)
-          case ExprLt(a, b)            => operation(Token.LessThan, a, b)
-          case ExprLte(a, b)           => operation(Token.LessThanOrEqual, a, b)
-          case ExprGt(a, b)            => operation(Token.GreaterThan, a, b)
-          case ExprGte(a, b)           => operation(Token.GreaterThanOrEqual, a, b)
-          case ExprNeq(a, b)           => operation(Token.Inequality, a, b)
-          case ExprAdd(a, b)           => operation(Token.Addition, a, b)
-          case ExprSub(a, b)           => operation(Token.Subtraction, a, b)
-          case ExprMul(a, b)           => operation(Token.Multiplication, a, b)
-          case ExprDivide(a, b)        => operation(Token.Division, a, b)
-          case ExprMod(a, b)           => operation(Token.Remainder, a, b)
-          case ExprIdentifier(id) =>
+          case ExprUniraryPlus(value, _)  => unirary(Token.UnaryPlus, value)
+          case ExprUniraryMinus(value, _) => unirary(Token.UnaryMinus, value)
+          case ExprNegate(value, _)       => unirary(Token.LogicalNot, value)
+          case ExprLor(a, b, _)           => operation(Token.LogicalOr, a, b)
+          case ExprLand(a, b, _)          => operation(Token.LogicalAnd, a, b)
+          case ExprEqeq(a, b, _)          => operation(Token.Equality, a, b)
+          case ExprLt(a, b, _)            => operation(Token.LessThan, a, b)
+          case ExprLte(a, b, _)           => operation(Token.LessThanOrEqual, a, b)
+          case ExprGt(a, b, _)            => operation(Token.GreaterThan, a, b)
+          case ExprGte(a, b, _)           => operation(Token.GreaterThanOrEqual, a, b)
+          case ExprNeq(a, b, _)           => operation(Token.Inequality, a, b)
+          case ExprAdd(a, b, _)           => operation(Token.Addition, a, b)
+          case ExprSub(a, b, _)           => operation(Token.Subtraction, a, b)
+          case ExprMul(a, b, _)           => operation(Token.Multiplication, a, b)
+          case ExprDivide(a, b, _)        => operation(Token.Division, a, b)
+          case ExprMod(a, b, _)           => operation(Token.Remainder, a, b)
+          case ExprIdentifier(id, _) =>
             Token(id)
-          case ExprAt(array, index) =>
+          case ExprAt(array, index, _) =>
             Container(
                 Vector(nested(index, inPlaceholder = inString)),
                 prefix =
                   Some(Adjacent(Vector(nested(array, inPlaceholder = inString), Token.IndexOpen))),
                 suffix = Some(Token.IndexClose)
             )
-          case ExprIfThenElse(cond, tBranch, fBranch) =>
+          case ExprIfThenElse(cond, tBranch, fBranch, _) =>
             Spaced(
                 Vector(
                     Token.If,
@@ -377,13 +387,13 @@ case class WDL10Formatter(opts: Options,
                 ),
                 Wrapping.AsNeeded
             )
-          case ExprApply(funcName, elements) =>
+          case ExprApply(funcName, elements, _) =>
             Container(
                 elements.map(nested(_, inPlaceholder = inString)),
                 prefix = Some(Adjacent(Vector(Token(funcName), Token.FunctionCallOpen))),
                 suffix = Some(Token.FunctionCallClose)
             )
-          case ExprGetName(e, id) =>
+          case ExprGetName(e, id, _) =>
             Adjacent(Vector(nested(e, inPlaceholder = inString), Token.Access, Token(id)))
           case other => throw new Exception(s"Unrecognized expression $other")
         }
@@ -616,8 +626,8 @@ case class WDL10Formatter(opts: Options,
                   command.parts.head match {
                     case s: ValueString =>
                       s.value match {
-                        case commandSingletonRegexp(body) => ValueString(body)
-                        case _                            => s
+                        case commandSingletonRegexp(body, _) => ValueString(body, s.text)
+                        case _                               => s
                       }
                     case other => other
                   },
@@ -629,8 +639,9 @@ case class WDL10Formatter(opts: Options,
           bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.head match {
-                    case ValueString(s) => ValueString(commandStartRegexp.replaceFirstIn(s, ""))
-                    case other          => other
+                    case ValueString(s, text) =>
+                      ValueString(commandStartRegexp.replaceFirstIn(s, ""), text)
+                    case other => other
                   },
                   placeholderOpen = Token.PlaceholderOpenTilde,
                   inString = true
@@ -648,8 +659,9 @@ case class WDL10Formatter(opts: Options,
           bodyFormatter.appendChunk(
               buildExpression(
                   command.parts.last match {
-                    case ValueString(s) => ValueString(commandEndRegexp.replaceFirstIn(s, ""))
-                    case other          => other
+                    case ValueString(s, text) =>
+                      ValueString(commandEndRegexp.replaceFirstIn(s, ""), text)
+                    case other => other
                   },
                   placeholderOpen = Token.PlaceholderOpenTilde,
                   inString = true

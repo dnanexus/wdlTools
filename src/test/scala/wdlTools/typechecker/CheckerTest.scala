@@ -4,7 +4,7 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 
-import wdlTools.util.Options
+import wdlTools.util.{Options, URL}
 import wdlTools.syntax.ParseAll
 
 class CheckerTest extends FlatSpec with Matchers {
@@ -30,8 +30,8 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecking/tasks/positive")
     for (pc <- positiveCases) {
-      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
-      val doc = parser.apply(wdlSourceCode)
+      val wdlSourceUrl = URL(pc.toString)
+      val doc = parser.apply(wdlSourceUrl)
       try {
         checker.apply(doc)
       } catch {
@@ -44,8 +44,8 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecking/tasks/negative")
     for (pc <- negativeCases) {
-      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
-      val doc = parser.apply(wdlSourceCode)
+      val wdlSourceUrl = URL(pc.toString)
+      val doc = parser.apply(wdlSourceUrl)
       val checkVal =
         try {
           checker.apply(doc)
@@ -65,8 +65,8 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecking/workflows/positive")
     for (pc <- positiveCases) {
-      val wdlSourceCode = Files.readAllLines(pc).asScala.mkString(System.lineSeparator())
-      val doc = parser.apply(wdlSourceCode)
+      val wdlSourceUrl = URL(pc.toString)
+      val doc = parser.apply(wdlSourceUrl)
       try {
         checker.apply(doc)
       } catch {
@@ -80,8 +80,8 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecking/workflows/negative")
     for (nc <- negativeCases) {
-      val wdlSourceCode = Files.readAllLines(nc).asScala.mkString(System.lineSeparator())
-      val doc = parser.apply(wdlSourceCode)
+      val wdlSourceUrl = URL(nc.toString)
+      val doc = parser.apply(wdlSourceUrl)
       val checkVal =
         try {
           checker.apply(doc)

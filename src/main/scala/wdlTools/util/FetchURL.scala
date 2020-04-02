@@ -8,15 +8,6 @@ import wdlTools.util.Verbosity._
 import scala.collection.JavaConverters._
 import scala.io.Source
 
-// a path to a file or an http location
-//
-// examples:
-//   http://google.com/A.txt
-//   https://google.com/A.txt
-//   file://A/B.txt
-//   foo.txt
-case class URL(addr: String)
-
 // Examples for URLs:
 //   http://google.com/A.txt
 //   https://google.com/A.txt
@@ -87,6 +78,14 @@ object FetchURL {
       case null | "" | "file" => Util.readFromFile(uriLocalPath)
       case _ =>
         FetchURL(conf).apply(URL(uri.toString))
+    }
+  }
+
+  def fromUri(uri: URI, conf: Options): URL = {
+    val uriLocalPath = Util.getLocalPath(uri)
+    uri.getScheme match {
+      case null | "" | "file" => URL(uriLocalPath.toString)
+      case _                  => URL(uri.toString)
     }
   }
 }
