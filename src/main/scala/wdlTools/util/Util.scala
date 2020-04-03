@@ -26,6 +26,16 @@ import Verbosity._
 //   foo.txt
 case class URL(addr: String)
 
+object URL {
+  def fromPath(path: Path): URL = {
+    fromUri(path.toUri)
+  }
+
+  def fromUri(uri: URI): URL = {
+    URL(uri.toString)
+  }
+}
+
 // source location in a WDL program. We add it to each syntax element
 // so we could do accurate error reporting.
 //
@@ -36,12 +46,14 @@ case class URL(addr: String)
 case class TextSource(line: Int, col: Int, url: URL)
 
 /**
-  * Common configuration options used by syntax classes.
+  * Common configuration options.
   * @param localDirectories local directories to search for imports.
+  * @param followImports whether to follow imports when parsing.
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
 case class Options(localDirectories: Seq[Path] = Vector.empty,
+                   followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false)
 
@@ -61,13 +73,14 @@ object Util {
     * current working directory is used as the parent unless `parent` is specified. If the URI indicates a local path
     * and `ovewrite` is `true`, then the absolute local path is returned unless `parent` is specified.
     *
-    * @param uri a URI, which might be a local path, a file:// uri, or an http(s):// uri)
+    * @param url a URL, which might be a local path, a file:// uri, or an http(s):// uri)
     * @param parent The directory to which the local file should be made relative
     * @param selfOk Whether it is allowed to return the absolute path of a URI that is a local file, rather than making
     *               it relative to the current directory; ignored if `parent` is defined
     * @return The Path to the local file
     */
-  def getLocalPath(uri: URI, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
+  def getLocalPath(url: URL, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
+    val uri = new URI(url.addr)
     uri.getScheme match {
       case null | "" | "file" =>
         val path = Paths.get(uri.getPath)
@@ -90,9 +103,21 @@ object Util {
     * @return
     */
   def readFromFile(path: Path): String = {
+    readLinesFromFile(path).mkString(System.lineSeparator())
+  }
+
+  /**
+    * Reads the lines from a file
+    * @param path the path to the file
+    * @return a Seq of the lines from the file
+    */
+  def readLinesFromFile(path: Path): Seq[String] = {
     val source = io.Source.fromFile(path.toString)
-    try source.getLines.mkString(System.lineSeparator())
-    finally source.close()
+    try {
+      source.getLines.toVector
+    } finally {
+      source.close()
+    }
   }
 
   /**
@@ -102,12 +127,12 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeLinesToFiles(docs: Map[URI, Seq[String]],
+  def writeLinesToFiles(docs: Map[URL, Seq[String]],
                         outputDir: Option[Path],
                         overwrite: Boolean = false): Unit = {
     docs.foreach {
-      case (uri, lines) =>
-        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+      case (url, lines) =>
+        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
         Files.write(outputPath, lines.asJava)
     }
   }
@@ -119,12 +144,12 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeContentsToFiles(docs: Map[URI, String],
+  def writeContentsToFiles(docs: Map[URL, String],
                            outputDir: Option[Path],
                            overwrite: Boolean = false): Unit = {
     docs.foreach {
-      case (uri, contents) =>
-        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+      case (url, contents) =>
+        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
         Files.write(outputPath, contents.getBytes())
     }
   }

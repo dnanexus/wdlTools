@@ -1,11 +1,12 @@
-package wdlTools.syntax
+package wdlTools.syntax.v1_0
 
-import wdlTools.util.{Options, URL}
+import wdlTools.syntax.{AbstractSyntax, Parser}
+import wdlTools.util.{SourceCode, Options, URL}
 
 import scala.collection.mutable
 
 // parse and follow imports
-case class ParseAll(conf: Options) {
+case class ParseAll(opts: Options, loader: SourceCode.Loader) extends Parser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 
@@ -13,7 +14,7 @@ case class ParseAll(conf: Options) {
     docCache.get(url) match {
       case None =>
         val cDoc: ConcreteSyntax.Document =
-          ParseDocument.apply(url, conf)
+          ParseDocument.apply(loader.apply(url), opts)
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -269,10 +270,19 @@ case class ParseAll(conf: Options) {
     AbstractSyntax.Document(doc.version, elems, aWf, doc.text)
   }
 
+  override def canParse(sourceCode: SourceCode): Boolean = {
+    sourceCode.lines.foreach { line =>
+      if (!(line.trim.isEmpty || line.startsWith("#"))) {
+        return line.startsWith("version 1.0")
+      }
+    }
+    false
+  }
+
   // [dirs] : the directories where to search for imported documents
   //
-  def apply(docSourceUrl: URL): AbstractSyntax.Document = {
-    val top: ConcreteSyntax.Document = ParseDocument.apply(docSourceUrl, conf)
+  def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
+    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, opts)
     dfs(top)
   }
 }

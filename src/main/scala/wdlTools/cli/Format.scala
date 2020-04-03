@@ -1,6 +1,5 @@
 package wdlTools.cli
 
-import java.net.URI
 import java.nio.file.Files
 
 import wdlTools.formatter._
@@ -11,12 +10,10 @@ import scala.language.reflectiveCalls
 
 case class Format(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val uri = new URI(conf.format.uri())
-    val uriLocalPath = Util.getLocalPath(uri)
-    val opts = conf.getSyntaxOptions(Set(uriLocalPath.getParent))
-    val formatter = WDL10Formatter(opts)
-
-    formatter.formatDocuments(uri, followImports = conf.format.followImports())
+    val url = conf.format.url()
+    val opts = conf.format.getOptions(Set(Util.getLocalPath(url).getParent))
+    val formatter = V1_0Formatter(opts)
+    formatter.formatDocuments(url)
     formatter.documents.foreach {
       case (uri, lines) =>
         val outputPath =

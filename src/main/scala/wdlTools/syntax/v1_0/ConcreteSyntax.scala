@@ -1,10 +1,7 @@
-package wdlTools.syntax
+package wdlTools.syntax.v1_0
 
-import wdlTools.util.{URL, TextSource}
-
-// A parser based on a WDL grammar written by Patrick Magee. The tool
-// underlying the grammar is Antlr4.
-//
+import wdlTools.syntax.WdlVersion
+import wdlTools.util.{TextSource, URL}
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
@@ -172,7 +169,7 @@ object ConcreteSyntax {
       extends Element
 
   case class Version(value: String, text: TextSource) extends Element
-  case class Document(version: String,
+  case class Document(version: WdlVersion = WdlVersion.V1_0,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource)

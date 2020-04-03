@@ -1,7 +1,7 @@
-parser grammar WdlParser;
+parser grammar Draft2WdlParser;
 
 
-options { tokenVocab=WdlLexer; }
+options { tokenVocab=Draft2WdlLexer; }
 
 
 map_type
@@ -20,7 +20,7 @@ type_base
 	: array_type
 	| map_type
 	| pair_type
-	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT | Identifier)
+	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT)
 	;
 
 wdl_type
@@ -138,10 +138,6 @@ expr_core
 	| expr_core DOT Identifier #get_name
 	;
 
-version
-	: VERSION RELEASE_VERSION
-	;
-
 import_alias
 	: ALIAS Identifier AS Identifier
 	;
@@ -153,12 +149,9 @@ import_as
 import_doc
 	: IMPORT string import_as? (import_alias)*
 	;
-struct
-	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
-	;
 
 meta_kv
-	: Identifier COLON expr
+	: Identifier COLON string
 	;
 
 
@@ -179,7 +172,7 @@ task_runtime
 	;
 
 task_input
-	: INPUT LBRACE (any_decls)* RBRACE
+	: (any_decls)*
 	;
 
 task_output
@@ -203,19 +196,17 @@ task_command
   | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
   ;
 
-
 task_element
-	: task_input
-	| task_output
-	| task_command
-	| task_runtime
-	| bound_decls
-	| parameter_meta
-	| meta
-	;
+  : task_output
+  | task_command
+  | task_runtime
+  | parameter_meta
+  | meta
+  | any_decls
+  ;
 
 task
-	: TASK Identifier LBRACE (task_element)+ RBRACE
+	: TASK Identifier LBRACE task_input (task_element)+ RBRACE
 	;
 
 
@@ -255,9 +246,8 @@ conditional
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	;
 
-
 workflow_input
-	: INPUT LBRACE (any_decls)* RBRACE
+	: (any_decls)*
 	;
 
 workflow_output
@@ -265,24 +255,21 @@ workflow_output
 	;
 
 workflow_element
-	: workflow_input #input
-	| workflow_output #output
-	| inner_workflow_element #inner_element
-	| parameter_meta #parameter_meta_element
-	| meta #meta_element
-	;
+  : workflow_output #output
+  | inner_workflow_element #inner_element
+  | parameter_meta #parameter_meta_element
+  | meta #meta_element
+  ;
 
 workflow
-	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
+	: WORKFLOW Identifier LBRACE workflow_input workflow_element* RBRACE
 	;
-
 
 document_element
 	: import_doc
-	| struct
 	| task
 	;
 
 document
-	: version document_element* (workflow document_element*)? EOF
+	: document_element* (workflow document_element*)? EOF
 	;
