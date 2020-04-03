@@ -5,40 +5,55 @@ package wdlTools.syntax.draft_2
 // we need these for safe casting, and reporting on errors
 //import reflect.ClassTag
 import collection.JavaConverters._
+import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
-import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.WdlVersion
+import wdlTools.syntax.{ErrorListener, SyntaxError, WdlVersion}
 import wdlTools.util.{Options, SourceCode, TextSource, URL}
+import wdlTools.util.Verbosity.Quiet
 
 object ParseDocument {
-  case class Draft2GrammarFactory(opts: Options)
-      extends GrammarFactory[Draft2WdlLexer, Draft2WdlParser](opts) {
-    override def createLexer(charStream: CharStream): Draft2WdlLexer = {
-      new Draft2WdlLexer(charStream)
-    }
+  private def getParser(inp: String, conf: Options): (ErrorListener, Draft2WdlParser) = {
+    val codePointBuffer: CodePointBuffer =
+      CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
+    val lexer: Draft2WdlLexer = new Draft2WdlLexer(CodePointCharStream.fromBuffer(codePointBuffer))
+    val parser: Draft2WdlParser = new Draft2WdlParser(new CommonTokenStream(lexer))
 
-    override def createParser(tokenStream: CommonTokenStream): Draft2WdlParser = {
-      new Draft2WdlParser(tokenStream)
-    }
+    // setting up our own error handling
+    val errListener = ErrorListener(conf)
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(errListener)
+    parser.removeErrorListeners()
+    parser.addErrorListener(errListener)
+
+    (errListener, parser)
   }
 
-  def apply(sourceCode: SourceCode, opts: Options): Document = {
-    val grammarFactory = Draft2GrammarFactory(opts)
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = new ParseDocument(grammar, sourceCode.url, opts)
-    val document = visitor.apply()
-    grammar.verify()
+  def apply(sourceCode: SourceCode, conf: Options): Document = {
+    val (errListener, parser) = getParser(sourceCode.toString, conf)
+    if (conf.antlr4Trace)
+      parser.setTrace(true)
+    val visitor = new ParseDocument(sourceCode.url, conf)
+    val document = visitor.visitDocument(parser.document)
+
+    // check if any errors were found
+    val errors: Vector[SyntaxError] = errListener.getAllErrors
+    if (errors.nonEmpty) {
+      if (conf.verbosity > Quiet) {
+        for (err <- errors) {
+          System.out.println(err)
+        }
+      }
+      throw new Exception(s"${errors.size} syntax errors were found, stopping")
+    }
     document
   }
 }
 
-case class ParseDocument(grammar: Grammar[Draft2WdlLexer, Draft2WdlParser],
-                         docSourceURL: URL,
-                         opts: Options)
+case class ParseDocument(docSourceURL: URL, conf: Options)
     extends Draft2WdlParserBaseVisitor[Element] {
 
   private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
@@ -1156,9 +1171,5 @@ document
         Some(visitWorkflow(ctx.workflow()))
 
     Document(WdlVersion.Draft_2, elems, workflow, getSourceText(ctx))
-  }
-
-  def apply(): Document = {
-    visitDocument(grammar.parser.document)
   }
 }

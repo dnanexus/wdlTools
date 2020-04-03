@@ -1,12 +1,12 @@
 package wdlTools.syntax.v1_0
 
-import wdlTools.syntax.{AbstractSyntax, WdlParser}
+import wdlTools.syntax.{AbstractSyntax, Parser}
 import wdlTools.util.{SourceCode, Options, URL}
 
 import scala.collection.mutable
 
 // parse and follow imports
-case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(opts, loader) {
+case class ParseAll(opts: Options, loader: SourceCode.Loader) extends Parser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 

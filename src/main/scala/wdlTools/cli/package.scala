@@ -25,8 +25,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](URL(_))
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
-    // there is a compiler bug that prevents accessing name directly
-    banner(s"""Usage: wdlTools ${commandNameAndAliases.head} <path|uri>
+    banner(s"""Usage: wdlTools ${name} <path|uri>
               |${description}
               |
               |Options:
@@ -108,8 +107,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   addSubcommand(format)
 
-  val printAST =
-    new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
+  val printAST = new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
   addSubcommand(printAST)
 
   val readmes =
