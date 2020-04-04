@@ -24,7 +24,7 @@ trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
 
-abstract class Parser(opts: Options, loader: SourceCode.Loader) {
+abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
   def canParse(sourceCode: SourceCode): Boolean
 
   def apply(sourceCode: SourceCode): AbstractSyntax.Document
