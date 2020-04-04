@@ -28,7 +28,8 @@ jobs:
 
           # compile ANTLR sources
           cd ${GITHUB_WORKSPACE}/src/main/antlr4
-          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser WdlParser.g4 WdlLexer.g4
+          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser.draft_2 Draft2WdlParser.g4 Draft2WdlLexer.g4
+          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser.v1_0 V10WdlParser.g4 V10WdlLexer.g4
 
           # install sbt
           echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
