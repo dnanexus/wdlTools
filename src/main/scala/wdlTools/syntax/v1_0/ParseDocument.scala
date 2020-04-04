@@ -1163,7 +1163,6 @@ document_element
 	;
    */
   override def visitDocument_element(ctx: V10WdlParser.Document_elementContext): DocumentElement = {
-    println(s"elt ${grammar.getComments(ctx)}")
     visitChildren(ctx).asInstanceOf[DocumentElement]
   }
 
@@ -1171,7 +1170,6 @@ document_element
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: V10WdlParser.VersionContext): Version = {
-    println(s"version ${grammar.getComments(ctx)}")
     val value = ctx.RELEASE_VERSION().getText
     Version(value, getSourceText(ctx))
   }
