@@ -283,8 +283,11 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
-      if (!(line.trim.isEmpty || line.startsWith("#"))) {
-        return line.startsWith("import") || line.startsWith("workflow") || line.startsWith("task")
+      val trimmed = line.trim
+      if (!(trimmed.isEmpty || trimmed.startsWith("#"))) {
+        return trimmed.trim.startsWith("import") ||
+          trimmed.startsWith("workflow") ||
+          trimmed.startsWith("task")
       }
     }
     false

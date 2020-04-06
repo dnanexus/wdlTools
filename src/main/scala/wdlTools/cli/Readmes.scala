@@ -9,7 +9,7 @@ import scala.language.reflectiveCalls
 case class Readmes(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.readmes.url()
-    val opts = conf.readmes.getOptions(Set(Util.getLocalPath(url).getParent))
+    val opts = conf.readmes.getOptions
     val parsers = Parsers(opts)
     val renderer = SspRenderer()
     val readmes = parsers.getDocumentWalker[String](url).walk { (url, doc, results) =>

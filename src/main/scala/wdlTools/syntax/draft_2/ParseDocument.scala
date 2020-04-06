@@ -720,7 +720,7 @@ task_input
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), getComment(ctx))
+    InputSection(decls, getSourceText(ctx), None)
   }
 
   /* task_output
@@ -862,15 +862,44 @@ task_input
     }
   }
 
+  def requiresEvaluation(expr: Expr): Boolean = {
+    expr match {
+      case _: ExprString | _: ExprFile | _: ExprBoolean | _: ExprInt | _: ExprFloat => false
+      case ExprPair(l, r, _)                                                        => requiresEvaluation(l) || requiresEvaluation(r)
+      case ExprArrayLiteral(value, _)                                               => value.exists(requiresEvaluation)
+      case ExprMapLiteral(value, _) =>
+        value.exists(elt => requiresEvaluation(elt._1) || requiresEvaluation(elt._2))
+      case ExprObjectLiteral(value, _) => value.values.exists(requiresEvaluation)
+      case _                           => true
+    }
+  }
+
+  def requiresEvaluation(decl: Declaration): Boolean = {
+    if (decl.expr.isDefined) {
+      requiresEvaluation(decl.expr.get)
+    } else {
+      false
+    }
+  }
+
   /* task
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: Draft2WdlParser.TaskContext): Task = {
     val name = ctx.Identifier().getText
-    val input = if (ctx.task_input().any_decls().isEmpty) {
-      None
+    // split inputs into those that do not require evalutation (which can be task inputs)
+    // and those that do (which must be non-overideable decLarations)
+    val (input, topDecls) = if (ctx.task_input().any_decls().isEmpty) {
+      (None, Vector.empty)
     } else {
-      Some(visitTask_input(ctx.task_input()))
+      val taskInput = visitTask_input(ctx.task_input())
+      val (evalDecls, noEvalDecls) = taskInput.declarations.partition(requiresEvaluation)
+      val newInput = if (noEvalDecls.isEmpty) {
+        None
+      } else {
+        Some(InputSection(noEvalDecls, taskInput.text, None))
+      }
+      (newInput, evalDecls)
     }
     val elems = ctx.task_element().asScala.map(visitTask_element).toVector
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
@@ -879,7 +908,7 @@ task_input
     val command: CommandSection = exactlyOneSection(elems.collect {
       case x: CommandSection => x
     }, "command", ctx)
-    val decls: Vector[Declaration] = elems.collect {
+    val decls: Vector[Declaration] = topDecls ++ elems.collect {
       case x: Declaration => x
     }
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
@@ -1046,7 +1075,7 @@ scatter
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), getComment(ctx))
+    InputSection(decls, getSourceText(ctx), None)
   }
 
   /* workflow_output
@@ -1097,10 +1126,19 @@ workflow
    */
   override def visitWorkflow(ctx: Draft2WdlParser.WorkflowContext): Workflow = {
     val name = ctx.Identifier().getText
-    val input: Option[InputSection] = if (ctx.workflow_input().any_decls().isEmpty) {
-      None
+    // split inputs into those that do not require evalutation (which can be task inputs)
+    // and those that do (which must be non-overideable decLarations)
+    val (input, topDecls) = if (ctx.workflow_input().any_decls().isEmpty) {
+      (None, Vector.empty)
     } else {
-      Some(visitWorkflow_input(ctx.workflow_input()))
+      val workflowInput = visitWorkflow_input(ctx.workflow_input())
+      val (evalDecls, noEvalDecls) = workflowInput.declarations.partition(requiresEvaluation)
+      val newInput = if (noEvalDecls.isEmpty) {
+        None
+      } else {
+        Some(InputSection(noEvalDecls, workflowInput.text, None))
+      }
+      (newInput, evalDecls)
     }
     val elems: Vector[Draft2WdlParser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
@@ -1116,7 +1154,7 @@ workflow
       case x: Draft2WdlParser.Parameter_meta_elementContext =>
         visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
-    val wfElems: Vector[WorkflowElement] = elems.collect {
+    val wfElems: Vector[WorkflowElement] = topDecls ++ elems.collect {
       case x: Draft2WdlParser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }

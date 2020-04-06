@@ -10,6 +10,7 @@ import org.rogach.scallop.{
   listArgConverter,
   singleArgConverter
 }
+import wdlTools.syntax.WdlVersion
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, URL, Util}
 
@@ -23,6 +24,8 @@ trait Command {
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
   implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](URL(_))
+  implicit val versionConverter: ValueConverter[WdlVersion] =
+    singleArgConverter[WdlVersion](WdlVersion.fromName)
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly
@@ -58,13 +61,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
     /**
       * Gets a syntax.Util.Options object based on the command line options.
-      * @param merge a Set of Paths to merge in with the local directories.
       * @return
       */
-    def getOptions(merge: Set[Path]): Options = {
+    def getOptions: Options = {
       val parent = this.parentConfig.asInstanceOf[WdlToolsConf]
       Options(
-          localDirectories = this.localDirectories(merge),
+          localDirectories = this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
           followImports = this.followImports(),
           verbosity = parent.verbosity,
           antlr4Trace = parent.antlr4Trace.getOrElse(default = false)
@@ -88,13 +90,14 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val format =
     new ParserSubcommand("format",
                          "Reformat WDL file and all its dependencies according to style rules.") {
-      val wdlVersion: ScallopOption[String] = opt[String](
+      val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
           descr = "WDL version to generate; currently only v1.0 is supported",
-          default = Some("1.0")
+          default = Some(WdlVersion.V1_0)
       )
       validateOpt(wdlVersion) {
-        case Some(version) if version != "1.0" => Left("Only WDL v1.0 is supported currently")
-        case _                                 => Right(Unit)
+        case Some(version) if version != WdlVersion.V1_0 =>
+          Left("Only WDL v1.0 is supported currently")
+        case _ => Right(Unit)
       }
       val outputDir: ScallopOption[Path] = opt[Path](descr =
         "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
@@ -107,6 +110,38 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       }
     }
   addSubcommand(format)
+
+  val upgrade = new ParserSubcommand("upgrade", "Upgrade a WDL file to a more recent version") {
+    val srcVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version of the document being upgraded",
+        default = None
+    )
+    val destVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version of the document being upgraded",
+        default = Some(WdlVersion.V1_0)
+    )
+    validateOpt(destVersion) {
+      case Some(version) if version != WdlVersion.V1_0 =>
+        Left("Only WDL v1.0 is supported currently")
+      case _ => Right(Unit)
+    }
+    validateOpt(srcVersion, destVersion) {
+      case (Some(src), Some(dst)) if src < dst => Right(Unit)
+      // ignore if srcVersion is unspecified - it will be detected and validated in the command
+      case (None, _) => Right(Unit)
+      case _         => Left("Source version must be earlier than destination version")
+    }
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+    validateOpt(outputDir, overwrite) {
+      case (None, Some(false) | None) =>
+        Left("--outputDir is required unless --overwrite is specified")
+      case _ => Right(Unit)
+    }
+  }
+  addSubcommand(upgrade)
 
   val printAST =
     new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
