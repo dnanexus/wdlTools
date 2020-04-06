@@ -15,3 +15,6 @@ target/
 src/main/java
 gen/
 *.tokens
+
+# Jar file of the ANTLR4 parser generator
+antlr-*.jar
