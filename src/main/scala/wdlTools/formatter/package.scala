@@ -2,6 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
+import wdlTools.syntax.Comment
 
 import scala.collection.mutable
 
@@ -33,6 +34,8 @@ abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndent
   def beginLine(): Unit
 
   def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
+
+  def appendComment(comment: Comment): Unit
 
   def appendString(value: String): Unit
 
@@ -161,6 +164,8 @@ object Token {
   val TypeParamDelimiter: Token = Token(",")
   val UnaryMinus: Token = Token("-")
   val UnaryPlus: Token = Token("+")
+  val Comment: Token = Token("#")
+  val PreformattedComment: Token = Token("##")
 
   val tokenPairs = Map(
       ArrayLiteralOpen -> ArrayLiteralClose,

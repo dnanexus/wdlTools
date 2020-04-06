@@ -1,8 +1,8 @@
 package wdlTools.typechecker
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.TextSource
 import WdlTypes._
+import wdlTools.syntax.TextSource
 
 case class Checker(stdlib: Stdlib) {
 
@@ -174,8 +174,10 @@ case class Checker(stdlib: Stdlib) {
       case _: TypeFloat          => WT_Float
       case TypeIdentifier(id, _) => WT_Identifier(id)
       case _: TypeObject         => WT_Object
-      case TypeStruct(name, members, _) =>
-        WT_Struct(name, members.map { case (name, t2) => name -> typeTranslate(t2) })
+      case TypeStruct(name, members, _, _) =>
+        WT_Struct(name, members.map {
+          case StructMember(name, t2, _, _) => name -> typeTranslate(t2)
+        }.toMap)
     }
   }
 
@@ -429,24 +431,24 @@ case class Checker(stdlib: Stdlib) {
 
     val inputType: Map[String, (WT, Boolean)] = inputSection match {
       case None => Map.empty
-      case Some(InputSection(decls, _)) =>
+      case Some(InputSection(decls, _, _)) =>
         decls.map {
-          case Declaration(name, wdlType, Some(_), _) =>
+          case Declaration(name, wdlType, Some(_), _, _) =>
             // input has a default value, caller may omit it.
             name -> (typeTranslate(wdlType), true)
 
-          case Declaration(name, TypeOptional(wdlType, _), _, _) =>
+          case Declaration(name, TypeOptional(wdlType, _), _, _, _) =>
             // input is optional, caller can omit it.
             name -> (WT_Optional(typeTranslate(wdlType)), true)
 
-          case Declaration(name, wdlType, _, _) =>
+          case Declaration(name, wdlType, _, _, _) =>
             // input is compulsory
             name -> (typeTranslate(wdlType), false)
         }.toMap
     }
     val outputType: Map[String, WT] = outputSection match {
       case None => Map.empty
-      case Some(OutputSection(decls, _)) =>
+      case Some(OutputSection(decls, _, _)) =>
         decls.map(decl => decl.name -> typeTranslate(decl.wdlType)).toMap
     }
     (inputType, outputType)

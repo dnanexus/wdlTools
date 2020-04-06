@@ -2,6 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
+import wdlTools.syntax.{Comment, CommentEmpty, CommentLine, CommentPreformatted, CommmentCompound}
 
 import scala.collection.mutable
 
@@ -98,6 +99,40 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
       builder.append(chunk.toString)
     }
     builder
+  }
+
+  private lazy val whitespace = "[ \t\n\r]+".r
+
+  override def appendComment(comment: Comment): Unit = {
+    require(atLineStart)
+    comment match {
+      case CommentEmpty() =>
+        beginLine()
+        appendChunk(Token.Comment)
+        endLine()
+      case CommentLine(text) =>
+        beginLine()
+        appendChunk(Token.Comment)
+        whitespace.split(text).foreach { token =>
+          // we let the line run over for a single token that is longer than the max line length
+          // (i.e. we don't try to hyphenate)
+          if (!atLineStart && lengthRemaining < token.length + 1) {
+            endLine()
+            beginLine()
+            appendChunk(Token.Comment)
+          }
+          currentLine.append(" ")
+          currentLine.append(token)
+        }
+        endLine()
+      case CommentPreformatted(preLines) =>
+        preLines.foreach { line =>
+          beginLine()
+          appendAll(Vector[Chunk](Token.PreformattedComment, StringLiteral(line)), Wrapping.Never)
+          endLine()
+        }
+      case CommmentCompound(comments) => comments.foreach(appendComment)
+    }
   }
 
   def appendString(value: String): Unit = {

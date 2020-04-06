@@ -1,7 +1,7 @@
 package wdlTools.formatter
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.Parsers
+import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.{Options, URL, Util, Verbosity}
 
 import scala.collection.mutable
@@ -145,13 +145,13 @@ case class V1_0Formatter(opts: Options,
           buildDataType(Token.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
         case TypePair(left, right, _) =>
           buildDataType(Token.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case TypeStruct(name, _, _) => Token(name)
-        case TypeObject(_)          => Token.ObjectType
-        case TypeString(_)          => Token.StringType
-        case TypeBoolean(_)         => Token.BooleanType
-        case TypeInt(_)             => Token.IntType
-        case TypeFloat(_)           => Token.FloatType
-        case other                  => throw new Exception(s"Unrecognized type $other")
+        case TypeStruct(name, _, _, _) => Token(name)
+        case TypeObject(_)             => Token.ObjectType
+        case TypeString(_)             => Token.StringType
+        case TypeBoolean(_)            => Token.BooleanType
+        case TypeInt(_)                => Token.IntType
+        case TypeFloat(_)              => Token.FloatType
+        case other                     => throw new Exception(s"Unrecognized type $other")
       }
     }
   }
@@ -403,6 +403,12 @@ case class V1_0Formatter(opts: Options,
     }
   }
 
+  case class CommentSection(comment: Comment) extends Statement {
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendComment(comment)
+    }
+  }
+
   case class VersionStatement(version: String) extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
@@ -413,6 +419,9 @@ case class V1_0Formatter(opts: Options,
 
   case class ImportStatement(importDoc: ImportDoc) extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      if (importDoc.comment.isDefined) {
+        lineFormatter.appendComment(importDoc.comment.get)
+      }
       lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
                               Wrapping.Never)
@@ -433,9 +442,15 @@ case class V1_0Formatter(opts: Options,
     }
   }
 
-  case class DeclarationStatement(name: String, wdlType: Type, expr: Option[Expr] = None)
+  case class DeclarationStatement(name: String,
+                                  wdlType: Type,
+                                  expr: Option[Expr] = None,
+                                  comment: Option[Comment])
       extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      if (comment.isDefined) {
+        lineFormatter.appendComment(comment.get)
+      }
       lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(DataType.fromWdlType(wdlType), Token(name)))
       if (expr.isDefined) {
@@ -445,10 +460,10 @@ case class V1_0Formatter(opts: Options,
     }
   }
 
-  case class MembersSection(members: Map[String, Type]) extends StatementGroup {
+  case class MembersSection(members: Seq[StructMember]) extends StatementGroup {
     override def statements: Seq[Statement] = {
       members.map {
-        case (name, dt) => DeclarationStatement(name, dt)
+        case StructMember(name, dt, _, comment) => DeclarationStatement(name, dt, None, comment)
       }.toVector
     }
   }
@@ -456,12 +471,12 @@ case class V1_0Formatter(opts: Options,
   case class DeclarationsSection(declarations: Seq[Declaration]) extends StatementGroup {
     override def statements: Seq[Statement] = {
       declarations.map { decl =>
-        DeclarationStatement(decl.name, decl.wdlType, decl.expr)
+        DeclarationStatement(decl.name, decl.wdlType, decl.expr, decl.comment)
       }
     }
   }
 
-  case class MetaKVStatement(id: String, expr: Expr) extends Statement {
+  case class MetaKVStatement(id: String, expr: Expr, comment: Option[Comment]) extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
       lineFormatter.appendAll(
@@ -473,13 +488,14 @@ case class V1_0Formatter(opts: Options,
 
   case class MetadataSection(metaKV: Seq[MetaKV]) extends StatementGroup {
     override def statements: Seq[Statement] = {
-      metaKV.map(kv => MetaKVStatement(kv.id, kv.expr))
+      metaKV.map(kv => MetaKVStatement(kv.id, kv.expr, kv.comment))
     }
   }
 
   sealed abstract class BlockStatement(keyword: Token,
                                        clause: Option[Atom] = None,
-                                       body: Option[Chunk])
+                                       body: Option[Chunk],
+                                       comment: Option[Comment])
       extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
@@ -497,19 +513,28 @@ case class V1_0Formatter(opts: Options,
   case class StructBlock(struct: TypeStruct)
       extends BlockStatement(Token.Struct,
                              Some(Token(struct.name)),
-                             Some(MembersSection(struct.members)))
+                             Some(MembersSection(struct.members)),
+                             struct.comment)
 
   case class InputsBlock(inputs: InputSection)
-      extends BlockStatement(Token.Input, body = Some(DeclarationsSection(inputs.declarations)))
+      extends BlockStatement(Token.Input,
+                             body = Some(DeclarationsSection(inputs.declarations)),
+                             comment = inputs.comment)
 
   case class OutputsBlock(outputs: OutputSection)
-      extends BlockStatement(Token.Output, body = Some(DeclarationsSection(outputs.declarations)))
+      extends BlockStatement(Token.Output,
+                             body = Some(DeclarationsSection(outputs.declarations)),
+                             comment = outputs.comment)
 
   case class MetaBlock(meta: MetaSection)
-      extends BlockStatement(Token.Meta, body = Some(MetadataSection(meta.kvs)))
+      extends BlockStatement(Token.Meta,
+                             body = Some(MetadataSection(meta.kvs)),
+                             comment = meta.comment)
 
   case class ParameterMetaBlock(parameterMeta: ParameterMetaSection)
-      extends BlockStatement(Token.ParameterMeta, body = Some(MetadataSection(parameterMeta.kvs)))
+      extends BlockStatement(Token.ParameterMeta,
+                             body = Some(MetadataSection(parameterMeta.kvs)),
+                             comment = parameterMeta.comment)
 
   case class WorkflowElementBody(elements: Seq[WorkflowElement]) extends SectionsStatement {
     override def sections: Seq[Statement] = {
@@ -564,20 +589,23 @@ case class V1_0Formatter(opts: Options,
             Some(CallInputsStatement(call.inputs))
           } else {
             None
-          }
+          },
+          call.comment
       )
 
   case class ScatterBlock(scatter: Scatter)
       extends BlockStatement(
           Token.Scatter,
           Some(Spaced(Vector(Token(scatter.identifier), Token.In, buildExpression(scatter.expr)))),
-          Some(WorkflowElementBody(scatter.body))
+          Some(WorkflowElementBody(scatter.body)),
+          scatter.comment
       )
 
   case class ConditionalBlock(conditional: Conditional)
       extends BlockStatement(Token.If,
                              Some(buildExpression(conditional.expr)),
-                             Some(WorkflowElementBody(conditional.body)))
+                             Some(WorkflowElementBody(conditional.body)),
+                             conditional.comment)
 
   case class WorkflowSections(workflow: Workflow) extends Sections {
     if (workflow.input.isDefined) {
@@ -602,7 +630,8 @@ case class V1_0Formatter(opts: Options,
   case class WorkflowBlock(workflow: Workflow)
       extends BlockStatement(Token.Workflow,
                              Some(Token(workflow.name)),
-                             Some(WorkflowSections(workflow)))
+                             Some(WorkflowSections(workflow)),
+                             workflow.comment)
 
   private val commandStartRegexp = "^[\n\r]+".r
   private val commandEndRegexp = "\\s+$".r
@@ -677,12 +706,14 @@ case class V1_0Formatter(opts: Options,
 
   case class RuntimeMetadataSection(runtimeKV: Seq[RuntimeKV]) extends StatementGroup {
     override def statements: Seq[Statement] = {
-      runtimeKV.map(kv => MetaKVStatement(kv.id, kv.expr))
+      runtimeKV.map(kv => MetaKVStatement(kv.id, kv.expr, kv.comment))
     }
   }
 
   case class RuntimeBlock(runtime: RuntimeSection)
-      extends BlockStatement(Token.Runtime, body = Some(RuntimeMetadataSection(runtime.kvs)))
+      extends BlockStatement(Token.Runtime,
+                             body = Some(RuntimeMetadataSection(runtime.kvs)),
+                             comment = runtime.comment)
 
   case class TaskSections(task: Task) extends Sections {
     if (task.input.isDefined) {
@@ -713,7 +744,10 @@ case class V1_0Formatter(opts: Options,
   }
 
   case class TaskBlock(task: Task)
-      extends BlockStatement(Token.Task, Some(Token(task.name)), Some(TaskSections(task)))
+      extends BlockStatement(Token.Task,
+                             Some(Token(task.name)),
+                             Some(TaskSections(task)),
+                             task.comment)
 
   case class FormatterDocument(document: Document) extends Sections {
     def format(): Seq[String] = {
@@ -728,6 +762,10 @@ case class V1_0Formatter(opts: Options,
       }
 
       statements.append(VersionStatement("1.0"))
+
+      if (document.comment.isDefined) {
+        statements.append(CommentSection(document.comment.get))
+      }
 
       if (imports.nonEmpty) {
         statements.append(ImportsSection(imports))
