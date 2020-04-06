@@ -136,73 +136,90 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   }
 
   private def translateMetaKV(kv: ConcreteSyntax.MetaKV): AbstractSyntax.MetaKV = {
-    AbstractSyntax.MetaKV(kv.id, AbstractSyntax.ValueString(kv.value, kv.text), kv.text)
+    AbstractSyntax.MetaKV(kv.id, AbstractSyntax.ValueString(kv.value, kv.text), kv.text, kv.comment)
   }
 
   private def translateInputSection(
       inp: ConcreteSyntax.InputSection
   ): AbstractSyntax.InputSection = {
-    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration), inp.text)
+    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration), inp.text, inp.comment)
   }
 
   private def translateOutputSection(
       output: ConcreteSyntax.OutputSection
   ): AbstractSyntax.OutputSection = {
-    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration), output.text)
+    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration),
+                                 output.text,
+                                 output.comment)
   }
 
   private def translateCommandSection(
       cs: ConcreteSyntax.CommandSection
   ): AbstractSyntax.CommandSection = {
-    AbstractSyntax.CommandSection(cs.parts.map(translateExpr), cs.text)
+    AbstractSyntax.CommandSection(cs.parts.map(translateExpr), cs.text, cs.comment)
   }
 
   private def translateDeclaration(decl: ConcreteSyntax.Declaration): AbstractSyntax.Declaration = {
     AbstractSyntax.Declaration(decl.name,
                                translateType(decl.wdlType),
                                decl.expr.map(translateExpr),
-                               decl.text)
+                               decl.text,
+                               decl.comment)
   }
 
   private def translateMetaSection(meta: ConcreteSyntax.MetaSection): AbstractSyntax.MetaSection = {
-    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV), meta.text)
+    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV), meta.text, meta.comment)
   }
 
   private def translateParameterMetaSection(
       paramMeta: ConcreteSyntax.ParameterMetaSection
   ): AbstractSyntax.ParameterMetaSection = {
-    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text)
+    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
+                                        paramMeta.text,
+                                        paramMeta.comment)
   }
 
   private def translateRuntimeSection(
       runtime: ConcreteSyntax.RuntimeSection
   ): AbstractSyntax.RuntimeSection = {
-    AbstractSyntax.RuntimeSection(runtime.kvs.map {
-      case ConcreteSyntax.RuntimeKV(id, expr, text) =>
-        AbstractSyntax.RuntimeKV(id, translateExpr(expr), text)
-    }, runtime.text)
+    AbstractSyntax.RuntimeSection(
+        runtime.kvs.map {
+          case ConcreteSyntax.RuntimeKV(id, expr, text, comment) =>
+            AbstractSyntax.RuntimeKV(id, translateExpr(expr), text, comment)
+        },
+        runtime.text,
+        runtime.comment
+    )
   }
 
   private def translateWorkflowElement(
       elem: ConcreteSyntax.WorkflowElement
   ): AbstractSyntax.WorkflowElement = {
     elem match {
-      case ConcreteSyntax.Declaration(name, wdlType, expr, text) =>
-        AbstractSyntax.Declaration(name, translateType(wdlType), expr.map(translateExpr), text)
+      case ConcreteSyntax.Declaration(name, wdlType, expr, text, comment) =>
+        AbstractSyntax.Declaration(name,
+                                   translateType(wdlType),
+                                   expr.map(translateExpr),
+                                   text,
+                                   comment)
 
-      case ConcreteSyntax.Call(name, alias, inputs, text) =>
+      case ConcreteSyntax.Call(name, alias, inputs, text, comment) =>
         AbstractSyntax.Call(name, alias, inputs.map {
           case (name, expr) => name -> translateExpr(expr)
-        }, text)
+        }, text, comment)
 
-      case ConcreteSyntax.Scatter(identifier, expr, body, text) =>
+      case ConcreteSyntax.Scatter(identifier, expr, body, text, comment) =>
         AbstractSyntax.Scatter(identifier,
                                translateExpr(expr),
                                body.map(translateWorkflowElement),
-                               text)
+                               text,
+                               comment)
 
-      case ConcreteSyntax.Conditional(expr, body, text) =>
-        AbstractSyntax.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text)
+      case ConcreteSyntax.Conditional(expr, body, text, comment) =>
+        AbstractSyntax.Conditional(translateExpr(expr),
+                                   body.map(translateWorkflowElement),
+                                   text,
+                                   comment)
     }
   }
 
@@ -214,7 +231,8 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
         wf.meta.map(translateMetaSection),
         wf.parameterMeta.map(translateParameterMetaSection),
         wf.body.map(translateWorkflowElement),
-        wf.text
+        wf.text,
+        wf.comment
     )
   }
 
@@ -224,14 +242,14 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
-      case ConcreteSyntax.ImportDoc(name, aliases, url, text) =>
+      case ConcreteSyntax.ImportDoc(name, aliases, url, text, comment) =>
         val importedDoc = followImport(url)
         val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = aliases.map {
           case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
         }
 
         // Replace the original statement with a new one
-        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc, text)
+        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc, text, comment)
 
       case ConcreteSyntax.Task(name,
                                input,
@@ -241,7 +259,8 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
                                meta,
                                parameterMeta,
                                runtime,
-                               text) =>
+                               text,
+                               comment) =>
         AbstractSyntax.Task(
             name,
             input.map(translateInputSection),
@@ -251,14 +270,15 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
             meta.map(translateMetaSection),
             parameterMeta.map(translateParameterMetaSection),
             runtime.map(translateRuntimeSection),
-            text
+            text,
+            comment
         )
 
       case other => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
-    AbstractSyntax.Document(doc.version, elems, aWf, doc.text)
+    AbstractSyntax.Document(doc.version, None, elems, aWf, doc.text, doc.comment)
   }
 
   override def canParse(sourceCode: SourceCode): Boolean = {

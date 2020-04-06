@@ -1,6 +1,6 @@
 package wdlTools.typechecker
 
-import wdlTools.util.TextSource
+import wdlTools.syntax.TextSource
 
 // Type error exception
 class TypeException private (ex: Exception) extends Exception(ex) {

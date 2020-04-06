@@ -10,10 +10,11 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
-import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, SourceCode, TextSource, URL}
+import wdlTools.syntax.{Comment, TextSource, WdlVersion}
+import wdlTools.util.{Options, SourceCode, URL}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 object ParseDocument {
   case class V1_0GrammarFactory(opts: Options)
@@ -50,15 +51,15 @@ case class ParseDocument(grammar: Grammar[V10WdlLexer, V10WdlParser],
   }
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    val tok = ctx.start
-    val line = tok.getLine
-    val col = tok.getCharPositionInLine
-    TextSource(line = line, col = col, url = docSourceURL)
+    grammar.getSourceText(ctx, docSourceURL)
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    val tok = symbol.getSymbol
-    TextSource(line = tok.getLine, col = tok.getCharPositionInLine, url = docSourceURL)
+    grammar.getSourceText(symbol, docSourceURL)
+  }
+
+  private def getComment(ctx: ParserRuleContext): Option[Comment] = {
+    grammar.getComment(ctx)
   }
 
   /*
@@ -68,26 +69,25 @@ struct
    */
   override def visitStruct(ctx: V10WdlParser.StructContext): TypeStruct = {
     val sName = ctx.Identifier().getText
-    val membersVec: Vector[(String, Type)] = ctx
+    val members: Vector[StructMember] = ctx
       .unbound_decls()
       .asScala
       .map { x =>
         val decl = visitUnbound_decls(x)
-        decl.name -> decl.wdlType
+        StructMember(decl.name, decl.wdlType, decl.text, decl.comment)
       }
       .toVector
 
     // check that each field appears once
-    val members: Map[String, Type] = membersVec
-      .foldLeft(Map.empty[String, Type]) {
-        case (accu, (fieldName, wdlType)) =>
-          accu.get(fieldName) match {
-            case None => accu + (fieldName -> wdlType)
-            case Some(_) =>
-              throw makeWdlException(s"struct ${sName} has field ${fieldName} defined twice", ctx)
-          }
+    val memberNames: mutable.Set[String] = mutable.HashSet.empty
+    members.foreach { member =>
+      if (memberNames.contains(member.name)) {
+        throw makeWdlException(s"struct ${sName} has field ${member.name} defined twice", ctx)
       }
-    TypeStruct(sName, members, getSourceText(ctx))
+      memberNames.add(member.name)
+    }
+
+    TypeStruct(sName, members, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -659,7 +659,7 @@ unbound_decls
   override def visitUnbound_decls(ctx: V10WdlParser.Unbound_declsContext): Declaration = {
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
-    Declaration(name, wdlType, None, getSourceText(ctx))
+    Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -671,9 +671,9 @@ bound_decls
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     if (ctx.expr() == null)
-      return Declaration(name, wdlType, None, getSourceText(ctx))
+      return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
     val expr: Expr = visitExpr(ctx.expr())
-    Declaration(name, wdlType, Some(expr), getSourceText(ctx))
+    Declaration(name, wdlType, Some(expr), getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -696,7 +696,7 @@ any_decls
   override def visitMeta_kv(ctx: V10WdlParser.Meta_kvContext): MetaKV = {
     val id = ctx.Identifier().getText
     val expr = visitExpr(ctx.expr)
-    MetaKV(id, expr, getSourceText(ctx))
+    MetaKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
@@ -708,7 +708,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    ParameterMetaSection(kvs, getSourceText(ctx))
+    ParameterMetaSection(kvs, getSourceText(ctx), getComment(ctx))
   }
 
   //  META LBRACE meta_kv* RBRACE #meta
@@ -718,7 +718,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    MetaSection(kvs, getSourceText(ctx))
+    MetaSection(kvs, getSourceText(ctx), getComment(ctx))
   }
 
   /* task_runtime_kv
@@ -727,7 +727,7 @@ any_decls
   override def visitTask_runtime_kv(ctx: V10WdlParser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
     val expr: Expr = visitExpr(ctx.expr())
-    RuntimeKV(id, expr, getSourceText(ctx))
+    RuntimeKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
 
   /* task_runtime
@@ -739,7 +739,7 @@ any_decls
       .asScala
       .map(x => visitTask_runtime_kv(x))
       .toVector
-    RuntimeSection(kvs, getSourceText(ctx))
+    RuntimeSection(kvs, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -753,7 +753,7 @@ task_input
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx))
+    InputSection(decls, getSourceText(ctx), getComment(ctx))
   }
 
   /* task_output
@@ -765,7 +765,7 @@ task_input
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx))
+    OutputSection(decls, getSourceText(ctx), getComment(ctx))
   }
 
   /* task_command_string_part
@@ -833,7 +833,7 @@ task_input
 
     // TODO: do the above until reaching a fixed point
 
-    CommandSection(cleanedParts, getSourceText(ctx))
+    CommandSection(cleanedParts, getSourceText(ctx), getComment(ctx))
   }
 
   // A that should appear zero or once. Make sure this is the case.
@@ -888,7 +888,7 @@ task_input
     val ioVarNames = inputVarNames ++ outputVarNames
 
     paramMeta.kvs.foreach {
-      case MetaKV(k, _, _) =>
+      case MetaKV(k, _, _, _) =>
         if (!(ioVarNames contains k))
           throw makeWdlException(s"parameter ${k} does not appear in the input or output sections",
                                  ctx)
@@ -926,15 +926,18 @@ task_input
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Task(name,
-         input = input,
-         output = output,
-         command = command,
-         declarations = decls,
-         meta = meta,
-         parameterMeta = parameterMeta,
-         runtime = runtime,
-         text = getSourceText(ctx))
+    Task(
+        name,
+        input = input,
+        output = output,
+        command = command,
+        declarations = decls,
+        meta = meta,
+        parameterMeta = parameterMeta,
+        runtime = runtime,
+        text = getSourceText(ctx),
+        getComment(ctx)
+    )
   }
 
   /* import_alias
@@ -971,7 +974,7 @@ import_as
       .asScala
       .map(x => visitImport_alias(x))
       .toVector
-    ImportDoc(name, aliases, URL(url), getSourceText(ctx))
+    ImportDoc(name, aliases, URL(url), getSourceText(ctx), getComment(ctx))
   }
 
   /* call_alias
@@ -1035,7 +1038,7 @@ import_as
         cb.value
       }
 
-    Call(name, alias, inputs, getSourceText(ctx))
+    Call(name, alias, inputs, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -1050,7 +1053,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Scatter(id, expr, body, getSourceText(ctx))
+    Scatter(id, expr, body, getSourceText(ctx), getComment(ctx))
   }
 
   /* conditional
@@ -1063,7 +1066,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Conditional(expr, body, getSourceText(ctx))
+    Conditional(expr, body, getSourceText(ctx), getComment(ctx))
   }
 
   /* workflow_input
@@ -1075,7 +1078,7 @@ scatter
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx))
+    InputSection(decls, getSourceText(ctx), getComment(ctx))
   }
 
   /* workflow_output
@@ -1088,7 +1091,7 @@ scatter
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx))
+    OutputSection(decls, getSourceText(ctx), getComment(ctx))
   }
 
   /* inner_workflow_element
@@ -1152,7 +1155,7 @@ workflow
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Workflow(name, input, output, meta, parameterMeta, wfElems, getSourceText(ctx))
+    Workflow(name, input, output, meta, parameterMeta, wfElems, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -1171,7 +1174,7 @@ document_element
 	; */
   override def visitVersion(ctx: V10WdlParser.VersionContext): Version = {
     val value = ctx.RELEASE_VERSION().getText
-    Version(value, getSourceText(ctx))
+    Version(WdlVersion.fromName(value), getSourceText(ctx))
   }
 
   /*
@@ -1195,7 +1198,7 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(WdlVersion.fromName(version.value), elems, workflow, getSourceText(ctx))
+    Document(version, elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
   def apply(): Document = {

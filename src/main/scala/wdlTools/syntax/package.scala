@@ -20,6 +20,24 @@ object WdlVersion {
   }
 }
 
+// source location in a WDL program. We add it to each syntax element
+// so we could do accurate error reporting.
+//
+// line: line number
+// col : column number
+// URL:  original file or web URL
+//
+case class TextSource(line: Int, col: Int, url: URL)
+
+/**
+  * Type hierarchy for comments.
+  */
+abstract class Comment {}
+case class CommentLine(text: String) extends Comment
+case class CommentEmpty() extends Comment
+case class CommentPreformatted(lines: Seq[String]) extends Comment
+case class CommmentCompound(comments: Seq[Comment]) extends Comment
+
 trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
@@ -39,8 +57,8 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
       extends DocumentWalker[T] {
     def extractDependencies(document: AbstractSyntax.Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, url, doc, _) => Some(url -> doc)
-        case _                            => None
+        case ImportDoc(_, _, url, doc, _, _) => Some(url -> doc)
+        case _                               => None
       }.toMap
     }
 

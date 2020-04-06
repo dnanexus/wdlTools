@@ -36,15 +36,6 @@ object URL {
   }
 }
 
-// source location in a WDL program. We add it to each syntax element
-// so we could do accurate error reporting.
-//
-// line: line number
-// col : column number
-// URL:  original file or web URL
-//
-case class TextSource(line: Int, col: Int, url: URL)
-
 /**
   * Common configuration options.
   * @param localDirectories local directories to search for imports.
