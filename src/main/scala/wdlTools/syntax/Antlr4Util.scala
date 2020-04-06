@@ -89,7 +89,8 @@ object Antlr4Util {
                   currentComment.clear()
                 }
                 preformatted = false
-              } else if (trimmed.isEmpty) {
+              }
+              if (trimmed.isEmpty) {
                 if (currentComment.nonEmpty) {
                   comments.append(CommentLine(currentComment.mkString(" ")))
                   currentComment.clear()
@@ -109,7 +110,7 @@ object Antlr4Util {
             }
           }
           return Some(if (comments.size > 1) {
-            CommmentCompound(comments.toVector)
+            CommentCompound(comments.toVector)
           } else {
             comments.head
           })

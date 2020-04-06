@@ -2,7 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.{Comment, CommentEmpty, CommentLine, CommentPreformatted, CommmentCompound}
+import wdlTools.syntax.{Comment, CommentEmpty, CommentLine, CommentPreformatted, CommentCompound}
 
 import scala.collection.mutable
 
@@ -131,7 +131,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
           appendAll(Vector[Chunk](Token.PreformattedComment, StringLiteral(line)), Wrapping.Never)
           endLine()
         }
-      case CommmentCompound(comments) => comments.foreach(appendComment)
+      case CommentCompound(comments) => comments.foreach(appendComment)
     }
   }
 

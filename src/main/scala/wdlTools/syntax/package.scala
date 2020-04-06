@@ -36,7 +36,7 @@ abstract class Comment {}
 case class CommentLine(text: String) extends Comment
 case class CommentEmpty() extends Comment
 case class CommentPreformatted(lines: Seq[String]) extends Comment
-case class CommmentCompound(comments: Seq[Comment]) extends Comment
+case class CommentCompound(comments: Seq[Comment]) extends Comment
 
 trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
