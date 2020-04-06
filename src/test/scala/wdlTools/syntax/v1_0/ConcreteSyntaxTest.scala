@@ -1,25 +1,27 @@
-package wdlTools.syntax
+package wdlTools.syntax.v1_0
 
 import java.nio.file.{Path, Paths}
-import org.scalatest.{FlatSpec, Matchers}
 
-import ConcreteSyntax._
-import wdlTools.util.{Options, URL}
+import org.scalatest.{FlatSpec, Matchers}
+import wdlTools.syntax.{Edge, WdlVersion}
+import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
+import wdlTools.util.{Options, SourceCode, URL}
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
-
-  private def getWdlSource(dirname: String, fname: String): URL = {
-    val p: String = getClass.getResource(s"/syntax/${dirname}/${fname}").getPath
-    val path: Path = Paths.get(p)
-    URL(path.toString)
-  }
   private lazy val conf = Options(antlr4Trace = false, verbosity = Quiet)
+  lazy val loader = SourceCode.Loader(conf)
+
+  private def getWdlSource(dirname: String, fname: String): SourceCode = {
+    val p: String = getClass.getResource(s"/syntax/v1_0/${dirname}/${fname}").getPath
+    val path: Path = Paths.get(p)
+    loader.apply(URL(path.toString))
+  }
 
   it should "handle various types" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "types.wdl"), conf)
 
-    doc.elements.size shouldBe (1)
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
@@ -68,8 +70,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle types and expressions" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "expressions.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
-    doc.elements.size shouldBe (1)
+    doc.version shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
@@ -104,84 +106,78 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                        _) =>
     }
     task.declarations(7) should matchPattern {
-      case (Declaration("b4",
-                        _: TypeBoolean,
-                        Some(ExprEqeq(ExprInt(3, _), ExprInt(5, _), _)),
-                        _)) =>
+      case Declaration("b4", _: TypeBoolean, Some(ExprEqeq(ExprInt(3, _), ExprInt(5, _), _)), _) =>
     }
     task.declarations(8) should matchPattern {
-      case (Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4, _), ExprInt(5, _), _)), _)) =>
+      case Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4, _), ExprInt(5, _), _)), _) =>
     }
     task.declarations(9) should matchPattern {
-      case (Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4, _), ExprInt(5, _), _)), _)) =>
+      case Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4, _), ExprInt(5, _), _)), _) =>
     }
     task.declarations(10) should matchPattern {
-      case (Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6, _), ExprInt(7, _), _)), _)) =>
+      case Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6, _), ExprInt(7, _), _)), _) =>
     }
     task.declarations(11) should matchPattern {
-      case (Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6, _), ExprInt(7, _), _)), _)) =>
+      case Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6, _), ExprInt(7, _), _)), _) =>
     }
     task.declarations(12) should matchPattern {
-      case (Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6, _), ExprInt(7, _), _)), _)) =>
+      case Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6, _), ExprInt(7, _), _)), _) =>
     }
     task.declarations(13) should matchPattern {
-      case (Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2", _), _)), _)) =>
+      case Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2", _), _)), _) =>
     }
 
     // Arithmetic
     task.declarations(14) should matchPattern {
-      case (Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _)) =>
+      case Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _) =>
     }
     task.declarations(15) should matchPattern {
-      case (Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4, _), ExprInt(10, _), _)), _)) =>
+      case Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4, _), ExprInt(10, _), _)), _) =>
     }
     task.declarations(16) should matchPattern {
-      case (Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10, _), ExprInt(7, _), _)), _)) =>
+      case Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10, _), ExprInt(7, _), _)), _) =>
     }
     task.declarations(17) should matchPattern {
-      case (Declaration("j3", _: TypeInt, Some(ExprIdentifier("j", _)), _)) =>
+      case Declaration("j3", _: TypeInt, Some(ExprIdentifier("j", _)), _) =>
     }
     task.declarations(18) should matchPattern {
-      case (Declaration("j4",
-                        _: TypeInt,
-                        Some(ExprAdd(ExprIdentifier("j", _), ExprInt(19, _), _)),
-                        _)) =>
+      case Declaration("j4",
+                       _: TypeInt,
+                       Some(ExprAdd(ExprIdentifier("j", _), ExprInt(19, _), _)),
+                       _) =>
     }
 
     task.declarations(19) should matchPattern {
-      case (Declaration(
+      case Declaration(
           "ia",
           TypeArray(_: TypeInt, false, _),
           Some(ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _)),
           _
-          )) =>
+          ) =>
     }
     task.declarations(20) should matchPattern {
-      case (Declaration("ia",
-                        TypeArray(_: TypeInt, true, _),
-                        Some(ExprArrayLiteral(Vector(ExprInt(10, _)), _)),
-                        _)) =>
+      case Declaration("ia",
+                       TypeArray(_: TypeInt, true, _),
+                       Some(ExprArrayLiteral(Vector(ExprInt(10, _)), _)),
+                       _) =>
     }
     task.declarations(21) should matchPattern {
-      case (Declaration("k",
-                        _: TypeInt,
-                        Some(ExprAt(ExprIdentifier("ia", _), ExprInt(3, _), _)),
-                        _)) =>
+      case Declaration("k",
+                       _: TypeInt,
+                       Some(ExprAt(ExprIdentifier("ia", _), ExprInt(3, _), _)),
+                       _) =>
     }
     task.declarations(22) should matchPattern {
-      case (Declaration(
+      case Declaration(
           "k2",
           _: TypeInt,
           Some(ExprApply("f", Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _)),
           _
-          )) =>
+          ) =>
     }
 
     task.declarations(23) should matchPattern {
-      case (Declaration("m",
-                        TypeMap(TypeInt(_), TypeString(_), _),
-                        Some(ExprMapLiteral(_, _)),
-                        _)) =>
+      case Declaration("m", TypeMap(TypeInt(_), TypeString(_), _), Some(ExprMapLiteral(_, _)), _) =>
     }
     /*    val m = task.declarations(23).expr
     m should matchPattern {
@@ -190,50 +186,50 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     _)),*/
 
     task.declarations(24) should matchPattern {
-      case (Declaration("k3",
-                        _: TypeInt,
-                        Some(ExprIfThenElse(ExprBoolean(true, _), ExprInt(1, _), ExprInt(2, _), _)),
-                        _)) =>
+      case Declaration("k3",
+                       _: TypeInt,
+                       Some(ExprIfThenElse(ExprBoolean(true, _), ExprInt(1, _), ExprInt(2, _), _)),
+                       _) =>
     }
     task.declarations(25) should matchPattern {
-      case (Declaration("k4", _: TypeInt, Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _)) =>
+      case Declaration("k4", _: TypeInt, Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
     }
 
     task.declarations(26) should matchPattern {
-      case (Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_, _)), _)) =>
+      case Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_, _)), _) =>
     }
     /*(Map("A" -> ExprInt(1, _),
      "B" -> ExprInt(2, _,
      _))), _)) */
 
     task.declarations(27) should matchPattern {
-      case (Declaration("twenty_threes",
-                        TypePair(TypeInt(_), TypeString(_), _),
-                        Some(ExprPair(ExprInt(23, _), ExprString("twenty-three", _), _)),
-                        _)) =>
+      case Declaration("twenty_threes",
+                       TypePair(TypeInt(_), TypeString(_), _),
+                       Some(ExprPair(ExprInt(23, _), ExprString("twenty-three", _), _)),
+                       _) =>
     }
   }
 
   it should "handle get name" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "get_name_bug.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
-    doc.elements.size shouldBe (1)
+    doc.version shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    task.name shouldBe ("district")
-    task.input shouldBe (None)
-    task.output shouldBe (None)
+    task.name shouldBe "district"
+    task.input shouldBe None
+    task.output shouldBe None
     task.command should matchPattern {
       case CommandSection(Vector(), _) =>
     }
-    task.meta shouldBe (None)
-    task.parameterMeta shouldBe (None)
+    task.meta shouldBe None
+    task.parameterMeta shouldBe None
 
     task.declarations(0) should matchPattern {
-      case (Declaration("k", TypeInt(_), Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _)) =>
+      case Declaration("k", TypeInt(_), Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
     }
   }
 
@@ -247,13 +243,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse a task with an output section only" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "output_section.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
-    doc.elements.size shouldBe (1)
+    doc.version shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    task.name shouldBe ("wc")
+    task.name shouldBe "wc"
     task.output.get should matchPattern {
       case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _)), _) =>
     }
@@ -262,13 +258,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse a task" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "wc.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
-    doc.elements.size shouldBe (1)
+    doc.version shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    task.name shouldBe ("wc")
+    task.name shouldBe "wc"
     task.input.get should matchPattern {
       case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _)), _) =>
     }
@@ -276,7 +272,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _)), _) =>
     }
     task.command shouldBe a[CommandSection]
-    task.command.parts.size shouldBe (3)
+    task.command.parts.size shouldBe 3
     task.command.parts(0) should matchPattern {
       case ExprString("\n    wc -l ", _) =>
     }
@@ -285,14 +281,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
 
     task.meta.get shouldBe a[MetaSection]
-    task.meta.get.kvs.size shouldBe (1)
+    task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
       case MetaKV("author", ExprString("Robin Hood", _), _) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
-    task.parameterMeta.get.kvs.size shouldBe (1)
+    task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
       case MetaKV("inp_file", ExprString("just because", _), _) =>
@@ -312,15 +308,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle string interpolation" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "interpolation.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
-    doc.elements.size shouldBe (1)
+    doc.version shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    task.name shouldBe ("foo")
+    task.name shouldBe "foo"
     task.input.get shouldBe a[InputSection]
-    task.input.get.declarations.size shouldBe (2)
+    task.input.get.declarations.size shouldBe 2
     task.input.get.declarations(0) should matchPattern {
       case Declaration("min_std_max_min", TypeInt(_), None, _) =>
     }
@@ -340,38 +336,38 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse structs" in {
     val doc = ParseDocument.apply(getWdlSource("structs", "I.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
+    doc.version shouldBe WdlVersion.V1_0
     val structs = doc.elements.collect {
       case x: TypeStruct => x
     }
-    structs.size shouldBe (2)
-    structs(0).name shouldBe ("Address")
-    structs(0).members.size shouldBe (3)
+    structs.size shouldBe 2
+    structs(0).name shouldBe "Address"
+    structs(0).members.size shouldBe 3
     structs(0).members.toVector should matchPattern {
       case Vector(("street", TypeString(_)), ("city", TypeString(_)), ("zipcode", TypeInt(_))) =>
     }
 
-    structs(1).name shouldBe ("Data")
+    structs(1).name shouldBe "Data"
     structs(1).members.toVector should matchPattern {
       case Vector(("history", TypeFile(_)), ("date", TypeInt(_)), ("month", TypeString(_))) =>
     }
   }
 
-  it should "parse a simple workflow" taggedAs (Edge) in {
+  it should "parse a simple workflow" taggedAs Edge in {
     val doc = ParseDocument.apply(getWdlSource("workflows", "I.wdl"), conf)
-    doc.elements.size shouldBe (0)
+    doc.elements.size shouldBe 0
 
-    doc.version shouldBe ("1.0")
+    doc.version shouldBe WdlVersion.V1_0
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
-    wf.name shouldBe ("biz")
-    wf.body.size shouldBe (3)
+    wf.name shouldBe "biz"
+    wf.body.size shouldBe 3
 
     val calls = wf.body.collect {
       case x: Call => x
     }
-    calls.size shouldBe (1)
+    calls.size shouldBe 1
     calls(0) should matchPattern {
       case Call("bar", Some("boz"), _, _) =>
     }
@@ -382,12 +378,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val scatters = wf.body.collect {
       case x: Scatter => x
     }
-    scatters.size shouldBe (1)
-    scatters(0).identifier shouldBe ("i")
+    scatters.size shouldBe 1
+    scatters(0).identifier shouldBe "i"
     scatters(0).expr should matchPattern {
       case ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _) =>
     }
-    scatters(0).body.size shouldBe (1)
+    scatters(0).body.size shouldBe 1
     scatters(0).body(0) should matchPattern {
       case Call("add", None, _, _) =>
     }
@@ -399,14 +395,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val conditionals = wf.body.collect {
       case x: Conditional => x
     }
-    conditionals.size shouldBe (1)
+    conditionals.size shouldBe 1
     conditionals(0).expr should matchPattern {
       case ExprEqeq(ExprBoolean(true, _), ExprBoolean(false, _), _) =>
     }
     conditionals(0).body should matchPattern {
       case Vector(Call("sub", None, _, _)) =>
     }
-    conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe (0)
+    conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe 0
 
     wf.meta.get shouldBe a[MetaSection]
     wf.meta.get.kvs should matchPattern {
@@ -417,12 +413,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle import statements" in {
     val doc = ParseDocument.apply(getWdlSource("workflows", "imports.wdl"), conf)
 
-    doc.version shouldBe ("1.0")
+    doc.version shouldBe WdlVersion.V1_0
 
     val imports = doc.elements.collect {
       case x: ImportDoc => x
     }
-    imports.size shouldBe (2)
+    imports.size shouldBe 2
 
     doc.workflow should not be empty
   }
@@ -433,7 +429,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations" taggedAs (Edge) in {
+  it should "handle chained operations" taggedAs Edge in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"), conf)
 
     doc.elements.size shouldBe 1
@@ -451,11 +447,11 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations in a workflow" taggedAs (Edge) in {
+  it should "handle chained operations in a workflow" taggedAs Edge in {
     val doc = ParseDocument.apply(getWdlSource("workflows", "chained_expr.wdl"), conf)
-    doc.elements.size shouldBe (0)
+    doc.elements.size shouldBe 0
 
-    doc.version shouldBe ("1.0")
+    doc.version shouldBe WdlVersion.V1_0
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 

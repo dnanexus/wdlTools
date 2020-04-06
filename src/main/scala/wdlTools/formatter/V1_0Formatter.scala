@@ -1,15 +1,13 @@
 package wdlTools.formatter
 
-import java.net.URI
-
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.WalkDocuments
-import wdlTools.util.{Options, Util, Verbosity}
+import wdlTools.syntax.Parsers
+import wdlTools.util.{Options, URL, Util, Verbosity}
 
 import scala.collection.mutable
 
-case class WDL10Formatter(opts: Options,
-                          documents: mutable.Map[URI, Seq[String]] = mutable.Map.empty) {
+case class V1_0Formatter(opts: Options,
+                         documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
 
   abstract class Group(prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
@@ -757,9 +755,9 @@ case class WDL10Formatter(opts: Options,
     }
   }
 
-  def formatDocuments(uri: URI, followImports: Boolean = true): Unit = {
-    WalkDocuments(uri, opts, followImports, documents).apply { (uri, doc, results) =>
-      results(uri) = FormatterDocument(doc).format()
+  def formatDocuments(url: URL): Unit = {
+    Parsers(opts).getDocumentWalker[Seq[String]](url, documents).walk { (url, doc, results) =>
+      results(url) = FormatterDocument(doc).format()
     }
   }
 }

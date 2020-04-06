@@ -1,6 +1,9 @@
-lexer grammar WdlLexer;
+lexer grammar V10WdlLexer;
 
-channels { WdlComments, SkipChannel }
+channels { COMMENTS }
+
+// Comments
+LINE_COMMENT: '#' ~[\r\n]* -> channel(COMMENTS);
 
 // Keywords
 VERSION: 'version' -> pushMode(Version);
@@ -91,15 +94,9 @@ WHITESPACE
 	: [ \t\r\n]+ -> channel(HIDDEN)
 	;
 
-COMMENT
-	: '#' ~[\r\n]* -> channel(HIDDEN)
-	;
-
 Identifier: CompleteIdentifier;
 
-
 mode SquoteInterpolatedString;
-
 
 SQuoteEscapedChar: '\\' . -> type(StringPart);
 SQuoteDollarString: '$'  -> type(StringPart);
@@ -120,7 +117,6 @@ DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommand
 DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(StringPart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
 DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
-
 
 mode HereDocCommand;
 
