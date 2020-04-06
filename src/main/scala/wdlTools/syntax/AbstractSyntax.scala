@@ -209,7 +209,7 @@ object AbstractSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Document(wdlVersion: WdlVersion,
+  case class Document(version: WdlVersion,
                       versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
