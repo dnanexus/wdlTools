@@ -2,6 +2,7 @@ version 1.0
 
 task foo {
   input {
+    # This is a comment that should be reformatted
     String s
     Int i
   }
