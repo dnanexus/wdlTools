@@ -1,30 +1,30 @@
 package wdlTools.syntax
 
 import AbstractSyntax._
-import java.nio.file.{Path, Paths}
+import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode, Util}
 
 class AbstractSyntaxTest extends FlatSpec with Matchers {
-  private lazy val wdlSourceDirs: Vector[Path] = {
-    val p1: Path = Paths.get(getClass.getResource("/syntax/v1_0/workflows").getPath)
-    val p2: Path = Paths.get(getClass.getResource("/syntax/v1_0/tasks").getPath)
-    Vector(p1, p2)
-  }
-  private lazy val conf = Options(antlr4Trace = false, localDirectories = wdlSourceDirs)
-  private lazy val loader = SourceCode.Loader(conf)
-  private lazy val parser = ParseAll(conf, loader)
+  private val tasksDir = Paths.get(getClass.getResource("/syntax/v1_0/tasks").getPath)
+  private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1_0/workflows").getPath)
+  private val opts =
+    Options(antlr4Trace = false, localDirectories = Some(Vector(tasksDir, workflowsDir)))
+  private val loader = SourceCode.Loader(opts)
+  private val parser = ParseAll(opts, loader)
 
-  private def getWdlSource(dirname: String, fname: String): SourceCode = {
-    val p: String = getClass.getResource(s"/syntax/v1_0/${dirname}/${fname}").getPath
-    val path: Path = Paths.get(p)
-    loader.apply(URL(path.toString))
+//  private def getTaskSource(fname: String): SourceCode = {
+//    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+//  }
+
+  private def getWorkflowSource(fname: String): SourceCode = {
+    loader.apply(Util.getURL(workflowsDir.resolve(fname)))
   }
 
   it should "handle import statements" in {
-    val doc = parser.apply(getWdlSource("workflows", "imports.wdl"))
+    val doc = parser.apply(getWorkflowSource("imports.wdl"))
 
     doc.version shouldBe WdlVersion.V1_0
 

@@ -1,5 +1,6 @@
 package wdlTools.cli
 
+import java.net.URL
 import java.nio.file.{Path, Paths}
 
 import org.rogach.scallop.{
@@ -12,7 +13,7 @@ import org.rogach.scallop.{
 }
 import wdlTools.syntax.WdlVersion
 import wdlTools.util.Verbosity._
-import wdlTools.util.{Options, URL, Util}
+import wdlTools.util.{Options, Util}
 
 /**
   * Base class for wdlTools CLI commands.
@@ -23,7 +24,7 @@ trait Command {
 
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
-  implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](URL(_))
+  implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.fromName)
 
@@ -51,7 +52,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @param merge a Set of Paths to merge in with the local directories.
       * @return
       */
-    def localDirectories(merge: Set[Path] = Set.empty): Seq[Path] = {
+    def localDirectories(merge: Set[Path] = Set.empty): Iterable[Path] = {
       if (this.localDir.isDefined) {
         (this.localDir().toSet ++ merge).toVector
       } else {
@@ -64,12 +65,13 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @return
       */
     def getOptions: Options = {
-      val parent = this.parentConfig.asInstanceOf[WdlToolsConf]
+      val parentConf = this.parentConfig.asInstanceOf[WdlToolsConf]
+      val wdlDir: Path = Util.getLocalPath(url()).getParent
       Options(
-          localDirectories = this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          localDirectories = Some(this.localDirectories(Set(wdlDir))),
           followImports = this.followImports(),
-          verbosity = parent.verbosity,
-          antlr4Trace = parent.antlr4Trace.getOrElse(default = false)
+          verbosity = parentConf.verbosity,
+          antlr4Trace = parentConf.antlr4Trace.getOrElse(default = false)
       )
     }
   }

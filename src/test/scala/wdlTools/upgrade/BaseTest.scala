@@ -1,11 +1,12 @@
 package wdlTools.upgrade
 
+import java.net.URL
 import java.nio.file.{Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.formatter.Upgrader
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, URL, Util}
+import wdlTools.util.{Options, Util}
 
 class BaseTest extends FlatSpec with Matchers {
   private lazy val opts = Options()
@@ -19,7 +20,7 @@ class BaseTest extends FlatSpec with Matchers {
   }
 
   def getBeforeAfterPair(fname: String): (URL, Path) = {
-    (URL.fromPath(getBeforePath(fname)), getAfterPath(fname))
+    (Util.getURL(getBeforePath(fname)), getAfterPath(fname))
   }
 
   it should "Upgrade draft-2 to v1.0" in {

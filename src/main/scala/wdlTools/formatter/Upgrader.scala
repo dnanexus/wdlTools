@@ -1,8 +1,10 @@
 package wdlTools.formatter
 
+import java.net.URL
+
 import wdlTools.syntax
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, URL}
+import wdlTools.util.Options
 
 case class Upgrader(opts: Options) {
   private val parsers = syntax.Parsers(opts)

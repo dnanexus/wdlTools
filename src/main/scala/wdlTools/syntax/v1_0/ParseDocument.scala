@@ -2,16 +2,14 @@ package wdlTools.syntax.v1_0
 
 // Parse one document. Do not follow imports.
 
-// we need these for safe casting, and reporting on errors
-//import reflect.ClassTag
-
+import java.net.URL
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -40,7 +38,7 @@ object ParseDocument {
 
 case class ParseDocument(grammar: Grammar[V10WdlLexer, V10WdlParser],
                          docSourceURL: URL,
-                         conf: Options)
+                         opts: Options)
     extends V10WdlParserBaseVisitor[Element] {
 
   private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
@@ -974,7 +972,7 @@ import_as
       .asScala
       .map(x => visitImport_alias(x))
       .toVector
-    ImportDoc(name, aliases, URL(url), getSourceText(ctx), getComment(ctx))
+    ImportDoc(name, aliases, opts.getURL(url), getSourceText(ctx), getComment(ctx))
   }
 
   /* call_alias

@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode, Util}
 
 class CheckerTest extends FlatSpec with Matchers {
   private val conf = Options(antlr4Trace = false)
@@ -27,7 +27,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecking/tasks/positive")
     for (pc <- positiveCases) {
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -40,7 +40,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecking/tasks/negative")
     for (pc <- negativeCases) {
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       val checkVal =
         try {
           checker.apply(doc)
@@ -60,7 +60,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecking/workflows/positive")
     for (pc <- positiveCases) {
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -74,7 +74,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecking/workflows/negative")
     for (nc <- negativeCases) {
-      val doc = parser.parse(URL.fromPath(nc))
+      val doc = parser.parse(Util.getURL(nc))
       val checkVal =
         try {
           checker.apply(doc)

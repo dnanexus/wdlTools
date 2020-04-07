@@ -1,7 +1,8 @@
 package wdlTools.syntax.draft_2
 
+import java.net.URL
+
 import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-import wdlTools.util.URL
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
