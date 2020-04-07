@@ -1,0 +1,11 @@
+<%@ import val workflow: wdlTools.syntax.AbstractSyntax.Workflow %>
+<%@ val tasks: Seq[(String, String)] %>
+# Workflow ${name}
+
+## Overview
+
+## Tasks
+
+#for (task <- tasks)
+* [${task._1}](${task._2})
+#end

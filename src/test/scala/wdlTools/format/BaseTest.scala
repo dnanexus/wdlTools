@@ -1,25 +1,40 @@
 package wdlTools.format
 
-import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
-import org.scalatest.{FlatSpec, Matchers}
+import java.net.URL
+import java.nio.file.{Path, Paths}
 
-//import wdlTools.syntax.ConcreteSyntax._
-import wdlTools.syntax.ParseDocument
-import wdlTools.util.Options
-//import wdlTools.util.Verbosity.Quiet
+import org.scalatest.{FlatSpec, Matchers}
+import wdlTools.formatter.V1_0Formatter
+import wdlTools.syntax.{WdlVersion, v1_0}
+import wdlTools.util.{Options, SourceCode, Util}
 
 class BaseTest extends FlatSpec with Matchers {
+  private lazy val opts = Options()
+  private lazy val loader = SourceCode.Loader(opts)
+  private lazy val parser = v1_0.ParseAll(opts, loader)
 
-  private def getWdlSource(fname: String): String = {
-    val p: String = getClass.getResource(s"/format/${fname}").getPath
-    val path: Path = Paths.get(p)
-    Files.readAllLines(path).asScala.mkString(System.lineSeparator())
+  def getWdlPath(fname: String, subdir: String): Path = {
+    Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
-  private lazy val conf = Options(antlr4Trace = false)
+
+  private def getWdlURL(fname: String, subdir: String): URL = {
+    Util.getURL(getWdlPath(fname, subdir))
+  }
 
   it should "handle the runtime section correctly" in {
-    val doc = ParseDocument.apply(getWdlSource("simple.wdl"), conf)
-    doc.version shouldBe ("1.0")
+    val doc = parser.parse(getWdlURL(fname = "simple.wdl", subdir = "after"))
+    doc.version shouldBe WdlVersion.V1_0
+  }
+
+  def getWdlSource(fname: String, subdir: String): String = {
+    Util.readFromFile(getWdlPath(fname, subdir))
+  }
+
+  it should "reformat simple WDL" in {
+    val beforeURL = getWdlURL(fname = "simple.wdl", subdir = "before")
+    val expected = getWdlSource(fname = "simple.wdl", subdir = "after")
+    val formatter = V1_0Formatter(opts)
+    formatter.formatDocuments(beforeURL)
+    formatter.documents(beforeURL).mkString("\n") shouldBe expected
   }
 }

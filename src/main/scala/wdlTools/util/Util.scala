@@ -1,7 +1,7 @@
 package wdlTools.util
 
 import collection.JavaConverters._
-import java.net.URI
+import java.net.URL
 import java.nio.file.{Files, Path, Paths}
 
 import com.typesafe.config.ConfigFactory
@@ -18,14 +18,21 @@ object Verbosity extends Enumeration {
 import Verbosity._
 
 /**
-  * Common configuration options used by syntax classes.
+  * Common configuration options.
   * @param localDirectories local directories to search for imports.
+  * @param followImports whether to follow imports when parsing.
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Seq[Path] = Seq.empty,
+case class Options(localDirectories: Option[Iterable[Path]] = None,
+                   followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
-                   antlr4Trace: Boolean = false)
+                   antlr4Trace: Boolean = false) {
+
+  def getURL(pathOrUrl: String): URL = {
+    Util.getURL(pathOrUrl, localDirectories)
+  }
+}
 
 object Util {
 
@@ -38,21 +45,45 @@ object Util {
     config.getString("wdlTools.version")
   }
 
+  def getURL(pathOrUrl: String, searchPath: Option[Iterable[Path]] = None): URL = {
+    if (pathOrUrl.contains("://")) {
+      new URL(pathOrUrl)
+    } else {
+      val path: Path = Paths.get(pathOrUrl)
+      val resolved: Option[Path] = if (Files.exists(path)) {
+        Some(path)
+      } else if (searchPath.isDefined) {
+        // search in all directories where imports may be found
+        searchPath.get.map(d => d.resolve(pathOrUrl)).collectFirst {
+          case fp if Files.exists(fp) => fp
+        }
+      } else None
+      if (resolved.isEmpty) {
+        throw new Exception(s"Could not resolve path or URL ${pathOrUrl}")
+      }
+      new URL(s"file://${resolved.get.toAbsolutePath}")
+    }
+  }
+
+  def getURL(path: Path): URL = {
+    path.toUri.toURL
+  }
+
   /**
     * Determines the local path to a URI's file. The path will be the URI's file name relative to the parent; the
     * current working directory is used as the parent unless `parent` is specified. If the URI indicates a local path
     * and `ovewrite` is `true`, then the absolute local path is returned unless `parent` is specified.
     *
-    * @param uri a URI, which might be a local path, a file:// uri, or an http(s):// uri)
+    * @param url a URL, which might be a local path, a file:// uri, or an http(s):// uri)
     * @param parent The directory to which the local file should be made relative
     * @param selfOk Whether it is allowed to return the absolute path of a URI that is a local file, rather than making
     *               it relative to the current directory; ignored if `parent` is defined
     * @return The Path to the local file
     */
-  def getLocalPath(uri: URI, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
-    uri.getScheme match {
+  def getLocalPath(url: URL, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
+    url.getProtocol match {
       case null | "" | "file" =>
-        val path = Paths.get(uri.getPath)
+        val path = Paths.get(url.getPath)
 
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
@@ -62,7 +93,7 @@ object Util {
           Paths.get("").toAbsolutePath.resolve(path.getFileName)
         }
       case _ =>
-        parent.getOrElse(Paths.get("")).resolve(Paths.get(uri.getPath).getFileName)
+        parent.getOrElse(Paths.get("")).resolve(Paths.get(url.getPath).getFileName)
     }
   }
 
@@ -72,9 +103,21 @@ object Util {
     * @return
     */
   def readFromFile(path: Path): String = {
+    readLinesFromFile(path).mkString(System.lineSeparator())
+  }
+
+  /**
+    * Reads the lines from a file
+    * @param path the path to the file
+    * @return a Seq of the lines from the file
+    */
+  def readLinesFromFile(path: Path): Seq[String] = {
     val source = io.Source.fromFile(path.toString)
-    try source.getLines.mkString(System.lineSeparator())
-    finally source.close()
+    try {
+      source.getLines.toVector
+    } finally {
+      source.close()
+    }
   }
 
   /**
@@ -84,12 +127,12 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeLinesToFiles(docs: Map[URI, Seq[String]],
+  def writeLinesToFiles(docs: Map[URL, Seq[String]],
                         outputDir: Option[Path],
                         overwrite: Boolean = false): Unit = {
     docs.foreach {
-      case (uri, lines) =>
-        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+      case (url, lines) =>
+        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
         Files.write(outputPath, lines.asJava)
     }
   }
@@ -101,18 +144,18 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeContentsToFiles(docs: Map[URI, String],
+  def writeContentsToFiles(docs: Map[URL, String],
                            outputDir: Option[Path],
                            overwrite: Boolean = false): Unit = {
     docs.foreach {
-      case (uri, contents) =>
-        val outputPath = Util.getLocalPath(uri, outputDir, overwrite)
+      case (url, contents) =>
+        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
         Files.write(outputPath, contents.getBytes())
     }
   }
 
   /**
-    * Pretty prints a Scala value similar to its source represention.
+    * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
     * @param a - The value to pretty print.
@@ -121,14 +164,14 @@ object Util {
     * @param depth - Initial depth to pretty print indents.
     * @return
     */
-  def prettyPrint(a: Any,
-                  indentSize: Int = 2,
-                  maxElementWidth: Int = 30,
-                  depth: Int = 0): String = {
+  def prettyFormat(a: Any,
+                   indentSize: Int = 2,
+                   maxElementWidth: Int = 30,
+                   depth: Int = 0): String = {
     val indent = " " * depth * indentSize
     val fieldIndent = indent + (" " * indentSize)
-    val thisDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth)
-    val nextDepth = prettyPrint(_: Any, indentSize, maxElementWidth, depth + 1)
+    val thisDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth)
+    val nextDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth + 1)
     a match {
       // Make Strings look similar to their literal form.
       case s: String =>

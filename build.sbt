@@ -51,9 +51,12 @@ assemblyJarName in assembly := "wdlTools.jar"
 logLevel in assembly := Level.Info
 //assemblyOutputPath in assembly := file("applet_resources/resources/dxWDL.jar")
 
-val antlr4Version = "4.8"
-//antlr4Version in Antlr4 := "4.7.2" // default: 4.7.2
+//antlr4Version in Antlr4 := "4.8.0"
+//antlr4PackageName in Antlr4 := Some("org.openwdl.wdl.parser")
 //antlr4GenVisitor in Antlr4 := true
+//antlr4TreatWarningsAsErrors in Antlr4 := true
+
+val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.5"

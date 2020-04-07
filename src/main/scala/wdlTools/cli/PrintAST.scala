@@ -1,20 +1,14 @@
 package wdlTools.cli
 
-import java.net.URI
-
-import wdlTools.syntax.ParseAll
-import wdlTools.util.{FetchURL, Util}
-
-import scala.language.reflectiveCalls
+import wdlTools.syntax.Parsers
+import wdlTools.util.Util
 
 case class PrintAST(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val uri = new URI(conf.printAST.uri())
-    val uriLocalPath = Util.getLocalPath(uri)
-    val opts = conf.printAST.getSyntaxOptions(Set(uriLocalPath.getParent))
-    val sourceCode = FetchURL.readFromUri(uri, opts)
-    val parser = ParseAll(opts)
-    val document = parser.apply(sourceCode)
-    println(Util.prettyPrint(document))
+    val url = conf.check.url()
+    val opts = conf.check.getOptions
+    val parsers = Parsers(opts)
+    val document = parsers.parse(url)
+    println(Util.prettyFormat(document))
   }
 }

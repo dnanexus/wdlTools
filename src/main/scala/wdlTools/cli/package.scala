@@ -1,9 +1,17 @@
 package wdlTools.cli
 
+import java.net.URL
 import java.nio.file.{Path, Paths}
 
-import org.rogach.scallop.{ScallopConf, ScallopOption, Subcommand, ValueConverter, listArgConverter}
-import wdlTools.generators.TaskGenerator.Model
+import org.rogach.scallop.{
+  ScallopConf,
+  ScallopOption,
+  Subcommand,
+  ValueConverter,
+  listArgConverter,
+  singleArgConverter
+}
+import wdlTools.syntax.WdlVersion
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, Util}
 
@@ -16,6 +24,57 @@ trait Command {
 
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
+  implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
+  implicit val versionConverter: ValueConverter[WdlVersion] =
+    singleArgConverter[WdlVersion](WdlVersion.fromName)
+
+  class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
+    // there is a compiler bug that prevents accessing name directly
+    banner(s"""Usage: wdlTools ${commandNameAndAliases.head} <path|uri>
+              |${description}
+              |
+              |Options:
+              |""".stripMargin)
+    val followImports: ScallopOption[Boolean] = toggle(
+        descrYes = "format imported files in addition to the main file",
+        descrNo = "only format the main file",
+        default = Some(true)
+    )
+    val localDir: ScallopOption[List[Path]] =
+      opt[List[Path]](descr =
+        "directory in which to search for imports; ignored if --noFollowImports is specified"
+      )
+    val url: ScallopOption[URL] =
+      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
+
+    /**
+      * The local directories to search for WDL imports.
+      * @param merge a Set of Paths to merge in with the local directories.
+      * @return
+      */
+    def localDirectories(merge: Set[Path] = Set.empty): Iterable[Path] = {
+      if (this.localDir.isDefined) {
+        (this.localDir().toSet ++ merge).toVector
+      } else {
+        merge
+      }.toVector
+    }
+
+    /**
+      * Gets a syntax.Util.Options object based on the command line options.
+      * @return
+      */
+    def getOptions: Options = {
+      val parentConf = this.parentConfig.asInstanceOf[WdlToolsConf]
+      val wdlDir: Path = Util.getLocalPath(url()).getParent
+      Options(
+          localDirectories = Some(this.localDirectories(Set(wdlDir))),
+          followImports = this.followImports(),
+          verbosity = parentConf.verbosity,
+          antlr4Trace = parentConf.antlr4Trace.getOrElse(default = false)
+      )
+    }
+  }
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     banner(s"""Usage: wdlTools ${name} <path|uri>
@@ -77,13 +136,14 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val format =
     new ParserSubcommand("format",
                          "Reformat WDL file and all its dependencies according to style rules.") {
-      val wdlVersion: ScallopOption[String] = opt[String](
+      val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
           descr = "WDL version to generate; currently only v1.0 is supported",
-          default = Some("1.0")
+          default = Some(WdlVersion.V1_0)
       )
       validateOpt(wdlVersion) {
-        case Some(version) if version != "1.0" => Left("Only WDL v1.0 is supported currently")
-        case _                                 => Right(Unit)
+        case Some(version) if version != WdlVersion.V1_0 =>
+          Left("Only WDL v1.0 is supported currently")
+        case _ => Right(Unit)
       }
       val outputDir: ScallopOption[Path] = opt[Path](descr =
         "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
@@ -97,20 +157,25 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   addSubcommand(format)
 
-  val generate = new Subcommand("new") {
-    banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
-             |Generate a new WDL task, workflow, or project.
-             |
-             |Options:
-             |""".stripMargin)
-
-    val wdlVersion: ScallopOption[String] = opt[String](
-        descr = "WDL version to generate; currently only v1.0 is supported",
-        default = Some("1.0")
+  val upgrade = new ParserSubcommand("upgrade", "Upgrade a WDL file to a more recent version") {
+    val srcVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version of the document being upgraded",
+        default = None
     )
-    validateOpt(wdlVersion) {
-      case Some(version) if version != "1.0" => Left("Only WDL v1.0 is supported currently")
-      case _                                 => Right(Unit)
+    val destVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version of the document being upgraded",
+        default = Some(WdlVersion.V1_0)
+    )
+    validateOpt(destVersion) {
+      case Some(version) if version != WdlVersion.V1_0 =>
+        Left("Only WDL v1.0 is supported currently")
+      case _ => Right(Unit)
+    }
+    validateOpt(srcVersion, destVersion) {
+      case (Some(src), Some(dst)) if src < dst => Right(Unit)
+      // ignore if srcVersion is unspecified - it will be detected and validated in the command
+      case (None, _) => Right(Unit)
+      case _         => Left("Source version must be earlier than destination version")
     }
     val readmes: ScallopOption[Boolean] = toggle(
         descrYes = "Generate a README file for each task/workflow",
@@ -122,7 +187,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         default = Some(false)
     )
     val outputDir: ScallopOption[Path] = opt[Path](descr =
-      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+      "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten"
     )
 
     val task = new Subcommand("task") {
@@ -130,23 +195,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       val title: ScallopOption[String] = opt[String](descr = "The task title")
       val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
     }
-    addSubcommand(task)
-
-    val workflow = new Subcommand("workflow") {
-      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
-      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
-    }
-    addSubcommand(workflow)
-
-    val project = new Subcommand("project") {
-      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
-      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
-    }
-    addSubcommand(project)
   }
-  addSubcommand(generate)
+  addSubcommand(upgrade)
 
-  val printAST = new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
+  val printAST =
+    new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
   addSubcommand(printAST)
 
   val readmes =
