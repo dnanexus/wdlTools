@@ -1,6 +1,7 @@
 package wdlTools.util
 
-import java.nio.file.{Files, Path, Paths}
+import java.net.URL
+import java.nio.file.Paths
 
 import wdlTools.util.Verbosity._
 
@@ -25,26 +26,8 @@ object SourceCode {
   //
   // Follow the URL and retrieve the content as a string.
   case class Loader(opts: Options) {
-    // This is a local file. Look for it in all the possible
-    // search locations.
-    private def fetchLocalFile(filepath: String): Seq[String] = {
-      val path: Path = Paths.get(filepath)
-      val resolved: Option[Path] = if (Files.exists(path)) {
-        Some(path)
-      } else {
-        // search in all directories where imports may be found
-        opts.localDirectories.map(d => d.resolve(filepath)).collectFirst {
-          case fp if Files.exists(fp) => fp
-        }
-      }
-      if (resolved.isEmpty) {
-        throw new Exception(s"Could not find local file ${filepath}")
-      }
-      Util.readLinesFromFile(resolved.get)
-    }
-
-    private def fetchHttpAddress(urlAddr: String): Seq[String] = {
-      val src = Source.fromURL(urlAddr)
+    private def fetchHttpAddress(url: URL): Seq[String] = {
+      val src = Source.fromURL(url)
       try {
         src.getLines().toVector
       } finally {
@@ -53,23 +36,15 @@ object SourceCode {
     }
 
     def apply(url: URL): SourceCode = {
-      val p: String = url.addr
       if (opts.verbosity > Normal) {
-        System.out.println(s"looking for ${p}")
+        System.out.println(s"looking for ${url}")
       }
 
-      val lines = if (p contains "://") {
-        val components = p.split("://")
-        val protocol = components.head
-        protocol match {
-          case "http"  => fetchHttpAddress(p)
-          case "https" => fetchHttpAddress(p)
-          case "file"  => fetchLocalFile(components(1))
-          case _       => throw new Exception(s"unknown protocol ${protocol} in path ${p}")
-        }
-      } else {
-        // no recognizable protocol, assuming a file
-        fetchLocalFile(p)
+      val lines = url.getProtocol match {
+        case "http"  => fetchHttpAddress(url)
+        case "https" => fetchHttpAddress(url)
+        case "file"  => Util.readLinesFromFile(Paths.get(url.getPath))
+        case _       => throw new Exception(s"unknown protocol in URL ${url}")
       }
 
       SourceCode(url, lines)

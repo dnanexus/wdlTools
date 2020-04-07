@@ -1,8 +1,10 @@
 package wdlTools.formatter
 
+import java.net.URL
+
 import wdlTools.syntax
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, URL}
+import wdlTools.util.Options
 
 case class Upgrader(opts: Options) {
   private val parsers = syntax.Parsers(opts)
@@ -17,7 +19,7 @@ case class Upgrader(opts: Options) {
     }
 
     // the parser will follow imports, so the formatter should not
-    val formatter = V1_0Formatter(opts.clone(followImports = false))
+    val formatter = V1_0Formatter(opts.copy(followImports = false))
 
     // parse and format the document (and any imports)
     val walker = parser.Walker[Seq[String]](url)

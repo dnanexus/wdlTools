@@ -1,5 +1,6 @@
 package wdlTools.syntax
 
+import java.net.URL
 import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -16,7 +17,7 @@ import org.antlr.v4.runtime.{
   ParserRuleContext
 }
 import wdlTools.syntax
-import wdlTools.util.{Options, URL, Verbosity}
+import wdlTools.util.{Options, Verbosity}
 
 import scala.collection.mutable
 

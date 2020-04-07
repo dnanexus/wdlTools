@@ -1,7 +1,8 @@
 package wdlTools.syntax.v1_0
 
+import java.net.URL
+
 import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-import wdlTools.util.URL
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.

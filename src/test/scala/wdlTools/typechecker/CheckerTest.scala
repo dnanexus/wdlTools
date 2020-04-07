@@ -5,17 +5,15 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode, Util}
 
 class CheckerTest extends FlatSpec with Matchers {
-  private lazy val wdlSourceDirs: Vector[Path] = {
-    val p1: Path = Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
-    Vector(p1)
-  }
-  private lazy val conf = Options(antlr4Trace = false, localDirectories = wdlSourceDirs)
-  private val loader = SourceCode.Loader(conf)
-  private val parser = ParseAll(conf, loader)
-  private val stdlib = Stdlib(conf)
+  private val positivePath =
+    Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
+  private val opts = Options(antlr4Trace = false, localDirectories = Some(Vector(positivePath)))
+  private val loader = SourceCode.Loader(opts)
+  private val parser = ParseAll(opts, loader)
+  private val stdlib = Stdlib(opts)
   private val checker = Checker(stdlib)
 
   // Get a list of WDL files from a resource directory.
@@ -31,7 +29,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (positive cases)" in {
     val positiveCases = getWdlSourceFiles("/typechecker/v1_0/tasks/positive")
     for (pc <- positiveCases) {
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -44,7 +42,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecker/v1_0/tasks/negative")
     for (pc <- negativeCases) {
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       val checkVal =
         try {
           checker.apply(doc)
@@ -61,14 +59,13 @@ class CheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check workflows (positive cases)" taggedAs(Edge) in {
+  it should "type check workflows (positive cases)" taggedAs Edge in {
     val positiveCases =
       getWdlSourceFiles("/typechecker/v1_0/workflows/positive")
         .filter(p => !(p.toString contains "import"))
 
     for (pc <- positiveCases) {
-//      System.out.println(pc)
-      val doc = parser.parse(URL.fromPath(pc))
+      val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -82,7 +79,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (negative cases)" in {
     val negativeCases = getWdlSourceFiles("/typechecker/v1_0/workflows/negative")
     for (nc <- negativeCases) {
-      val doc = parser.parse(URL.fromPath(nc))
+      val doc = parser.parse(Util.getURL(nc))
       val checkVal =
         try {
           checker.apply(doc)

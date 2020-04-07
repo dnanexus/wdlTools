@@ -1,8 +1,10 @@
 package wdlTools.formatter
 
+import java.net.URL
+
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.{Options, URL, Util, Verbosity}
+import wdlTools.util.{Options, Util, Verbosity}
 
 import scala.collection.mutable
 

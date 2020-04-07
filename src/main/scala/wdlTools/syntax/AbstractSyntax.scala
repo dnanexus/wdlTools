@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.URL
+import java.net.URL
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
