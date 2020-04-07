@@ -31,17 +31,26 @@ object WdlTypes {
   // a user defined structure
   case class WT_Struct(name: String, members: Map[String, WT]) extends WT
 
+  // Anything that can be called. A general group that includesw tasks
+  // and workflows
+  //
+  sealed trait WT_Callable extends WT {
+    val name : String
+    val input: Map[String, (WT, Boolean)]
+    val output: Map[String, WT]
+  }
+
   // The type of a task.
   //
   // It takes typed-inputs and returns typed-outputs. The boolean flag denotes
   // if input is optional
   case class WT_Task(name: String, input: Map[String, (WT, Boolean)], output: Map[String, WT])
-      extends WT
+      extends WT_Callable
 
   // The type of a workflow.
   // It takes typed-inputs and returns typed-outputs.
   case class WT_Workflow(name: String, input: Map[String, (WT, Boolean)], output: Map[String, WT])
-      extends WT
+      extends WT_Callable
 
   // The type of a call to a task or a workflow.
   case class WT_Call(name: String, output: Map[String, WT]) extends WT

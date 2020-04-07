@@ -64,10 +64,9 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (positive cases)" taggedAs(Edge) in {
     val positiveCases =
       getWdlSourceFiles("/typechecker/v1_0/workflows/positive")
-        .filter(p => !(p.toString contains "import"))
+//        .filter(p => p.toString contains "import")
 
     for (pc <- positiveCases) {
-//      System.out.println(pc)
       val doc = parser.parse(URL.fromPath(pc))
       try {
         checker.apply(doc)

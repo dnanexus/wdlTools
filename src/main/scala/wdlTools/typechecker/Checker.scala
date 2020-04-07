@@ -15,7 +15,7 @@ case class Checker(stdlib: Stdlib) {
   // There separate namespaces for variables, struct definitions, and callables (tasks/workflows)
   case class Context(declarations: Map[String, WT],
                      structs: Map[String, WT_Struct],
-                     callables: Map[String, WT] /* tasks and workflows */ ) {
+                     callables: Map[String, WT_Callable]) {
     def bind(varName: String, wdlType: WT, srcText: TextSource): Context = {
       declarations.get(varName) match {
         case None =>
@@ -24,17 +24,6 @@ case class Checker(stdlib: Stdlib) {
           throw new TypeException(s"variable ${varName} shadows an existing variable", srcText)
       }
     }
-
-    /*    def bind(decl: Declaration): Context = {
-      declarations.get(decl.name) match {
-        case None =>
-          this.copy(declarations = declarations + (decl.name -> decl.wdlType))
-        case Some(_) =>
-          throw new Exception(
-              s"declaration ${decl} shadows an existing variable by the same name (${decl.name})"
-          )
-      }
-    }*/
 
     def bind(s: WT_Struct, srcText: TextSource): Context = {
       structs.get(s.name) match {
@@ -45,24 +34,17 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(taskSig: WT_Task, srcText: TextSource): Context = {
-      callables.get(taskSig.name) match {
+    // add a callable (task/workflow)
+    def bind(callable: WT_Callable, srcText: TextSource): Context = {
+      callables.get(callable.name) match {
         case None =>
-          this.copy(callables = callables + (taskSig.name -> taskSig))
+          this.copy(callables = callables + (callable.name -> callable))
         case Some(_) =>
-          throw new TypeException(s"a callable named ${taskSig.name} is already declared", srcText)
+          throw new TypeException(s"a callable named ${callable.name} is already declared", srcText)
       }
     }
 
-    def bind(wfSig: WT_Workflow, srcText: TextSource): Context = {
-      callables.get(wfSig.name) match {
-        case None =>
-          this.copy(callables = callables + (wfSig.name -> wfSig))
-        case Some(_) =>
-          throw new TypeException(s"a callable named ${wfSig.name} is already declared", srcText)
-      }
-    }
-
+    // add a bunch of bindings
     def bind(bindings: Bindings, srcText: TextSource): Context = {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
@@ -70,6 +52,30 @@ case class Checker(stdlib: Stdlib) {
       if (both.nonEmpty)
         throw new TypeException(s"Variables ${both} are being redeclared", srcText)
       this.copy(declarations = declarations ++ bindings)
+    }
+
+    // When we import another document all of its definitions are prefixed with the
+    // namespace name.
+    //
+    // -- library.wdl --
+    // task add {}
+    // workflow act {}
+    //
+    // import "library.wdl" as lib
+    // workflow hello {
+    //    call lib.add
+    //    call lib.act
+    // }
+    def bindImportedDoc(namespace : String, impCtx : Context, srcText : TextSource) : Context = {
+      val impCallables = impCtx.callables.map {
+        case (name, taskSig : WT_Task) =>
+          val fqn = namespace + "." + name
+          fqn -> taskSig.copy(name = fqn)
+        case (name, wfSig : WT_Workflow) =>
+          val fqn = namespace + "." + name
+          fqn -> wfSig.copy(name = fqn)
+      }
+      this.copy(callables = callables ++ impCallables)
     }
   }
 
@@ -496,6 +502,7 @@ case class Checker(stdlib: Stdlib) {
     WT_Task(task.name, inputType, outputType)
   }
 
+  //
   // 1. all the caller arguments have to exist with the correct types
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
@@ -547,14 +554,24 @@ case class Checker(stdlib: Stdlib) {
         }
     }
 
-    // build a type for the resulting object
+    // The name of the call may not contain dots. Examples:
+    //
+    // call lib.concat as concat     concat
+    // call add                      add
+    // call a.b.c                    c
     val callName = call.alias match {
-      case None        => call.name
+      case None if !(call.name contains ".") =>
+        call.name
+      case None =>
+        val parts = call.name.split("\\.")
+        parts.last
       case Some(alias) => alias
     }
 
     if (ctx.declarations contains callName)
       throw new TypeException(s"call ${callName} shadows an existing definition", call.text)
+
+    // build a type for the resulting object
     callName -> WT_Call(callName, calleeOutputs)
   }
 
@@ -706,8 +723,29 @@ case class Checker(stdlib: Stdlib) {
         val tt = applyTask(task, accu)
         accu.bind(tt, task.text)
 
-      case (_, _: ImportDoc) =>
-        throw new Exception("imports not implemented yet")
+      case (accu : Context, iStat: ImportDoc) =>
+        // type check the imported document
+        val iCtx = apply(iStat.doc, contextEmpty)
+
+        // Figure out what to name the sub-document
+        val namespace = iStat.name match {
+          case None =>
+            // Something like
+            //    import "http://example.com/lib/stdlib"
+            //    import "A/B/C"
+            // Where the user does not specify an alias. The namespace
+            // will be named:
+            //    stdlib
+            //    C
+            val parts = iStat.url.addr.split("/")
+            if (parts.isEmpty)
+              throw new Exception(s"URL ${iStat.url.addr} is invalid")
+            parts.last
+          case Some(x) => x
+        }
+
+        // add the externally visible definitions to the context
+        accu.bindImportedDoc(namespace, iCtx, iStat.text)
 
       case (accu: Context, struct: TypeStruct) =>
         // Add the struct to the context
