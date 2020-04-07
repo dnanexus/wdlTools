@@ -481,6 +481,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     imports.size shouldBe 2
 
     doc.workflow should not be empty
+
+    val calls : Vector[Call] = doc.workflow.get.body.collect {
+      case call : Call => call
+    }
+    calls(0).name shouldBe("I.biz")
+    calls(1).name shouldBe("I.undefined")
+    calls(2).name shouldBe("wc")
   }
 
   it should "parse a workflow that is illegal in v1.0" in {

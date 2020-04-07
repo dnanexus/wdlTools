@@ -1017,7 +1017,7 @@ import_as
 	: CALL Identifier call_alias?  call_body?
 	; */
   override def visitCall(ctx: Draft2WdlParser.CallContext): Call = {
-    val name = ctx.Identifier.getText
+    val name = ctx.call_name().getText
 
     val alias: Option[String] =
       if (ctx.call_alias() == null) None
