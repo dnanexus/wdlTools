@@ -1,15 +1,21 @@
 package wdlTools.syntax
 
-import wdlTools.util.{TextSource, URL}
+import wdlTools.util.URL
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
   trait Element {
     val text: TextSource // where in the source program does this element belong
   }
+  trait StatementElement {
 
-  sealed trait WorkflowElement extends Element
-  sealed trait DocumentElement extends Element
+    /**
+      * An optional comment that comes before the element.
+      */
+    val comment: Option[Comment]
+  }
+  sealed trait WorkflowElement extends StatementElement
+  sealed trait DocumentElement extends StatementElement
 
   // type system
   sealed trait Type extends Element
@@ -24,7 +30,15 @@ object AbstractSyntax {
   case class TypeFloat(text: TextSource) extends Type
   case class TypeIdentifier(id: String, text: TextSource) extends Type
   case class TypeObject(text: TextSource) extends Type
-  case class TypeStruct(name: String, members: Map[String, Type], text: TextSource)
+  case class StructMember(name: String,
+                          dataType: Type,
+                          text: TextSource,
+                          comment: Option[Comment] = None)
+      extends StatementElement
+  case class TypeStruct(name: String,
+                        members: Seq[StructMember],
+                        text: TextSource,
+                        comment: Option[Comment] = None)
       extends Type
       with DocumentElement
 
@@ -94,12 +108,22 @@ object AbstractSyntax {
   //   Int z = x.a
   case class ExprGetName(e: Expr, id: String, text: TextSource) extends Expr
 
-  case class Declaration(name: String, wdlType: Type, expr: Option[Expr], text: TextSource)
+  case class Declaration(name: String,
+                         wdlType: Type,
+                         expr: Option[Expr],
+                         text: TextSource,
+                         comment: Option[Comment])
       extends WorkflowElement
 
   // sections
-  case class InputSection(declarations: Vector[Declaration], text: TextSource)
-  case class OutputSection(declarations: Vector[Declaration], text: TextSource)
+  case class InputSection(declarations: Vector[Declaration],
+                          text: TextSource,
+                          comment: Option[Comment])
+      extends StatementElement
+  case class OutputSection(declarations: Vector[Declaration],
+                           text: TextSource,
+                           comment: Option[Comment])
+      extends StatementElement
 
   // A command can be simple, with just one continuous string:
   //
@@ -114,15 +138,21 @@ object AbstractSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandSection(parts: Vector[Expr], text: TextSource)
+  case class CommandSection(parts: Vector[Expr], text: TextSource, comment: Option[Comment])
+      extends StatementElement
 
-  case class RuntimeKV(id: String, expr: Expr, text: TextSource)
-  case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource)
+  case class RuntimeKV(id: String, expr: Expr, text: TextSource, comment: Option[Comment])
+      extends StatementElement
+  case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource, comment: Option[Comment])
+      extends StatementElement
 
   // meta section
-  case class MetaKV(id: String, expr: Expr, text: TextSource)
-  case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource)
-  case class MetaSection(kvs: Vector[MetaKV], text: TextSource)
+  case class MetaKV(id: String, expr: Expr, text: TextSource, comment: Option[Comment])
+      extends StatementElement
+  case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource, comment: Option[Comment])
+      extends StatementElement
+  case class MetaSection(kvs: Vector[MetaKV], text: TextSource, comment: Option[Comment])
+      extends StatementElement
 
   // import statement with the AST for the referenced document
   case class ImportAlias(id1: String, id2: String, text: TextSource)
@@ -130,7 +160,8 @@ object AbstractSyntax {
                        aliases: Vector[ImportAlias],
                        url: URL,
                        doc: Document,
-                       text: TextSource)
+                       text: TextSource,
+                       comment: Option[Comment])
       extends DocumentElement
 
   // A task
@@ -142,19 +173,29 @@ object AbstractSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
-                  text: TextSource)
+                  text: TextSource,
+                  comment: Option[Comment])
       extends DocumentElement
 
-  case class Call(name: String, alias: Option[String], inputs: Map[String, Expr], text: TextSource)
+  // TODO: support comments - only one comment before inputs
+  case class Call(name: String,
+                  alias: Option[String],
+                  inputs: Map[String, Expr],
+                  text: TextSource,
+                  comment: Option[Comment])
       extends WorkflowElement
 
   case class Scatter(identifier: String,
                      expr: Expr,
                      body: Vector[WorkflowElement],
-                     text: TextSource)
+                     text: TextSource,
+                     comment: Option[Comment])
       extends WorkflowElement
 
-  case class Conditional(expr: Expr, body: Vector[WorkflowElement], text: TextSource)
+  case class Conditional(expr: Expr,
+                         body: Vector[WorkflowElement],
+                         text: TextSource,
+                         comment: Option[Comment])
       extends WorkflowElement
 
   // A workflow
@@ -164,10 +205,15 @@ object AbstractSyntax {
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement],
-                      text: TextSource)
+                      text: TextSource,
+                      comment: Option[Comment])
+      extends StatementElement
 
   case class Document(version: WdlVersion,
+                      versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
-                      text: TextSource)
+                      text: TextSource,
+                      comment: Option[Comment])
+      extends StatementElement
 }

@@ -1,6 +1,9 @@
 package wdlTools.syntax
 
 import java.nio.ByteBuffer
+
+import org.antlr.v4.runtime.tree.TerminalNode
+
 import collection.JavaConverters._
 import org.antlr.v4.runtime.{
   BufferedTokenStream,
@@ -12,7 +15,10 @@ import org.antlr.v4.runtime.{
   Parser,
   ParserRuleContext
 }
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.syntax
+import wdlTools.util.{Options, URL, Verbosity}
+
+import scala.collection.mutable
 
 object Antlr4Util {
   case class Grammar[L <: Lexer, P <: Parser](lexer: L,
@@ -36,7 +42,19 @@ object Antlr4Util {
       }
     }
 
-    def getComments(ctx: ParserRuleContext, before: Boolean = true): Seq[String] = {
+    def getSourceText(ctx: ParserRuleContext, docSourceURL: URL): TextSource = {
+      val tok = ctx.start
+      val line = tok.getLine
+      val col = tok.getCharPositionInLine
+      syntax.TextSource(line = line, col = col, url = docSourceURL)
+    }
+
+    def getSourceText(symbol: TerminalNode, docSourceURL: URL): TextSource = {
+      val tok = symbol.getSymbol
+      syntax.TextSource(line = tok.getLine, col = tok.getCharPositionInLine, url = docSourceURL)
+    }
+
+    def getComment(ctx: ParserRuleContext, before: Boolean = true): Option[Comment] = {
       val start = ctx.getStart
       val idx = start.getTokenIndex
       if (idx >= 0) {
@@ -47,10 +65,58 @@ object Antlr4Util {
           tokenStream.getHiddenTokensToRight(idx, commentChannel)
         }
         if (commentTokens != null) {
-          return commentTokens.asScala.map(_.getText).toVector
+          val comments: mutable.Buffer[Comment] = mutable.ArrayBuffer.empty
+          val currentComment: mutable.Buffer[String] = mutable.ArrayBuffer.empty
+          var preformatted: Boolean = false
+          val lines = commentTokens.asScala.map(_.getText).toVector
+          lines.foreach { line =>
+            if (line.startsWith("##")) {
+              // handle pre-formatted comment line
+              if (!preformatted) {
+                if (currentComment.nonEmpty) {
+                  comments.append(CommentLine(currentComment.mkString(" ")))
+                  currentComment.clear()
+                }
+                preformatted = true
+              }
+              currentComment.append(line.substring(2).trim)
+            } else {
+              // handle regular comment line
+              val trimmed = line.substring(1).trim
+              if (preformatted) {
+                if (currentComment.nonEmpty) {
+                  comments.append(CommentPreformatted(currentComment.toVector))
+                  currentComment.clear()
+                }
+                preformatted = false
+              }
+              if (trimmed.isEmpty) {
+                if (currentComment.nonEmpty) {
+                  comments.append(CommentLine(currentComment.mkString(" ")))
+                  currentComment.clear()
+                }
+                comments.append(CommentEmpty())
+              } else {
+                currentComment.append(trimmed)
+              }
+            }
+          }
+          if (currentComment.nonEmpty) {
+            // handle final comment line
+            if (preformatted) {
+              comments.append(CommentPreformatted(currentComment.toVector))
+            } else {
+              comments.append(CommentLine(currentComment.mkString(" ")))
+            }
+          }
+          return Some(if (comments.size > 1) {
+            CommentCompound(comments.toVector)
+          } else {
+            comments.head
+          })
         }
       }
-      Vector.empty[String]
+      None
     }
   }
 
