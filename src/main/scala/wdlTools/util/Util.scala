@@ -29,16 +29,6 @@ case class Options(localDirectories: Option[Iterable[Path]] = None,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false) {
 
-  /**
-    * Clone this Options object, possibly updating attributes.
-    */
-  def clone(localDirectories: Option[Iterable[Path]] = localDirectories,
-            followImports: Boolean = followImports,
-            verbosity: Verbosity = verbosity,
-            antlr4Trace: Boolean = antlr4Trace): Options = {
-    Options(localDirectories, followImports, verbosity, antlr4Trace)
-  }
-
   def getURL(pathOrUrl: String): URL = {
     Util.getURL(pathOrUrl, localDirectories)
   }

@@ -19,7 +19,7 @@ case class Upgrader(opts: Options) {
     }
 
     // the parser will follow imports, so the formatter should not
-    val formatter = V1_0Formatter(opts.clone(followImports = false))
+    val formatter = V1_0Formatter(opts.copy(followImports = false))
 
     // parse and format the document (and any imports)
     val walker = parser.Walker[Seq[String]](url)
