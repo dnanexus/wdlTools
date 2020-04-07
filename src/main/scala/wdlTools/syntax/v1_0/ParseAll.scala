@@ -305,7 +305,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
       if (!(line.trim.isEmpty || line.startsWith("#"))) {
-        return line.startsWith("version 1.0")
+        return line.trim.startsWith("version 1.0")
       }
     }
     false

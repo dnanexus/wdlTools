@@ -793,9 +793,13 @@ case class V1_0Formatter(opts: Options,
     }
   }
 
+  def formatDocument(doc: Document): Seq[String] = {
+    FormatterDocument(doc).format()
+  }
+
   def formatDocuments(url: URL): Unit = {
     Parsers(opts).getDocumentWalker[Seq[String]](url, documents).walk { (url, doc, results) =>
-      results(url) = FormatterDocument(doc).format()
+      results(url) = formatDocument(doc)
     }
   }
 }
