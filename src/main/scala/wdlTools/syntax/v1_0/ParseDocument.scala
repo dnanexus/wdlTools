@@ -1018,7 +1018,7 @@ import_as
 	: CALL Identifier call_alias?  call_body?
 	; */
   override def visitCall(ctx: V10WdlParser.CallContext): Call = {
-    val name = ctx.Identifier.getText
+    val name = ctx.call_name().getText
 
     val alias: Option[String] =
       if (ctx.call_alias() == null) None
@@ -1170,6 +1170,8 @@ document_element
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: V10WdlParser.VersionContext): Version = {
+    if (ctx.RELEASE_VERSION() == null)
+      throw new Exception("version not specified")
     val value = ctx.RELEASE_VERSION().getText
     Version(value, getSourceText(ctx))
   }

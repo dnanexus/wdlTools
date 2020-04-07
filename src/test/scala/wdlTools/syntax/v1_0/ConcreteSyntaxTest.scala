@@ -3,7 +3,7 @@ package wdlTools.syntax.v1_0
 import java.nio.file.{Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Edge, WdlVersion}
+import wdlTools.syntax.{WdlVersion}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, URL}
@@ -353,7 +353,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "parse a simple workflow" taggedAs Edge in {
+  it should "parse a simple workflow" in {
     val doc = ParseDocument.apply(getWdlSource("workflows", "I.wdl"), conf)
     doc.elements.size shouldBe 0
 
@@ -421,6 +421,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     imports.size shouldBe 2
 
     doc.workflow should not be empty
+
+    val calls : Vector[Call] = doc.workflow.get.body.collect {
+      case call : Call => call
+    }
+    calls(0).name shouldBe("I.biz")
+    calls(1).name shouldBe("I.undefined")
+    calls(2).name shouldBe("wc")
   }
 
   it should "correctly report an error" in {
@@ -429,7 +436,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations" taggedAs Edge in {
+  it should "handle chained operations" in {
     val doc = ParseDocument.apply(getWdlSource("tasks", "bug16-chained-operations.wdl"), conf)
 
     doc.elements.size shouldBe 1
@@ -447,7 +454,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations in a workflow" taggedAs Edge in {
+  it should "handle chained operations in a workflow" in {
     val doc = ParseDocument.apply(getWdlSource("workflows", "chained_expr.wdl"), conf)
     doc.elements.size shouldBe 0
 
