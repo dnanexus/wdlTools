@@ -24,7 +24,7 @@ import Verbosity._
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Option[Iterable[Path]] = None,
+case class Options(localDirectories: Option[Vector[Path]] = None,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false) {
