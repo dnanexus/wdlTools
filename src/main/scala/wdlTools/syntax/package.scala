@@ -10,8 +10,8 @@ sealed abstract class WdlVersion(val name: String, val order: Int) extends Order
 }
 
 object WdlVersion {
-  case object V1_0 extends WdlVersion("1.0", 0)
-  case object Draft_2 extends WdlVersion("draft-2", 1)
+  case object Draft_2 extends WdlVersion("draft-2", 0)
+  case object V1_0 extends WdlVersion("1.0", 1)
 
   val All: Vector[WdlVersion] = Vector(V1_0, Draft_2).sortWith(_ < _)
 
@@ -31,6 +31,11 @@ case class TextSource(line: Int, col: Int, url: URL)
 
 /**
   * Type hierarchy for comments.
+  *
+  * # this is a line comment
+  * # that's split across two lines
+  * #
+  * ## this is a preformatted comment
   */
 abstract class Comment {}
 case class CommentLine(text: String) extends Comment

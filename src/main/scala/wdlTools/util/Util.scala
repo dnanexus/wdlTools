@@ -46,7 +46,18 @@ object URL {
 case class Options(localDirectories: Seq[Path] = Vector.empty,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
-                   antlr4Trace: Boolean = false)
+                   antlr4Trace: Boolean = false) {
+
+  /**
+    * Clone this Options object, possibly updating attributes.
+    */
+  def clone(localDirectories: Seq[Path] = localDirectories,
+            followImports: Boolean = followImports,
+            verbosity: Verbosity = verbosity,
+            antlr4Trace: Boolean = antlr4Trace): Options = {
+    Options(localDirectories, followImports, verbosity, antlr4Trace)
+  }
+}
 
 object Util {
 
