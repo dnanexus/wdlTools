@@ -3,7 +3,7 @@ package wdlTools.syntax.v1_0
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{WdlVersion}
+import wdlTools.syntax.{Edge, WdlVersion}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
@@ -477,12 +477,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     doc.workflow should not be empty
 
-    val calls : Vector[Call] = doc.workflow.get.body.collect {
-      case call : Call => call
+    val calls: Vector[Call] = doc.workflow.get.body.collect {
+      case call: Call => call
     }
-    calls(0).name shouldBe("I.biz")
-    calls(1).name shouldBe("I.undefined")
-    calls(2).name shouldBe("wc")
+    calls(0).name shouldBe "I.biz"
+    calls(1).name shouldBe "I.undefined"
+    calls(2).name shouldBe "wc"
   }
 
   it should "correctly report an error" in {
