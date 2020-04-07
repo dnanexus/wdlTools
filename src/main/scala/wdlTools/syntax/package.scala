@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc}
+import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -29,7 +29,15 @@ object WdlVersion {
 // col : column number
 // URL:  original file or web URL
 //
-case class TextSource(line: Int, col: Int, url: URL)
+case class TextSource(line: Int, col: Int, url: Option[URL] = None) {
+  override def toString: String = {
+    if (url.isDefined) {
+      s"line ${line} col ${col} of ${url}"
+    } else {
+      s"line ${line} col ${col}"
+    }
+  }
+}
 
 /**
   * Type hierarchy for comments.
@@ -52,7 +60,7 @@ trait DocumentWalker[T] {
 abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
   def canParse(sourceCode: SourceCode): Boolean
 
-  def apply(sourceCode: SourceCode): AbstractSyntax.Document
+  def apply(sourceCode: SourceCode): Document
 
   def parse(url: URL): Document = {
     apply(loader.apply(url))
@@ -62,7 +70,7 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
                        sourceCode: Option[SourceCode] = None,
                        results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
       extends DocumentWalker[T] {
-    def extractDependencies(document: AbstractSyntax.Document): Map[URL, Document] = {
+    def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, url, doc, _, _) => Some(url -> doc)
         case _                               => None
@@ -86,4 +94,12 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
       results.toMap
     }
   }
+}
+
+trait WdlTypeParser {
+  def apply(text: String): Type
+}
+
+trait WdlExprParser {
+  def apply(text: String): Expr
 }

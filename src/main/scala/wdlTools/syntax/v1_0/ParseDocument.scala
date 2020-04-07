@@ -49,11 +49,11 @@ case class ParseDocument(grammar: Grammar[V10WdlLexer, V10WdlParser],
   }
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, docSourceURL)
+    grammar.getSourceText(ctx, Some(docSourceURL))
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, docSourceURL)
+    grammar.getSourceText(symbol, Some(docSourceURL))
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {

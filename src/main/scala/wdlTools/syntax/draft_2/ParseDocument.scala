@@ -39,19 +39,16 @@ case class ParseDocument(grammar: Grammar[Draft2WdlLexer, Draft2WdlParser],
                          opts: Options)
     extends Draft2WdlParserBaseVisitor[Element] {
 
-  private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
-    val tok = ctx.start
-    val line = tok.getLine
-    val col = tok.getCharPositionInLine
-    new RuntimeException(s"${msg}  in line ${line} col ${col}")
+  protected def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
+    grammar.makeWdlException(msg, ctx, Some(docSourceURL))
   }
 
-  private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, docSourceURL)
+  protected def getSourceText(ctx: ParserRuleContext): TextSource = {
+    grammar.getSourceText(ctx, Some(docSourceURL))
   }
 
-  private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, docSourceURL)
+  protected def getSourceText(symbol: TerminalNode): TextSource = {
+    grammar.getSourceText(symbol, Some(docSourceURL))
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {

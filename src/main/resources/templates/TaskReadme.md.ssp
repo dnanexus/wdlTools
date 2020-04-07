@@ -1,2 +1,0 @@
-<%@ import val task: wdlTools.syntax.AbstractSyntax.Task %>
-# Task ${name}

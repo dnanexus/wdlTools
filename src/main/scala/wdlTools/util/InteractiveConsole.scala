@@ -13,6 +13,14 @@ case class InteractiveConsole(promptColor: String = "",
 
   val OTHER_KEY = "Other"
 
+  def println(text: String, color: String = ""): Unit = {
+    Console.println(s"${color}${text}")
+  }
+
+  def error(text: String): Unit = {
+    println(text, Console.RED)
+  }
+
   def resolveDefault[T](default: Option[T],
                         choices: Option[BiMap[String, T]] = None): (Option[T], Option[String]) = {
     val resolvedDefault = default match {
@@ -31,7 +39,7 @@ case class InteractiveConsole(promptColor: String = "",
     (resolvedDefault, defaultKey)
   }
 
-  def getPrompt[T](prompt: String,
+  def getPrompt[T](prefix: String,
                    optional: Boolean = false,
                    default: Option[T] = None,
                    choices: Option[BiMap[String, T]] = None): String = {
@@ -52,7 +60,7 @@ case class InteractiveConsole(promptColor: String = "",
     if (attrs.isEmpty && optional) {
       attrs.append("*")
     }
-    s"${promptColor}${prompt}${attrs}${Console.RESET}${separator}"
+    s"${promptColor}${prefix}${attrs}${Console.RESET}${separator}"
   }
 
   def promptLoop[T](prompt: String,
@@ -68,14 +76,14 @@ case class InteractiveConsole(promptColor: String = "",
         }
       } catch {
         case e: InputException =>
-          Console.println(s"You entered an invalid value: ${e.getMessage}; please try again")
+          error(s"You entered an invalid value: ${e.getMessage}; please try again")
           None
       }
     }
 
     var result = promptOnce
     while (result.isEmpty && !optional) {
-      Console.println("A non-empty value is required; please try again")
+      error("A non-empty value is required; please try again")
       result = promptOnce
     }
     if (afterEntry.isDefined) {
@@ -86,7 +94,7 @@ case class InteractiveConsole(promptColor: String = "",
 
   /**
     * As the user to enter a value.
-    * @param prompt the prompt to print
+    * @param promptPrefix the prompt prefix
     * @param optional whether the user's response is optional
     * @param default the default value to return when the user does not enter a value
     * @param choices a sequence of allowed choices
@@ -95,7 +103,7 @@ case class InteractiveConsole(promptColor: String = "",
     * @tparam T the type to return
     * @return the value the user entered, converted to type T
     */
-  def ask[T](prompt: String,
+  def ask[T](promptPrefix: String,
              optional: Boolean = false,
              default: Option[T] = None,
              choices: Option[Seq[T]] = None,
@@ -109,7 +117,7 @@ case class InteractiveConsole(promptColor: String = "",
     val (defaultValue, defaultKey) = resolveDefault(default, finalChoices)
 
     val getOnce: Boolean => Option[T] = if (menu.getOrElse(finalChoices.isDefined)) {
-      val prompt = getPrompt(prompt, optional, defaultValue)
+      val prompt: String = getPrompt(promptPrefix, optional, defaultValue)
       val otherKey = if (otherOk) {
         Vector(OTHER_KEY)
       } else {
@@ -125,7 +133,7 @@ case class InteractiveConsole(promptColor: String = "",
           val key = choiceKeys(choice.get)
           if (otherOk && key == OTHER_KEY) {
             promptLoop[T](
-                getPrompt(prompt = "Enter other value", optional = optional),
+                getPrompt(prefix = "Enter other value", optional = optional),
                 reader,
                 optional
             )
@@ -138,7 +146,7 @@ case class InteractiveConsole(promptColor: String = "",
       }
       getOnce
     } else {
-      val prompt = getPrompt(prompt, optional, defaultValue, finalChoices)
+      val prompt = getPrompt(promptPrefix, optional, defaultValue, finalChoices)
       def getOnce(optional: Boolean): Option[T] = {
         promptLoop[T](prompt, reader, optional, defaultValue)
       }
@@ -227,7 +235,7 @@ object InteractiveConsole {
       try {
         Some(io.StdIn.readInt())
       } catch {
-        case EOFException             => None
+        case _: EOFException          => None
         case e: NumberFormatException => throw new InputException(e)
       }
     }
@@ -262,7 +270,7 @@ object InteractiveConsole {
         try {
           Some(io.StdIn.readBoolean())
         } catch {
-          case EOFException => None
+          case _: EOFException => None
         }
       }
     }
@@ -272,7 +280,7 @@ object InteractiveConsole {
         try {
           Some(io.StdIn.readChar())
         } catch {
-          case EOFException                       => None
+          case _: EOFException                    => None
           case e: StringIndexOutOfBoundsException => throw new InputException(e)
         }
       }
@@ -283,7 +291,7 @@ object InteractiveConsole {
         try {
           Some(io.StdIn.readDouble())
         } catch {
-          case EOFException             => None
+          case _: EOFException          => None
           case e: NumberFormatException => throw new InputException(e)
         }
       }

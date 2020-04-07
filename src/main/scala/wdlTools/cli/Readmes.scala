@@ -13,7 +13,7 @@ case class Readmes(conf: WdlToolsConf) extends Command {
     val parsers = Parsers(opts)
     val renderer = SspRenderer()
     val readmes = parsers.getDocumentWalker[String](url).walk { (url, doc, results) =>
-      ReadmeGenerator(url, doc, conf.readmes.developerReadmes(), renderer, results).apply()
+      ReadmeGenerator(conf.readmes.developerReadmes(), renderer, results).apply(url, doc)
     }
     Util.writeContentsToFiles(readmes,
                               outputDir = conf.readmes.outputDir.toOption,

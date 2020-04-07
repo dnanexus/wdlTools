@@ -14,7 +14,8 @@ import org.antlr.v4.runtime.{
   CommonTokenStream,
   Lexer,
   Parser,
-  ParserRuleContext
+  ParserRuleContext,
+  Token
 }
 import wdlTools.syntax
 import wdlTools.util.{Options, Verbosity}
@@ -43,16 +44,23 @@ object Antlr4Util {
       }
     }
 
-    def getSourceText(ctx: ParserRuleContext, docSourceURL: URL): TextSource = {
-      val tok = ctx.start
-      val line = tok.getLine
-      val col = tok.getCharPositionInLine
-      syntax.TextSource(line = line, col = col, url = docSourceURL)
+    def makeWdlException(msg: String,
+                         ctx: ParserRuleContext,
+                         docSourceURL: Option[URL] = None): RuntimeException = {
+      val src = getSourceText(ctx, docSourceURL)
+      new RuntimeException(s"${msg} ${src}")
     }
 
-    def getSourceText(symbol: TerminalNode, docSourceURL: URL): TextSource = {
-      val tok = symbol.getSymbol
-      syntax.TextSource(line = tok.getLine, col = tok.getCharPositionInLine, url = docSourceURL)
+    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL] = None): TextSource = {
+      getSourceText(ctx.start, docSourceURL)
+    }
+
+    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL] = None): TextSource = {
+      getSourceText(symbol.getSymbol, docSourceURL)
+    }
+
+    def getSourceText(token: Token, docSourceURL: Option[URL] = None): TextSource = {
+      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
     }
 
     def getComment(ctx: ParserRuleContext, before: Boolean = true): Option[Comment] = {

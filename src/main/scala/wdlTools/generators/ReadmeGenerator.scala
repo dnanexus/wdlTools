@@ -1,14 +1,14 @@
 package wdlTools.generators
 
 import java.net.URL
+import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.util.Util
 
 import scala.collection.mutable
 
-case class ReadmeGenerator(url: URL,
-                           document: Document,
-                           developerReadmes: Boolean = false,
+case class ReadmeGenerator(developerReadmes: Boolean = false,
                            renderer: Renderer = SspRenderer(),
                            readmes: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
@@ -17,62 +17,66 @@ case class ReadmeGenerator(url: URL,
   val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/WorkflowReadme.developer.md.ssp"
   val TASK_README_DEVELOPER_TEMPLATE = "/templates/TaskReadme.developer.md.ssp"
 
-  private val pathParts: Seq[String] = url.getPath.split("/")
-  require(pathParts.last.endsWith(".wdl"))
-  private val wdlName: String = pathParts.last.slice(0, pathParts.last.length - 4)
+  case class Generator(wdlUrl: URL) {
+    private val wdlPath = Util.getLocalPath(wdlUrl)
+    private val fname = wdlPath.getFileName.toString
+    require(fname.endsWith(".wdl"))
+    private val wdlName = fname.slice(0, fname.length - 4)
 
-  def getReadmeNameAndURL(elementName: String, developer: Boolean): (String, URL) = {
-    val devStr = if (developer) {
-      "developer."
-    } else {
-      ""
+    def getReadmeNameAndPath(elementName: String, developer: Boolean): (String, Path) = {
+      val devStr = if (developer) {
+        "developer."
+      } else {
+        ""
+      }
+      val newName = s"Readme.${devStr}${wdlName}.${elementName}.md"
+      val newPath = wdlPath.getParent.resolve(newName)
+      (newName, newPath)
     }
-    val newName = s"Readme.${devStr}${wdlName}.${elementName}.md"
-    val newPath = (pathParts.slice(0, pathParts.size - 1) ++ Vector(newName)).mkString("/")
-    val newURL = new URL(url.getProtocol, url.getHost, url.getPort, newPath)
-    (newName, newURL)
+
+    def generateWorkflowReadme(workflow: Workflow,
+                               tasks: Seq[(String, String)],
+                               developer: Boolean): Unit = {
+      val (_, path) = getReadmeNameAndPath(workflow.name, developer = developer)
+      val templateName = if (developer) {
+        WORKFLOW_README_DEVELOPER_TEMPLATE
+      } else {
+        WORKFLOW_README_TEMPLATE
+      }
+      val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
+      readmes(path) = contents
+    }
+
+    def generateTaskReadme(task: Task, developer: Boolean): String = {
+      val (readmeName, path) = getReadmeNameAndPath(task.name, developer = developer)
+      val templateName = if (developer) {
+        TASK_README_DEVELOPER_TEMPLATE
+      } else {
+        TASK_README_TEMPLATE
+      }
+      val contents = renderer.render(templateName, Map("task" -> task))
+      readmes(path) = contents
+      readmeName
+    }
   }
 
-  def generateWorkflowReadme(workflow: Workflow,
-                             tasks: Seq[(String, String)],
-                             developer: Boolean): Unit = {
-    val (_, url) = getReadmeNameAndURL(workflow.name, developer = developer)
-    val templateName = if (developer) {
-      WORKFLOW_README_DEVELOPER_TEMPLATE
-    } else {
-      WORKFLOW_README_TEMPLATE
-    }
-    val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-    readmes(url) = contents
-  }
+  def apply(wdlUrl: URL, document: Document): Unit = {
+    val generator = Generator(wdlUrl)
 
-  def generateTaskReadme(task: Task, developer: Boolean): String = {
-    val (readmeName, url) = getReadmeNameAndURL(task.name, developer = developer)
-    val templateName = if (developer) {
-      TASK_README_DEVELOPER_TEMPLATE
-    } else {
-      TASK_README_TEMPLATE
-    }
-    val contents = renderer.render(templateName, Map("task" -> task))
-    readmes(url) = contents
-    readmeName
-  }
-
-  def apply(): Unit = {
     val tasks = document.elements.flatMap {
       case task: Task =>
-        val taskReadme = generateTaskReadme(task, developer = false)
+        val taskReadme = generator.generateTaskReadme(task, developer = false)
         if (developerReadmes) {
-          generateTaskReadme(task, developer = true)
+          generator.generateTaskReadme(task, developer = true)
         }
         Some(task.name -> taskReadme)
       case _ => None
     }
 
     if (document.workflow.isDefined) {
-      generateWorkflowReadme(document.workflow.get, tasks, developer = false)
+      generator.generateWorkflowReadme(document.workflow.get, tasks, developer = false)
       if (developerReadmes) {
-        generateWorkflowReadme(document.workflow.get, tasks, developer = true)
+        generator.generateWorkflowReadme(document.workflow.get, tasks, developer = true)
       }
     }
   }

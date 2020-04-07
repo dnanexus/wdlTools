@@ -65,58 +65,14 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @return
       */
     def getOptions: Options = {
-      val parentConf = this.parentConfig.asInstanceOf[WdlToolsConf]
       val wdlDir: Path = Util.getLocalPath(url()).getParent
-      Options(
-          localDirectories = Some(this.localDirectories(Set(wdlDir))),
-          followImports = this.followImports(),
-          verbosity = parentConf.verbosity,
-          antlr4Trace = parentConf.antlr4Trace.getOrElse(default = false)
-      )
-    }
-  }
-
-  class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
-    banner(s"""Usage: wdlTools ${name} <path|uri>
-              |${description}
-              |
-              |Options:
-              |""".stripMargin)
-    val followImports: ScallopOption[Boolean] = toggle(
-        descrYes = "format imported files in addition to the main file",
-        descrNo = "only format the main file",
-        default = Some(true)
-    )
-    val localDir: ScallopOption[List[Path]] =
-      opt[List[Path]](descr =
-        "directory in which to search for imports; ignored if --noFollowImports is specified"
-      )
-    val uri: ScallopOption[String] =
-      trailArg[String](descr = "path or URI (file:// or http(s)://) to the main WDL file")
-
-    /**
-      * The local directories to search for WDL imports.
-      * @param merge a Set of Paths to merge in with the local directories.
-      * @return
-      */
-    def localDirectories(merge: Set[Path] = Set.empty): Seq[Path] = {
-      if (this.localDir.isDefined) {
-        (this.localDir().toSet ++ merge).toVector
-      } else {
-        merge
-      }.toVector
-    }
-
-    /**
-      * Gets a syntax.Util.Options object based on the command line options.
-      * @param merge a Set of Paths to merge in with the local directories.
-      * @return
-      */
-    def getSyntaxOptions(merge: Set[Path]): Options = {
-      val parent = this.parentConfig.asInstanceOf[WdlToolsConf]
-      Options(localDirectories = this.localDirectories(merge),
-              verbosity = parent.verbosity,
-              antlr4Trace = parent.antlr4Trace.getOrElse(default = false))
+      parentConfig
+        .asInstanceOf[WdlToolsConf]
+        .getOptions
+        .copy(
+            localDirectories = Some(this.localDirectories(Set(wdlDir))),
+            followImports = this.followImports()
+        )
     }
   }
 
@@ -202,6 +158,62 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
   addSubcommand(printAST)
 
+  val generate = new Subcommand("new") {
+    banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
+             |Generate a new WDL task, workflow, or project.
+             |
+             |Options:
+             |""".stripMargin)
+
+    val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version to generate; currently only v1.0 is supported",
+        default = Some(WdlVersion.V1_0)
+    )
+    validateOpt(wdlVersion) {
+      case Some(version) if version != WdlVersion.V1_0 =>
+        Left("Only WDL v1.0 is supported currently")
+      case _ => Right(Unit)
+    }
+    val readmes: ScallopOption[Boolean] = toggle(
+        descrYes = "Generate a README file for each task/workflow",
+        descrNo = "Do not generate README files",
+        default = Some(true)
+    )
+    val interactive: ScallopOption[Boolean] = toggle(
+        descrYes = "Specify inputs and outputs interactively",
+        default = Some(false)
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+    validateOpt(outputDir, overwrite) {
+      case (None, Some(false) | None) =>
+        Left("--outputDir is required unless --overwrite is specified")
+      case _ => Right(Unit)
+    }
+
+    val task = new Subcommand("task") {
+      val name: ScallopOption[String] = opt[String](descr = "The task name")
+      val title: ScallopOption[String] = opt[String](descr = "The task title")
+      val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
+    }
+    addSubcommand(task)
+
+    val workflow = new Subcommand("workflow") {
+      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
+      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
+    }
+    addSubcommand(workflow)
+
+    val project = new Subcommand("project") {
+      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
+      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
+    }
+    addSubcommand(project)
+  }
+  addSubcommand(generate)
+
   val readmes =
     new ParserSubcommand("readmes", "Generate README file stubs for tasks and workflows.") {
       val developerReadmes: ScallopOption[Boolean] = toggle(
@@ -229,5 +241,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     } else {
       Normal
     }
+  }
+
+  def getOptions: Options = {
+    Options(
+        verbosity = verbosity,
+        antlr4Trace = antlr4Trace.getOrElse(default = false)
+    )
   }
 }
