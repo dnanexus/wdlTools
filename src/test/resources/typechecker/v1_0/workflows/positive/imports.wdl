@@ -1,7 +1,7 @@
 version 1.0
 
 import "library.wdl" as lib
-import "census.wdl"
+import "census.wdl" as lib2
 
 workflow w {
 
@@ -14,4 +14,9 @@ workflow w {
   String longStr = concat.result
   Int i = add.result
   Array[Int] a = gen_array.result
+
+  call lib2.census
+  Person p = census.p
+
+  String name = p.name
 }
