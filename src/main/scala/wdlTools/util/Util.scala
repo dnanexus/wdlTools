@@ -1,7 +1,7 @@
 package wdlTools.util
 
 import collection.JavaConverters._
-import java.net.URI
+import java.net.URL
 import java.nio.file.{Files, Path, Paths}
 
 import com.typesafe.config.ConfigFactory
@@ -17,25 +17,6 @@ object Verbosity extends Enumeration {
 }
 import Verbosity._
 
-// a path to a file or an http location
-//
-// examples:
-//   http://google.com/A.txt
-//   https://google.com/A.txt
-//   file://A/B.txt
-//   foo.txt
-case class URL(addr: String)
-
-object URL {
-  def fromPath(path: Path): URL = {
-    fromUri(path.toUri)
-  }
-
-  def fromUri(uri: URI): URL = {
-    URL(uri.toString)
-  }
-}
-
 /**
   * Common configuration options.
   * @param localDirectories local directories to search for imports.
@@ -43,19 +24,13 @@ object URL {
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Seq[Path] = Vector.empty,
+case class Options(localDirectories: Option[Iterable[Path]] = None,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false) {
 
-  /**
-    * Clone this Options object, possibly updating attributes.
-    */
-  def clone(localDirectories: Seq[Path] = localDirectories,
-            followImports: Boolean = followImports,
-            verbosity: Verbosity = verbosity,
-            antlr4Trace: Boolean = antlr4Trace): Options = {
-    Options(localDirectories, followImports, verbosity, antlr4Trace)
+  def getURL(pathOrUrl: String): URL = {
+    Util.getURL(pathOrUrl, localDirectories)
   }
 }
 
@@ -70,6 +45,30 @@ object Util {
     config.getString("wdlTools.version")
   }
 
+  def getURL(pathOrUrl: String, searchPath: Option[Iterable[Path]] = None): URL = {
+    if (pathOrUrl.contains("://")) {
+      new URL(pathOrUrl)
+    } else {
+      val path: Path = Paths.get(pathOrUrl)
+      val resolved: Option[Path] = if (Files.exists(path)) {
+        Some(path)
+      } else if (searchPath.isDefined) {
+        // search in all directories where imports may be found
+        searchPath.get.map(d => d.resolve(pathOrUrl)).collectFirst {
+          case fp if Files.exists(fp) => fp
+        }
+      } else None
+      if (resolved.isEmpty) {
+        throw new Exception(s"Could not resolve path or URL ${pathOrUrl}")
+      }
+      new URL(s"file://${resolved.get.toAbsolutePath}")
+    }
+  }
+
+  def getURL(path: Path): URL = {
+    path.toUri.toURL
+  }
+
   /**
     * Determines the local path to a URI's file. The path will be the URI's file name relative to the parent; the
     * current working directory is used as the parent unless `parent` is specified. If the URI indicates a local path
@@ -82,10 +81,9 @@ object Util {
     * @return The Path to the local file
     */
   def getLocalPath(url: URL, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
-    val uri = new URI(url.addr)
-    uri.getScheme match {
+    url.getProtocol match {
       case null | "" | "file" =>
-        val path = Paths.get(uri.getPath)
+        val path = Paths.get(url.getPath)
 
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
@@ -95,7 +93,7 @@ object Util {
           Paths.get("").toAbsolutePath.resolve(path.getFileName)
         }
       case _ =>
-        parent.getOrElse(Paths.get("")).resolve(Paths.get(uri.getPath).getFileName)
+        parent.getOrElse(Paths.get("")).resolve(Paths.get(url.getPath).getFileName)
     }
   }
 

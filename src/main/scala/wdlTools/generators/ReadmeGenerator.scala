@@ -1,9 +1,8 @@
 package wdlTools.generators
 
-import java.net.URI
+import java.net.URL
 
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.URL
 
 import scala.collection.mutable
 
@@ -18,8 +17,7 @@ case class ReadmeGenerator(url: URL,
   val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/WorkflowReadme.developer.md.ssp"
   val TASK_README_DEVELOPER_TEMPLATE = "/templates/TaskReadme.developer.md.ssp"
 
-  private val uri: URI = new URI(url.addr)
-  private val pathParts: Seq[String] = uri.getPath.split("/")
+  private val pathParts: Seq[String] = url.getPath.split("/")
   require(pathParts.last.endsWith(".wdl"))
   private val wdlName: String = pathParts.last.slice(0, pathParts.last.length - 4)
 
@@ -31,14 +29,8 @@ case class ReadmeGenerator(url: URL,
     }
     val newName = s"Readme.${devStr}${wdlName}.${elementName}.md"
     val newPath = (pathParts.slice(0, pathParts.size - 1) ++ Vector(newName)).mkString("/")
-    val newURI = new URI(uri.getScheme,
-                         uri.getUserInfo,
-                         uri.getHost,
-                         uri.getPort,
-                         newPath,
-                         uri.getQuery,
-                         uri.getFragment)
-    (newName, URL.fromUri(newURI))
+    val newURL = new URL(url.getProtocol, url.getHost, url.getPort, newPath)
+    (newName, newURL)
   }
 
   def generateWorkflowReadme(workflow: Workflow,

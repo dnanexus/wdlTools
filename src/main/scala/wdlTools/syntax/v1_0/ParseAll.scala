@@ -1,7 +1,9 @@
 package wdlTools.syntax.v1_0
 
+import java.net.URL
+
 import wdlTools.syntax.{AbstractSyntax, WdlParser}
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
 
@@ -13,8 +15,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val cDoc: ConcreteSyntax.Document =
-          ParseDocument.apply(loader.apply(url), opts)
+        val cDoc: ConcreteSyntax.Document = ParseDocument.apply(loader.apply(url), opts)
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc

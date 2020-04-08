@@ -839,10 +839,7 @@ case class Checker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val parts = iStat.url.addr.split("/")
-            if (parts.isEmpty)
-              throw new Exception(s"URL ${iStat.url.addr} is invalid")
-            val nsName = parts.last
+            val nsName = iStat.url.getFile().replaceAll("/", "")
             if (nsName.endsWith(".wdl"))
               nsName.dropRight(".wdl".size)
             else

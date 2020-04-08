@@ -2,8 +2,7 @@ package wdlTools.syntax.draft_2
 
 // Parse one document. Do not follow imports.
 
-// we need these for safe casting, and reporting on errors
-//import reflect.ClassTag
+import java.net.URL
 import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -11,7 +10,7 @@ import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode, URL}
+import wdlTools.util.{Options, SourceCode}
 
 object ParseDocument {
   case class Draft2GrammarFactory(opts: Options)
@@ -971,7 +970,7 @@ import_as
       .asScala
       .map(x => visitImport_alias(x))
       .toVector
-    ImportDoc(name, aliases, URL(url), getSourceText(ctx), getComment(ctx))
+    ImportDoc(name, aliases, opts.getURL(url), getSourceText(ctx), getComment(ctx))
   }
 
   /* call_alias
