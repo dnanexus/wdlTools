@@ -10,7 +10,8 @@ import wdlTools.util.{Options, SourceCode, URL}
 class CheckerTest extends FlatSpec with Matchers {
   private lazy val wdlSourceDirs: Vector[Path] = {
     val p1: Path = Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
-    Vector(p1)
+    val p2: Path = Paths.get(getClass.getResource("/typechecker/v1_0/workflows/positive").getPath)
+    Vector(p1, p2)
   }
   private lazy val conf = Options(antlr4Trace = false, localDirectories = wdlSourceDirs)
   private val loader = SourceCode.Loader(conf)
@@ -64,7 +65,7 @@ class CheckerTest extends FlatSpec with Matchers {
   it should "type check workflows (positive cases)" taggedAs(Edge) in {
     val positiveCases =
       getWdlSourceFiles("/typechecker/v1_0/workflows/positive")
-//        .filter(p => p.toString contains "import")
+        .filter(p => p.toString contains "import")
 
     for (pc <- positiveCases) {
       val doc = parser.parse(URL.fromPath(pc))

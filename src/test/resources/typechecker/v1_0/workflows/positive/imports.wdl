@@ -1,6 +1,7 @@
 version 1.0
 
 import "library.wdl" as lib
+import "census.wdl"
 
 workflow w {
 
