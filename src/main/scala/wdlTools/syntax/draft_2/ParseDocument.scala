@@ -3,6 +3,7 @@ package wdlTools.syntax.draft_2
 // Parse one document. Do not follow imports.
 
 import java.net.URL
+
 import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode

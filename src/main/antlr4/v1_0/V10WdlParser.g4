@@ -1,8 +1,6 @@
 parser grammar V10WdlParser;
 
-
 options { tokenVocab=V10WdlLexer; }
-
 
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK
@@ -24,9 +22,8 @@ type_base
 	;
 
 wdl_type
-  : (type_base OPTIONAL | type_base)
-  ;
-
+	: (type_base OPTIONAL | type_base)
+	;
 
 unbound_decls
 	: wdl_type Identifier
@@ -47,28 +44,27 @@ number
 	;
 
 expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
-  | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
-  ;
-
+	: BoolLiteral EQUAL (string | number)
+	| DEFAULT EQUAL (string | number)
+	| SEP EQUAL (string | number)
+	;
 
 string_part
-  : StringPart*
-  ;
+	: StringPart*
+	;
 
 string_expr_part
-  : StringCommandStart (expression_placeholder_option)* expr RBRACE
-  ;
+	: StringCommandStart (expression_placeholder_option)* expr RBRACE
+	;
 
 string_expr_with_string_part
-  : string_expr_part string_part
-  ;
+	: string_expr_part string_part
+	;
 
 string
-  : DQUOTE string_part string_expr_with_string_part* DQUOTE
-  | SQUOTE string_part string_expr_with_string_part* SQUOTE
-  ;
+	: DQUOTE string_part string_expr_with_string_part* DQUOTE
+	| SQUOTE string_part string_expr_with_string_part* SQUOTE
+	;
 
 primitive_literal
 	: BoolLiteral
@@ -147,8 +143,8 @@ import_alias
 	;
 
 import_as
-    : AS Identifier
-    ;
+	: AS Identifier
+	;
 
 import_doc
 	: IMPORT string import_as? (import_alias)*
@@ -157,21 +153,25 @@ struct
 	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
 
-meta_kv
-	: Identifier COLON expr
+meta_expr
+	: expr
+	| Null
 	;
 
+meta_kv
+	: Identifier COLON meta_expr
+	;
 
 parameter_meta
 	: PARAMETERMETA LBRACE meta_kv* RBRACE
 	;
 
 meta
-    :  META LBRACE meta_kv* RBRACE
-    ;
+	:	META LBRACE meta_kv* RBRACE
+	;
 
 task_runtime_kv
-    : Identifier COLON expr
+	: Identifier COLON expr
 	;
 
 task_runtime
@@ -187,22 +187,21 @@ task_output
 	;
 
 task_command_string_part
-    : CommandStringPart*
-    ;
+	: CommandStringPart*
+	;
 
 task_command_expr_part
-    : StringCommandStart  (expression_placeholder_option)* expr RBRACE
-    ;
+	: StringCommandStart	(expression_placeholder_option)* expr RBRACE
+	;
 
 task_command_expr_with_string
-    : task_command_expr_part task_command_string_part
-    ;
+	: task_command_expr_part task_command_string_part
+	;
 
 task_command
-  : COMMAND task_command_string_part task_command_expr_with_string* EndCommand
-  | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
-  ;
-
+	: COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+	| HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+	;
 
 task_element
 	: task_input
@@ -217,7 +216,6 @@ task_element
 task
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;
-
 
 inner_workflow_element
 	: bound_decls
@@ -243,13 +241,12 @@ call_body
 	;
 
 call_name
-        : Identifier (DOT Identifier)*
-        ;
-
-call
-	: CALL call_name call_alias?  call_body?
+	: Identifier (DOT Identifier)*
 	;
 
+call
+	: CALL call_name call_alias?	call_body?
+	;
 
 scatter
 	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
@@ -258,7 +255,6 @@ scatter
 conditional
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	;
-
 
 workflow_input
 	: INPUT LBRACE (any_decls)* RBRACE
@@ -279,7 +275,6 @@ workflow_element
 workflow
 	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
 	;
-
 
 document_element
 	: import_doc

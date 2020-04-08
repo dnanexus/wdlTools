@@ -15,9 +15,9 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
 
-//  private def getTaskSource(fname: String): SourceCode = {
-//    loader.apply(Util.getURL(tasksDir.resolve(fname)))
-//  }
+  private def getTaskSource(fname: String): SourceCode = {
+    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+  }
 
   private def getWorkflowSource(fname: String): SourceCode = {
     loader.apply(Util.getURL(workflowsDir.resolve(fname)))
@@ -34,5 +34,20 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     imports.size shouldBe 2
 
     doc.workflow should not be empty
+  }
+
+  it should "handle nulls in meta sections" in {
+    val doc = parser.apply(getTaskSource("null.wdl"))
+
+    val tasks: Seq[Task] = doc.elements.collect {
+      case e: Task => e
+    }
+    tasks.size shouldBe 1
+
+    val kvs = tasks.head.parameterMeta.get.kvs
+    kvs.size shouldBe 1
+    kvs.head.expr should matchPattern {
+      case ValueNull(_) =>
+    }
   }
 }

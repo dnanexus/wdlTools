@@ -693,7 +693,12 @@ any_decls
    ; */
   override def visitMeta_kv(ctx: V10WdlParser.Meta_kvContext): MetaKV = {
     val id = ctx.Identifier().getText
-    val expr = visitExpr(ctx.expr)
+    val exprContext = ctx.meta_expr()
+    val expr = if (exprContext.Null() != null) {
+      ExprNull(getSourceText(exprContext.Null()))
+    } else {
+      visitExpr(exprContext.expr())
+    }
     MetaKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
 
