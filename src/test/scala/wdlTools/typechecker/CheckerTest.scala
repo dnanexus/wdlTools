@@ -13,8 +13,7 @@ class CheckerTest extends FlatSpec with Matchers {
     val p2: Path = Paths.get(getClass.getResource("/typechecker/v1_0/workflows/positive").getPath)
     Vector(p1, p2)
   }
-  private val opts = Options(antlr4Trace = false,
-                             localDirectories = Some(wdlSourceDirs))
+  private val opts = Options(antlr4Trace = false, localDirectories = Some(wdlSourceDirs))
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
   private val stdlib = Stdlib(opts)

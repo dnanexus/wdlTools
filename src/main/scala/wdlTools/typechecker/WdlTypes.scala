@@ -35,7 +35,7 @@ object WdlTypes {
   // and workflows
   //
   sealed trait WT_Callable extends WT {
-    val name : String
+    val name: String
     val input: Map[String, (WT, Boolean)]
     val output: Map[String, WT]
   }

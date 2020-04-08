@@ -66,12 +66,12 @@ case class Checker(stdlib: Stdlib) {
     //    call lib.add
     //    call lib.act
     // }
-    def bindImportedDoc(namespace : String, impCtx : Context, srcText : TextSource) : Context = {
+    def bindImportedDoc(namespace: String, impCtx: Context, srcText: TextSource): Context = {
       val impCallables = impCtx.callables.map {
-        case (name, taskSig : WT_Task) =>
+        case (name, taskSig: WT_Task) =>
           val fqn = namespace + "." + name
           fqn -> taskSig.copy(name = fqn)
-        case (name, wfSig : WT_Workflow) =>
+        case (name, wfSig: WT_Workflow) =>
           val fqn = namespace + "." + name
           fqn -> wfSig.copy(name = fqn)
       }
@@ -205,30 +205,29 @@ case class Checker(stdlib: Stdlib) {
     }
   }
 
-
   // type check a declaration like this:
   //  Person p1 = {
   //    "name" : "Carly",
   //    "height" : 168,
   //    "age" : 40
   //  }
-  private def checkIsObjectCoercibleToStruct(structName : String,
-                                             expr : Expr,
-                                             text : TextSource,
-                                             ctx : Context) : Unit = {
+  private def checkIsObjectCoercibleToStruct(structName: String,
+                                             expr: Expr,
+                                             text: TextSource,
+                                             ctx: Context): Unit = {
     val defFields = ctx.structs.get(structName) match {
       case None =>
         throw new TypeException(s"Struct ${structName} is not defined", text)
       case Some(WT_Struct(_, fields)) => fields
     }
-    val rhsFields : Map[String, Expr] = expr match {
-      case ExprMap(m : Map[Expr,Expr], _) =>
-        m.map{
+    val rhsFields: Map[String, Expr] = expr match {
+      case ExprMap(m: Map[Expr, Expr], _) =>
+        m.map {
           case (ValueString(fName, _), e) => fName -> e
-          case (_, _) => throw new TypeException("map isn't made up of string field names", text)
+          case (_, _)                     => throw new TypeException("map isn't made up of string field names", text)
         }
       case ExprObject(m, _) => m
-      case _ => throw new TypeException("Expression cannot be coereced into a struct", text)
+      case _                => throw new TypeException("Expression cannot be coereced into a struct", text)
     }
 
     // Check that the all the struct fields are defined
@@ -245,22 +244,22 @@ case class Checker(stdlib: Stdlib) {
     }
   }
 
-  private def typeTranslate(t: Type, text : TextSource, ctx : Context): WT = {
+  private def typeTranslate(t: Type, text: TextSource, ctx: Context): WT = {
     t match {
-      case TypeOptional(t, _)    => WT_Optional(typeTranslate(t, text, ctx))
-      case TypeArray(t, _, _)    => WT_Array(typeTranslate(t, text, ctx))
-      case TypeMap(k, v, _)      => WT_Map(typeTranslate(k, text, ctx), typeTranslate(v, text, ctx))
-      case TypePair(l, r, _)     => WT_Pair(typeTranslate(l, text, ctx), typeTranslate(r, text, ctx))
-      case _: TypeString         => WT_String
-      case _: TypeFile           => WT_File
-      case _: TypeBoolean        => WT_Boolean
-      case _: TypeInt            => WT_Int
-      case _: TypeFloat          => WT_Float
+      case TypeOptional(t, _) => WT_Optional(typeTranslate(t, text, ctx))
+      case TypeArray(t, _, _) => WT_Array(typeTranslate(t, text, ctx))
+      case TypeMap(k, v, _)   => WT_Map(typeTranslate(k, text, ctx), typeTranslate(v, text, ctx))
+      case TypePair(l, r, _)  => WT_Pair(typeTranslate(l, text, ctx), typeTranslate(r, text, ctx))
+      case _: TypeString      => WT_String
+      case _: TypeFile        => WT_File
+      case _: TypeBoolean     => WT_Boolean
+      case _: TypeInt         => WT_Int
+      case _: TypeFloat       => WT_Float
       case TypeIdentifier(id, _) =>
         if (!(ctx.structs contains id))
           throw new TypeException(s"struct ${id} has not been defined", text)
         WT_Identifier(id)
-      case _: TypeObject         => WT_Object
+      case _: TypeObject => WT_Object
       case TypeStruct(name, members, _, _) =>
         WT_Struct(name, members.map {
           case StructMember(name, t2, _, _) => name -> typeTranslate(t2, text, ctx)
@@ -282,7 +281,8 @@ case class Checker(stdlib: Stdlib) {
       // an identifier has to be bound to a known type
       case ExprIdentifier(id, _) =>
         (ctx.declarations.get(id), ctx.structs.get(id)) match {
-          case (None, None)    => throw new TypeException(s"Identifier ${id} is not defined", expr.text)
+          case (None, None) =>
+            throw new TypeException(s"Identifier ${id} is not defined", expr.text)
           case (Some(t), None) => t
           case (None, Some(t)) => t
           case (Some(_), Some(_)) =>
@@ -314,7 +314,7 @@ case class Checker(stdlib: Stdlib) {
         // The map type is unknown
         WT_Map(WT_Unknown, WT_Unknown)
 
-      case _ : ExprObject =>
+      case _: ExprObject =>
         WT_Object
 
       case ExprMap(m, _) =>
@@ -487,18 +487,18 @@ case class Checker(stdlib: Stdlib) {
       case (_, None) =>
         ()
 
-        // special case, something like this:
-        //  Person p1 = {
-        //    "name" : "Carly",
-        //    "height" : 168,
-        //    "age" : 40
-        //  }
-        //
-        // we cannot evaluate the right hand side on its own. We need the knowledge
-        // the it is actually a struct Person.
-      case (WT_Identifier(structName), Some(objExpr : ExprObject)) =>
+      // special case, something like this:
+      //  Person p1 = {
+      //    "name" : "Carly",
+      //    "height" : 168,
+      //    "age" : 40
+      //  }
+      //
+      // we cannot evaluate the right hand side on its own. We need the knowledge
+      // the it is actually a struct Person.
+      case (WT_Identifier(structName), Some(objExpr: ExprObject)) =>
         checkIsObjectCoercibleToStruct(structName, objExpr, decl.text, ctx)
-      case (WT_Identifier(structName), Some(mapExpr : ExprMap)) =>
+      case (WT_Identifier(structName), Some(mapExpr: ExprMap)) =>
         checkIsObjectCoercibleToStruct(structName, mapExpr, decl.text, ctx)
 
       case (_, Some(expr)) =>
@@ -529,10 +529,9 @@ case class Checker(stdlib: Stdlib) {
   }
 
   // calculate the type signature of a workflow or a task
-  private def calcSignature(
-      inputSection: Option[InputSection],
-      outputSection: Option[OutputSection],
-      ctx : Context) : (Map[String, (WT, Boolean)], Map[String, WT]) = {
+  private def calcSignature(inputSection: Option[InputSection],
+                            outputSection: Option[OutputSection],
+                            ctx: Context): (Map[String, (WT, Boolean)], Map[String, WT]) = {
 
     val inputType: Map[String, (WT, Boolean)] = inputSection match {
       case None => Map.empty
@@ -825,7 +824,7 @@ case class Checker(stdlib: Stdlib) {
         val tt = applyTask(task, accu)
         accu.bind(tt, task.text)
 
-      case (accu : Context, iStat: ImportDoc) =>
+      case (accu: Context, iStat: ImportDoc) =>
         // type check the imported document
         val iCtx = apply(iStat.doc, contextEmpty)
 
