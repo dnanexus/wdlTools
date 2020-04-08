@@ -31,7 +31,20 @@ case class Generate(conf: WdlToolsConf) extends Command {
         )
         generator.generate(model, outputDir)
       case workflow @ conf.generate.workflow =>
-        WorkflowGenerator()
+        val model = Model.WorkflowSpec(
+            conf.generate.wdlVersion(),
+            name = workflow.name.toOption,
+            title = workflow.title.toOption
+        )
+        val generator = WorkflowGenerator(
+            opts,
+            wdlVersion = conf.generate.wdlVersion(),
+            interactive = conf.generate.interactive(),
+            readmes = conf.generate.readmes(),
+            overwrite = conf.generate.overwrite(),
+            generatedFiles = generatedFiles
+        )
+        generator.generate(model, outputDir)
       case project @ conf.generate.project =>
         ProjectGenerator()
     }

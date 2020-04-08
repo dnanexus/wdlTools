@@ -202,6 +202,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
     val workflow = new Subcommand("workflow") {
       val name: ScallopOption[String] = opt[String](descr = "The workflow name")
+      val title: ScallopOption[String] = opt[String](descr = "The task title")
       val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
     }
     addSubcommand(workflow)
