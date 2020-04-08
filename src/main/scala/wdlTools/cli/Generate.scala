@@ -1,5 +1,6 @@
 package wdlTools.cli
 
+import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.generators._
@@ -9,14 +10,13 @@ import scala.language.reflectiveCalls
 
 case class Generate(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val generatedFiles: mutable.Map[Path, String] = mutable.HashMap.empty
+    val generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty
     val outputDir: Option[Path] = conf.generate.outputDir.toOption
     val opts = conf.getOptions
 
     conf.generate.subcommand match {
       case task @ conf.generate.task =>
-        val model = TaskGenerator.Model(
-            version = conf.generate.wdlVersion(),
+        val model = Model.TaskSpec(
             name = task.name.toOption,
             title = task.title.toOption,
             docker = task.docker.toOption

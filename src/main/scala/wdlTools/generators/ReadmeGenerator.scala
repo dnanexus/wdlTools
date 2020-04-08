@@ -9,7 +9,7 @@ import wdlTools.util.Util
 import scala.collection.mutable
 
 case class ReadmeGenerator(developerReadmes: Boolean = false,
-                           renderer: Renderer = SspRenderer(),
+                           renderer: Renderer = Renderer(),
                            readmes: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
   val WORKFLOW_README_TEMPLATE = "/templates/WorkflowReadme.md.ssp"
@@ -44,7 +44,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      readmes(path) = contents
+      readmes(Util.getURL(path)) = contents
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -55,7 +55,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      readmes(path) = contents
+      readmes(Util.getURL(path)) = contents
       readmeName
     }
   }
