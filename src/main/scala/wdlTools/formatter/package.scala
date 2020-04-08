@@ -99,6 +99,7 @@ object Token {
   val Then: Token = Token("then")
   val Version: Token = Token("version")
   val Workflow: Token = Token("workflow")
+  val Null: Token = Token("null")
 
   // data types
   val ArrayType: Token = Token("Array")

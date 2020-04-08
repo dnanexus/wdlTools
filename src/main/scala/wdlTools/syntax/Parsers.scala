@@ -1,13 +1,14 @@
 package wdlTools.syntax
 
 import java.net.URL
+import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.Document
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
 
-case class Parsers(opts: Options, defaultLoader: Option[SourceCode.Loader] = None) {
+case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
@@ -38,6 +39,10 @@ case class Parsers(opts: Options, defaultLoader: Option[SourceCode.Loader] = Non
 
   def getParser(wdlVersion: WdlVersion): WdlParser = {
     parsers(wdlVersion)
+  }
+
+  def parse(path: Path): Document = {
+    parse(Util.getURL(path))
   }
 
   def parse(url: URL): Document = {

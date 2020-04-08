@@ -30,7 +30,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly
-    banner(s"""Usage: wdlTools ${commandNameAndAliases.head} <path|uri>
+    banner(s"""Usage: wdlTools ${commandNameAndAliases.head} [OPTIONS] <path|uri>
               |${description}
               |
               |Options:

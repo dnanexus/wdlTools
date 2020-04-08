@@ -12,10 +12,12 @@ case class Checker(stdlib: Stdlib) {
 
   // An entire context
   //
-  // There separate namespaces for variables, struct definitions, and callables (tasks/workflows)
+  // There separate namespaces for variables, struct definitions, and callables (tasks/workflows).
+  // An additional variable holds a list of all imported namespaces.
   case class Context(declarations: Map[String, WT],
                      structs: Map[String, WT_Struct],
-                     callables: Map[String, WT] /* tasks and workflows */ ) {
+                     callables: Map[String, WT_Callable],
+                     namespaces: Set[String]) {
     def bind(varName: String, wdlType: WT, srcText: TextSource): Context = {
       declarations.get(varName) match {
         case None =>
@@ -24,17 +26,6 @@ case class Checker(stdlib: Stdlib) {
           throw new TypeException(s"variable ${varName} shadows an existing variable", srcText)
       }
     }
-
-    /*    def bind(decl: Declaration): Context = {
-      declarations.get(decl.name) match {
-        case None =>
-          this.copy(declarations = declarations + (decl.name -> decl.wdlType))
-        case Some(_) =>
-          throw new Exception(
-              s"declaration ${decl} shadows an existing variable by the same name (${decl.name})"
-          )
-      }
-    }*/
 
     def bind(s: WT_Struct, srcText: TextSource): Context = {
       structs.get(s.name) match {
@@ -45,24 +36,17 @@ case class Checker(stdlib: Stdlib) {
       }
     }
 
-    def bind(taskSig: WT_Task, srcText: TextSource): Context = {
-      callables.get(taskSig.name) match {
+    // add a callable (task/workflow)
+    def bindCallable(callable: WT_Callable, srcText: TextSource): Context = {
+      callables.get(callable.name) match {
         case None =>
-          this.copy(callables = callables + (taskSig.name -> taskSig))
+          this.copy(callables = callables + (callable.name -> callable))
         case Some(_) =>
-          throw new TypeException(s"a callable named ${taskSig.name} is already declared", srcText)
+          throw new TypeException(s"a callable named ${callable.name} is already declared", srcText)
       }
     }
 
-    def bind(wfSig: WT_Workflow, srcText: TextSource): Context = {
-      callables.get(wfSig.name) match {
-        case None =>
-          this.copy(callables = callables + (wfSig.name -> wfSig))
-        case Some(_) =>
-          throw new TypeException(s"a callable named ${wfSig.name} is already declared", srcText)
-      }
-    }
-
+    // add a bunch of bindings
     def bind(bindings: Bindings, srcText: TextSource): Context = {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
@@ -71,9 +55,68 @@ case class Checker(stdlib: Stdlib) {
         throw new TypeException(s"Variables ${both} are being redeclared", srcText)
       this.copy(declarations = declarations ++ bindings)
     }
+
+    // When we import another document all of its definitions are prefixed with the
+    // namespace name.
+    //
+    // -- library.wdl --
+    // task add {}
+    // workflow act {}
+    //
+    // import "library.wdl" as lib
+    // workflow hello {
+    //    call lib.add
+    //    call lib.act
+    // }
+    def bindImportedDoc(namespace: String,
+                        iCtx: Context,
+                        aliases: Vector[ImportAlias],
+                        srcText: TextSource): Context = {
+      if (this.namespaces contains namespace)
+        throw new TypeException(s"namespace ${namespace} already exists", srcText)
+
+      // There cannot be any collisions because this is a new namespace
+      val iCallables = iCtx.callables.map {
+        case (name, taskSig: WT_Task) =>
+          val fqn = namespace + "." + name
+          fqn -> taskSig.copy(name = fqn)
+        case (name, wfSig: WT_Workflow) =>
+          val fqn = namespace + "." + name
+          fqn -> wfSig.copy(name = fqn)
+        case other =>
+          throw new Exception(s"sanity: ${other.getClass}")
+      }
+
+      // rename the imported structs according to the aliases
+      //
+      // import http://example.com/another_exampl.wdl as ex2
+      //     alias Parent as Parent2
+      //     alias Child as Child2
+      //     alias GrandChild as GrandChild2
+      //
+      val aliasesMap: Map[String, String] = aliases.map {
+        case ImportAlias(src, dest, _) => src -> dest
+      }.toMap
+      val iStructs = iCtx.structs.map {
+        case (name, iStruct) =>
+          aliasesMap.get(name) match {
+            case None          => name -> iStruct
+            case Some(altName) => altName -> WT_Struct(altName, iStruct.members)
+          }
+      }
+
+      // check that the imported structs do not step over existing definitions
+      val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet
+      if (doublyDefinedStructs.nonEmpty)
+        throw new TypeException(s"Structs ${doublyDefinedStructs} are already defined", srcText)
+
+      this.copy(structs = structs ++ iStructs,
+                callables = callables ++ iCallables,
+                namespaces = namespaces + namespace)
+    }
   }
 
-  private val contextEmpty = Context(Map.empty, Map.empty, Map.empty)
+  private val contextEmpty = Context(Map.empty, Map.empty, Map.empty, Set.empty)
 
   private def typeEvalMathOp(expr: Expr, ctx: Context): WT = {
     val t = typeEval(expr, ctx)
@@ -161,22 +204,102 @@ case class Checker(stdlib: Stdlib) {
     }
   }
 
-  private def typeTranslate(t: Type): WT = {
+  // check if the right hand side of an assignment matches the left hand side
+  //
+  // Negative examples:
+  //    Int i = "hello"
+  //    Array[File] files = "8"
+  //
+  // Positive examples:
+  //    Int k =  3 + 9
+  //    Int j = k * 3
+  //    String s = "Ford model T"
+  //    String s2 = 5
+  private def isCoercibleTo(left: WT, right: WT): Boolean = {
+    (left, right) match {
+      case (WT_String, WT_String | WT_File | WT_Boolean | WT_Int | WT_Float) => true
+      case (WT_File, WT_String | WT_File)                                    => true
+      case (WT_Boolean, WT_Boolean)                                          => true
+      case (WT_Int, WT_Int)                                                  => true
+      case (WT_Float, WT_Int | WT_Float)                                     => true
+
+      case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo(l, r)
+      case (WT_Optional(l), r)              => isCoercibleTo(l, r)
+
+      case (WT_Array(l), WT_Array(r))         => isCoercibleTo(l, r)
+      case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
+      case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
+
+      case (WT_Identifier(structNameL), WT_Identifier(structNameR)) =>
+        structNameL == structNameR
+
+      case (WT_Object, WT_Object) => true
+
+      case (_, WT_Unknown) => true
+      case (WT_Unknown, _) => true
+
+      case _ => false
+    }
+  }
+
+  // type check a declaration like this:
+  //  Person p1 = {
+  //    "name" : "Carly",
+  //    "height" : 168,
+  //    "age" : 40
+  //  }
+  private def checkIsObjectCoercibleToStruct(structName: String,
+                                             expr: Expr,
+                                             text: TextSource,
+                                             ctx: Context): Unit = {
+    val defFields = ctx.structs.get(structName) match {
+      case None =>
+        throw new TypeException(s"Struct ${structName} is not defined", text)
+      case Some(WT_Struct(_, fields)) => fields
+    }
+    val rhsFields: Map[String, Expr] = expr match {
+      case ExprMap(m: Map[Expr, Expr], _) =>
+        m.map {
+          case (ValueString(fName, _), e) => fName -> e
+          case (_, _)                     => throw new TypeException("map isn't made up of string field names", text)
+        }
+      case ExprObject(m, _) => m
+      case _                => throw new TypeException("Expression cannot be coereced into a struct", text)
+    }
+
+    // Check that the all the struct fields are defined
+    if (defFields.keys.toSet != rhsFields.keys.toSet)
+      throw new TypeException(s"the fields should be ${defFields.keys.toSet}", text)
+
+    // Check that each field is of the correct type
+    defFields.foreach {
+      case (fieldName, fieldType) =>
+        val e = rhsFields(fieldName)
+        val t = typeEval(e, ctx)
+        if (!isCoercibleTo(fieldType, t))
+          throw new TypeException(s"field ${fieldName} is badly typed", text)
+    }
+  }
+
+  private def typeTranslate(t: Type, text: TextSource, ctx: Context): WT = {
     t match {
-      case TypeOptional(t, _)    => WT_Optional(typeTranslate(t))
-      case TypeArray(t, _, _)    => WT_Array(typeTranslate(t))
-      case TypeMap(k, v, _)      => WT_Map(typeTranslate(k), typeTranslate(v))
-      case TypePair(l, r, _)     => WT_Pair(typeTranslate(l), typeTranslate(r))
-      case _: TypeString         => WT_String
-      case _: TypeFile           => WT_File
-      case _: TypeBoolean        => WT_Boolean
-      case _: TypeInt            => WT_Int
-      case _: TypeFloat          => WT_Float
-      case TypeIdentifier(id, _) => WT_Identifier(id)
-      case _: TypeObject         => WT_Object
+      case TypeOptional(t, _) => WT_Optional(typeTranslate(t, text, ctx))
+      case TypeArray(t, _, _) => WT_Array(typeTranslate(t, text, ctx))
+      case TypeMap(k, v, _)   => WT_Map(typeTranslate(k, text, ctx), typeTranslate(v, text, ctx))
+      case TypePair(l, r, _)  => WT_Pair(typeTranslate(l, text, ctx), typeTranslate(r, text, ctx))
+      case _: TypeString      => WT_String
+      case _: TypeFile        => WT_File
+      case _: TypeBoolean     => WT_Boolean
+      case _: TypeInt         => WT_Int
+      case _: TypeFloat       => WT_Float
+      case TypeIdentifier(id, _) =>
+        if (!(ctx.structs contains id))
+          throw new TypeException(s"struct ${id} has not been defined", text)
+        WT_Identifier(id)
+      case _: TypeObject => WT_Object
       case TypeStruct(name, members, _, _) =>
         WT_Struct(name, members.map {
-          case StructMember(name, t2, _, _) => name -> typeTranslate(t2)
+          case StructMember(name, t2, _, _) => name -> typeTranslate(t2, text, ctx)
         }.toMap)
     }
   }
@@ -195,7 +318,8 @@ case class Checker(stdlib: Stdlib) {
       // an identifier has to be bound to a known type
       case ExprIdentifier(id, _) =>
         (ctx.declarations.get(id), ctx.structs.get(id)) match {
-          case (None, None)    => throw new RuntimeException(s"Identifier ${id} is not defined")
+          case (None, None) =>
+            throw new TypeException(s"Identifier ${id} is not defined", expr.text)
           case (Some(t), None) => t
           case (None, Some(t)) => t
           case (Some(_), Some(_)) =>
@@ -207,7 +331,7 @@ case class Checker(stdlib: Stdlib) {
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
           if (!isCoercibleTo(WT_String, t))
-            throw new TypeException(s"WT_ ${t} is not coercible to string", expr.text)
+            throw new TypeException(s"${t} is not coercible to string", expr.text)
         }
         WT_String
 
@@ -226,6 +350,9 @@ case class Checker(stdlib: Stdlib) {
       case ExprMap(m, _) if m.isEmpty =>
         // The map type is unknown
         WT_Map(WT_Unknown, WT_Unknown)
+
+      case _: ExprObject =>
+        WT_Object
 
       case ExprMap(m, _) =>
         // figure out the types from the first element
@@ -351,7 +478,7 @@ case class Checker(stdlib: Stdlib) {
         val elementTypes = elements.map(typeEval(_, ctx))
         stdlib.apply(funcName, elementTypes, expr)
 
-      // Access a field in a struct or an object. For example:
+      // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a
       case ExprGetName(e: Expr, id: String, _) =>
         val et = typeEval(e, ctx)
@@ -360,24 +487,44 @@ case class Checker(stdlib: Stdlib) {
             members.get(id) match {
               case None =>
                 throw new TypeException(
-                    s"Struct ${name} does not have member ${id} in expression ${expr}",
+                    s"Struct ${name} does not have member ${id} in expression",
                     expr.text
                 )
               case Some(t) =>
                 t
             }
+
           case WT_Call(name, members) =>
             members.get(id) match {
               case None =>
                 throw new TypeException(
-                    s"Call object ${name} does not have member ${id} in expression ${expr}",
+                    s"Call object ${name} does not have member ${id} in expression",
                     expr.text
                 )
               case Some(t) =>
                 t
             }
-          case _ =>
-            throw new TypeException(s"Member access ${id} in expression ${e} is illegal", expr.text)
+
+          // An identifier is a struct, and we want to access
+          // a field in it.
+          // Person p = census.p
+          // String name = p.name
+          case WT_Identifier(structName) =>
+            // produce the struct definition
+            val members = ctx.structs.get(structName) match {
+              case None                        => throw new TypeException(s"unknown struct ${structName}", expr.text)
+              case Some(WT_Struct(_, members)) => members
+              case other                       => throw new TypeException(s"not a struct ${other}", expr.text)
+            }
+            members.get(id) match {
+              case None =>
+                throw new TypeException(s"Struct ${structName} does not have member ${id}",
+                                        expr.text)
+              case Some(t) => t
+            }
+
+          case other =>
+            throw new TypeException(s"member access (${id}) in expression is illegal", expr.text)
         }
     }
   }
@@ -392,14 +539,29 @@ case class Checker(stdlib: Stdlib) {
   //   Int x = 5
   //   Int x = 7 + y
   private def applyDecl(decl: Declaration, ctx: Context): (String, WT) = {
-    val lhsType: WT = typeTranslate(decl.wdlType)
-    decl.expr match {
-      case None =>
+    val lhsType: WT = typeTranslate(decl.wdlType, decl.text, ctx)
+    (lhsType, decl.expr) match {
+      case (_, None) =>
         ()
-      case Some(expr) =>
-        val rhsType: WT = typeEval(expr, ctx)
+
+      // special case, something like this:
+      //  Person p1 = {
+      //    "name" : "Carly",
+      //    "height" : 168,
+      //    "age" : 40
+      //  }
+      //
+      // we cannot evaluate the right hand side on its own. We need the knowledge
+      // the it is actually a struct Person.
+      case (WT_Identifier(structName), Some(objExpr: ExprObject)) =>
+        checkIsObjectCoercibleToStruct(structName, objExpr, decl.text, ctx)
+      case (WT_Identifier(structName), Some(mapExpr: ExprMap)) =>
+        checkIsObjectCoercibleToStruct(structName, mapExpr, decl.text, ctx)
+
+      case (_, Some(expr)) =>
+        val rhsType = typeEval(expr, ctx)
         if (!isCoercibleTo(lhsType, rhsType))
-          throw new TypeException(s"declaration ${decl} is badly typed", decl.text)
+          throw new TypeException(s"declaration ${decl.name} is badly typed", decl.text)
     }
     (decl.name, lhsType)
   }
@@ -424,32 +586,34 @@ case class Checker(stdlib: Stdlib) {
   }
 
   // calculate the type signature of a workflow or a task
-  private def calcSignature(
-      inputSection: Option[InputSection],
-      outputSection: Option[OutputSection]
-  ): (Map[String, (WT, Boolean)], Map[String, WT]) = {
+  private def calcSignature(inputSection: Option[InputSection],
+                            outputSection: Option[OutputSection],
+                            ctx: Context): (Map[String, (WT, Boolean)], Map[String, WT]) = {
 
     val inputType: Map[String, (WT, Boolean)] = inputSection match {
       case None => Map.empty
       case Some(InputSection(decls, _, _)) =>
         decls.map {
-          case Declaration(name, wdlType, Some(_), _, _) =>
+          case Declaration(name, wdlType, Some(_), text, _) =>
             // input has a default value, caller may omit it.
-            name -> (typeTranslate(wdlType), true)
+            val t = typeTranslate(wdlType, text, ctx)
+            name -> (t, true)
 
-          case Declaration(name, TypeOptional(wdlType, _), _, _, _) =>
+          case Declaration(name, TypeOptional(wdlType, _), _, text, _) =>
             // input is optional, caller can omit it.
-            name -> (WT_Optional(typeTranslate(wdlType)), true)
+            val t = typeTranslate(wdlType, text, ctx)
+            name -> (WT_Optional(t), true)
 
-          case Declaration(name, wdlType, _, _, _) =>
+          case Declaration(name, wdlType, _, text, _) =>
             // input is compulsory
-            name -> (typeTranslate(wdlType), false)
+            val t = typeTranslate(wdlType, text, ctx)
+            name -> (t, false)
         }.toMap
     }
     val outputType: Map[String, WT] = outputSection match {
       case None => Map.empty
       case Some(OutputSection(decls, _, _)) =>
-        decls.map(decl => decl.name -> typeTranslate(decl.wdlType)).toMap
+        decls.map(decl => decl.name -> typeTranslate(decl.wdlType, decl.text, ctx)).toMap
     }
     (inputType, outputType)
   }
@@ -492,10 +656,11 @@ case class Checker(stdlib: Stdlib) {
     task.output.map(x => applyOutputSection(x, ctxDecl))
 
     // calculate the type signature of the task
-    val (inputType, outputType) = calcSignature(task.input, task.output)
+    val (inputType, outputType) = calcSignature(task.input, task.output, ctxOuter)
     WT_Task(task.name, inputType, outputType)
   }
 
+  //
   // 1. all the caller arguments have to exist with the correct types
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
@@ -547,14 +712,24 @@ case class Checker(stdlib: Stdlib) {
         }
     }
 
-    // build a type for the resulting object
+    // The name of the call may not contain dots. Examples:
+    //
+    // call lib.concat as concat     concat
+    // call add                      add
+    // call a.b.c                    c
     val callName = call.alias match {
-      case None        => call.name
+      case None if !(call.name contains ".") =>
+        call.name
+      case None =>
+        val parts = call.name.split("\\.")
+        parts.last
       case Some(alias) => alias
     }
 
     if (ctx.declarations contains callName)
       throw new TypeException(s"call ${callName} shadows an existing definition", call.text)
+
+    // build a type for the resulting object
     callName -> WT_Call(callName, calleeOutputs)
   }
 
@@ -691,9 +866,10 @@ case class Checker(stdlib: Stdlib) {
     wf.output.map(x => applyOutputSection(x, ctxBody))
 
     // calculate the type signature of the workflow
-    val (inputType, outputType) = calcSignature(wf.input, wf.output)
+    val (inputType, outputType) = calcSignature(wf.input, wf.output, ctxOuter)
     val wfSignature = WT_Workflow(wf.name, inputType, outputType)
-    ctxOuter.bind(wf.name, wfSignature, wf.text)
+    val ctxFinal = ctxOuter.bindCallable(wfSignature, wf.text)
+    ctxFinal
   }
 
   // Main entry point
@@ -704,14 +880,37 @@ case class Checker(stdlib: Stdlib) {
     val context: Context = doc.elements.foldLeft(ctxOuter) {
       case (accu: Context, task: Task) =>
         val tt = applyTask(task, accu)
-        accu.bind(tt, task.text)
+        accu.bindCallable(tt, task.text)
 
-      case (_, _: ImportDoc) =>
-        throw new Exception("imports not implemented yet")
+      case (accu: Context, iStat: ImportDoc) =>
+        val iCtx = apply(iStat.doc, contextEmpty)
+
+        // Figure out what to name the sub-document
+        val namespace = iStat.name match {
+          case None =>
+            // Something like
+            //    import "http://example.com/lib/stdlib"
+            //    import "A/B/C"
+            // Where the user does not specify an alias. The namespace
+            // will be named:
+            //    stdlib
+            //    C
+            val nsName = iStat.url.getFile().replaceAll("/", "")
+            if (nsName.endsWith(".wdl"))
+              nsName.dropRight(".wdl".size)
+            else
+              nsName
+          case Some(x) => x
+        }
+
+        // add the externally visible definitions to the context
+        accu.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text)
 
       case (accu: Context, struct: TypeStruct) =>
         // Add the struct to the context
-        accu.bind(typeTranslate(struct).asInstanceOf[WT_Struct], struct.text)
+        val t = typeTranslate(struct, struct.text, accu)
+        val t2 = t.asInstanceOf[WT_Struct]
+        accu.bind(t2, struct.text)
 
       case (_, other) =>
         throw new Exception(s"sanity: wrong element type in workflow $other")
@@ -722,5 +921,6 @@ case class Checker(stdlib: Stdlib) {
       case None     => context
       case Some(wf) => applyWorkflow(wf, context)
     }
+
   }
 }
