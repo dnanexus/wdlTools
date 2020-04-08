@@ -75,6 +75,7 @@ primitive_literal
 	| number
 	| string
 	| Identifier
+	| Null
 	;
 
 expr
@@ -234,8 +235,8 @@ call_body
 	;
 
 call_name
-        : Identifier (DOT Identifier)*
-        ;
+  : Identifier (DOT Identifier)*
+  ;
 
 call
 	: CALL call_name call_alias?  call_body?
