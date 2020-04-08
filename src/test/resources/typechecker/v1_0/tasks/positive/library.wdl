@@ -28,6 +28,6 @@ task gen_array {
   }
   command {}
   output {
-    Array[Int] o = range(len)
+    Array[Int] result = range(len)
   }
 }
