@@ -52,6 +52,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   private def translateExpr(e: ConcreteSyntax.Expr): AbstractSyntax.Expr = {
     e match {
       // values
+      case ConcreteSyntax.ExprNull(srcText)           => AbstractSyntax.ValueNull(srcText)
       case ConcreteSyntax.ExprString(value, srcText)  => AbstractSyntax.ValueString(value, srcText)
       case ConcreteSyntax.ExprFile(value, srcText)    => AbstractSyntax.ValueFile(value, srcText)
       case ConcreteSyntax.ExprBoolean(value, srcText) => AbstractSyntax.ValueBoolean(value, srcText)
