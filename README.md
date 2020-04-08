@@ -7,14 +7,21 @@ Tools for parsing and type-checking WDL programs written in the [Scala programmi
 The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. It uses [Antlr4 grammar]((https://github.com/patmagee/wdl/tree/grammar-remake)) developed by Patrick Magee. The class definitions reside in `src/main/scala/wdlTools/syntax/AbstractSyntax.scala`. In order to parse a document you need to do:
 
 ```scala
-    val pa = new ParseAll()
-    val doc : AbstractSyntax = pa.apply(WDL_SOURCE_CODE)
+    import java.net.URL
+    import wdlTools.syntax.AbstractSyntax._
+    import wdlTools.syntax.Parsers
+    import wdlTools.util.Options
+    val opts = Options(followImports=true)
+    val parsers = Parsers(opts)
+    val wdl = new URL("file:///path/to/my/wdl")
+    val doc : Document = parsers.parse(wdl)
 ```
 
-## Typechecker
+## Command line tools
+
+### Typechecker
 
 The typechecker is currently in development.
-
 
 ## Building
 
