@@ -4,7 +4,9 @@ Tools for parsing and type-checking WDL programs written in the [Scala programmi
 
 ## Abstract Syntax Tree (AST)
 
-The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. It uses [Antlr4 grammar]((https://github.com/patmagee/wdl/tree/grammar-remake)) developed by Patrick Magee. The class definitions reside in `src/main/scala/wdlTools/syntax/AbstractSyntax.scala`. In order to parse a document you need to do:
+The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. It uses [Antlr4 grammar]((https://github.com/patmagee/wdl/tree/grammar-remake)) developed by Patrick Magee. The class definitions reside in `src/main/scala/wdlTools/syntax/AbstractSyntax.scala`.
+
+Currently, WDL draft-2 and 1.0 are supported.
 
 ```scala
     import java.net.URL
