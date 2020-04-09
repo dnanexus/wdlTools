@@ -95,11 +95,3 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
     }
   }
 }
-
-trait WdlTypeParser {
-  def apply(text: String): Type
-}
-
-trait WdlExprParser {
-  def apply(text: String): Expr
-}
