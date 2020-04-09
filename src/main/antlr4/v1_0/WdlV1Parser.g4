@@ -1,8 +1,6 @@
-parser grammar Draft2WdlParser;
+parser grammar WdlV1Parser;
 
-
-options { tokenVocab=Draft2WdlLexer; }
-
+options { tokenVocab=WdlV1Lexer; }
 
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK
@@ -20,13 +18,12 @@ type_base
 	: array_type
 	| map_type
 	| pair_type
-	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT)
+	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT | Identifier)
 	;
 
 wdl_type
-  : (type_base OPTIONAL | type_base)
-  ;
-
+	: (type_base OPTIONAL | type_base)
+	;
 
 unbound_decls
 	: wdl_type Identifier
@@ -47,28 +44,27 @@ number
 	;
 
 expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
-  | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
-  ;
-
+	: BoolLiteral EQUAL (string | number)
+	| DEFAULT EQUAL (string | number)
+	| SEP EQUAL (string | number)
+	;
 
 string_part
-  : StringPart*
-  ;
+	: StringPart*
+	;
 
 string_expr_part
-  : StringCommandStart (expression_placeholder_option)* expr RBRACE
-  ;
+	: StringCommandStart (expression_placeholder_option)* expr RBRACE
+	;
 
 string_expr_with_string_part
-  : string_expr_part string_part
-  ;
+	: string_expr_part string_part
+	;
 
 string
-  : DQUOTE string_part string_expr_with_string_part* DQUOTE
-  | SQUOTE string_part string_expr_with_string_part* SQUOTE
-  ;
+	: DQUOTE string_part string_expr_with_string_part* DQUOTE
+	| SQUOTE string_part string_expr_with_string_part* SQUOTE
+	;
 
 primitive_literal
 	: BoolLiteral
@@ -138,33 +134,39 @@ expr_core
 	| expr_core DOT Identifier #get_name
 	;
 
+version
+	: VERSION RELEASE_VERSION
+	;
+
 import_alias
 	: ALIAS Identifier AS Identifier
 	;
 
 import_as
-    : AS Identifier
-    ;
+	: AS Identifier
+	;
 
 import_doc
 	: IMPORT string import_as? (import_alias)*
 	;
-
-meta_kv
-	: Identifier COLON string
+struct
+	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
 
+meta_kv
+	: Identifier COLON expr
+	;
 
 parameter_meta
 	: PARAMETERMETA LBRACE meta_kv* RBRACE
 	;
 
 meta
-    :  META LBRACE meta_kv* RBRACE
-    ;
+	:	META LBRACE meta_kv* RBRACE
+	;
 
 task_runtime_kv
-    : Identifier COLON expr
+	: Identifier COLON expr
 	;
 
 task_runtime
@@ -172,7 +174,7 @@ task_runtime
 	;
 
 task_input
-	: (any_decls)*
+	: INPUT LBRACE (any_decls)* RBRACE
 	;
 
 task_output
@@ -180,35 +182,35 @@ task_output
 	;
 
 task_command_string_part
-    : CommandStringPart*
-    ;
-
-task_command_expr_part
-    : StringCommandStart  (expression_placeholder_option)* expr RBRACE
-    ;
-
-task_command_expr_with_string
-    : task_command_expr_part task_command_string_part
-    ;
-
-task_command
-  : COMMAND task_command_string_part task_command_expr_with_string* EndCommand
-  | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
-  ;
-
-task_element
-  : task_output
-  | task_command
-  | task_runtime
-  | parameter_meta
-  | meta
-  | any_decls
-  ;
-
-task
-	: TASK Identifier LBRACE task_input (task_element)+ RBRACE
+	: CommandStringPart*
 	;
 
+task_command_expr_part
+	: StringCommandStart	(expression_placeholder_option)* expr RBRACE
+	;
+
+task_command_expr_with_string
+	: task_command_expr_part task_command_string_part
+	;
+
+task_command
+	: COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+	| HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+	;
+
+task_element
+	: task_input
+	| task_output
+	| task_command
+	| task_runtime
+	| bound_decls
+	| parameter_meta
+	| meta
+	;
+
+task
+	: TASK Identifier LBRACE (task_element)+ RBRACE
+	;
 
 inner_workflow_element
 	: bound_decls
@@ -234,11 +236,11 @@ call_body
 	;
 
 call_name
-        : Identifier (DOT Identifier)*
-        ;
+	: Identifier (DOT Identifier)*
+	;
 
 call
-	: CALL call_name call_alias?  call_body?
+	: CALL call_name call_alias?	call_body?
 	;
 
 scatter
@@ -250,7 +252,7 @@ conditional
 	;
 
 workflow_input
-	: (any_decls)*
+	: INPUT LBRACE (any_decls)* RBRACE
 	;
 
 workflow_output
@@ -258,21 +260,23 @@ workflow_output
 	;
 
 workflow_element
-  : workflow_output #output
-  | inner_workflow_element #inner_element
-  | parameter_meta #parameter_meta_element
-  | meta #meta_element
-  ;
+	: workflow_input #input
+	| workflow_output #output
+	| inner_workflow_element #inner_element
+	| parameter_meta #parameter_meta_element
+	| meta #meta_element
+	;
 
 workflow
-	: WORKFLOW Identifier LBRACE workflow_input workflow_element* RBRACE
+	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
 	;
 
 document_element
 	: import_doc
+	| struct
 	| task
 	;
 
 document
-	: document_element* (workflow document_element*)? EOF
+	: version document_element* (workflow document_element*)? EOF
 	;

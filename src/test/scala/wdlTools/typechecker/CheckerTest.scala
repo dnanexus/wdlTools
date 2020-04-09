@@ -8,21 +8,18 @@ import wdlTools.syntax.v1_0.ParseAll
 import wdlTools.util.{Options, SourceCode, Util}
 
 class CheckerTest extends FlatSpec with Matchers {
-  private lazy val wdlSourceDirs: Vector[Path] = {
-    val p1: Path = Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
-    val p2: Path = Paths.get(getClass.getResource("/typechecker/v1_0/workflows/positive").getPath)
-    Vector(p1, p2)
-  }
-  private val opts = Options(antlr4Trace = false, localDirectories = Some(wdlSourceDirs))
+  private val positivePath =
+    Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
+  private val negativePath =
+    Paths.get(getClass.getResource("/typechecker/v1_0/tasks/negative").getPath)
+  private val opts = Options(antlr4Trace = false, localDirectories = Some(Vector(positivePath)))
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
   private val stdlib = Stdlib(opts)
   private val checker = Checker(stdlib)
 
   // Get a list of WDL files from a resource directory.
-  private def getWdlSourceFiles(dirname: String): Vector[Path] = {
-    val d: String = getClass.getResource(dirname).getPath
-    val folder = Paths.get(d)
+  private def getWdlSourceFiles(folder: Path): Vector[Path] = {
     Files.exists(folder) shouldBe true
     Files.isDirectory(folder) shouldBe true
     val allFiles: Vector[Path] = Files.list(folder).iterator().asScala.toVector
@@ -30,20 +27,20 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check tasks (positive cases)" in {
-    val positiveCases = getWdlSourceFiles("/typechecker/v1_0/tasks/positive")
+    val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
-        case e: Throwable =>
+        case _: Throwable =>
           throw new RuntimeException(s"Type error in file ${pc}")
       }
     }
   }
 
   it should "type check tasks (negative cases)" in {
-    val negativeCases = getWdlSourceFiles("/typechecker/v1_0/tasks/negative")
+    val negativeCases = getWdlSourceFiles(negativePath)
     for (pc <- negativeCases) {
       val doc = parser.parse(Util.getURL(pc))
       val checkVal =
@@ -51,7 +48,7 @@ class CheckerTest extends FlatSpec with Matchers {
           checker.apply(doc)
           true
         } catch {
-          case e: Throwable =>
+          case _: Throwable =>
             // This file should NOT pass type validation.
             // The exception is expected at this point.
             false
@@ -79,7 +76,7 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check workflows (negative cases)" in {
-    val negativeCases = getWdlSourceFiles("/typechecker/v1_0/workflows/negative")
+    val negativeCases = getWdlSourceFiles(negativePath)
     for (nc <- negativeCases) {
       val doc = parser.parse(Util.getURL(nc))
       val checkVal =
@@ -87,7 +84,7 @@ class CheckerTest extends FlatSpec with Matchers {
           checker.apply(doc)
           true
         } catch {
-          case e: Throwable =>
+          case _: Throwable =>
             // This file should NOT pass type validation
             // The exception is expected at this point.
             false
