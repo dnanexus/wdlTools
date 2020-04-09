@@ -20,14 +20,7 @@ case class TaskGenerator(opts: Options,
                          defaultDockerImage: String = "debian:stretch-slim",
                          generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
-  lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
-  lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = true, readmes = generatedFiles)
-
-  def generate(model: TaskSpec, outputDir: Option[Path]): Unit = {
-    if (interactive) {
-      TaskPopulator(opts, wdlVersion, readmes, defaultDockerImage).apply(model)
-    }
+  def generateTask(model: TaskSpec, fname: String): Unit = {
 
     val fname = s"${model.name}.wdl"
     val outputPath = if (outputDir.isDefined) {
@@ -48,40 +41,6 @@ case class TaskGenerator(opts: Options,
 
     if (readmes) {
       readmeGenerator.apply(url, doc)
-    }
-  }
-}
-
-object TaskGenerator {
-  case class TaskPopulator(opts: Options,
-                           wdlVersion: WdlVersion,
-                           readmes: Boolean,
-                           defaultDockerImage: String) {
-    def apply(model: TaskSpec = TaskSpec()): TaskSpec = {
-      val console = GeneratorConsole(opts, wdlVersion)
-
-      if (model.name.isEmpty) {
-        model.name = console.askOnce[String](prompt = "Task name")
-      }
-      if (model.title.isEmpty) {
-        model.title = console.askOnce[String](prompt = "Task title", optional = true)
-      }
-      if (model.summary.isEmpty) {
-        model.summary = console.askOnce[String](prompt = "Task summary", optional = true)
-      }
-      if (model.description.isEmpty && !readmes) {
-        model.description = console.askOnce[String](prompt = "Task description", optional = true)
-      }
-      if (model.docker.isEmpty) {
-        model.docker =
-          console.askOnce[String](prompt = "Docker image ID", default = Some(defaultDockerImage))
-      }
-
-      console.readFields(fieldType = "inputs", fields = model.inputs)
-
-      console.readFields(fieldType = "output", fields = model.outputs)
-
-      model
     }
   }
 }

@@ -24,25 +24,7 @@ case class WorkflowGenerator(opts: Options,
   lazy val taskPopulator: TaskGenerator.TaskPopulator =
     TaskGenerator.TaskPopulator(opts, wdlVersion, readmes, defaultDockerImage)
 
-  def populateWorkflow(model: Model.WorkflowSpec): Unit = {
-    val console = GeneratorConsole(opts, wdlVersion)
 
-    if (model.name.isEmpty) {
-      model.name = console.askOnce[String](prompt = "Workflow name")
-    }
-    if (model.title.isEmpty) {
-      model.title = console.askOnce[String](prompt = "Workflow title", optional = true)
-    }
-    if (model.summary.isEmpty) {
-      model.summary = console.askOnce[String](prompt = "Workflow summary", optional = true)
-    }
-    if (model.description.isEmpty && !readmes) {
-      model.description = console.askOnce[String](prompt = "Workflow description", optional = true)
-    }
-
-    console.readFields(fieldType = "input", fields = model.inputs)
-
-    console.readFields(fieldType = "output", fields = model.outputs)
 
     model.tasks.foreach { task =>
       taskPopulator.apply(task)

@@ -174,14 +174,31 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(Unit)
     }
+    val interactive: ScallopOption[Boolean] = toggle(
+        descrYes = "Specify inputs and outputs interactively",
+        default = Some(false)
+    )
+    val workflow: ScallopOption[Boolean] = toggle(
+        descrYes = "Generate a workflow",
+        descrNo = "Do not generate a workflow",
+        default = Some(true)
+    )
+    val task: ScallopOption[List[String]] = opt[List[String]](descr = "A task name")
     val readmes: ScallopOption[Boolean] = toggle(
         descrYes = "Generate a README file for each task/workflow",
         descrNo = "Do not generate README files",
         default = Some(true)
     )
-    val interactive: ScallopOption[Boolean] = toggle(
-        descrYes = "Specify inputs and outputs interactively",
+    val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
+    val dockerFile: ScallopOption[Boolean] = toggle(
+        descrYes = "Generate a Dockerfile template",
+        descrNo = "Do not generate a Dockerfile template",
         default = Some(false)
+    )
+    val tests: ScallopOption[Boolean] = toggle(
+        descrYes = "Generate pytest-wdl test template",
+        descrNo = "Do not generate a pytest-wdl test template",
+        default = Some(true)
     )
     val outputDir: ScallopOption[Path] = opt[Path](descr =
       "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
@@ -192,26 +209,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         Left("--outputDir is required unless --overwrite is specified")
       case _ => Right(Unit)
     }
-
-    val task = new Subcommand("task") {
-      val name: ScallopOption[String] = opt[String](descr = "The task name")
-      val title: ScallopOption[String] = opt[String](descr = "The task title")
-      val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
-    }
-    addSubcommand(task)
-
-    val workflow = new Subcommand("workflow") {
-      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
-      val title: ScallopOption[String] = opt[String](descr = "The task title")
-      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
-    }
-    addSubcommand(workflow)
-
-    val project = new Subcommand("project") {
-      val name: ScallopOption[String] = opt[String](descr = "The workflow name")
-      val task: ScallopOption[List[String]] = opt[List[String]](descr = "a task name")
-    }
-    addSubcommand(project)
+    val name: ScallopOption[String] =
+      trailArg[String](descr = "The project name - this will also be the name of the workflow")
   }
   addSubcommand(generate)
 
