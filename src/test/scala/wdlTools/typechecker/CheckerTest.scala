@@ -60,9 +60,7 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check workflows (positive cases)" in {
-    val positiveCases =
-      getWdlSourceFiles("/typechecker/v1_0/workflows/positive")
-
+    val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
       try {
