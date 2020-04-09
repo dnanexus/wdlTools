@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
+import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
