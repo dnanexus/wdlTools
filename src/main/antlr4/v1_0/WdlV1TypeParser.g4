@@ -1,6 +1,6 @@
-parser grammar V10WdlTypeParser;
+parser grammar WdlV1TypeParser;
 
-options { tokenVocab=V10WdlLexer; }
+options { tokenVocab=WdlV1Lexer; }
 
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK

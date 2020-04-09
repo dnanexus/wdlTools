@@ -45,7 +45,7 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Option[Iterable[Path]] = None): URL = {
+  def getURL(pathOrUrl: String, searchPath: Option[Vector[Path]] = None): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
@@ -59,7 +59,9 @@ object Util {
         }
       } else None
       if (resolved.isEmpty) {
-        throw new Exception(s"Could not resolve path or URL ${pathOrUrl}")
+        throw new Exception(
+            s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+        )
       }
       new URL(s"file://${resolved.get.toAbsolutePath}")
     }

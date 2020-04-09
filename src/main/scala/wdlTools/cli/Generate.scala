@@ -14,39 +14,44 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val outputDir: Option[Path] = conf.generate.outputDir.toOption
     val opts = conf.getOptions
 
-    conf.generate.subcommand match {
-      case task @ conf.generate.task =>
+    val parent = conf.generate
+    parent.subcommand match {
+      case parent.task =>
         val model = Model.TaskSpec(
-            name = task.name.toOption,
-            title = task.title.toOption,
-            docker = task.docker.toOption
+            name = parent.task.name.toOption,
+            title = parent.task.title.toOption,
+            docker = parent.task.docker.toOption
         )
         val generator = TaskGenerator(
             opts,
-            wdlVersion = conf.generate.wdlVersion(),
-            interactive = conf.generate.interactive(),
-            readmes = conf.generate.readmes(),
-            overwrite = conf.generate.overwrite(),
+            wdlVersion = parent.wdlVersion(),
+            interactive = parent.interactive(),
+            readmes = parent.readmes(),
+            overwrite = parent.overwrite(),
             generatedFiles = generatedFiles
         )
         generator.generate(model, outputDir)
-      case workflow @ conf.generate.workflow =>
+      case parent.workflow =>
         val model = Model.WorkflowSpec(
-            conf.generate.wdlVersion(),
-            name = workflow.name.toOption,
-            title = workflow.title.toOption
+            parent.wdlVersion(),
+            name = parent.workflow.name.toOption,
+            title = parent.workflow.title.toOption
         )
+        parent.workflow.task().foreach { taskName =>
+          model.tasks.append(Model.TaskSpec(Some(taskName)))
+        }
         val generator = WorkflowGenerator(
             opts,
-            wdlVersion = conf.generate.wdlVersion(),
-            interactive = conf.generate.interactive(),
-            readmes = conf.generate.readmes(),
-            overwrite = conf.generate.overwrite(),
+            wdlVersion = parent.wdlVersion(),
+            interactive = parent.interactive(),
+            readmes = parent.readmes(),
+            overwrite = parent.overwrite(),
             generatedFiles = generatedFiles
         )
         generator.generate(model, outputDir)
-      case project @ conf.generate.project =>
+      case parent.project =>
         ProjectGenerator()
+      case _ => throw new RuntimeException("Unrecognized subcommand")
     }
   }
 }

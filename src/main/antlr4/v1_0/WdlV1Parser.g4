@@ -1,6 +1,6 @@
-parser grammar V10WdlParser;
+parser grammar WdlV1Parser;
 
-options { tokenVocab=V10WdlLexer; }
+options { tokenVocab=WdlV1Lexer; }
 
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK
@@ -153,13 +153,8 @@ struct
 	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
 
-meta_expr
-	: expr
-	| Null
-	;
-
 meta_kv
-	: Identifier COLON meta_expr
+	: Identifier COLON expr
 	;
 
 parameter_meta

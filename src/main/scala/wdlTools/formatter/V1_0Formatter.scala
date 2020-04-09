@@ -286,7 +286,6 @@ case class V1_0Formatter(opts: Options,
 
     expr match {
       // literal values
-      case ValueNull(_)           => Token.Null
       case ValueString(value, _)  => stringOrToken(value)
       case ValueFile(value, _)    => stringOrToken(value)
       case ValueBoolean(value, _) => Token(value.toString)

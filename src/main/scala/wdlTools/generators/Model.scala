@@ -134,7 +134,7 @@ object Model {
         Map.empty
       }
 
-      val (body: Seq[Task], calls: Seq[Call]) = tasks.foreach { taskSpec =>
+      val (body: Seq[Task], calls: Seq[Call]) = tasks.map { taskSpec =>
         val task = taskSpec.toTask
         val callInputs: Map[String, Expr] = if (task.input.isDefined) {
           def getInputValue(inp: Declaration): Option[(String, Expr)] = {
@@ -143,7 +143,7 @@ object Model {
             } else if (inp.wdlType.isInstanceOf[TypeOptional]) {
               None
             } else {
-              Some(inp.name ->)
+              Some(inp.name -> ValueString("set my value!", null))
             }
           }
           task.input.get.declarations.flatMap(getInputValue).toMap

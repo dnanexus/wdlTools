@@ -1,4 +1,4 @@
-lexer grammar V10WdlLexer;
+lexer grammar WdlV1Lexer;
 
 channels { COMMENTS }
 
@@ -56,7 +56,6 @@ BoolLiteral
 	: 'true'
 	| 'false'
 	;
-Null: 'null';
 
 // Symbols
 LPAREN: '(';

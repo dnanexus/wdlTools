@@ -7,9 +7,9 @@ import wdlTools.util.Util.BiMap
 
 import scala.collection.mutable
 
-case class InteractiveConsole(promptColor: String = "",
-                              separator: String = ": ",
-                              afterEntry: Option[String] = Some("\n")) {
+class InteractiveConsole(promptColor: String = "",
+                         separator: String = ": ",
+                         afterEntry: Option[String] = Some("\n")) {
 
   val OTHER_KEY = "Other"
 

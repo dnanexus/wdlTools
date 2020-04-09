@@ -1,6 +1,6 @@
-parser grammar Draft2WdlTypeParser;
+parser grammar WdlDraft2TypeParser;
 
-options { tokenVocab=Draft2WdlLexer; }
+options { tokenVocab=WdlDraft2Lexer; }
 
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK

@@ -44,7 +44,11 @@ case class WorkflowGenerator(opts: Options,
 
     console.readFields(fieldType = "output", fields = model.outputs)
 
-    while (console.askYesNo("Add a task", default = Some(false))) {
+    model.tasks.foreach { task =>
+      taskPopulator.apply(task)
+    }
+
+    while (console.askYesNo("Add a task?", default = Some(false))) {
       model.tasks.append(taskPopulator.apply())
     }
   }

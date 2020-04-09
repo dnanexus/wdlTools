@@ -3,9 +3,9 @@ package wdlTools.syntax.draft_2
 import org.antlr.v4.runtime.{CharStream, CommonTokenStream, ParserRuleContext}
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2.{
-  Draft2WdlLexer,
-  Draft2WdlTypeParser,
-  Draft2WdlTypeParserBaseVisitor
+  WdlDraft2Lexer,
+  WdlDraft2TypeParser,
+  WdlDraft2TypeParserBaseVisitor
 }
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.{AbstractSyntax, TextSource}
@@ -14,29 +14,29 @@ import wdlTools.util.Options
 
 object ParseTypeDocument {
   case class Draft2TypeGrammarFactory(opts: Options)
-      extends GrammarFactory[Draft2WdlLexer, Draft2WdlTypeParser](opts) {
-    override def createLexer(charStream: CharStream): Draft2WdlLexer = {
-      new Draft2WdlLexer(charStream)
+      extends GrammarFactory[WdlDraft2Lexer, WdlDraft2TypeParser](opts) {
+    override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
+      new WdlDraft2Lexer(charStream)
     }
 
-    override def createParser(tokenStream: CommonTokenStream): Draft2WdlTypeParser = {
-      new Draft2WdlTypeParser(tokenStream)
+    override def createParser(tokenStream: CommonTokenStream): WdlDraft2TypeParser = {
+      new WdlDraft2TypeParser(tokenStream)
     }
   }
 }
 
-case class ParseTypeDocument(grammar: Grammar[Draft2WdlLexer, Draft2WdlTypeParser], opts: Options)
-    extends Draft2WdlTypeParserBaseVisitor[Element] {
+case class ParseTypeDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2TypeParser], opts: Options)
+    extends WdlDraft2TypeParserBaseVisitor[Element] {
   protected def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
     grammar.makeWdlException(msg, ctx)
   }
 
   protected def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx)
+    grammar.getSourceText(ctx, None)
   }
 
   protected def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol)
+    grammar.getSourceText(symbol, None)
   }
 
   /*
@@ -44,7 +44,7 @@ map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK
 	;
    */
-  override def visitMap_type(ctx: Draft2WdlTypeParser.Map_typeContext): Type = {
+  override def visitMap_type(ctx: WdlDraft2TypeParser.Map_typeContext): Type = {
     val kt: Type = visitWdl_type(ctx.wdl_type(0))
     val vt: Type = visitWdl_type(ctx.wdl_type(1))
     TypeMap(kt, vt, getSourceText(ctx))
@@ -55,7 +55,7 @@ array_type
 	: ARRAY LBRACK wdl_type RBRACK PLUS?
 	;
    */
-  override def visitArray_type(ctx: Draft2WdlTypeParser.Array_typeContext): Type = {
+  override def visitArray_type(ctx: WdlDraft2TypeParser.Array_typeContext): Type = {
     val t: Type = visitWdl_type(ctx.wdl_type())
     val nonEmpty = ctx.PLUS() != null
     TypeArray(t, nonEmpty, getSourceText(ctx))
@@ -66,7 +66,7 @@ pair_type
 	: PAIR LBRACK wdl_type COMMA wdl_type RBRACK
 	;
    */
-  override def visitPair_type(ctx: Draft2WdlTypeParser.Pair_typeContext): Type = {
+  override def visitPair_type(ctx: WdlDraft2TypeParser.Pair_typeContext): Type = {
     val lt: Type = visitWdl_type(ctx.wdl_type(0))
     val rt: Type = visitWdl_type(ctx.wdl_type(1))
     TypePair(lt, rt, getSourceText(ctx))
@@ -80,7 +80,7 @@ type_base
 	| (STRING | FILE | BOOLEAN | OBJECT | INT | FLOAT | Identifier)
 	;
    */
-  override def visitType_base(ctx: Draft2WdlTypeParser.Type_baseContext): Type = {
+  override def visitType_base(ctx: WdlDraft2TypeParser.Type_baseContext): Type = {
     if (ctx.array_type() != null)
       return visitArray_type(ctx.array_type())
     if (ctx.map_type() != null)
@@ -107,7 +107,7 @@ wdl_type
   : (type_base OPTIONAL | type_base)
   ;
    */
-  override def visitWdl_type(ctx: Draft2WdlTypeParser.Wdl_typeContext): Type = {
+  override def visitWdl_type(ctx: WdlDraft2TypeParser.Wdl_typeContext): Type = {
     visitChildren(ctx).asInstanceOf[Type]
   }
 
@@ -116,7 +116,7 @@ document
 	: version document_element* (workflow document_element*)?
 	;
    */
-  override def visitDocument(ctx: Draft2WdlTypeParser.DocumentContext): Type = {
+  override def visitDocument(ctx: WdlDraft2TypeParser.DocumentContext): Type = {
     visitWdl_type(ctx.wdl_type())
   }
 

@@ -47,7 +47,6 @@ object AbstractSyntax {
 
   // values
   sealed trait Value extends Expr
-  case class ValueNull(text: TextSource) extends Value
   case class ValueString(value: String, text: TextSource) extends Value
   case class ValueFile(value: String, text: TextSource) extends Value
   case class ValueBoolean(value: Boolean, text: TextSource) extends Value

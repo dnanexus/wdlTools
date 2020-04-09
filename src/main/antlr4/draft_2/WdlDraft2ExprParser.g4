@@ -1,6 +1,6 @@
-parser grammar V10WdlExprParser;
+parser grammar WdlDraft2ExprParser;
 
-options { tokenVocab=V10WdlLexer; }
+options { tokenVocab=WdlDraft2Lexer; }
 
 number
 	: IntLiteral

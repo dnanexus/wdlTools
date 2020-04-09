@@ -14,8 +14,7 @@ import org.antlr.v4.runtime.{
   CommonTokenStream,
   Lexer,
   Parser,
-  ParserRuleContext,
-  Token
+  ParserRuleContext
 }
 import wdlTools.syntax
 import wdlTools.util.{Options, Verbosity}
@@ -51,15 +50,13 @@ object Antlr4Util {
       new RuntimeException(s"${msg} ${src}")
     }
 
-    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL] = None): TextSource = {
-      getSourceText(ctx.start, docSourceURL)
+    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
+      val token = ctx.start
+      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
     }
 
-    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL] = None): TextSource = {
-      getSourceText(symbol.getSymbol, docSourceURL)
-    }
-
-    def getSourceText(token: Token, docSourceURL: Option[URL] = None): TextSource = {
+    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
+      val token = symbol.getSymbol
       syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
     }
 
