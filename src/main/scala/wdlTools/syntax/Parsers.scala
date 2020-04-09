@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
-  private val parsers: Map[WdlVersion, WdlParser] = Map(
+  private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
       WdlVersion.V1_0 -> v1_0.ParseAll(opts, loader)
   )

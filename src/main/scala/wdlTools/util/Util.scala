@@ -24,7 +24,7 @@ import Verbosity._
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Option[Iterable[Path]] = None,
+case class Options(localDirectories: Option[Vector[Path]] = None,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false) {
@@ -45,7 +45,7 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Option[Iterable[Path]] = None): URL = {
+  def getURL(pathOrUrl: String, searchPath: Option[Vector[Path]] = None): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
@@ -59,7 +59,9 @@ object Util {
         }
       } else None
       if (resolved.isEmpty) {
-        throw new Exception(s"Could not resolve path or URL ${pathOrUrl}")
+        throw new Exception(
+            s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+        )
       }
       new URL(s"file://${resolved.get.toAbsolutePath}")
     }
@@ -216,6 +218,32 @@ object Util {
         }
       // If we haven't specialized this type, just use its toString.
       case _ => a.toString
+    }
+  }
+
+  case class BiMap[X, Y](keys: Seq[X], values: Seq[Y]) {
+    require(keys.size == values.size, "no 1 to 1 relation")
+    private lazy val kvMap: Map[X, Y] = keys.zip(values).toMap
+    private lazy val vkMap: Map[Y, X] = values.zip(keys).toMap
+
+    def size: Int = keys.size
+
+    def fromKey(x: X): Y = kvMap(x)
+
+    def fromValue(y: Y): X = vkMap(y)
+
+    def filterKeys(p: X => Boolean): BiMap[X, Y] = {
+      BiMap.fromPairs(keys.zip(values).filter(item => p(item._1)))
+    }
+  }
+
+  object BiMap {
+    def fromPairs[X, Y](pairs: Seq[(X, Y)]): BiMap[X, Y] = {
+      BiMap(pairs.map(_._1), pairs.map(_._2))
+    }
+
+    def fromMap[X, Y](map: Map[X, Y]): BiMap[X, Y] = {
+      fromPairs(map.toVector)
     }
   }
 }
