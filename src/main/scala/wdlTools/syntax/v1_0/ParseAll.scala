@@ -166,6 +166,10 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   }
 
   private def translateDeclaration(decl: ConcreteSyntax.Declaration): AbstractSyntax.Declaration = {
+    if (decl.wdlType == null) {
+      System.out.println(decl)
+    }
+    assert(decl.wdlType != null)
     AbstractSyntax.Declaration(decl.name,
                                translateType(decl.wdlType),
                                decl.expr.map(translateExpr),

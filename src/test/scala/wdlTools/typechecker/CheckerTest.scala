@@ -62,10 +62,9 @@ class CheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check workflows (positive cases)" taggedAs Edge in {
+  it should "type check workflows (positive cases)" in {
     val positiveCases =
       getWdlSourceFiles("/typechecker/v1_0/workflows/positive")
-        .filter(p => p.toString contains "import")
 
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
@@ -96,5 +95,12 @@ class CheckerTest extends FlatSpec with Matchers {
       if (checkVal)
         throw new RuntimeException(s"Type error missed in file ${nc}")
     }
+  }
+
+  it should "be able to handle GATK" taggedAs(Edge) in {
+    val url = Util.getURL(
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl")
+    val doc = parser.parse(url)
+    checker.apply(doc)
   }
 }

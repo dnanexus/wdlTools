@@ -31,6 +31,12 @@ object WdlVersion {
 //
 case class TextSource(line: Int, col: Int, url: URL)
 
+// Syntax error exception
+class SyntaxException private (ex: Exception) extends Exception(ex) {
+  def this(msg: String, text: TextSource) =
+    this(new Exception(s"${msg} in file ${text.url} line ${text.line} col ${text.col}"))
+}
+
 /**
   * Type hierarchy for comments.
   *

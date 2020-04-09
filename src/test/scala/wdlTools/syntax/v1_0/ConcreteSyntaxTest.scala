@@ -509,7 +509,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations in a workflow" taggedAs Edge in {
+  it should "handle chained operations in a workflow" in {
     val doc = ParseDocument.apply(getWorkflowSource("chained_expr.wdl"), opts)
     doc.elements.size shouldBe 0
 
@@ -523,5 +523,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.expr.get should matchPattern {
       case ExprAdd(ExprAdd(ExprInt(1, _), ExprInt(2, _), _), ExprInt(3, _), _) =>
     }
+  }
+
+  it should "have real world GATK tasks" taggedAs Edge in {
+    val url = "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+    val sourceCode = loader.apply(Util.getURL(url))
+    val doc = ParseDocument.apply(sourceCode, opts)
+
+    doc.version.value shouldBe WdlVersion.V1_0
+    doc.elements.size shouldBe 19
   }
 }

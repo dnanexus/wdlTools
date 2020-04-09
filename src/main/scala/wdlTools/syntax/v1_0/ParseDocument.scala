@@ -8,8 +8,8 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
-import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
+import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -40,13 +40,6 @@ case class ParseDocument(grammar: Grammar[V10WdlLexer, V10WdlParser],
                          docSourceURL: URL,
                          opts: Options)
     extends V10WdlParserBaseVisitor[Element] {
-
-  private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
-    val tok = ctx.start
-    val line = tok.getLine
-    val col = tok.getCharPositionInLine
-    new RuntimeException(s"${msg}  in line ${line} col ${col}")
-  }
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
     grammar.getSourceText(ctx, docSourceURL)
@@ -80,7 +73,8 @@ struct
     val memberNames: mutable.Set[String] = mutable.HashSet.empty
     members.foreach { member =>
       if (memberNames.contains(member.name)) {
-        throw makeWdlException(s"struct ${sName} has field ${member.name} defined twice", ctx)
+        throw new SyntaxException(s"struct ${sName} has field ${member.name} defined twice",
+                                  getSourceText(ctx))
       }
       memberNames.add(member.name)
     }
@@ -150,7 +144,7 @@ type_base
       return TypeFloat(getSourceText(ctx))
     if (ctx.Identifier() != null)
       return TypeIdentifier(ctx.getText, getSourceText(ctx))
-    throw makeWdlException("sanity: unrecgonized type case", ctx)
+    throw new SyntaxException("sanity: unrecgonized type case", getSourceText(ctx))
   }
 
   /*
@@ -159,7 +153,11 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: V10WdlParser.Wdl_typeContext): Type = {
-    visitChildren(ctx).asInstanceOf[Type]
+    val t = visitType_base(ctx.type_base())
+    if (ctx.OPTIONAL() != null)
+      TypeOptional(t, getSourceText(ctx))
+    else
+      t
   }
 
   // EXPRESSIONS
@@ -171,7 +169,8 @@ wdl_type
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getSourceText(ctx))
     }
-    throw makeWdlException(s"Not an integer nor a float ${ctx.getText}", ctx)
+    throw new SyntaxException(s"Not an integer nor a float ${ctx.getText}",
+                              getSourceText(ctx))
   }
 
   /* expression_placeholder_option
@@ -188,7 +187,9 @@ wdl_type
       else if (ctx.number() != null)
         visitNumber(ctx.number())
       else
-        throw makeWdlException("sanity: not a string or a number", ctx)
+        throw new SyntaxException("sanity: not a string or a number",
+                                  getSourceText(ctx))
+
 
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
@@ -200,7 +201,7 @@ wdl_type
     if (ctx.SEP() != null) {
       return ExprPlaceholderPartSep(expr, getSourceText(ctx))
     }
-    throw makeWdlException(s"Not one of three known variants of a placeholder", ctx)
+    throw new SyntaxException(s"Not one of three known variants of a placeholder", getSourceText(ctx))
   }
 
   // These are full expressions of the same kind
@@ -229,7 +230,7 @@ wdl_type
         case ExprPlaceholderPartSep(sep, _) =>
           return ExprPlaceholderSep(sep, expr, source)
         case _ =>
-          throw makeWdlException("invalid place holder", ctx)
+          throw new SyntaxException("invalid place holder", getSourceText(ctx))
       }
     }
 
@@ -241,13 +242,13 @@ wdl_type
         case (ExprPlaceholderPartEqual(false, x, _), ExprPlaceholderPartEqual(true, y, _)) =>
           return ExprPlaceholderEqual(y, x, expr, source)
         case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
-          throw makeWdlException("invalid boolean place holder", ctx)
+          throw new SyntaxException("invalid boolean place holder", getSourceText(ctx))
         case (_, _) =>
-          throw makeWdlException("invalid place holder", ctx)
+          throw new SyntaxException("invalid place holder", getSourceText(ctx))
       }
     }
 
-    throw makeWdlException("invalid place holder", ctx)
+    throw new SyntaxException("invalid place holder", getSourceText(ctx))
   }
 
   /* string_part
@@ -329,7 +330,7 @@ string
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText, getSourceText(ctx))
     }
-    throw makeWdlException("Not one of four supported variants of primitive_literal", ctx)
+    throw new SyntaxException("Not one of four supported variants of primitive_literal", getSourceText(ctx))
   }
 
   override def visitLor(ctx: V10WdlParser.LorContext): Expr = {
@@ -441,7 +442,7 @@ string
 
     val n = elements.size
     if (n % 2 != 0)
-      throw makeWdlException("the expressions in a map must come in pairs", ctx)
+      throw new SyntaxException("the expressions in a map must come in pairs", getSourceText(ctx))
 
     val m: Map[Expr, Expr] =
       Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
@@ -478,7 +479,7 @@ string
     else if (ctx.MINUS() != null)
       ExprUniraryMinus(expr, getSourceText(ctx))
     else
-      throw makeWdlException("sanity", ctx)
+      throw new SyntaxException("sanity", getSourceText(ctx))
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -530,7 +531,6 @@ string
     ctx match {
       case lor: V10WdlParser.LorContext       => visitLor(lor)
       case infix1: V10WdlParser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
-      case _                                  => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -542,7 +542,6 @@ string
     ctx match {
       case land: V10WdlParser.LandContext     => visitLand(land)
       case infix2: V10WdlParser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
-      case _                                  => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -565,7 +564,6 @@ string
       case lt: V10WdlParser.LtContext         => visitLt(lt)
       case gt: V10WdlParser.GtContext         => visitGt(gt)
       case infix3: V10WdlParser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
-      case _                                  => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -579,7 +577,6 @@ string
       case add: V10WdlParser.AddContext       => visitAdd(add)
       case sub: V10WdlParser.SubContext       => visitSub(sub)
       case infix4: V10WdlParser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
-      case _                                  => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -595,7 +592,6 @@ string
       case divide: V10WdlParser.DivideContext => visitDivide(divide)
       case mod: V10WdlParser.ModContext       => visitMod(mod)
       case infix5: V10WdlParser.Infix5Context => visitInfix5(infix5).asInstanceOf[Expr]
-//      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -632,8 +628,7 @@ string
   private def visitExpr_core(ctx: V10WdlParser.Expr_coreContext): Expr = {
     ctx match {
       case group: V10WdlParser.Expression_groupContext => visitExpression_group(group)
-      case primitives: V10WdlParser.PrimitivesContext =>
-        visitChildren(primitives).asInstanceOf[Expr]
+      case primitives: V10WdlParser.PrimitivesContext =>      visitPrimitive_literal(primitives.primitive_literal())
       case array_literal: V10WdlParser.Array_literalContext => visitArray_literal(array_literal)
       case pair_literal: V10WdlParser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: V10WdlParser.Map_literalContext     => visitMap_literal(map_literal)
@@ -645,7 +640,6 @@ string
       case apply: V10WdlParser.ApplyContext                 => visitApply(apply)
       case left_name: V10WdlParser.Left_nameContext         => visitLeft_name(left_name)
       case get_name: V10WdlParser.Get_nameContext           => visitGet_name(get_name)
-//      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -842,9 +836,9 @@ task_input
       case 0 => None
       case 1 => Some(sections.head)
       case n =>
-        throw makeWdlException(
+        throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it cannot appear more than once",
-            ctx
+            getSourceText(ctx)
         )
     }
   }
@@ -856,9 +850,9 @@ task_input
     sections.size match {
       case 1 => sections.head
       case n =>
-        throw makeWdlException(
+        throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it must appear exactly once",
-            ctx
+            getSourceText(ctx)
         )
     }
   }
@@ -880,16 +874,27 @@ task_input
 
     // make sure the input and output sections to not intersect
     val both = inputVarNames intersect outputVarNames
-    if (both.nonEmpty)
-      throw makeWdlException(s"${both} appears in both input and output sections", ctx)
+    if (both.nonEmpty) {
+      for (varName <- both) {
+        // issue a warning with the exact text where this occurs
+        val decl : Declaration = inputSection.get.declarations.find{
+          case decl => decl.name == varName
+        }.get
+        val text = decl.text
+        Util.warning(s"""|Warning: "${varName}" appears in both input and output sections.
+                         |In file ${text.url} line ${text.line} col ${text.col}"""
+                       .stripMargin.replaceAll("\n", " "),
+                     opts.verbosity)
+      }
+    }
 
     val ioVarNames = inputVarNames ++ outputVarNames
 
     paramMeta.kvs.foreach {
       case MetaKV(k, _, _, _) =>
         if (!(ioVarNames contains k))
-          throw makeWdlException(s"parameter ${k} does not appear in the input or output sections",
-                                 ctx)
+          throw new SyntaxException(s"parameter ${k} does not appear in the input or output sections",
+                                 getSourceText(ctx))
     }
   }
 

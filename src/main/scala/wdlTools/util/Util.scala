@@ -218,4 +218,11 @@ object Util {
       case _ => a.toString
     }
   }
+
+  def warning(msg : String, verbose: Verbosity) : Unit = {
+    if (verbose == Quiet) {
+      return
+    }
+    System.err.println(Console.YELLOW + msg + Console.RESET)
+  }
 }

@@ -9,7 +9,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{Comment, TextSource, WdlVersion}
+import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.{Options, SourceCode}
 
 object ParseDocument {
@@ -38,13 +38,6 @@ case class ParseDocument(grammar: Grammar[Draft2WdlLexer, Draft2WdlParser],
                          docSourceURL: URL,
                          opts: Options)
     extends Draft2WdlParserBaseVisitor[Element] {
-
-  private def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
-    val tok = ctx.start
-    val line = tok.getLine
-    val col = tok.getCharPositionInLine
-    new RuntimeException(s"${msg}  in line ${line} col ${col}")
-  }
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
     grammar.getSourceText(ctx, docSourceURL)
@@ -118,7 +111,7 @@ type_base
       return TypeInt(getSourceText(ctx))
     if (ctx.FLOAT() != null)
       return TypeFloat(getSourceText(ctx))
-    throw makeWdlException("sanity: unrecgonized type case", ctx)
+    throw new SyntaxException("sanity: unrecgonized type case", getSourceText(ctx))
   }
 
   /*
@@ -139,7 +132,7 @@ wdl_type
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getSourceText(ctx))
     }
-    throw makeWdlException(s"Not an integer nor a float ${ctx.getText}", ctx)
+    throw new SyntaxException("Not an integer nor a float", getSourceText(ctx))
   }
 
   /* expression_placeholder_option
@@ -156,7 +149,7 @@ wdl_type
       else if (ctx.number() != null)
         visitNumber(ctx.number())
       else
-        throw makeWdlException("sanity: not a string or a number", ctx)
+        throw new SyntaxException("sanity: not a string or a number", getSourceText(ctx))
 
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
@@ -168,7 +161,7 @@ wdl_type
     if (ctx.SEP() != null) {
       return ExprPlaceholderPartSep(expr, getSourceText(ctx))
     }
-    throw makeWdlException(s"Not one of three known variants of a placeholder", ctx)
+    throw new SyntaxException(s"Not one of three known variants of a placeholder", getSourceText(ctx))
   }
 
   // These are full expressions of the same kind
@@ -197,7 +190,7 @@ wdl_type
         case ExprPlaceholderPartSep(sep, _) =>
           return ExprPlaceholderSep(sep, expr, source)
         case _ =>
-          throw makeWdlException("invalid place holder", ctx)
+          throw new SyntaxException("invalid place holder", getSourceText(ctx))
       }
     }
 
@@ -209,13 +202,13 @@ wdl_type
         case (ExprPlaceholderPartEqual(false, x, _), ExprPlaceholderPartEqual(true, y, _)) =>
           return ExprPlaceholderEqual(y, x, expr, source)
         case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
-          throw makeWdlException("invalid boolean place holder", ctx)
+          throw new SyntaxException("invalid boolean place holder", getSourceText(ctx))
         case (_, _) =>
-          throw makeWdlException("invalid place holder", ctx)
+          throw new SyntaxException("invalid place holder", getSourceText(ctx))
       }
     }
 
-    throw makeWdlException("invalid place holder", ctx)
+    throw new SyntaxException("invalid place holder", getSourceText(ctx))
   }
 
   /* string_part
@@ -297,7 +290,7 @@ string
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText, getSourceText(ctx))
     }
-    throw makeWdlException("Not one of four supported variants of primitive_literal", ctx)
+    throw new SyntaxException("Not one of four supported variants of primitive_literal", getSourceText(ctx))
   }
 
   override def visitLor(ctx: Draft2WdlParser.LorContext): Expr = {
@@ -409,7 +402,7 @@ string
 
     val n = elements.size
     if (n % 2 != 0)
-      throw makeWdlException("the expressions in a map must come in pairs", ctx)
+      throw new SyntaxException("the expressions in a map must come in pairs", getSourceText(ctx))
 
     val m: Map[Expr, Expr] =
       Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
@@ -446,7 +439,7 @@ string
     else if (ctx.MINUS() != null)
       ExprUniraryMinus(expr, getSourceText(ctx))
     else
-      throw makeWdlException("sanity", ctx)
+      throw new SyntaxException("sanity", getSourceText(ctx))
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -810,9 +803,9 @@ task_input
       case 0 => None
       case 1 => Some(sections.head)
       case n =>
-        throw makeWdlException(
+        throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it cannot appear more than once",
-            ctx
+            getSourceText(ctx)
         )
     }
   }
@@ -824,9 +817,9 @@ task_input
     sections.size match {
       case 1 => sections.head
       case n =>
-        throw makeWdlException(
+        throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it must appear exactly once",
-            ctx
+            getSourceText(ctx)
         )
     }
   }
@@ -849,15 +842,15 @@ task_input
     // make sure the input and output sections to not intersect
     val both = inputVarNames intersect outputVarNames
     if (both.nonEmpty)
-      throw makeWdlException(s"${both} appears in both input and output sections", ctx)
+      throw new SyntaxException(s"${both} appears in both input and output sections", getSourceText(ctx))
 
     val ioVarNames = inputVarNames ++ outputVarNames
 
     paramMeta.kvs.foreach {
       case MetaKV(k, _, _, _) =>
         if (!(ioVarNames contains k))
-          throw makeWdlException(s"parameter ${k} does not appear in the input or output sections",
-                                 ctx)
+          throw new SyntaxException(s"parameter ${k} does not appear in the input or output sections",
+                                 getSourceText(ctx))
     }
   }
 
