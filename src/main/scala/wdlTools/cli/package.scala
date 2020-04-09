@@ -52,7 +52,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @param merge a Set of Paths to merge in with the local directories.
       * @return
       */
-    def localDirectories(merge: Set[Path] = Set.empty): Iterable[Path] = {
+    def localDirectories(merge: Set[Path] = Set.empty): Vector[Path] = {
       if (this.localDir.isDefined) {
         (this.localDir().toSet ++ merge).toVector
       } else {
