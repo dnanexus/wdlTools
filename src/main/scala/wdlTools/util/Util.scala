@@ -269,4 +269,11 @@ object Util {
       fromPairs(map.toVector)
     }
   }
+
+  def warning(msg: String, verbose: Verbosity): Unit = {
+    if (verbose == Quiet) {
+      return
+    }
+    System.err.println(Console.YELLOW + msg + Console.RESET)
+  }
 }

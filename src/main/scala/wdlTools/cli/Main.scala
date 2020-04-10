@@ -7,7 +7,7 @@ object Main extends App {
     case None => conf.printHelp()
     case Some(subcommand) =>
       val command: Command = subcommand match {
-        case conf.check    => Check(conf)
+        case conf.check    => TypeCheck(conf)
         case conf.format   => Format(conf)
         case conf.upgrade  => Upgrade(conf)
         case conf.generate => Generate(conf)
