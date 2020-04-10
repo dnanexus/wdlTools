@@ -63,7 +63,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
   def apply(wdlUrl: URL, document: Document): Unit = {
     val generator = Generator(wdlUrl)
 
-    val tasks = document.elements.flatMap {
+    val tasks: Seq[(String, String)] = document.elements.flatMap {
       case task: Task =>
         val taskReadme = generator.generateTaskReadme(task, developer = false)
         if (developerReadmes) {

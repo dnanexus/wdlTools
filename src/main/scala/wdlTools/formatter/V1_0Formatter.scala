@@ -67,7 +67,7 @@ case class V1_0Formatter(opts: Options,
 
     override def toString: String = {
       val open = prefix.map(_.toString).getOrElse("")
-      val close = prefix.map(_.toString).getOrElse("")
+      val close = suffix.map(_.toString).getOrElse("")
       s"${open}${itemStr}${close}"
     }
 
@@ -78,6 +78,9 @@ case class V1_0Formatter(opts: Options,
     def wrapBody(lineFormatter: LineFormatter): Unit = {
       if (items.nonEmpty) {
         if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
+          if (!lineFormatter.atLineStart) {
+            lineFormatter.endLine(wrap = true)
+          }
           items.foreach { atom =>
             lineFormatter.appendChunk(Adjacent(Vector(atom, delimiter)))
             lineFormatter.endLine(wrap = true, indenting = Indenting.IfNotIndented)
@@ -92,7 +95,7 @@ case class V1_0Formatter(opts: Options,
   case class KeyValue(key: Atom, value: Atom, delimiter: Token = Token.KeyValueDelimiter)
       extends Atom {
     override def toString: String = {
-      s"${key}${delimiter.length} ${value}"
+      s"${key}${delimiter} ${value}"
     }
 
     override def length: Int = {

@@ -9,12 +9,14 @@ import scala.collection.mutable
 
 case class InteractiveConsole(promptColor: String = "",
                               separator: String = ": ",
-                              afterEntry: Option[String] = Some("\n")) {
+                              afterEntry: Option[String] = None) {
 
-  val OTHER_KEY = "Other"
+  def println(text: String, style: String = ""): Unit = {
+    Console.println(s"${style}${text}${Console.RESET}")
+  }
 
-  def println(text: String, color: String = ""): Unit = {
-    Console.println(s"${color}${text}")
+  def title(text: String): Unit = {
+    println(text, s"${promptColor}${Console.UNDERLINED}")
   }
 
   def error(text: String): Unit = {
@@ -22,11 +24,13 @@ case class InteractiveConsole(promptColor: String = "",
   }
 
   def resolveDefault[T](default: Option[T],
-                        choices: Option[BiMap[String, T]] = None): (Option[T], Option[String]) = {
+                        choices: Option[BiMap[String, T]] = None,
+                        optional: Boolean = false): (Option[T], Option[String]) = {
     val resolvedDefault = default match {
-      case v: Some[T]                                        => v
-      case None if choices.nonEmpty && choices.get.size == 1 => Some(choices.get.values.head)
-      case _                                                 => None
+      case v: Some[T] => v
+      case None if choices.nonEmpty && choices.get.size == 1 && !optional =>
+        Some(choices.get.values.head)
+      case _ => None
     }
     val defaultKey = if (resolvedDefault.isDefined && choices.isDefined) {
       if (!choices.get.values.contains(resolvedDefault.get)) {
@@ -42,8 +46,18 @@ case class InteractiveConsole(promptColor: String = "",
   def getPrompt[T](prefix: String,
                    optional: Boolean = false,
                    default: Option[T] = None,
-                   choices: Option[BiMap[String, T]] = None): String = {
+                   choices: Option[BiMap[String, T]] = None,
+                   index: Int = -1,
+                   maxIndex: Option[Int] = None): String = {
     val attrs = new StringBuilder()
+    val max = if (maxIndex.isDefined) {
+      maxIndex.get.toString
+    } else {
+      "N"
+    }
+    if (index > 0) {
+      attrs.append(s" (${index}/${max})")
+    }
     choices match {
       case Some(values) if default.nonEmpty =>
         val defaultKey = values.fromValue(default.get)
@@ -51,13 +65,14 @@ case class InteractiveConsole(promptColor: String = "",
         if (rest.size == values.size) {
           throw new RuntimeException("choices must contain default value")
         }
-        attrs.append(s"[${Console.UNDERLINED}${defaultKey}${Console.RESET}")
+        attrs.append(s" [${Console.UNDERLINED}${defaultKey}${Console.RESET}${promptColor}")
         rest.keys.foreach(item => attrs.append(s", ${item}"))
         attrs.append("]")
-      case Some(values)          => attrs.append(s"s[${values.keys.mkString(",")}]")
+      case Some(values)          => attrs.append(s" s[${values.keys.mkString(",")}]")
       case _ if default.nonEmpty => attrs.append(s" [${default.get}]")
+      case _                     => Unit
     }
-    if (attrs.isEmpty && optional) {
+    if (optional && !attrs.endsWith("]")) {
       attrs.append("*")
     }
     s"${promptColor}${prefix}${attrs}${Console.RESET}${separator}"
@@ -68,6 +83,7 @@ case class InteractiveConsole(promptColor: String = "",
                     optional: Boolean,
                     default: Option[T] = None): Option[T] = {
     def promptOnce: Option[T] = {
+      Console.print(prompt)
       try {
         reader.read match {
           case v: Some[T]               => v
@@ -110,28 +126,33 @@ case class InteractiveConsole(promptColor: String = "",
              choicesMap: Option[BiMap[String, T]] = None,
              menu: Option[Boolean] = None,
              otherOk: Boolean = false,
+             otherOption: String = "Other",
              multiple: Boolean = false)(
       implicit reader: InteractiveConsole.Reader[T]
   ): Seq[T] = {
     val finalChoices = choicesMap.orElse(choices.map(choicesToMap)).orElse(reader.defaultChoices)
-    val (defaultValue, defaultKey) = resolveDefault(default, finalChoices)
+    val (defaultValue, defaultKey) = resolveDefault(default, finalChoices, optional)
 
-    val getOnce: Boolean => Option[T] = if (menu.getOrElse(finalChoices.isDefined)) {
-      val prompt: String = getPrompt(promptPrefix, optional, defaultValue)
+    val getOnce: (Boolean, Int) => Option[T] = if (menu.getOrElse(finalChoices.isDefined)) {
       val otherKey = if (otherOk) {
-        Vector(OTHER_KEY)
+        Vector(otherOption)
       } else {
         Vector.empty[String]
       }
       val choiceKeys: Seq[String] = finalChoices.get.keys.toVector ++ otherKey
-      val defaultChoice = finalChoices.map(_.keys.indexOf(defaultKey.get))
+      val defaultChoice = if (finalChoices.isDefined && defaultKey.isDefined) {
+        Some(finalChoices.get.keys.indexOf(defaultKey.get))
+      } else {
+        None
+      }
       choiceKeys.zipWithIndex.foreach(choice => Console.println(s"${choice._2}) ${choice._1}"))
-      def getOnce(optional: Boolean): Option[T] = {
+      def getOnce(optional: Boolean, n: Int): Option[T] = {
+        val prompt: String = getPrompt(promptPrefix, optional, defaultValue, index = n)
         val choice =
           promptLoop[Int](prompt, new RangeReader(0, choiceKeys.size), optional, defaultChoice)
         if (choice.isDefined) {
           val key = choiceKeys(choice.get)
-          if (otherOk && key == OTHER_KEY) {
+          if (otherOk && key == otherOption) {
             promptLoop[T](
                 getPrompt(prefix = "Enter other value", optional = optional),
                 reader,
@@ -146,14 +167,19 @@ case class InteractiveConsole(promptColor: String = "",
       }
       getOnce
     } else {
-      val prompt = getPrompt(promptPrefix, optional, defaultValue, finalChoices)
-      def getOnce(optional: Boolean): Option[T] = {
+      def getOnce(optional: Boolean, n: Int): Option[T] = {
+        val prompt = getPrompt(promptPrefix, optional, defaultValue, finalChoices, n)
         promptLoop[T](prompt, reader, optional, defaultValue)
       }
       getOnce
     }
 
-    val firstResult = getOnce(optional)
+    var n = if (multiple) {
+      1
+    } else {
+      -1
+    }
+    val firstResult = getOnce(optional, n)
 
     if (firstResult.isEmpty) {
       Vector.empty
@@ -161,7 +187,8 @@ case class InteractiveConsole(promptColor: String = "",
       val result: mutable.Buffer[T] = mutable.ArrayBuffer(firstResult.get)
       var continue = true
       while (continue) {
-        val nextResult = getOnce(optional)
+        n += 1
+        val nextResult = getOnce(optional, n)
         if (nextResult.isDefined) {
           result.append(nextResult.get)
         } else {
@@ -181,9 +208,18 @@ case class InteractiveConsole(promptColor: String = "",
       choices: Option[Seq[T]] = None,
       choicesMap: Option[BiMap[String, T]] = None,
       menu: Option[Boolean] = None,
-      otherOk: Boolean = false
+      otherOk: Boolean = false,
+      otherOption: String = "Other"
   )(implicit reader: InteractiveConsole.Reader[T]): Option[T] = {
-    ask[T](prompt, optional, default, choices, choicesMap, menu, otherOk, multiple = false) match {
+    ask[T](prompt,
+           optional,
+           default,
+           choices,
+           choicesMap,
+           menu,
+           otherOk,
+           otherOption,
+           multiple = false) match {
       case Seq(result) => Some(result)
       case _           => None
     }
@@ -267,10 +303,10 @@ object InteractiveConsole {
         Some(choicesToMap(Vector(true, false)))
 
       def read: Option[Boolean] = {
-        try {
-          Some(io.StdIn.readBoolean())
-        } catch {
-          case _: EOFException => None
+        io.StdIn.readLine().trim match {
+          case null | ""                  => None
+          case "true" | "t" | "yes" | "y" => Some(true)
+          case _                          => Some(false)
         }
       }
     }

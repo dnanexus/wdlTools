@@ -1,7 +1,7 @@
 package wdlTools.cli
 
 import java.net.URL
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Path, Paths}
 
 import wdlTools.generators.ProjectGenerator.{TaskModel, WorkflowModel}
 import wdlTools.generators._
@@ -17,17 +17,6 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val args = conf.generate
     val name = args.name()
     val outputDir: Path = args.outputDir.getOrElse(Paths.get(name))
-    val overwrite = args.overwrite()
-
-    if (Files.exists(outputDir)) {
-      if (overwrite) {
-        Util.rmdir(outputDir)
-      } else {
-        throw new Exception(
-            s"Output directory ${outputDir} exists; use --overwrite if you want to overwrite it"
-        )
-      }
-    }
 
     val generator = ProjectGenerator(
         opts,
@@ -46,10 +35,11 @@ case class Generate(conf: WdlToolsConf) extends Command {
     } else {
       None
     }
-    val tasks = args.task().map(taskName => TaskModel(Some(taskName))).toVector
+    val tasks =
+      args.task.map(_.map(taskName => TaskModel(Some(taskName))).toVector).getOrElse(Vector.empty)
 
     generator.apply(workflow, tasks)
 
-    Util.writeContentsToFiles(generator.generatedFiles.toMap)
+    Util.writeContentsToFiles(generator.generatedFiles.toMap, Some(outputDir), args.overwrite())
   }
 }

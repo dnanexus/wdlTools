@@ -10,6 +10,7 @@ import wdlTools.syntax.{Parsers, WdlExprParser, WdlTypeParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
 import scala.collection.mutable
+import util.control.Breaks._
 
 case class ProjectGenerator(opts: Options,
                             name: String,
@@ -70,49 +71,102 @@ case class ProjectGenerator(opts: Options,
     }
   }
 
-  def readFields(fieldType: String, fields: mutable.Buffer[FieldModel]): Unit = {
+  def readFields(fieldType: String,
+                 choicesAllowed: Boolean,
+                 fields: mutable.Buffer[FieldModel],
+                 predefinedPrompt: Option[String] = None,
+                 predefinedChoices: Vector[FieldModel] = Vector.empty): Unit = {
+    lazy val predefinedChoiceMap: Map[String, FieldModel] =
+      predefinedChoices.map(field => field.name -> field).toMap
     var continue: Boolean =
-      console.askYesNo(prompt = s"Define ${fieldType}s interactively?", default = Some(true))
+      console.askYesNo(prompt = s"Define ${fieldType.toLowerCase}s interactively?",
+                       default = Some(true))
+    var inputIdx: Int = 0
     while (continue) {
-      val name = console.askRequired[String](prompt = "Name")
-      val label = console.askOnce[String](prompt = "Label", optional = true)
-      val help = console.askOnce[String](prompt = "Help", optional = true)
-      val optional = console.askYesNo(prompt = "Optional", default = Some(true))
-      val dataType: Type = typeParser.apply(
-          console
-            .askRequired[String](prompt = "Type", choices = Some(basicTypeChoices), otherOk = true)
-      )
-      val patterns = if (containsFile(dataType)) {
-        console.ask[String](promptPrefix = "Patterns", optional = true, multiple = true)
-      } else {
-        Vector.empty
+      inputIdx += 1
+      console.title(s"${fieldType} ${inputIdx}")
+      breakable {
+        if (predefinedChoices.nonEmpty) {
+          console.println(predefinedPrompt.get)
+          val predefinedChoice = console.askOnce[String](
+              prompt = "Select which workflow input",
+              optional = true,
+              choices = Some(predefinedChoiceMap.keys.toVector),
+              menu = Some(true)
+          )
+          if (predefinedChoice.isDefined) {
+            fields.append(predefinedChoiceMap(predefinedChoice.get).copy())
+            break
+          }
+        }
+        val name = console.askRequired[String](prompt = "Name")
+        val label = console.askOnce[String](prompt = "Label", optional = true)
+        val help = console.askOnce[String](prompt = "Help", optional = true)
+        val optional = console.askYesNo(prompt = "Optional", default = Some(true))
+        val dataType: Type = typeParser.apply(
+            console
+              .askRequired[String](prompt = "Type",
+                                   choices = Some(basicTypeChoices),
+                                   otherOk = true)
+        )
+        val patterns = if (containsFile(dataType)) {
+          console.ask[String](promptPrefix = "Patterns", optional = true, multiple = true)
+        } else {
+          Vector.empty
+        }
+
+        def askDefault: Option[Expr] = {
+          console.askOnce[String](prompt = "Default", optional = true).map(exprParser.apply)
+        }
+
+        var default: Option[Expr] = askDefault
+        while (default.isDefined && requiresEvaluation(default.get)) {
+          console.error("Default value cannot be an expression that requires evaluation")
+          default = askDefault
+        }
+        val choices = if (choicesAllowed) {
+          def askChoices: Seq[Expr] = {
+            console
+              .ask[String](promptPrefix = "Choice", optional = true, multiple = true)
+              .map(exprParser.apply)
+          }
+
+          var choiceList = askChoices
+          while (choiceList.nonEmpty && choiceList.exists(requiresEvaluation)) {
+            console.error("Choice value cannot be an expression that requires evaluation")
+            choiceList = askChoices
+          }
+          choiceList
+        } else {
+          Vector.empty
+        }
+        fields.append(
+            FieldModel(name, label, help, optional, dataType, patterns, default, choices)
+        )
       }
-      def askDefault: Option[Expr] = {
-        console.askOnce[String](prompt = "Default", optional = true).map(exprParser.apply)
-      }
-      var default: Option[Expr] = askDefault
-      while (default.isDefined && requiresEvaluation(default.get)) {
-        console.error("Default value cannot be an expression that requires evaluation")
-        default = askDefault
-      }
-      def askChoices: Seq[Expr] = {
-        console
-          .ask[String](promptPrefix = "Choice", optional = true, multiple = true)
-          .map(exprParser.apply)
-      }
-      var choices = askChoices
-      while (choices.nonEmpty && choices.exists(requiresEvaluation)) {
-        console.error("Choice value cannot be an expression that requires evaluation")
-        choices = askChoices
-      }
-      fields.append(
-          FieldModel(name, label, help, optional, dataType, patterns, default, choices)
-      )
-      continue = console.askYesNo(prompt = s"Define another ${fieldType}?")
+      continue = console.askYesNo(prompt = s"Define another ${fieldType}?", default = Some(true))
     }
   }
 
-  def populateTask(model: TaskModel = TaskModel()): TaskModel = {
+  def populateWorkflow(model: WorkflowModel): Unit = {
+    if (model.name.isEmpty) {
+      model.name = console.askOnce[String](prompt = "Workflow name")
+    }
+    if (model.title.isEmpty) {
+      model.title = console.askOnce[String](prompt = "Workflow title", optional = true)
+    }
+    if (model.summary.isEmpty) {
+      model.summary = console.askOnce[String](prompt = "Workflow summary", optional = true)
+    }
+    if (model.description.isEmpty && !readmes) {
+      model.description = console.askOnce[String](prompt = "Workflow description", optional = true)
+    }
+    readFields(fieldType = "Input", choicesAllowed = true, fields = model.inputs)
+    readFields(fieldType = "Output", choicesAllowed = false, fields = model.outputs)
+  }
+
+  def populateTask(model: TaskModel = TaskModel(),
+                   predefinedInputs: Vector[FieldModel] = Vector.empty): TaskModel = {
     if (model.name.isEmpty) {
       model.name = console.askOnce[String](prompt = "Task name")
     }
@@ -129,47 +183,47 @@ case class ProjectGenerator(opts: Options,
       model.docker =
         console.askOnce[String](prompt = "Docker image ID", default = Some(defaultDockerImage))
     }
-    readFields(fieldType = "inputs", fields = model.inputs)
-    readFields(fieldType = "output", fields = model.outputs)
+    readFields(fieldType = "Input",
+               choicesAllowed = true,
+               fields = model.inputs,
+               predefinedPrompt = Some("Is this a workflow input?"),
+               predefinedChoices = predefinedInputs)
+    readFields(fieldType = "Output", choicesAllowed = false, fields = model.outputs)
     model
   }
 
-  def populateWorkflow(model: WorkflowModel): Unit = {
-    if (model.name.isEmpty) {
-      model.name = console.askOnce[String](prompt = "Workflow name")
-    }
-    if (model.title.isEmpty) {
-      model.title = console.askOnce[String](prompt = "Workflow title", optional = true)
-    }
-    if (model.summary.isEmpty) {
-      model.summary = console.askOnce[String](prompt = "Workflow summary", optional = true)
-    }
-    if (model.description.isEmpty && !readmes) {
-      model.description = console.askOnce[String](prompt = "Workflow description", optional = true)
-    }
-    readFields(fieldType = "input", fields = model.inputs)
-    readFields(fieldType = "output", fields = model.outputs)
-  }
-
   def apply(workflowModel: Option[WorkflowModel], taskModels: Vector[TaskModel]): Unit = {
-    val tasks = if (interactive) {
-      if (workflowModel.isDefined) {
+    val tasksAndLinkedInputs = if (interactive) {
+      val predefinedTaskInputs = if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
+        workflowModel.get.inputs.toVector
+      } else {
+        Vector.empty
       }
-      val tasksBuf: mutable.Buffer[Task] = mutable.ArrayBuffer.empty
+      val tasksBuf: mutable.Buffer[(Task, Set[String])] = mutable.ArrayBuffer.empty
       taskModels.foreach { taskModel =>
-        populateTask(taskModel)
-        tasksBuf.append(taskModel.toTask)
+        tasksBuf.append(populateTask(taskModel, predefinedInputs = predefinedTaskInputs).toTask)
       }
-      while (console.askYesNo("Add a task?", default = Some(false))) {
-        tasksBuf.append(populateTask().toTask)
+      var word = if (taskModels.isEmpty) {
+        "a"
+      } else {
+        "another"
+      }
+      while (console.askYesNo(s"Add ${word} task?", default = Some(false))) {
+        tasksBuf.append(populateTask(predefinedInputs = predefinedTaskInputs).toTask)
+        word = "another"
       }
       tasksBuf.toVector
     } else {
       taskModels.map(_.toTask)
     }
 
-    val doc = Document(wdlVersion, null, tasks, workflowModel.map(_.toWorkflow(tasks)), null, None)
+    val doc = Document(wdlVersion,
+                       null,
+                       tasksAndLinkedInputs.map(_._1),
+                       workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
+                       null,
+                       None)
     val wdlName = s"${name}.wdl"
     val docUrl = Util.getURL(outputDir.resolve(wdlName))
     generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
@@ -198,7 +252,8 @@ object ProjectGenerator {
                         dataType: Type,
                         patterns: Seq[String] = Vector.empty,
                         default: Option[Expr] = None,
-                        choices: Seq[Expr] = Vector.empty) {
+                        choices: Seq[Expr] = Vector.empty,
+                        linked: Boolean = false) {
     def toDeclaration: Declaration = {
       Declaration(name, dataType, None, null, None)
     }
@@ -229,11 +284,15 @@ object ProjectGenerator {
     }
   }
 
-  def getInput(inputs: Vector[FieldModel]): Option[InputSection] = {
+  def getInput(inputs: Vector[FieldModel]): (Option[InputSection], Set[String]) = {
     if (inputs.isEmpty) {
-      None
+      (None, Set.empty)
     } else {
-      Some(InputSection(inputs.map(_.toDeclaration), null, None))
+      val inputSection = InputSection(inputs.map(_.toDeclaration), null, None)
+      val linkedInputs = inputs.collect {
+        case f: FieldModel if f.linked => f.name
+      }.toSet
+      (Some(inputSection), linkedInputs)
     }
   }
 
@@ -277,10 +336,11 @@ object ProjectGenerator {
                        var docker: Option[String] = None,
                        inputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty,
                        outputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty) {
-    def toTask: Task = {
-      Task(
+    def toTask: (Task, Set[String]) = {
+      val (inputSection, linkedInputs) = getInput(inputs.toVector)
+      val task = Task(
           name.get,
-          getInput(inputs.toVector),
+          inputSection,
           getOutput(outputs.toVector),
           CommandSection(Vector.empty, null, None),
           Vector.empty,
@@ -298,6 +358,7 @@ object ProjectGenerator {
           null,
           None
       )
+      (task, linkedInputs)
     }
   }
 
@@ -308,37 +369,30 @@ object ProjectGenerator {
                            var description: Option[String] = None,
                            inputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty,
                            outputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty) {
-    def toWorkflow(tasks: Vector[Task]): Workflow = {
-      val wfInputs = getInput(inputs.toVector)
-      lazy val wfInputMap: Map[String, Declaration] = if (wfInputs.isDefined) {
-        wfInputs.get.declarations.map { inp =>
-          inp.name -> inp
-        }.toMap
-      } else {
-        Map.empty
-      }
-
-      val calls: Vector[Call] = tasks.map { task =>
-        val callInputs: Map[String, Expr] = if (task.input.isDefined) {
-          def getInputValue(inp: Declaration): Option[(String, Expr)] = {
-            if (wfInputMap.contains(inp.name)) {
-              Some(inp.name -> ExprIdentifier(inp.name, null))
-            } else if (inp.wdlType.isInstanceOf[TypeOptional]) {
-              None
-            } else {
-              Some(inp.name -> ValueString("set my value!", null))
+    def toWorkflow(tasksAndLinkedInputs: Vector[(Task, Set[String])]): Workflow = {
+      val calls: Vector[Call] = tasksAndLinkedInputs.map {
+        case (task, linkedInputs) =>
+          val callInputs: Map[String, Expr] = if (task.input.isDefined) {
+            def getInputValue(inp: Declaration): Option[(String, Expr)] = {
+              if (linkedInputs.contains(inp.name)) {
+                Some(inp.name -> ExprIdentifier(inp.name, null))
+              } else if (inp.wdlType.isInstanceOf[TypeOptional]) {
+                None
+              } else {
+                Some(inp.name -> ValueString("set my value!", null))
+              }
             }
+            task.input.get.declarations.flatMap(getInputValue).toMap
+          } else {
+            Map.empty
           }
-          task.input.get.declarations.flatMap(getInputValue).toMap
-        } else {
-          Map.empty
-        }
-        Call(task.name, None, callInputs, null, None)
+          Call(task.name, None, callInputs, null, None)
       }
 
+      val (wfInputSection, _) = getInput(inputs.toVector)
       Workflow(
           name.get,
-          wfInputs,
+          wfInputSection,
           getOutput(outputs.toVector),
           getMeta(
               Map("title" -> title, "summary" -> summary, description -> "description").collect {
