@@ -18,6 +18,7 @@ case class ProjectGenerator(opts: Options,
                             wdlVersion: WdlVersion = WdlVersion.V1_0,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
+                            developerReadmes: Boolean = false,
                             dockerfile: Boolean = false,
                             tests: Boolean = false,
                             dockerImage: Option[String] = None,
@@ -26,7 +27,7 @@ case class ProjectGenerator(opts: Options,
   val defaultDockerImage = "debian:stretch-slim"
   lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
   lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = true, generatedFiles = generatedFiles)
+    ReadmeGenerator(developerReadmes = developerReadmes, generatedFiles = generatedFiles)
   lazy val dockerfileGenerator: DockerfileGenerator =
     DockerfileGenerator(generatedFiles = generatedFiles)
   lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)

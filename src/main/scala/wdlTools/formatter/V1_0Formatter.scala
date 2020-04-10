@@ -82,7 +82,8 @@ case class V1_0Formatter(opts: Options,
             lineFormatter.endLine(wrap = true)
           }
           items.foreach { atom =>
-            lineFormatter.appendChunk(Adjacent(Vector(atom, delimiter)))
+            lineFormatter.appendAll(Vector(atom))
+            lineFormatter.appendChunk(delimiter, spacing = "")
             lineFormatter.endLine(wrap = true, indenting = Indenting.IfNotIndented)
           }
         } else {
