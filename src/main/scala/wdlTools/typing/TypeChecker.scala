@@ -1,10 +1,10 @@
-package wdlTools.typechecker
+package wdlTools.typing
 
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
 
-case class Checker(stdlib: Stdlib) {
+case class TypeChecker(stdlib: Stdlib) {
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.

@@ -1,4 +1,4 @@
-package wdlTools.typechecker
+package wdlTools.typing
 
 import wdlTools.syntax.TextSource
 
