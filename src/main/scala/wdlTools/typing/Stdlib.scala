@@ -1,4 +1,4 @@
-package wdlTools.typechecker
+package wdlTools.typing
 
 import WdlTypes._
 import wdlTools.util.Options
@@ -36,11 +36,19 @@ case class Stdlib(conf: Options) {
       WT_Function1Arg("write_objects", WT_File, WT_Array(WT_File)),
       WT_Function1Arg("write_json", WT_Unknown, WT_File),
       // Size can take several kinds of arguments.
+      WT_Function1Arg("size", WT_String, WT_Float),
+      WT_Function1Arg("size", WT_Optional(WT_String), WT_Float),
+      WT_Function1Arg("size", WT_Array(WT_String), WT_Float),
+      WT_Function1Arg("size", WT_Array(WT_Optional(WT_String)), WT_Float),
       WT_Function1Arg("size", WT_File, WT_Float),
       WT_Function1Arg("size", WT_Optional(WT_File), WT_Float),
       WT_Function1Arg("size", WT_Array(WT_File), WT_Float),
       WT_Function1Arg("size", WT_Array(WT_Optional(WT_File)), WT_Float),
       // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
+      WT_Function2Arg("size", WT_String, WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Optional(WT_String), WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Array(WT_String), WT_String, WT_Float),
+      WT_Function2Arg("size", WT_Array(WT_Optional(WT_String)), WT_String, WT_Float),
       WT_Function2Arg("size", WT_File, WT_String, WT_Float),
       WT_Function2Arg("size", WT_Optional(WT_File), WT_String, WT_Float),
       WT_Function2Arg("size", WT_Array(WT_File), WT_String, WT_Float),
@@ -68,7 +76,9 @@ case class Stdlib(conf: Options) {
       WT_Function1Arg("basename", WT_String, WT_String),
       WT_Function1Arg("floor", WT_Float, WT_Int),
       WT_Function1Arg("ceil", WT_Float, WT_Int),
-      WT_Function1Arg("round", WT_Float, WT_Int)
+      WT_Function1Arg("round", WT_Float, WT_Int),
+      // extras not mentioned in the specification
+      WT_Function1Arg("glob", WT_String, WT_Array(WT_File))
   )
 
   // build a mapping from a function name to all of its prototypes.

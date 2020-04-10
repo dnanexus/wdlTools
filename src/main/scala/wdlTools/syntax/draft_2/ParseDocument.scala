@@ -121,7 +121,11 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlDraft2Parser.Wdl_typeContext): Type = {
-    visitChildren(ctx).asInstanceOf[Type]
+    val t = visitType_base(ctx.type_base())
+    if (ctx.OPTIONAL() != null)
+      TypeOptional(t, getSourceText(ctx))
+    else
+      t
   }
 
   // EXPRESSIONS
@@ -162,7 +166,8 @@ wdl_type
     if (ctx.SEP() != null) {
       return ExprPlaceholderPartSep(expr, getSourceText(ctx))
     }
-    throw new SyntaxException(s"Not one of three known variants of a placeholder", getSourceText(ctx))
+    throw new SyntaxException(s"Not one of three known variants of a placeholder",
+                              getSourceText(ctx))
   }
 
   // These are full expressions of the same kind
@@ -291,7 +296,8 @@ string
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText, getSourceText(ctx))
     }
-    throw new SyntaxException("Not one of four supported variants of primitive_literal", getSourceText(ctx))
+    throw new SyntaxException("Not one of four supported variants of primitive_literal",
+                              getSourceText(ctx))
   }
 
   override def visitLor(ctx: WdlDraft2Parser.LorContext): Expr = {
@@ -492,7 +498,6 @@ string
     ctx match {
       case lor: WdlDraft2Parser.LorContext       => visitLor(lor)
       case infix1: WdlDraft2Parser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
-      case _                                     => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -504,7 +509,6 @@ string
     ctx match {
       case land: WdlDraft2Parser.LandContext     => visitLand(land)
       case infix2: WdlDraft2Parser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
-      case _                                     => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -527,7 +531,6 @@ string
       case lt: WdlDraft2Parser.LtContext         => visitLt(lt)
       case gt: WdlDraft2Parser.GtContext         => visitGt(gt)
       case infix3: WdlDraft2Parser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
-      case _                                     => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -541,7 +544,6 @@ string
       case add: WdlDraft2Parser.AddContext       => visitAdd(add)
       case sub: WdlDraft2Parser.SubContext       => visitSub(sub)
       case infix4: WdlDraft2Parser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
-      case _                                     => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -557,7 +559,6 @@ string
       case divide: WdlDraft2Parser.DivideContext => visitDivide(divide)
       case mod: WdlDraft2Parser.ModContext       => visitMod(mod)
       case infix5: WdlDraft2Parser.Infix5Context => visitInfix5(infix5).asInstanceOf[Expr]
-      //      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -595,7 +596,7 @@ string
     ctx match {
       case group: WdlDraft2Parser.Expression_groupContext => visitExpression_group(group)
       case primitives: WdlDraft2Parser.PrimitivesContext =>
-        visitChildren(primitives).asInstanceOf[Expr]
+        visitPrimitive_literal(primitives.primitive_literal())
       case array_literal: WdlDraft2Parser.Array_literalContext => visitArray_literal(array_literal)
       case pair_literal: WdlDraft2Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlDraft2Parser.Map_literalContext     => visitMap_literal(map_literal)
@@ -607,7 +608,6 @@ string
       case apply: WdlDraft2Parser.ApplyContext                 => visitApply(apply)
       case left_name: WdlDraft2Parser.Left_nameContext         => visitLeft_name(left_name)
       case get_name: WdlDraft2Parser.Get_nameContext           => visitGet_name(get_name)
-      //      case _ => visitChildren(ctx).asInstanceOf[Expr]
     }
   }
 
@@ -843,15 +843,18 @@ task_input
     // make sure the input and output sections to not intersect
     val both = inputVarNames intersect outputVarNames
     if (both.nonEmpty)
-      throw new SyntaxException(s"${both} appears in both input and output sections", getSourceText(ctx))
+      throw new SyntaxException(s"${both} appears in both input and output sections",
+                                getSourceText(ctx))
 
     val ioVarNames = inputVarNames ++ outputVarNames
 
     paramMeta.kvs.foreach {
       case MetaKV(k, _, _, _) =>
         if (!(ioVarNames contains k))
-          throw new SyntaxException(s"parameter ${k} does not appear in the input or output sections",
-                                 getSourceText(ctx))
+          throw new SyntaxException(
+              s"parameter ${k} does not appear in the input or output sections",
+              getSourceText(ctx)
+          )
     }
   }
 

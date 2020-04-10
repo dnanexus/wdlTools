@@ -169,8 +169,7 @@ wdl_type
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getSourceText(ctx))
     }
-    throw new SyntaxException(s"Not an integer nor a float ${ctx.getText}",
-                              getSourceText(ctx))
+    throw new SyntaxException(s"Not an integer nor a float ${ctx.getText}", getSourceText(ctx))
   }
 
   /* expression_placeholder_option
@@ -187,9 +186,7 @@ wdl_type
       else if (ctx.number() != null)
         visitNumber(ctx.number())
       else
-        throw new SyntaxException("sanity: not a string or a number",
-                                  getSourceText(ctx))
-
+        throw new SyntaxException("sanity: not a string or a number", getSourceText(ctx))
 
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
@@ -201,7 +198,8 @@ wdl_type
     if (ctx.SEP() != null) {
       return ExprPlaceholderPartSep(expr, getSourceText(ctx))
     }
-    throw new SyntaxException(s"Not one of three known variants of a placeholder", getSourceText(ctx))
+    throw new SyntaxException(s"Not one of three known variants of a placeholder",
+                              getSourceText(ctx))
   }
 
   // These are full expressions of the same kind
@@ -330,7 +328,8 @@ string
     if (ctx.Identifier() != null) {
       return ExprIdentifier(ctx.getText, getSourceText(ctx))
     }
-    throw new SyntaxException("Not one of four supported variants of primitive_literal", getSourceText(ctx))
+    throw new SyntaxException("Not one of four supported variants of primitive_literal",
+                              getSourceText(ctx))
   }
 
   override def visitLor(ctx: WdlV1Parser.LorContext): Expr = {
@@ -628,7 +627,8 @@ string
   private def visitExpr_core(ctx: WdlV1Parser.Expr_coreContext): Expr = {
     ctx match {
       case group: WdlV1Parser.Expression_groupContext => visitExpression_group(group)
-      case primitives: WdlV1Parser.PrimitivesContext =>      visitPrimitive_literal(primitives.primitive_literal())
+      case primitives: WdlV1Parser.PrimitivesContext =>
+        visitPrimitive_literal(primitives.primitive_literal())
       case array_literal: WdlV1Parser.Array_literalContext => visitArray_literal(array_literal)
       case pair_literal: WdlV1Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlV1Parser.Map_literalContext     => visitMap_literal(map_literal)
@@ -877,14 +877,16 @@ task_input
     if (both.nonEmpty) {
       for (varName <- both) {
         // issue a warning with the exact text where this occurs
-        val decl : Declaration = inputSection.get.declarations.find{
+        val decl: Declaration = inputSection.get.declarations.find {
           case decl => decl.name == varName
         }.get
         val text = decl.text
-        Util.warning(s"""|Warning: "${varName}" appears in both input and output sections.
-                         |In file ${text.url} line ${text.line} col ${text.col}"""
-                       .stripMargin.replaceAll("\n", " "),
-                     opts.verbosity)
+        Util.warning(
+            s"""|Warning: "${varName}" appears in both input and output sections.
+                |In file ${text.url} line ${text.line} col ${text.col}""".stripMargin
+              .replaceAll("\n", " "),
+            opts.verbosity
+        )
       }
     }
 
@@ -893,8 +895,10 @@ task_input
     paramMeta.kvs.foreach {
       case MetaKV(k, _, _, _) =>
         if (!(ioVarNames contains k))
-          throw new SyntaxException(s"parameter ${k} does not appear in the input or output sections",
-                                 getSourceText(ctx))
+          throw new SyntaxException(
+              s"parameter ${k} does not appear in the input or output sections",
+              getSourceText(ctx)
+          )
     }
   }
 

@@ -221,7 +221,7 @@ object Util {
     }
   }
 
-  def warning(msg : String, verbose: Verbosity) : Unit = {
+  def warning(msg: String, verbose: Verbosity): Unit = {
     if (verbose == Quiet) {
       return
     }

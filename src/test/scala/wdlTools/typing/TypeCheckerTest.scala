@@ -1,22 +1,29 @@
-package wdlTools.typechecker
+package wdlTools.typing
 
 import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
-class CheckerTest extends FlatSpec with Matchers {
-  private val positivePath =
-    Paths.get(getClass.getResource("/typechecker/v1_0/tasks/positive").getPath)
-  private val negativePath =
-    Paths.get(getClass.getResource("/typechecker/v1_0/tasks/negative").getPath)
-  private val opts = Options(antlr4Trace = false, localDirectories = Some(Vector(positivePath)))
+class TypeCheckerTest extends FlatSpec with Matchers {
+  private val opts = Options(
+      antlr4Trace = false,
+      localDirectories = Some(
+          Vector(
+              Paths.get(getClass.getResource("/typing/v1_0/tasks/positive").getPath),
+              Paths.get(getClass.getResource("/typing/v1_0/tasks/negative").getPath),
+              Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath),
+              Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
+          )
+      ),
+      verbosity = Verbosity.Quiet
+  )
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
   private val stdlib = Stdlib(opts)
-  private val checker = Checker(stdlib)
+  private val checker = TypeChecker(stdlib)
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(folder: Path): Vector[Path] = {
@@ -27,6 +34,8 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check tasks (positive cases)" in {
+    val positivePath =
+      Paths.get(getClass.getResource("/typing/v1_0/tasks/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
@@ -40,6 +49,8 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check tasks (negative cases)" in {
+    val negativePath =
+      Paths.get(getClass.getResource("/typing/v1_0/tasks/negative").getPath)
     val negativeCases = getWdlSourceFiles(negativePath)
     for (pc <- negativeCases) {
       val doc = parser.parse(Util.getURL(pc))
@@ -60,6 +71,8 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check workflows (positive cases)" in {
+    val positivePath =
+      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
@@ -74,6 +87,8 @@ class CheckerTest extends FlatSpec with Matchers {
   }
 
   it should "type check workflows (negative cases)" in {
+    val negativePath =
+      Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
     val negativeCases = getWdlSourceFiles(negativePath)
     for (nc <- negativeCases) {
       val doc = parser.parse(Util.getURL(nc))
@@ -92,10 +107,16 @@ class CheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" taggedAs(Edge) in {
+  ignore should "be able to handle GATK" taggedAs (Edge) in {
     val url = Util.getURL(
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl")
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+    )
     val doc = parser.parse(url)
+    checker.apply(doc)
+  }
+
+  it should "size stdlib" taggedAs (Edge) in {
+    val doc = parser.parse(opts.getURL("stdlib.wdl"))
     checker.apply(doc)
   }
 }

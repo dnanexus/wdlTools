@@ -281,9 +281,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = opts.copy(verbosity = Quiet)
     assertThrows[Exception] {
-      ParseDocument.apply(getTaskSource("wrong_comment_style.wdl"), confQuiet)
+      ParseDocument.apply(getTaskSource("wrong_comment_style.wdl"), opts)
     }
   }
 
@@ -526,7 +525,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "have real world GATK tasks" taggedAs Edge in {
-    val url = "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
     val doc = ParseDocument.apply(sourceCode, opts)
 

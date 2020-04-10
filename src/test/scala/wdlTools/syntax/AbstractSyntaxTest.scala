@@ -5,13 +5,15 @@ import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
 class AbstractSyntaxTest extends FlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1_0/tasks").getPath)
   private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1_0/workflows").getPath)
   private val opts =
-    Options(antlr4Trace = false, localDirectories = Some(Vector(tasksDir, workflowsDir)))
+    Options(antlr4Trace = false,
+            localDirectories = Some(Vector(tasksDir, workflowsDir)),
+            verbosity = Verbosity.Quiet)
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
 
@@ -42,7 +44,8 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "type check GATK tasks" in {
-     val url = "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
     val doc = parser.apply(sourceCode)
 
@@ -50,7 +53,8 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "type check GATK joint genotyping workflow" taggedAs Edge in {
-    val url = "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
     val doc = parser.apply(sourceCode)
 

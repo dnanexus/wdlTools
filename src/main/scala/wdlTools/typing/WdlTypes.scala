@@ -1,4 +1,4 @@
-package wdlTools.typechecker
+package wdlTools.typing
 
 // This is the WDL typesystem
 object WdlTypes {

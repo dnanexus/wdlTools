@@ -1,14 +1,14 @@
 package wdlTools.cli
 
 import wdlTools.syntax.Parsers
-import wdlTools.typechecker.{Checker, Stdlib}
+import wdlTools.typing.{TypeChecker, Stdlib}
 
-case class Check(conf: WdlToolsConf) extends Command {
+case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.check.url()
     val opts = conf.check.getOptions
     val parsers = Parsers(opts)
-    val checker = Checker(Stdlib(opts))
+    val checker = TypeChecker(Stdlib(opts))
 
     parsers.getDocumentWalker[checker.Context](url).walk { (_, doc, _) =>
       // TODO: rather than throw an exception as soon as a type error is encountered, accumulate all errors
