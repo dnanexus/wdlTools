@@ -17,6 +17,8 @@ object Wrapping extends Enumeration {
 }
 
 trait Chunk {
+  def wrapAll: Boolean = false
+
   def format(lineFormatter: LineFormatter): Unit
 }
 

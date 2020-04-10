@@ -25,4 +25,11 @@ task foo {
   runtime {
     docker: "debian:stretch-slim"
   }
+
+  parameter_meta {
+    s: {
+      foo: "bar",
+      baz: "blorf"
+    }
+  }
 }

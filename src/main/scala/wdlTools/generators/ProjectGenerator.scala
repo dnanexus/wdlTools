@@ -96,14 +96,14 @@ case class ProjectGenerator(opts: Options,
               menu = Some(true)
           )
           if (predefinedChoice.isDefined) {
-            fields.append(predefinedChoiceMap(predefinedChoice.get).copy())
+            fields.append(predefinedChoiceMap(predefinedChoice.get).copy(linked = true))
             break
           }
         }
         val name = console.askRequired[String](prompt = "Name")
         val label = console.askOnce[String](prompt = "Label", optional = true)
         val help = console.askOnce[String](prompt = "Help", optional = true)
-        val optional = console.askYesNo(prompt = "Optional", default = Some(true))
+        val optional = console.askYesNo(prompt = "Optional", default = Some(false))
         val dataType: Type = typeParser.apply(
             console
               .askRequired[String](prompt = "Type",

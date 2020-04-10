@@ -13,41 +13,34 @@ case class V1_0Formatter(opts: Options,
 
   abstract class Group(prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
-                       wrapAll: Boolean = false)
+                       override val wrapAll: Boolean = false)
       extends Atom {
     lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
     lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
 
     override def format(lineFormatter: LineFormatter): Unit = {
-      val wrapAndDedentSuffix = if (prefix.isEmpty) {
+      val wrapAndIndent = if (prefix.isEmpty) {
         lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
         false
       } else if (prefixLength < lineFormatter.lengthRemaining) {
         lineFormatter.appendChunk(prefix.get)
-        lineFormatter.endLine(wrap = true, Indenting.Always)
         true
       } else {
         lineFormatter.endLine(wrap = true, Indenting.IfNotIndented)
-        val wrap = wrapAll || length > lineFormatter.lengthRemaining
+        val tooLong = length > lineFormatter.lengthRemaining
         lineFormatter.appendChunk(prefix.get)
-        if (wrap) {
-          lineFormatter.endLine(wrap = true, Indenting.Always)
-          true
-        } else {
-          false
-        }
+        wrapAll || tooLong
       }
 
-      wrapBody(lineFormatter)
+      if (wrapAndIndent) {
+        lineFormatter.endLine()
+        wrapBody(lineFormatter.indented())
+        lineFormatter.beginLine()
+      }
 
       if (suffix.isDefined) {
-        if (wrapAndDedentSuffix || suffixLength > lineFormatter.lengthRemaining) {
-          val indenting = if (wrapAndDedentSuffix) {
-            Indenting.Dedent
-          } else {
-            Indenting.Never
-          }
-          lineFormatter.endLine(wrap = true, indenting = indenting)
+        if (suffixLength > lineFormatter.lengthRemaining) {
+          lineFormatter.endLine(wrap = true)
         }
         lineFormatter.appendChunk(suffix.get)
       }
@@ -60,7 +53,7 @@ case class V1_0Formatter(opts: Options,
                        delimiter: Token = Token.ArrayDelimiter,
                        prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
-                       wrapAll: Boolean = false)
+                       override val wrapAll: Boolean = false)
       extends Group(prefix = prefix, suffix = suffix, wrapAll = wrapAll) {
     lazy val itemStr: String = items.mkString(s"${delimiter} ")
     lazy val itemLength: Int = itemStr.length
@@ -78,14 +71,17 @@ case class V1_0Formatter(opts: Options,
     def wrapBody(lineFormatter: LineFormatter): Unit = {
       if (items.nonEmpty) {
         if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
-          if (!lineFormatter.atLineStart) {
-            lineFormatter.endLine(wrap = true)
-          }
-          items.foreach { atom =>
-            lineFormatter.appendAll(Vector(atom))
+          lineFormatter.beginLine()
+          lineFormatter.appendAll(Vector(items.head))
+          items.tail.foreach { atom =>
             lineFormatter.appendChunk(delimiter, spacing = "")
-            lineFormatter.endLine(wrap = true, indenting = Indenting.IfNotIndented)
+            if (wrapAll || atom.length > lineFormatter.lengthRemaining) {
+              lineFormatter.endLine(wrap = true, indenting = Indenting.Never)
+              lineFormatter.beginLine()
+            }
+            lineFormatter.appendAll(Vector(atom))
           }
+          lineFormatter.endLine()
         } else {
           lineFormatter.appendString(itemStr)
         }

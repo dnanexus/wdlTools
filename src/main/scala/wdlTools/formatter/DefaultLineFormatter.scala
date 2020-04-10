@@ -14,8 +14,8 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
                                 maxLineWidth: Int = 100,
                                 lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty)
     extends LineFormatter(defaultIndenting, defaultSpacing) {
-  private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-  private val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
+  val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
+  val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
 
   def indented(indenting: Indenting = defaultIndenting): LineFormatter = {
     DefaultLineFormatter(
@@ -159,7 +159,14 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
       } else {
         spacing
       }
-      if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
+      val wrap = if (wrapping == Wrapping.Never) {
+        false
+      } else if (lengthRemaining < space.length + substr.length) {
+        true
+      } else {
+        chunks.exists(_.wrapAll)
+      }
+      if (wrap) {
         chunks.foreach { chunk =>
           chunk.format(lineFormatter = this)
         }
