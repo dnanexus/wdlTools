@@ -200,6 +200,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "Do not generate a pytest-wdl test template",
         default = Some(true)
     )
+    val makefile: ScallopOption[Boolean] = toggle(
+        descrYes = "(Default) Generate a Makefile",
+        descrNo = "Do not generate a Makefile",
+        default = Some(true)
+    )
     val outputDir: ScallopOption[Path] = opt[Path](descr =
       "Directory in which to output formatted WDL files; if not specified, ./<name> is used"
     )
