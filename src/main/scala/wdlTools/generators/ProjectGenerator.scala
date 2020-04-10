@@ -21,15 +21,20 @@ case class ProjectGenerator(opts: Options,
                             developerReadmes: Boolean = false,
                             dockerfile: Boolean = false,
                             tests: Boolean = false,
+                            makefile: Boolean = true,
                             dockerImage: Option[String] = None,
                             generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
+  val DOCKERFILE_TEMPLATE = "/templates/project/Dockerfile.ssp"
+  val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
+
   val defaultDockerImage = "debian:stretch-slim"
   lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
+  lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = developerReadmes, generatedFiles = generatedFiles)
-  lazy val dockerfileGenerator: DockerfileGenerator =
-    DockerfileGenerator(generatedFiles = generatedFiles)
+    ReadmeGenerator(developerReadmes = developerReadmes,
+                    generatedFiles = generatedFiles,
+                    renderer = renderer)
   lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
   lazy val parsers: Parsers = Parsers(opts)
@@ -235,12 +240,18 @@ case class ProjectGenerator(opts: Options,
 
     if (dockerfile) {
       val dockerfileUrl = Util.getURL(outputDir.resolve("Dockerfile"))
-      dockerfileGenerator.apply(dockerfileUrl)
+      generatedFiles(dockerfileUrl) = renderer.render(DOCKERFILE_TEMPLATE)
     }
 
     if (tests) {
       val testUrl = Util.getURL(outputDir.resolve("tests").resolve(s"test_${name}.json"))
       testsGenerator.apply(testUrl, wdlName, doc)
+    }
+
+    if (makefile) {
+      val makefileUrl = Util.getURL(outputDir.resolve("Makefile"))
+      generatedFiles(makefileUrl) = renderer
+        .render(MAKEFILE_TEMPLATE, Map("name" -> name, "test" -> tests, "docker" -> dockerfile))
     }
   }
 }
