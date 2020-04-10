@@ -8,10 +8,10 @@ download_antlr_jar:
 	fi)
 
 draft2 :
-	(cd ${ROOT_DIR}/src/main/antlr4/draft_2;  java -jar ${ROOT_DIR}/antlr-4.8-complete.jar -o ${ROOT_DIR}/src/main/java -visitor -package org.openwdl.wdl.parser.draft_2 WdlDraft2Lexer.g4 WdlDraft2Parser.g4)
+	(cd ${ROOT_DIR}/src/main/antlr4/draft_2;  java -jar ${ROOT_DIR}/antlr-4.8-complete.jar -o ${ROOT_DIR}/src/main/java -visitor -package org.openwdl.wdl.parser.draft_2 WdlDraft2Parser.g4 WdlDraft2Lexer.g4)
 
 v10 :
-	(cd ${ROOT_DIR}/src/main/antlr4/v1_0; java -jar ${ROOT_DIR}/antlr-4.8-complete.jar -o ${ROOT_DIR}/src/main/java -visitor -package org.openwdl.wdl.parser.v1_0 WdlV1Lexer.g4 WdlV1Parser.g4)
+	(cd ${ROOT_DIR}/src/main/antlr4/v1_0; java -jar ${ROOT_DIR}/antlr-4.8-complete.jar -o ${ROOT_DIR}/src/main/java -visitor -package org.openwdl.wdl.parser.v1_0 WdlV1Parser.g4 WdlV1Lexer.g4)
 
 
 clean :
