@@ -27,6 +27,7 @@ case class Generate(conf: WdlToolsConf) extends Command {
         readmes = args.readmes(),
         dockerfile = args.dockerfile(),
         tests = args.tests(),
+        makefile = args.makefile(),
         generatedFiles = generatedFiles,
         dockerImage = args.docker.toOption
     )

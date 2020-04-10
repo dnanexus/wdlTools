@@ -1,0 +1,27 @@
+<%@ val name: String %>
+<%@ val test: Boolean %>
+<%@ val docker: Boolean %>
+cmd = java -jar $$WDLTOOLS_JAR
+name = ${name}
+wdl = ${'$'}{name}.wdl
+repo = my-repo-name
+
+all: check test
+
+check:
+  $(cmd) check $(wdl)
+
+format:
+  $(cmd) format --overwrite $(wdl)
+#if (test)
+test:
+  PYTEST_WDL_EXECUTORS=miniwdl pytest -vv
+
+test_dx:
+  dx whoami || dx login
+  PYTEST_WDL_EXECUTORS=dxwdl pytest -vv
+#end
+#if (docker)
+build_docker:
+  docker build -t $(repo)/$(name) .
+#end
