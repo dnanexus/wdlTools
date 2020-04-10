@@ -154,10 +154,11 @@ wdl_type
    */
   override def visitWdl_type(ctx: WdlV1Parser.Wdl_typeContext): Type = {
     val t = visitType_base(ctx.type_base())
-    if (ctx.OPTIONAL() != null)
+    if (ctx.OPTIONAL() != null) {
       TypeOptional(t, getSourceText(ctx))
-    else
+    } else {
       t
+    }
   }
 
   // EXPRESSIONS
@@ -528,8 +529,9 @@ string
 
   private def visitExpr_infix0(ctx: WdlV1Parser.Expr_infix0Context): Expr = {
     ctx match {
-      case lor: WdlV1Parser.LorContext       => visitLor(lor)
-      case infix1: WdlV1Parser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
+      case lor: WdlV1Parser.LorContext => visitLor(lor)
+      case infix1: WdlV1Parser.Infix1Context =>
+        visitInfix1(infix1).asInstanceOf[Expr]
     }
   }
 
@@ -556,13 +558,14 @@ string
 
   private def visitExpr_infix2(ctx: WdlV1Parser.Expr_infix2Context): Expr = {
     ctx match {
-      case eqeq: WdlV1Parser.EqeqContext     => visitEqeq(eqeq)
-      case neq: WdlV1Parser.NeqContext       => visitNeq(neq)
-      case lte: WdlV1Parser.LteContext       => visitLte(lte)
-      case gte: WdlV1Parser.GteContext       => visitGte(gte)
-      case lt: WdlV1Parser.LtContext         => visitLt(lt)
-      case gt: WdlV1Parser.GtContext         => visitGt(gt)
-      case infix3: WdlV1Parser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
+      case eqeq: WdlV1Parser.EqeqContext => visitEqeq(eqeq)
+      case neq: WdlV1Parser.NeqContext   => visitNeq(neq)
+      case lte: WdlV1Parser.LteContext   => visitLte(lte)
+      case gte: WdlV1Parser.GteContext   => visitGte(gte)
+      case lt: WdlV1Parser.LtContext     => visitLt(lt)
+      case gt: WdlV1Parser.GtContext     => visitGt(gt)
+      case infix3: WdlV1Parser.Infix3Context =>
+        visitInfix3(infix3).asInstanceOf[Expr]
     }
   }
 
@@ -573,9 +576,10 @@ string
 	; */
   private def visitExpr_infix3(ctx: WdlV1Parser.Expr_infix3Context): Expr = {
     ctx match {
-      case add: WdlV1Parser.AddContext       => visitAdd(add)
-      case sub: WdlV1Parser.SubContext       => visitSub(sub)
-      case infix4: WdlV1Parser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
+      case add: WdlV1Parser.AddContext => visitAdd(add)
+      case sub: WdlV1Parser.SubContext => visitSub(sub)
+      case infix4: WdlV1Parser.Infix4Context =>
+        visitInfix4(infix4).asInstanceOf[Expr]
     }
   }
 
@@ -877,9 +881,7 @@ task_input
     if (both.nonEmpty) {
       for (varName <- both) {
         // issue a warning with the exact text where this occurs
-        val decl: Declaration = inputSection.get.declarations.find {
-          case decl => decl.name == varName
-        }.get
+        val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
         val text = decl.text
         Util.warning(
             s"""|Warning: "${varName}" appears in both input and output sections.

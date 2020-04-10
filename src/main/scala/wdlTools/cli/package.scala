@@ -65,14 +65,14 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @return
       */
     def getOptions: Options = {
-      val parentConf = this.parentConfig.asInstanceOf[WdlToolsConf]
       val wdlDir: Path = Util.getLocalPath(url()).getParent
-      Options(
-          localDirectories = Some(this.localDirectories(Set(wdlDir))),
-          followImports = this.followImports(),
-          verbosity = parentConf.verbosity,
-          antlr4Trace = parentConf.antlr4Trace.getOrElse(default = false)
-      )
+      parentConfig
+        .asInstanceOf[WdlToolsConf]
+        .getOptions
+        .copy(
+            localDirectories = Some(this.localDirectories(Set(wdlDir))),
+            followImports = this.followImports()
+        )
     }
   }
 
@@ -104,7 +104,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       val outputDir: ScallopOption[Path] = opt[Path](descr =
         "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
       )
-      val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+      val overwrite: ScallopOption[Boolean] = toggle(
+          descrYes = "Overwrite existing files",
+          descrNo = "(Default) Do not overwrite existing files",
+          default = Some(false)
+      )
       validateOpt(outputDir, overwrite) {
         case (None, Some(false) | None) =>
           Left("--outputDir is required unless --overwrite is specified")
@@ -136,7 +140,11 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     val outputDir: ScallopOption[Path] = opt[Path](descr =
       "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten"
     )
-    val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
     validateOpt(outputDir, overwrite) {
       case (None, Some(false) | None) =>
         Left("--outputDir is required unless --overwrite is specified")
@@ -149,6 +157,62 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
   addSubcommand(printAST)
 
+  val generate = new Subcommand("new") {
+    banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
+             |Generate a new WDL task, workflow, or project.
+             |
+             |Options:
+             |""".stripMargin)
+
+    val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version to generate; currently only v1.0 is supported",
+        default = Some(WdlVersion.V1_0)
+    )
+    validateOpt(wdlVersion) {
+      case Some(version) if version != WdlVersion.V1_0 =>
+        Left("Only WDL v1.0 is supported currently")
+      case _ => Right(Unit)
+    }
+    val interactive: ScallopOption[Boolean] = toggle(
+        descrYes = "Specify inputs and outputs interactively",
+        descrNo = "(Defaut) Do not specify inputs and outputs interactively",
+        default = Some(false)
+    )
+    val workflow: ScallopOption[Boolean] = toggle(
+        descrYes = "(Default) Generate a workflow",
+        descrNo = "Do not generate a workflow",
+        default = Some(true)
+    )
+    val task: ScallopOption[List[String]] = opt[List[String]](descr = "A task name")
+    val readmes: ScallopOption[Boolean] = toggle(
+        descrYes = "(Default) Generate a README file for each task/workflow",
+        descrNo = "Do not generate README files",
+        default = Some(true)
+    )
+    val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
+    val dockerfile: ScallopOption[Boolean] = toggle(
+        descrYes = "Generate a Dockerfile template",
+        descrNo = "(Default) Do not generate a Dockerfile template",
+        default = Some(false)
+    )
+    val tests: ScallopOption[Boolean] = toggle(
+        descrYes = "(Default) Generate pytest-wdl test template",
+        descrNo = "Do not generate a pytest-wdl test template",
+        default = Some(true)
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output formatted WDL files; if not specified, ./<name> is used"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+    val name: ScallopOption[String] =
+      trailArg[String](descr = "The project name - this will also be the name of the workflow")
+  }
+  addSubcommand(generate)
+
   val readmes =
     new ParserSubcommand("readmes", "Generate README file stubs for tasks and workflows.") {
       val developerReadmes: ScallopOption[Boolean] = toggle(
@@ -156,9 +220,13 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
           default = Some(false)
       )
       val outputDir: ScallopOption[Path] = opt[Path](descr =
-        "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+        "Directory in which to output README files; if not specified, the current directory is used"
       )
-      val overwrite: ScallopOption[Boolean] = toggle(default = Some(false))
+      val overwrite: ScallopOption[Boolean] = toggle(
+          descrYes = "Overwrite existing files",
+          descrNo = "(Default) Do not overwrite existing files",
+          default = Some(false)
+      )
     }
   addSubcommand(readmes)
 
@@ -176,5 +244,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     } else {
       Normal
     }
+  }
+
+  def getOptions: Options = {
+    Options(
+        verbosity = verbosity,
+        antlr4Trace = antlr4Trace.getOrElse(default = false)
+    )
   }
 }

@@ -1,6 +1,6 @@
 package wdlTools.cli
 
-import wdlTools.generators.{ReadmeGenerator, SspRenderer}
+import wdlTools.generators.{ReadmeGenerator, Renderer}
 import wdlTools.syntax.Parsers
 import wdlTools.util.Util
 
@@ -11,9 +11,9 @@ case class Readmes(conf: WdlToolsConf) extends Command {
     val url = conf.readmes.url()
     val opts = conf.readmes.getOptions
     val parsers = Parsers(opts)
-    val renderer = SspRenderer()
+    val renderer = Renderer()
     val readmes = parsers.getDocumentWalker[String](url).walk { (url, doc, results) =>
-      ReadmeGenerator(url, doc, conf.readmes.developerReadmes(), renderer, results).apply()
+      ReadmeGenerator(conf.readmes.developerReadmes(), renderer, results).apply(url, doc)
     }
     Util.writeContentsToFiles(readmes,
                               outputDir = conf.readmes.outputDir.toOption,

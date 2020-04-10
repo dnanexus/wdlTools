@@ -107,7 +107,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "be able to handle GATK" taggedAs (Edge) in {
+  ignore should "be able to handle GATK" taggedAs Edge in {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
@@ -115,7 +115,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     checker.apply(doc)
   }
 
-  it should "size stdlib" taggedAs (Edge) in {
+  it should "size stdlib" taggedAs Edge in {
     val doc = parser.parse(opts.getURL("stdlib.wdl"))
     checker.apply(doc)
   }

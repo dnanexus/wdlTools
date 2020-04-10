@@ -122,10 +122,11 @@ wdl_type
    */
   override def visitWdl_type(ctx: WdlDraft2Parser.Wdl_typeContext): Type = {
     val t = visitType_base(ctx.type_base())
-    if (ctx.OPTIONAL() != null)
+    if (ctx.OPTIONAL() != null) {
       TypeOptional(t, getSourceText(ctx))
-    else
+    } else {
       t
+    }
   }
 
   // EXPRESSIONS
