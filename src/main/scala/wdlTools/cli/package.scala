@@ -190,7 +190,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         default = Some(true)
     )
     val docker: ScallopOption[String] = opt[String](descr = "The Docker image ID")
-    val dockerFile: ScallopOption[Boolean] = toggle(
+    val dockerfile: ScallopOption[Boolean] = toggle(
         descrYes = "Generate a Dockerfile template",
         descrNo = "Do not generate a Dockerfile template",
         default = Some(false)

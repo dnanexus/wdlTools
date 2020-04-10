@@ -10,12 +10,12 @@ import scala.collection.mutable
 
 case class ReadmeGenerator(developerReadmes: Boolean = false,
                            renderer: Renderer = Renderer(),
-                           readmes: mutable.Map[URL, String] = mutable.HashMap.empty) {
+                           generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
-  val WORKFLOW_README_TEMPLATE = "/templates/WorkflowReadme.md.ssp"
-  val TASK_README_TEMPLATE = "/templates/TaskReadme.md.ssp"
-  val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/WorkflowReadme.developer.md.ssp"
-  val TASK_README_DEVELOPER_TEMPLATE = "/templates/TaskReadme.developer.md.ssp"
+  val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
+  val TASK_README_TEMPLATE = "/templates/readme/TaskReadme.md.ssp"
+  val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/readme/WorkflowReadme.developer.md.ssp"
+  val TASK_README_DEVELOPER_TEMPLATE = "/templates/readme/TaskReadme.developer.md.ssp"
 
   case class Generator(wdlUrl: URL) {
     private val wdlPath = Util.getLocalPath(wdlUrl)
@@ -44,7 +44,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      readmes(Util.getURL(path)) = contents
+      generatedFiles(Util.getURL(path)) = contents
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -55,7 +55,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      readmes(Util.getURL(path)) = contents
+      generatedFiles(Util.getURL(path)) = contents
       readmeName
     }
   }

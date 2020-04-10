@@ -1,8 +1,11 @@
 package wdlTools.util
 
+import java.io.IOException
+
 import collection.JavaConverters._
 import java.net.URL
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
 
@@ -139,6 +142,22 @@ object Util {
     }
   }
 
+  def rmdir(dir: Path): Unit = {
+    Files.walkFileTree(
+        dir,
+        new SimpleFileVisitor[Path] {
+          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+            Files.delete(file)
+            FileVisitResult.CONTINUE
+          }
+          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+            Files.delete(dir)
+            FileVisitResult.CONTINUE
+          }
+        }
+    )
+  }
+
   /**
     * Write a collection of documents, which is a map of URIs to contents, to disk by converting
     * each URI to a local path.
@@ -147,7 +166,7 @@ object Util {
     * @param overwrite whether it is okay to overwrite an existing file
     */
   def writeContentsToFiles(docs: Map[URL, String],
-                           outputDir: Option[Path],
+                           outputDir: Option[Path] = None,
                            overwrite: Boolean = false): Unit = {
     docs.foreach {
       case (url, contents) =>

@@ -1,28 +1,34 @@
 package wdlTools.generators
 
 import java.net.URL
+import java.nio.file.Path
 
 import wdlTools.formatter.V1_0Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Parsers, WdlExprParser, WdlTypeParser, WdlVersion}
-import wdlTools.util.{InteractiveConsole, Options}
+import wdlTools.util.{InteractiveConsole, Options, Util}
 
 import scala.collection.mutable
 
 case class ProjectGenerator(opts: Options,
                             name: String,
+                            outputDir: Path,
                             wdlVersion: WdlVersion = WdlVersion.V1_0,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
-                            overwrite: Boolean = false,
+                            dockerfile: Boolean = false,
+                            tests: Boolean = false,
                             dockerImage: Option[String] = None,
                             generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
 
   val defaultDockerImage = "debian:stretch-slim"
   lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
   lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = true, readmes = generatedFiles)
+    ReadmeGenerator(developerReadmes = true, generatedFiles = generatedFiles)
+  lazy val dockerfileGenerator: DockerfileGenerator =
+    DockerfileGenerator(generatedFiles = generatedFiles)
+  lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
   lazy val parsers: Parsers = Parsers(opts)
   lazy val typeParser: WdlTypeParser = parsers.getTypeParser(wdlVersion)
@@ -106,7 +112,7 @@ case class ProjectGenerator(opts: Options,
     }
   }
 
-  def populateTask(model: TaskModel): Unit = {
+  def populateTask(model: TaskModel = TaskModel()): TaskModel = {
     if (model.name.isEmpty) {
       model.name = console.askOnce[String](prompt = "Task name")
     }
@@ -125,6 +131,7 @@ case class ProjectGenerator(opts: Options,
     }
     readFields(fieldType = "inputs", fields = model.inputs)
     readFields(fieldType = "output", fields = model.outputs)
+    model
   }
 
   def populateWorkflow(model: WorkflowModel): Unit = {
@@ -145,16 +152,41 @@ case class ProjectGenerator(opts: Options,
   }
 
   def apply(workflowModel: Option[WorkflowModel], taskModels: Vector[TaskModel]): Unit = {
-    if (interactive) {
+    val tasks = if (interactive) {
       if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
       }
-      taskModels.foreach(populateTask)
+      val tasksBuf: mutable.Buffer[Task] = mutable.ArrayBuffer.empty
+      taskModels.foreach { taskModel =>
+        populateTask(taskModel)
+        tasksBuf.append(taskModel.toTask)
+      }
+      while (console.askYesNo("Add a task?", default = Some(false))) {
+        tasksBuf.append(populateTask().toTask)
+      }
+      tasksBuf.toVector
+    } else {
+      taskModels.map(_.toTask)
     }
 
-    val tasks = taskModels.map(_.toTask)
     val doc = Document(wdlVersion, null, tasks, workflowModel.map(_.toWorkflow(tasks)), null, None)
-    generatedFiles() = formatter.formatDocument(doc).mkString(System.lineSeparator())
+    val wdlName = s"${name}.wdl"
+    val docUrl = Util.getURL(outputDir.resolve(wdlName))
+    generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
+
+    if (readmes) {
+      readmeGenerator.apply(docUrl, doc)
+    }
+
+    if (dockerfile) {
+      val dockerfileUrl = Util.getURL(outputDir.resolve("Dockerfile"))
+      dockerfileGenerator.apply(dockerfileUrl)
+    }
+
+    if (tests) {
+      val testUrl = Util.getURL(outputDir.resolve("tests").resolve(s"test_${name}.json"))
+      testsGenerator.apply(testUrl, wdlName, doc)
+    }
   }
 }
 

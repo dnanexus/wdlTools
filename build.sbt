@@ -60,6 +60,7 @@ val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.5"
+val sprayVersion = "1.3.5"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
@@ -69,6 +70,7 @@ libraryDependencies ++= Seq(
     // template engine
     "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
     "com.typesafe" % "config" % typesafeVersion,
+    "io.spray" %% "spray-json" % sprayVersion,
     //---------- Test libraries -------------------//
     "org.scalactic" %% "scalactic" % "3.0.1",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
