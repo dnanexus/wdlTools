@@ -3,6 +3,7 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
+import wdlTools.util.Util.prettyFormat
 
 case class TypeChecker(stdlib: Stdlib) {
 
@@ -18,7 +19,7 @@ case class TypeChecker(stdlib: Stdlib) {
                      structs: Map[String, WT_Struct],
                      callables: Map[String, WT_Callable],
                      namespaces: Set[String]) {
-    def bind(varName: String, wdlType: WT, srcText: TextSource): Context = {
+    def bindVar(varName: String, wdlType: WT, srcText: TextSource): Context = {
       declarations.get(varName) match {
         case None =>
           this.copy(declarations = declarations + (varName -> wdlType))
@@ -47,7 +48,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
 
     // add a bunch of bindings
-    def bind(bindings: Bindings, srcText: TextSource): Context = {
+    def bindVarList(bindings: Bindings, srcText: TextSource): Context = {
       val existingVarNames = declarations.keys.toSet
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
@@ -123,7 +124,7 @@ case class TypeChecker(stdlib: Stdlib) {
     t match {
       case _: TypeInt   => WT_Int
       case _: TypeFloat => WT_Float
-      case _            => throw new TypeException(s"${expr} must be an integer or a float", expr.text)
+      case _            => throw new TypeException(s"${prettyFormat(expr)} must be an integer or a float", expr.text)
     }
   }
 
@@ -150,7 +151,9 @@ case class TypeChecker(stdlib: Stdlib) {
       // adding files is equivalent to concatenating paths
       case (WT_File, WT_File) => WT_File
 
-      case (_, _) => throw new TypeException(s"Expressions ${a} and ${b} cannot be added", a.text)
+      case (_, _) => throw new TypeException(
+        s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} cannot be added",
+        a.text)
     }
   }
 
@@ -163,7 +166,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Int, WT_Float)   => WT_Float
       case (WT_Float, WT_Float) => WT_Float
       case (_, _) =>
-        throw new TypeException(s"Expressions ${a} and ${b} must be integers or floats", a.text)
+        throw new TypeException(
+          s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} must be integers or floats",
+          a.text)
     }
   }
 
@@ -172,7 +177,9 @@ case class TypeChecker(stdlib: Stdlib) {
     t match {
       case WT_Boolean => WT_Boolean
       case other =>
-        throw new TypeException(s"${expr} must be a boolean, it is ${other}", expr.text)
+        throw new TypeException(
+          s"${prettyFormat(expr)} must be a boolean, it is ${WdlTypes.toString(other)}",
+          expr.text)
     }
   }
 
@@ -182,7 +189,7 @@ case class TypeChecker(stdlib: Stdlib) {
     (at, bt) match {
       case (WT_Boolean, WT_Boolean) => WT_Boolean
       case (_, _) =>
-        throw new TypeException(s"${a} and ${b} must have boolean type", a.text)
+        throw new TypeException(s"${prettyFormat(a)} and ${prettyFormat(b)} must have boolean type", a.text)
     }
   }
 
@@ -200,45 +207,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Int, WT_Float) => WT_Boolean
       case (WT_Float, WT_Int) => WT_Boolean
       case (_, _) =>
-        throw new TypeException(s"Expressions ${a} and ${b} must have the same type", a.text)
-    }
-  }
-
-  // check if the right hand side of an assignment matches the left hand side
-  //
-  // Negative examples:
-  //    Int i = "hello"
-  //    Array[File] files = "8"
-  //
-  // Positive examples:
-  //    Int k =  3 + 9
-  //    Int j = k * 3
-  //    String s = "Ford model T"
-  //    String s2 = 5
-  private def isCoercibleTo(left: WT, right: WT): Boolean = {
-    (left, right) match {
-      case (WT_String, WT_String | WT_File | WT_Boolean | WT_Int | WT_Float) => true
-      case (WT_File, WT_String | WT_File)                                    => true
-      case (WT_Boolean, WT_Boolean)                                          => true
-      case (WT_Int, WT_Int)                                                  => true
-      case (WT_Float, WT_Int | WT_Float)                                     => true
-
-      case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo(l, r)
-      case (WT_Optional(l), r)              => isCoercibleTo(l, r)
-
-      case (WT_Array(l), WT_Array(r))         => isCoercibleTo(l, r)
-      case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
-      case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
-
-      case (WT_Identifier(structNameL), WT_Identifier(structNameR)) =>
-        structNameL == structNameR
-
-      case (WT_Object, WT_Object) => true
-
-      case (_, WT_Unknown) => true
-      case (WT_Unknown, _) => true
-
-      case _ => false
+        throw new TypeException(
+          s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} must have the same type",
+          a.text)
     }
   }
 
@@ -261,10 +232,15 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprMap(m: Map[Expr, Expr], _) =>
         m.map {
           case (ValueString(fName, _), e) => fName -> e
-          case (_, _)                     => throw new TypeException("map isn't made up of string field names", text)
+          case (_, _)                     =>
+            throw new TypeException(
+              s"map ${prettyFormat(expr)} isn't made up of string field names",
+              text)
         }
       case ExprObject(m, _) => m
-      case _                => throw new TypeException("Expression cannot be coereced into a struct", text)
+      case _                => throw new TypeException(
+        s"Expression ${prettyFormat(expr)} cannot be coereced into a struct",
+        text)
     }
 
     // Check that the all the struct fields are defined
@@ -317,13 +293,9 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // an identifier has to be bound to a known type
       case ExprIdentifier(id, _) =>
-        (ctx.declarations.get(id), ctx.structs.get(id)) match {
-          case (None, None) =>
-            throw new TypeException(s"Identifier ${id} is not defined", expr.text)
-          case (Some(t), None) => t
-          case (None, Some(t)) => t
-          case (Some(_), Some(_)) =>
-            throw new TypeException(s"sanity: ${id} is both a struct and an identifier", expr.text)
+        ctx.declarations.get(id) match {
+          case None => throw new TypeException(s"Identifier ${id} is not defined", expr.text)
+          case Some(t) => t
         }
 
       // All the sub-exressions have to be strings, or coercible to strings
@@ -331,7 +303,9 @@ case class TypeChecker(stdlib: Stdlib) {
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
           if (!isCoercibleTo(WT_String, t))
-            throw new TypeException(s"${t} is not coercible to string", expr.text)
+            throw new TypeException(
+              s"expression ${prettyFormat(expr)} of type ${t} is not coercible to string",
+              expr.text)
         }
         WT_String
 
@@ -343,7 +317,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val t = vecTypes.head
-        if (!vecTypes.tail.forall(isCoercibleTo(_, t)))
+        if (!vecTypes.tail.forall(isCoercibleTo(t, _)))
           throw new TypeException(s"Array elements do not all have type ${t}", expr.text)
         WT_Array(t)
 
@@ -374,13 +348,14 @@ case class TypeChecker(stdlib: Stdlib) {
         val fType = typeEval(f, ctx)
         if (fType != tType)
           throw new TypeException(
-              s"subexpressions ${t} and ${f} in ${expr} must have the same type",
-              expr.text
-          )
+            s"""|subexpressions ${prettyFormat(t)} and ${prettyFormat(f)}
+                |in ${prettyFormat(expr)} must have the same type"""
+              .stripMargin.replaceAll("\n", " "),
+            expr.text)
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
-              s"${value} in ${expr} should have boolean type, it has type ${tv} instead",
+              s"${value} in ${prettyFormat(expr)} should have boolean type, it has type ${WdlTypes.toString(tv)} instead",
               expr.text
           )
         tType
@@ -394,7 +369,7 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${value} in ${expr} must have type optional(${dt})
+                s"""|Subxpression ${prettyFormat(value)} must have type optional(${WdlTypes.toString(dt)})
                     |it has type ${vt} instead""".stripMargin
                   .replaceAll("\n", " "),
                 expr.text
@@ -570,7 +545,7 @@ case class TypeChecker(stdlib: Stdlib) {
   private def applyInputSection(inputSection: InputSection, ctx: Context): Bindings = {
     inputSection.declarations.foldLeft(Map.empty[String, WT]) {
       case (accu, decl) =>
-        val (varName, typ) = applyDecl(decl, ctx.bind(accu, inputSection.text))
+        val (varName, typ) = applyDecl(decl, ctx.bindVarList(accu, inputSection.text))
         accu + (varName -> typ)
     }
   }
@@ -580,7 +555,7 @@ case class TypeChecker(stdlib: Stdlib) {
     outputSection.declarations.foldLeft(Map.empty[String, WT]) {
       case (accu, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
-        val (varName, typ) = applyDecl(decl, ctx.bind(accu, outputSection.text))
+        val (varName, typ) = applyDecl(decl, ctx.bindVarList(accu, outputSection.text))
         accu + (varName -> typ)
     }
   }
@@ -630,7 +605,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case None => ctxOuter
       case Some(inpSection) =>
         val bindings = applyInputSection(inpSection, ctxOuter)
-        ctxOuter.bind(bindings, task.text)
+        ctxOuter.bindVarList(bindings, task.text)
     }
 
     // TODO: type-check the runtime section
@@ -639,7 +614,7 @@ case class TypeChecker(stdlib: Stdlib) {
     val ctxDecl = task.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
         val (varName, typ) = applyDecl(decl, accu)
-        accu.bind(varName, typ, decl.text)
+        accu.bindVar(varName, typ, decl.text)
     }
 
     // check that all expressions in the command section are strings
@@ -647,7 +622,7 @@ case class TypeChecker(stdlib: Stdlib) {
       val t = typeEval(expr, ctxDecl)
       if (!isCoercibleTo(WT_String, t))
         throw new TypeException(
-            s"Expression ${expr} in the command section is coercible to a string",
+            s"Expression ${prettyFormat(expr)} in the command section is not coercible to a string",
             expr.text
         )
     }
@@ -750,16 +725,16 @@ case class TypeChecker(stdlib: Stdlib) {
         throw new Exception(s"Collection in scatter (${scatter}) is not an array type")
     }
     // add a binding for the iteration variable
-    val ctxInner = ctxOuter.bind(scatter.identifier, elementType, scatter.text)
+    val ctxInner = ctxOuter.bindVar(scatter.identifier, elementType, scatter.text)
 
     // Add an array type to all variables defined in the scatter body
     val bodyBindings: Bindings = scatter.body.foldLeft(Map.empty[String, WT]) {
       case (accu: Bindings, decl: Declaration) =>
-        val (varName, typ) = applyDecl(decl, ctxInner.bind(accu, decl.text))
+        val (varName, typ) = applyDecl(decl, ctxInner.bindVarList(accu, decl.text))
         accu + (varName -> WT_Array(typ))
 
       case (accu: Bindings, call: Call) =>
-        val (callName, callType) = applyCall(call, ctxInner.bind(accu, call.text))
+        val (callName, callType) = applyCall(call, ctxInner.bindVarList(accu, call.text))
         val callOutput = callType.output.map {
           case (name, t) => name -> WT_Array(t)
         }
@@ -767,7 +742,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (accu: Bindings, subSct: Scatter) =>
         // a nested scatter
-        val sctBindings = applyScatter(subSct, ctxInner.bind(accu, subSct.text))
+        val sctBindings = applyScatter(subSct, ctxInner.bindVarList(accu, subSct.text))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> WT_Array(typ)
         }
@@ -775,7 +750,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (accu: Bindings, cond: Conditional) =>
         // a nested conditional
-        val condBindings = applyConditional(cond, ctxInner.bind(accu, cond.text))
+        val condBindings = applyConditional(cond, ctxInner.bindVarList(accu, cond.text))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> WT_Array(typ)
         }
@@ -800,11 +775,11 @@ case class TypeChecker(stdlib: Stdlib) {
     // Add an array type to all variables defined in the scatter body
     val bodyBindings = cond.body.foldLeft(Map.empty[String, WT]) {
       case (accu: Bindings, decl: Declaration) =>
-        val (varName, typ) = applyDecl(decl, ctxOuter.bind(accu, decl.text))
+        val (varName, typ) = applyDecl(decl, ctxOuter.bindVarList(accu, decl.text))
         accu + (varName -> WT_Optional(typ))
 
       case (accu: Bindings, call: Call) =>
-        val (callName, callType) = applyCall(call, ctxOuter.bind(accu, call.text))
+        val (callName, callType) = applyCall(call, ctxOuter.bindVarList(accu, call.text))
         val callOutput = callType.output.map {
           case (name, t) => name -> WT_Optional(t)
         }
@@ -812,7 +787,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (accu: Bindings, subSct: Scatter) =>
         // a nested scatter
-        val sctBindings = applyScatter(subSct, ctxOuter.bind(accu, subSct.text))
+        val sctBindings = applyScatter(subSct, ctxOuter.bindVarList(accu, subSct.text))
         val sctBindings2 = sctBindings.map {
           case (varName, typ) => varName -> WT_Optional(typ)
         }
@@ -820,7 +795,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (accu: Bindings, cond: Conditional) =>
         // a nested conditional
-        val condBindings = applyConditional(cond, ctxOuter.bind(accu, cond.text))
+        val condBindings = applyConditional(cond, ctxOuter.bindVarList(accu, cond.text))
         val condBindings2 = condBindings.map {
           case (varName, typ) => varName -> WT_Optional(typ)
         }
@@ -838,25 +813,25 @@ case class TypeChecker(stdlib: Stdlib) {
       case None => ctxOuter
       case Some(inpSection) =>
         val inputs = applyInputSection(inpSection, ctxOuter)
-        ctxOuter.bind(inputs, inpSection.text)
+        ctxOuter.bindVarList(inputs, inpSection.text)
     }
 
     val ctxBody = wf.body.foldLeft(ctx) {
       case (accu: Context, decl: Declaration) =>
         val (name, typ) = applyDecl(decl, accu)
-        accu.bind(name, typ, decl.text)
+        accu.bindVar(name, typ, decl.text)
 
       case (accu: Context, call: Call) =>
         val (callName, callType) = applyCall(call, accu)
-        accu.bind(callName, callType, call.text)
+        accu.bindVar(callName, callType, call.text)
 
       case (accu: Context, scatter: Scatter) =>
         val sctBindings = applyScatter(scatter, accu)
-        accu.bind(sctBindings, scatter.text)
+        accu.bindVarList(sctBindings, scatter.text)
 
       case (accu: Context, cond: Conditional) =>
         val condBindings = applyConditional(cond, accu)
-        accu.bind(condBindings, cond.text)
+        accu.bindVarList(condBindings, cond.text)
 
       case (_, other) =>
         throw new Exception(s"Sanity: ${other}")

@@ -2,6 +2,7 @@ package wdlTools.typing
 
 import WdlTypes._
 import wdlTools.util.Options
+import wdlTools.util.Verbosity._
 import wdlTools.syntax.AbstractSyntax
 
 case class Stdlib(conf: Options) {
@@ -9,25 +10,15 @@ case class Stdlib(conf: Options) {
   private val stdlibV1_0: Vector[WT_StdlibFunc] = Vector(
       WT_FunctionUnit("stdout", WT_File),
       WT_FunctionUnit("stderr", WT_File),
-      WT_Function1Arg("read_lines", WT_String, WT_Array(WT_String)),
       WT_Function1Arg("read_lines", WT_File, WT_Array(WT_String)),
-      WT_Function1Arg("read_tsv", WT_String, WT_Array(WT_Array(WT_String))),
       WT_Function1Arg("read_tsv", WT_File, WT_Array(WT_Array(WT_String))),
-      WT_Function1Arg("read_map", WT_String, WT_Array(WT_Array(WT_String))),
       WT_Function1Arg("read_map", WT_File, WT_Array(WT_Array(WT_String))),
-      WT_Function1Arg("read_object", WT_String, WT_Object),
       WT_Function1Arg("read_object", WT_File, WT_Object),
-      WT_Function1Arg("read_objects", WT_String, WT_Array(WT_Object)),
       WT_Function1Arg("read_objects", WT_File, WT_Array(WT_Object)),
-      WT_Function1Arg("read_json", WT_String, WT_Unknown),
       WT_Function1Arg("read_json", WT_File, WT_Unknown),
-      WT_Function1Arg("read_int", WT_String, WT_Int),
       WT_Function1Arg("read_int", WT_File, WT_Int),
-      WT_Function1Arg("read_string", WT_String, WT_String),
       WT_Function1Arg("read_string", WT_File, WT_String),
-      WT_Function1Arg("read_float", WT_String, WT_Float),
       WT_Function1Arg("read_float", WT_File, WT_Float),
-      WT_Function1Arg("read_boolean", WT_String, WT_Boolean),
       WT_Function1Arg("read_boolean", WT_File, WT_Boolean),
       WT_Function1Arg("write_lines", WT_Array(WT_String), WT_File),
       WT_Function1Arg("write_tsv", WT_Array(WT_Array(WT_String)), WT_File),
@@ -35,43 +26,44 @@ case class Stdlib(conf: Options) {
       WT_Function1Arg("write_object", WT_Object, WT_File),
       WT_Function1Arg("write_objects", WT_File, WT_Array(WT_File)),
       WT_Function1Arg("write_json", WT_Unknown, WT_File),
-      // Size can take several kinds of arguments.
-      WT_Function1Arg("size", WT_String, WT_Float),
-      WT_Function1Arg("size", WT_Optional(WT_String), WT_Float),
-      WT_Function1Arg("size", WT_Array(WT_String), WT_Float),
-      WT_Function1Arg("size", WT_Array(WT_Optional(WT_String)), WT_Float),
+
+    // Size can take several kinds of arguments.
       WT_Function1Arg("size", WT_File, WT_Float),
       WT_Function1Arg("size", WT_Optional(WT_File), WT_Float),
       WT_Function1Arg("size", WT_Array(WT_File), WT_Float),
       WT_Function1Arg("size", WT_Array(WT_Optional(WT_File)), WT_Float),
       // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      WT_Function2Arg("size", WT_String, WT_String, WT_Float),
-      WT_Function2Arg("size", WT_Optional(WT_String), WT_String, WT_Float),
-      WT_Function2Arg("size", WT_Array(WT_String), WT_String, WT_Float),
-      WT_Function2Arg("size", WT_Array(WT_Optional(WT_String)), WT_String, WT_Float),
       WT_Function2Arg("size", WT_File, WT_String, WT_Float),
       WT_Function2Arg("size", WT_Optional(WT_File), WT_String, WT_Float),
       WT_Function2Arg("size", WT_Array(WT_File), WT_String, WT_Float),
       WT_Function2Arg("size", WT_Array(WT_Optional(WT_File)), WT_String, WT_Float),
-      WT_Function3Arg("sub", WT_String, WT_String, WT_String, WT_String),
+
+    WT_Function3Arg("sub", WT_String, WT_String, WT_String, WT_String),
       WT_Function1Arg("range", WT_Int, WT_Array(WT_Int)),
       // functions that obay parametric polymorphism
       WT_FunctionParamPoly1Arg("transpose",
-                               (x: WT) => (WT_Array(WT_Array(x)), WT_Array(WT_Array(x)))),
-      WT_FunctionParamPoly2Arg(
-          "zip",
-          (x: WT, y: WT) => ((WT_Array(x), WT_Array(y)), WT_Array(WT_Pair(x, y)))
-      ),
-      WT_FunctionParamPoly2Arg(
-          "cross",
-          (x: WT, y: WT) => ((WT_Array(x), WT_Array(y)), WT_Array(WT_Pair(x, y)))
-      ),
-      WT_FunctionParamPoly1Arg("length", (x: WT) => (WT_Array(x), WT_Int)),
-      WT_FunctionParamPoly1Arg("flatten", (x: WT) => (WT_Array(WT_Array(x)), WT_Array(x))),
+                               x => WT_Array(WT_Array(x)),
+                               x => WT_Array(WT_Array(x))),
+      WT_FunctionParamPoly2Arg("zip",
+                               (x, y) => (WT_Array(x), WT_Array(y)),
+                               (x, y) =>  WT_Array(WT_Pair(x, y))),
+      WT_FunctionParamPoly2Arg("cross",
+                               (x, y) => (WT_Array(x), WT_Array(y)),
+                               (x, y) => WT_Array(WT_Pair(x, y))),
+      WT_FunctionParamPoly1Arg("length",
+                               x => WT_Array(x),
+                               x => WT_Int),
+      WT_FunctionParamPoly1Arg("flatten",
+                               x => WT_Array(WT_Array(x)),
+                               x => WT_Array(x)),
       // Shortcut, can we use an unknown here?
       WT_Function2Arg("prefix", WT_String, WT_Array(WT_Unknown), WT_String),
-      WT_FunctionParamPoly1Arg("select_first", (x: WT) => (WT_Array(x), x)),
-      WT_FunctionParamPoly1Arg("defined", (x: WT) => (WT_Optional(x), WT_Boolean)),
+      WT_FunctionParamPoly1Arg("select_first",
+                               x => WT_Array(WT_Optional(x)),
+                               x => x),
+      WT_FunctionParamPoly1Arg("defined",
+                               x => WT_Optional(x),
+                               x => WT_Boolean),
       // simple functions again
       WT_Function1Arg("basename", WT_String, WT_String),
       WT_Function1Arg("floor", WT_Float, WT_Int),
@@ -95,34 +87,61 @@ case class Stdlib(conf: Options) {
     }
   }
 
+  // check if the inputs match the function signature
+  private def inputTypesMatchSig(inputTypes : Vector[WT],
+                                 functionInputSig : Vector[WT]) : Boolean = {
+    if (inputTypes.size != functionInputSig.size) {
+      return false
+    }
+    val pairs = inputTypes zip functionInputSig
+
+    pairs.forall {
+      case (inType, sigT) => isCoercibleTo(sigT, inType)
+    }
+  }
+
   // evaluate the output type of a function. This may require calculation because
   // some functions are polymorphic in their inputs.
-  private def evalOnePrototype(funcDesc: WT_StdlibFunc, inputArgs: Vector[WT]): Option[WT] = {
+  private def evalOnePrototype(funcDesc: WT_StdlibFunc, inputTypes: Vector[WT]): Option[WT] = {
     funcDesc match {
-      case WT_FunctionUnit(_, tOutput) if inputArgs.isEmpty =>
+      case WT_FunctionUnit(_, tOutput) if inputTypes.isEmpty =>
         Some(tOutput)
-      case WT_Function1Arg(_, arg1, tOutput) if inputArgs == Vector(arg1) =>
+      case WT_Function1Arg(_, arg1, tOutput) if inputTypesMatchSig(inputTypes, Vector(arg1)) =>
         Some(tOutput)
-      case WT_Function2Arg(_, arg1, arg2, tOutput) if inputArgs == Vector(arg1, arg2) =>
+      case WT_Function2Arg(_, arg1, arg2, tOutput) if inputTypesMatchSig(inputTypes, Vector(arg1, arg2)) =>
         Some(tOutput)
-      case WT_Function3Arg(_, arg1, arg2, arg3, tOutput) if inputArgs == Vector(arg1, arg2, arg3) =>
+      case WT_Function3Arg(_, arg1, arg2, arg3, tOutput) if inputTypesMatchSig(inputTypes, Vector(arg1, arg2, arg3)) =>
         Some(tOutput)
-      case WT_FunctionParamPoly1Arg(_, io) if inputArgs.size == 1 =>
-        val typeParam = inputArgs.head
-        val (funcIn, funcOut) = io(typeParam)
-        if (funcIn == inputArgs.head) Some(funcOut)
-        else None
-      case WT_FunctionParamPoly2Arg(_, io) if inputArgs.size == 2 =>
-        val (param1, param2) = (inputArgs(0), inputArgs(1))
-        val (funcIn, funcOut) = io(param1, param2)
-        if (funcIn == (inputArgs(0), inputArgs(1))) Some(funcOut)
+      case WT_FunctionParamPoly1Arg(name, funcIn, funcOut) if inputTypes.size == 1 =>
+        val typeParam = inputTypes.head
+        val inArgType : WT = funcIn(WT_Unknown)
+        val t =
+          try {
+            Some(unify(typeParam, inArgType))
+          } catch {
+            case _ : Throwable =>
+              None
+          }
+        if (conf.verbosity == Verbose) {
+          System.out.println(s"""|evalOnePrototype $name
+                                 | input: $typeParam
+                                 | unify: $t
+                                 |""".stripMargin)
+        }
+        t.map(funcOut(_))
+
+      case WT_FunctionParamPoly2Arg(_, funcIn, funcOut) if inputTypes.size == 2 =>
+        val (param1, param2) = (inputTypes(0), inputTypes(1))
+        val inArgType = funcIn(param1, param2)
+        val outArgType = funcOut(param1, param2)
+        if (inArgType == (inputTypes(0), inputTypes(1))) Some(outArgType)
         else None
       case _ =>
         None
     }
   }
 
-  def apply(funcName: String, inputArgs: Vector[WT], expr: AbstractSyntax.Expr): WT = {
+  def apply(funcName: String, inputTypes: Vector[WT], expr: AbstractSyntax.Expr): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library", expr.text)
@@ -133,17 +152,30 @@ case class Stdlib(conf: Options) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[WT]] = candidates.map {
-      evalOnePrototype(_, inputArgs)
+      evalOnePrototype(_, inputTypes)
     }
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        throw new TypeException(s"Call to ${funcName} is badly typed", expr.text)
+        val inputsStr = inputTypes.map(WdlTypes.toString(_)).mkString("\n")
+        val candidatesStr = candidates.map(WdlTypes.toString(_)).mkString("\n")
+        throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
+                                    |${candidatesStr}
+                                    |inputs: ${inputsStr}
+                                    |""".stripMargin,
+                                expr.text)
       case 1 =>
         result.head
-      case _ =>
-        throw new TypeException(s"Sanity, call to ${funcName} matches at least two prototypes",
-                                expr.text)
+      case n =>
+        // Match more than one prototype. If they all have the same output type, then it doesn't matter
+        // though.
+        val possibleOutputTypes : Set[WT] = result.toSet
+        if (possibleOutputTypes.size > 1)
+          throw new TypeException(s"""|Call to ${funcName} matches ${n} prototypes with different
+                                      |output types (${possibleOutputTypes})"""
+                                    .stripMargin.replaceAll("\n", " "),
+                                  expr.text)
+        possibleOutputTypes.toVector.head
     }
   }
 }

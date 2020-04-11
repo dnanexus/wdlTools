@@ -36,13 +36,16 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (positive cases)" in {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/tasks/positive").getPath)
-    val positiveCases = getWdlSourceFiles(positivePath)
+    val positiveCases =
+      getWdlSourceFiles(positivePath)
+
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
-        case _: Throwable =>
+        case e: Throwable =>
+          System.out.println(e.getMessage)
           throw new RuntimeException(s"Type error in file ${pc}")
       }
     }
@@ -107,16 +110,11 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "be able to handle GATK" taggedAs (Edge) in {
+  it should "be able to handle GATK" taggedAs (Edge) in {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
     val doc = parser.parse(url)
-    checker.apply(doc)
-  }
-
-  it should "size stdlib" taggedAs (Edge) in {
-    val doc = parser.parse(opts.getURL("stdlib.wdl"))
     checker.apply(doc)
   }
 }
