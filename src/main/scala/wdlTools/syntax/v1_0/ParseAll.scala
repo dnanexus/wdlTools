@@ -12,11 +12,14 @@ import scala.collection.mutable
 case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
+  private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val cDoc: ConcreteSyntax.Document = ParseDocument.apply(loader.apply(url), opts)
+        val grammar = grammarFactory.createGrammar(loader.apply(url).toString)
+        val visitor = ParseOne(opts, grammar, Some(url))
+        val cDoc: ConcreteSyntax.Document = visitor.parseDocument
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -95,10 +98,10 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     false
   }
 
-  // [dirs] : the directories where to search for imported documents
-  //
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
-    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, opts)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val visitor = ParseOne(opts, grammar, Some(sourceCode.url))
+    val top: ConcreteSyntax.Document = visitor.parseDocument
     dfs(top)
   }
 }
