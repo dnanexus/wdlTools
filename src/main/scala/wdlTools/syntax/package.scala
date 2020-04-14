@@ -102,10 +102,7 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
   }
 }
 
-trait WdlTypeParser {
-  def apply(text: String): Type
-}
-
-trait WdlExprParser {
-  def apply(text: String): Expr
+trait WdlFragmentParser {
+  def parseExpr(text: String): Expr
+  def parseType(text: String): Type
 }
