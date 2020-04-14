@@ -14,7 +14,7 @@ import wdlTools.util.Options
 
 object ParseTypeDocument {
   case class Draft2TypeGrammarFactory(opts: Options)
-      extends GrammarFactory[WdlDraft2Lexer, WdlDraft2TypeParser](opts) {
+      extends GrammarFactory[WdlDraft2Lexer, WdlDraft2TypeParser, Element](opts) {
     override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
       new WdlDraft2Lexer(charStream)
     }
@@ -25,7 +25,8 @@ object ParseTypeDocument {
   }
 }
 
-case class ParseTypeDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2TypeParser], opts: Options)
+case class ParseTypeDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2TypeParser, Element],
+                             opts: Options)
     extends WdlDraft2TypeParserBaseVisitor[Element] {
   protected def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
     grammar.makeWdlException(msg, ctx)

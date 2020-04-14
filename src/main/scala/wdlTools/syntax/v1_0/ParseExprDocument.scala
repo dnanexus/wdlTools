@@ -10,8 +10,8 @@ import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.util.Options
 
 object ParseExprDocument {
-  case class V1_0ExprGrammarFactory(opts: Options)
-      extends GrammarFactory[WdlV1Lexer, WdlV1ExprParser](opts) {
+  case class WdlV1ExprGrammarFActory(opts: Options)
+      extends GrammarFactory[WdlV1Lexer, WdlV1ExprParser, Element](opts) {
     override def createLexer(charStream: CharStream): WdlV1Lexer = {
       new WdlV1Lexer(charStream)
     }
@@ -22,7 +22,7 @@ object ParseExprDocument {
   }
 }
 
-case class ParseExprDocument(grammar: Grammar[WdlV1Lexer, WdlV1ExprParser], opts: Options)
+case class ParseExprDocument(grammar: Grammar[WdlV1Lexer, WdlV1ExprParser, Element], opts: Options)
     extends WdlV1ExprParserBaseVisitor[Element] {
   protected def makeWdlException(msg: String, ctx: ParserRuleContext): RuntimeException = {
     grammar.makeWdlException(msg, ctx)

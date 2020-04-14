@@ -3,7 +3,7 @@ package wdlTools.generators
 import java.net.URL
 import java.nio.file.Path
 
-import wdlTools.formatter.V1_0Formatter
+import wdlTools.formatter.WdlV1Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Parsers, WdlExprParser, WdlTypeParser, WdlVersion}
@@ -15,7 +15,7 @@ import util.control.Breaks._
 case class ProjectGenerator(opts: Options,
                             name: String,
                             outputDir: Path,
-                            wdlVersion: WdlVersion = WdlVersion.V1_0,
+                            wdlVersion: WdlVersion = WdlVersion.V1,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
                             developerReadmes: Boolean = false,
@@ -29,7 +29,7 @@ case class ProjectGenerator(opts: Options,
   val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
 
   val defaultDockerImage = "debian:stretch-slim"
-  lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
+  lazy val formatter: WdlV1Formatter = WdlV1Formatter(opts)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
     ReadmeGenerator(developerReadmes = developerReadmes,

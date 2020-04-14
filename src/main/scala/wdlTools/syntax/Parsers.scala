@@ -12,15 +12,15 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
-      WdlVersion.V1_0 -> v1_0.ParseAll(opts, loader)
+      WdlVersion.V1 -> v1_0.ParseAll(opts, loader)
   )
   private lazy val typeParsers: Map[WdlVersion, WdlTypeParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseType(opts),
-      WdlVersion.V1_0 -> v1_0.ParseType(opts)
+      WdlVersion.V1 -> v1_0.ParseType(opts)
   )
   private lazy val exprParsers: Map[WdlVersion, WdlExprParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseExpr(opts),
-      WdlVersion.V1_0 -> v1_0.ParseExpr(opts)
+      WdlVersion.V1 -> v1_0.ParseExpr(opts)
   )
 
   def getParser(url: URL): WdlParser = {

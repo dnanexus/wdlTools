@@ -11,7 +11,7 @@ case class Upgrader(opts: Options) {
 
   def upgrade(url: URL,
               srcVersion: Option[WdlVersion] = None,
-              destVersion: WdlVersion = WdlVersion.V1_0): Map[URL, Seq[String]] = {
+              destVersion: WdlVersion = WdlVersion.V1): Map[URL, Seq[String]] = {
     val parser = if (srcVersion.isDefined) {
       parsers.getParser(srcVersion.get)
     } else {
@@ -19,7 +19,7 @@ case class Upgrader(opts: Options) {
     }
 
     // the parser will follow imports, so the formatter should not
-    val formatter = V1_0Formatter(opts.copy(followImports = false))
+    val formatter = WdlV1Formatter(opts.copy(followImports = false))
 
     // parse and format the document (and any imports)
     val walker = parser.Walker[Seq[String]](url)

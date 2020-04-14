@@ -34,8 +34,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     loader.apply(Util.getURL(workflowsDir.resolve(fname)))
   }
 
+  private def parseDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
+    val grammarFactory = WdlDraft2GrammarFactory(conf)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val visitor = ParseDocument(grammar, sourceCode.url, conf)
+    visitor.apply()
+  }
+
   it should "handle various types" in {
-    val doc = ParseDocument.apply(getTaskSource("types.wdl"), opts)
+    val doc = parseDocument(getTaskSource("types.wdl"))
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -84,7 +91,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle types and expressions" in {
-    val doc = ParseDocument.apply(getTaskSource("expressions.wdl"), opts)
+    val doc = parseDocument(getTaskSource("expressions.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
@@ -259,7 +266,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle get name" in {
-    val doc = ParseDocument.apply(getTaskSource("get_name_bug.wdl"), opts)
+    val doc = parseDocument(getTaskSource("get_name_bug.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
@@ -282,12 +289,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "detect a wrong comment style" in {
     val confQuiet = opts.copy(verbosity = Quiet)
     assertThrows[Exception] {
-      ParseDocument.apply(getTaskSource("wrong_comment_style.wdl"), confQuiet)
+      parseDocument(getTaskSource("wrong_comment_style.wdl"), confQuiet)
     }
   }
 
   it should "parse a task with an output section only" in {
-    val doc = ParseDocument.apply(getTaskSource("output_section.wdl"), opts)
+    val doc = parseDocument(getTaskSource("output_section.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
@@ -304,7 +311,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a task" in {
-    val doc = ParseDocument.apply(getTaskSource("wc.wdl"), opts)
+    val doc = parseDocument(getTaskSource("wc.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
     doc.comment shouldBe Some(
@@ -379,12 +386,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "detect when a task section appears twice" in {
     assertThrows[Exception] {
-      ParseDocument.apply(getTaskSource("multiple_input_section.wdl"), opts)
+      parseDocument(getTaskSource("multiple_input_section.wdl"))
     }
   }
 
   it should "handle string interpolation" in {
-    val doc = ParseDocument.apply(getTaskSource("interpolation.wdl"), opts)
+    val doc = parseDocument(getTaskSource("interpolation.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
@@ -412,7 +419,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a simple workflow" taggedAs Edge in {
-    val doc = ParseDocument.apply(getWorkflowSource("I.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("I.wdl"))
     doc.elements.size shouldBe 0
 
     doc.version shouldBe WdlVersion.Draft_2
@@ -471,7 +478,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle import statements" in {
-    val doc = ParseDocument.apply(getWorkflowSource("imports.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("imports.wdl"))
 
     doc.version shouldBe WdlVersion.Draft_2
 
@@ -491,11 +498,11 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a workflow that is illegal in v1.0" in {
-    val _ = ParseDocument.apply(getWorkflowSource("bad_declaration.wdl"), opts)
+    val _ = parseDocument(getWorkflowSource("bad_declaration.wdl"))
   }
 
   it should "handle chained operations" taggedAs Edge in {
-    val doc = ParseDocument.apply(getTaskSource("bug16-chained-operations.wdl"), opts)
+    val doc = parseDocument(getTaskSource("bug16-chained-operations.wdl"))
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -513,7 +520,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle chained operations in a workflow" taggedAs Edge in {
-    val doc = ParseDocument.apply(getWorkflowSource("chained_expr.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("chained_expr.wdl"))
     doc.elements.size shouldBe 0
 
     doc.version shouldBe WdlVersion.Draft_2

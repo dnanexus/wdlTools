@@ -8,34 +8,60 @@ import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
-import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
+import wdlTools.syntax.Antlr4Util.{Antlr4ParserListener, Grammar, GrammarFactory}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.util.Options
 
-object ParseDocument {
-  case class Draft2GrammarFactory(opts: Options)
-      extends GrammarFactory[WdlDraft2Lexer, WdlDraft2Parser](opts) {
-    override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
-      new WdlDraft2Lexer(charStream)
-    }
+import scala.reflect.runtime.universe
 
-    override def createParser(tokenStream: CommonTokenStream): WdlDraft2Parser = {
-      new WdlDraft2Parser(tokenStream)
+object ListenerKeys {
+  private val baseTypes: Map[String, Int] = Map(
+      "Element" -> -1,
+      "StatementElement" -> -2,
+      "WorkflowElement" -> -3,
+      "DocumentElement" -> -4,
+      "Type" -> -5,
+      "Expr" -> -6,
+      "PlaceHolderPart" -> -7
+  )
+
+  def getBaseType(sym: universe.Symbol): Option[Int] = {
+    baseTypes.get(sym.name.toString)
+  }
+
+  def get[T <: Element](implicit tag: universe.TypeTag[T]): Int = {
+    tag.tpe match {
+      case other => getBaseType(other.baseClasses.head).get
     }
   }
 
-  def apply(sourceCode: SourceCode, opts: Options): Document = {
-    val grammarFactory = Draft2GrammarFactory(opts)
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = new ParseDocument(grammar, sourceCode.url, opts)
-    val document = visitor.apply()
-    grammar.verify()
-    document
+  def getAll[T <: Element](implicit tag: universe.TypeTag[T]): Vector[Int] = {
+    Vector(get[T]) ++ tag.tpe.baseClasses.toVector.tail.flatMap(getBaseType)
   }
 }
 
-case class ParseDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
+abstract class WdlV1ParserListener[E <: Element, C <: ParserRuleContext]
+    extends Antlr4ParserListener[E, C]
+
+case class WdlDraft2GrammarFactory(opts: Options)
+    extends GrammarFactory[WdlDraft2Lexer, WdlDraft2Parser, Element](opts) {
+  override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
+    new WdlDraft2Lexer(charStream)
+  }
+
+  override def createParser(tokenStream: CommonTokenStream): WdlDraft2Parser = {
+    new WdlDraft2Parser(tokenStream)
+  }
+
+  def addListener[E <: Element, C <: ParserRuleContext](
+      listener: Antlr4ParserListener[E, C]
+  ): Unit = {
+    addListener[E, C](ListenerKeys.get[E], listener)
+  }
+}
+
+case class ParseDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser, Element],
                          docSourceURL: URL,
                          opts: Options)
     extends WdlDraft2ParserBaseVisitor[Element] {
@@ -51,6 +77,10 @@ case class ParseDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
     grammar.getComment(ctx)
   }
+
+//  private def notify[E <: Element, C <: ParserRuleContext](element: E, ctx: C): E = {
+//    grammar.notifyListeners[E, C](element, ctx)
+//  }
 
   /*
 map_type
@@ -1180,6 +1210,8 @@ document
   }
 
   def apply(): Document = {
-    visitDocument(grammar.parser.document)
+    val doc = visitDocument(grammar.parser.document)
+    grammar.verify()
+    doc
   }
 }

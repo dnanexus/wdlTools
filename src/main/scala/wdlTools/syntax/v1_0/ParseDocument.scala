@@ -3,40 +3,73 @@ package wdlTools.syntax.v1_0
 // Parse one document. Do not follow imports.
 
 import java.net.URL
+
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
-import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
+import wdlTools.syntax.Antlr4Util.{
+  Antlr4ParserListener,
+  Antlr4ParserListenerContext,
+  Grammar,
+  GrammarFactory
+}
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{Options, Util}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.reflect.runtime.universe
 
-object ParseDocument {
-  case class V1_0GrammarFactory(opts: Options)
-      extends GrammarFactory[WdlV1Lexer, WdlV1Parser](opts) {
-    override def createLexer(charStream: CharStream): WdlV1Lexer = {
-      new WdlV1Lexer(charStream)
-    }
+object ListenerKeys {
+  private val baseTypes: Map[String, Int] = Map(
+      "Element" -> -1,
+      "StatementElement" -> -2,
+      "WorkflowElement" -> -3,
+      "DocumentElement" -> -4,
+      "Type" -> -5,
+      "Expr" -> -6,
+      "PlaceHolderPart" -> -7
+  )
 
-    override def createParser(tokenStream: CommonTokenStream): WdlV1Parser = {
-      new WdlV1Parser(tokenStream)
+  def getBaseType(sym: universe.Symbol): Option[Int] = {
+    baseTypes.get(sym.name.toString)
+  }
+
+  def get[T <: Element](implicit tag: universe.TypeTag[T]): Int = {
+    tag.tpe match {
+      case TypeStruct => WdlV1Parser.RULE_struct
+
+      case other => getBaseType(other.baseClasses.head).get
     }
   }
 
-  def apply(sourceCode: SourceCode, opts: Options): Document = {
-    val grammarFactory = V1_0GrammarFactory(opts)
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = new ParseDocument(grammar, sourceCode.url, opts)
-    val document = visitor.apply()
-    grammar.verify()
-    document
+  def getAll[T <: Element](implicit tag: universe.TypeTag[T]): Vector[Int] = {
+    Vector(get[T]) ++ tag.tpe.baseClasses.toVector.tail.flatMap(getBaseType)
   }
 }
 
-case class ParseDocument(grammar: Grammar[WdlV1Lexer, WdlV1Parser],
+abstract class WdlV1ParserListener[E <: Element, C <: ParserRuleContext]
+    extends Antlr4ParserListener[E, C]
+
+case class WdlV1GrammarFactory(opts: Options)
+    extends GrammarFactory[WdlV1Lexer, WdlV1Parser, Element](opts) {
+  override def createLexer(charStream: CharStream): WdlV1Lexer = {
+    new WdlV1Lexer(charStream)
+  }
+
+  override def createParser(tokenStream: CommonTokenStream): WdlV1Parser = {
+    new WdlV1Parser(tokenStream)
+  }
+
+  def addListener[E <: Element, C <: ParserRuleContext](
+      listener: Antlr4ParserListener[E, C]
+  ): Unit = {
+    addListener[E, C](ListenerKeys.get[E], listener)
+  }
+}
+
+case class ParseDocument(grammar: Grammar[WdlV1Lexer, WdlV1Parser, Element],
                          docSourceURL: URL,
                          opts: Options)
     extends WdlV1ParserBaseVisitor[Element] {
@@ -51,6 +84,20 @@ case class ParseDocument(grammar: Grammar[WdlV1Lexer, WdlV1Parser],
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
     grammar.getComment(ctx)
+  }
+
+  private case class ListenerContext[C <: ParserRuleContext](ctx: C)
+      extends Antlr4ParserListenerContext[C] {
+    def getHiddenTokens(channel: String = "HIDDEN", before: Boolean = true): Vector[Token] = {
+      grammar.getHiddenTokens(ctx, grammar.getChannel(channel), before = before)
+    }
+  }
+
+  private def notify[E <: Element, C <: ParserRuleContext](element: E, ctx: C): E = {
+    val keys = ListenerKeys.getAll[E]
+    val listenerContext = ListenerContext[C](ctx)
+    keys.foreach(grammar.notifyListeners[E, C](_, element, listenerContext))
+    element
   }
 
   /*
@@ -79,7 +126,10 @@ struct
       memberNames.add(member.name)
     }
 
-    TypeStruct(sName, members, getSourceText(ctx), getComment(ctx))
+    notify[TypeStruct, WdlV1Parser.StructContext](
+        TypeStruct(sName, members, getSourceText(ctx), getComment(ctx)),
+        ctx
+    )
   }
 
   /*
@@ -1213,6 +1263,8 @@ document
   }
 
   def apply(): Document = {
-    visitDocument(grammar.parser.document)
+    val doc = visitDocument(grammar.parser.document)
+    grammar.verify()
+    doc
   }
 }

@@ -2,8 +2,9 @@ package wdlTools.syntax.draft_2
 
 import java.net.URL
 
+import org.antlr.v4.runtime.ParserRuleContext
 import wdlTools.syntax.draft_2.Translators._
-import wdlTools.syntax.{AbstractSyntax, WdlParser}
+import wdlTools.syntax.{AbstractSyntax, Antlr4Util, WdlParser}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -12,12 +13,20 @@ import scala.collection.mutable
 case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
+  private val grammarFactory: WdlDraft2GrammarFactory = WdlDraft2GrammarFactory(opts)
+
+  override def addListener[E <: ConcreteSyntax.Element, C <: ParserRuleContext](
+      listener: Antlr4Util.Antlr4ParserListener[E, C]
+  ): Unit = {
+    grammarFactory.addListener[E, C](listener)
+  }
 
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val cDoc: ConcreteSyntax.Document =
-          ParseDocument.apply(loader.apply(url), opts)
+        val grammar = grammarFactory.createGrammar(loader.apply(url).toString)
+        val visitor = ParseDocument(grammar, url, opts)
+        val cDoc: ConcreteSyntax.Document = visitor.apply()
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -82,10 +91,14 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     AbstractSyntax.Document(doc.version, None, elems, aWf, doc.text, doc.comment)
   }
 
-  // [dirs] : the directories where to search for imported documents
-  //
+  def apply(url: URL): AbstractSyntax.Document = {
+    apply(loader.apply(url))
+  }
+
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
-    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, opts)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val visitor = ParseDocument(grammar, sourceCode.url, opts)
+    val top: ConcreteSyntax.Document = visitor.apply()
     dfs(top)
   }
 }

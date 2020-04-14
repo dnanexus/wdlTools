@@ -8,8 +8,8 @@ import wdlTools.util.{Options, Util, Verbosity}
 
 import scala.collection.mutable
 
-case class V1_0Formatter(opts: Options,
-                         documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
+case class WdlV1Formatter(opts: Options,
+                          documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
 
   abstract class Group(prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,

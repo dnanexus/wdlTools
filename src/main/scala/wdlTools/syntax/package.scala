@@ -2,7 +2,9 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
+import org.antlr.v4.runtime.ParserRuleContext
+import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
+import wdlTools.syntax.Antlr4Util.Antlr4ParserListener
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -13,9 +15,9 @@ sealed abstract class WdlVersion(val name: String, val order: Int) extends Order
 
 object WdlVersion {
   case object Draft_2 extends WdlVersion("draft-2", 0)
-  case object V1_0 extends WdlVersion("1.0", 1)
+  case object V1 extends WdlVersion("1.0", 1)
 
-  val All: Vector[WdlVersion] = Vector(V1_0, Draft_2).sortWith(_ < _)
+  val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
 
   def fromName(name: String): WdlVersion = {
     All.collectFirst { case v if v.name == name => v }.get
@@ -64,7 +66,13 @@ trait DocumentWalker[T] {
 }
 
 abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
+  def addListener[T, C <: ParserRuleContext](
+      listener: Antlr4ParserListener[T, C]
+  ): Unit
+
   def canParse(sourceCode: SourceCode): Boolean
+
+  def apply(url: URL): Document
 
   def apply(sourceCode: SourceCode): Document
 

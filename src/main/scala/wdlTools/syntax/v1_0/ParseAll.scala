@@ -2,6 +2,9 @@ package wdlTools.syntax.v1_0
 
 import java.net.URL
 
+import org.antlr.v4.runtime.ParserRuleContext
+import wdlTools.syntax.Antlr4Util.Antlr4ParserListener
+import wdlTools.syntax.v1_0.ConcreteSyntax.Element
 import wdlTools.syntax.{AbstractSyntax, WdlParser}
 import wdlTools.syntax.v1_0.Translators._
 import wdlTools.util.{Options, SourceCode}
@@ -12,11 +15,20 @@ import scala.collection.mutable
 case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
+  private val grammarFactory: WdlV1GrammarFactory = WdlV1GrammarFactory(opts)
+
+  override def addListener[T <: Element, C <: ParserRuleContext](
+      listener: Antlr4ParserListener[T, C]
+  ): Unit = {
+    grammarFactory.addListener[T, C](listener)
+  }
 
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val cDoc: ConcreteSyntax.Document = ParseDocument.apply(loader.apply(url), opts)
+        val grammar = grammarFactory.createGrammar(loader.apply(url).toString)
+        val visitor = ParseDocument(grammar, url, opts)
+        val cDoc: ConcreteSyntax.Document = visitor.apply()
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -95,10 +107,14 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     false
   }
 
-  // [dirs] : the directories where to search for imported documents
-  //
+  def apply(url: URL): AbstractSyntax.Document = {
+    apply(loader.apply(url))
+  }
+
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
-    val top: ConcreteSyntax.Document = ParseDocument.apply(sourceCode, opts)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val visitor = ParseDocument(grammar, sourceCode.url, opts)
+    val top: ConcreteSyntax.Document = visitor.apply()
     dfs(top)
   }
 }

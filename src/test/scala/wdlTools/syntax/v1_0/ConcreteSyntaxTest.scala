@@ -32,8 +32,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     loader.apply(Util.getURL(structsDir.resolve(fname)))
   }
 
+  def parseDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
+    val grammarFactory = WdlV1GrammarFactory(conf)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val visitor = ParseDocument(grammar, sourceCode.url, conf)
+    visitor.apply()
+  }
+
   it should "handle various types" in {
-    val doc = ParseDocument.apply(getTaskSource("types.wdl"), opts)
+    val doc = parseDocument(getTaskSource("types.wdl"))
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -82,9 +89,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle types and expressions" in {
-    val doc = ParseDocument.apply(getTaskSource("expressions.wdl"), opts)
+    val doc = parseDocument(getTaskSource("expressions.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -258,9 +265,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle get name" in {
-    val doc = ParseDocument.apply(getTaskSource("get_name_bug.wdl"), opts)
+    val doc = parseDocument(getTaskSource("get_name_bug.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -282,14 +289,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "detect a wrong comment style" in {
     assertThrows[Exception] {
-      ParseDocument.apply(getTaskSource("wrong_comment_style.wdl"), opts)
+      parseDocument(getTaskSource("wrong_comment_style.wdl"))
     }
   }
 
   it should "parse a task with an output section only" in {
-    val doc = ParseDocument.apply(getTaskSource("output_section.wdl"), opts)
+    val doc = parseDocument(getTaskSource("output_section.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -304,9 +311,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a task" in {
-    val doc = ParseDocument.apply(getTaskSource("wc.wdl"), opts)
+    val doc = parseDocument(getTaskSource("wc.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -351,14 +358,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "detect when a task section appears twice" in {
     assertThrows[Exception] {
-      ParseDocument.apply(getTaskSource("multiple_input_section.wdl"), opts)
+      parseDocument(getTaskSource("multiple_input_section.wdl"))
     }
   }
 
   it should "handle string interpolation" in {
-    val doc = ParseDocument.apply(getTaskSource("interpolation.wdl"), opts)
+    val doc = parseDocument(getTaskSource("interpolation.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -384,9 +391,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse structs" in {
-    val doc = ParseDocument.apply(getStructSource("I.wdl"), opts)
+    val doc = parseDocument(getStructSource("I.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     val structs = doc.elements.collect {
       case x: TypeStruct => x
     }
@@ -408,10 +415,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "parse a simple workflow" taggedAs Edge in {
-    val doc = ParseDocument.apply(getWorkflowSource("I.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("I.wdl"))
     doc.elements.size shouldBe 0
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -465,9 +472,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle import statements" in {
-    val doc = ParseDocument.apply(getWorkflowSource("imports.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("imports.wdl"))
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
 
     val imports = doc.elements.collect {
       case x: ImportDoc => x
@@ -486,12 +493,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "correctly report an error" in {
     assertThrows[Exception] {
-      val _ = ParseDocument.apply(getWorkflowSource("bad_declaration.wdl"), opts)
+      val _ = parseDocument(getWorkflowSource("bad_declaration.wdl"))
     }
   }
 
   it should "handle chained operations" taggedAs Edge in {
-    val doc = ParseDocument.apply(getTaskSource("bug16-chained-operations.wdl"), opts)
+    val doc = parseDocument(getTaskSource("bug16-chained-operations.wdl"))
 
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
@@ -509,10 +516,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle chained operations in a workflow" in {
-    val doc = ParseDocument.apply(getWorkflowSource("chained_expr.wdl"), opts)
+    val doc = parseDocument(getWorkflowSource("chained_expr.wdl"))
     doc.elements.size shouldBe 0
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -528,9 +535,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
-    val doc = ParseDocument.apply(sourceCode, opts)
+    val doc = parseDocument(sourceCode)
 
-    doc.version.value shouldBe WdlVersion.V1_0
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 19
   }
 }

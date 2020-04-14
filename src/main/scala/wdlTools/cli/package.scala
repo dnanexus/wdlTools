@@ -94,10 +94,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
                          "Reformat WDL file and all its dependencies according to style rules.") {
       val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
           descr = "WDL version to generate; currently only v1.0 is supported",
-          default = Some(WdlVersion.V1_0)
+          default = Some(WdlVersion.V1)
       )
       validateOpt(wdlVersion) {
-        case Some(version) if version != WdlVersion.V1_0 =>
+        case Some(version) if version != WdlVersion.V1 =>
           Left("Only WDL v1.0 is supported currently")
         case _ => Right(Unit)
       }
@@ -117,6 +117,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   addSubcommand(format)
 
+  val lint =
+    new ParserSubcommand("lint", "Check WDL file for common mistakes and bad code smells") {}
+  addSubcommand(lint)
+
   val upgrade = new ParserSubcommand("upgrade", "Upgrade a WDL file to a more recent version") {
     val srcVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version of the document being upgraded",
@@ -124,10 +128,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
     val destVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version of the document being upgraded",
-        default = Some(WdlVersion.V1_0)
+        default = Some(WdlVersion.V1)
     )
     validateOpt(destVersion) {
-      case Some(version) if version != WdlVersion.V1_0 =>
+      case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(Unit)
     }
@@ -166,10 +170,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
     val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version to generate; currently only v1.0 is supported",
-        default = Some(WdlVersion.V1_0)
+        default = Some(WdlVersion.V1)
     )
     validateOpt(wdlVersion) {
-      case Some(version) if version != WdlVersion.V1_0 =>
+      case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(Unit)
     }

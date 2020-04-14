@@ -7,7 +7,6 @@ import wdlTools.syntax.{Comment, TextSource, WdlVersion}
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
 object ConcreteSyntax {
-
   sealed trait Element {
     val text: TextSource // where in the source program does this element belong
   }
@@ -208,7 +207,7 @@ object ConcreteSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Version(value: WdlVersion = WdlVersion.V1_0, text: TextSource) extends Element
+  case class Version(value: WdlVersion = WdlVersion.V1, text: TextSource) extends Element
   case class Document(version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
