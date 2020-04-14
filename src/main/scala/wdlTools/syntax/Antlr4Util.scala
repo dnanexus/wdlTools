@@ -43,13 +43,6 @@ object Antlr4Util {
       }
     }
 
-    def makeWdlException(msg: String,
-                         ctx: ParserRuleContext,
-                         docSourceURL: Option[URL] = None): RuntimeException = {
-      val src = getSourceText(ctx, docSourceURL)
-      new RuntimeException(s"${msg} ${src}")
-    }
-
     def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
       val token = ctx.start
       syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)

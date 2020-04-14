@@ -20,17 +20,11 @@ jobs:
           sudo apt-get update
 
           # install java
-          sudo apt-get install wget
-          sudo apt-get install openjdk-8-jdk-headless
+          sudo apt-get install wget make openjdk-8-jdk-headless
 
-          # download ANTLR
-          wget https://www.antlr.org/download/antlr-4.8-complete.jar
-
-          # compile ANTLR sources
-          cd ${GITHUB_WORKSPACE}/src/main/antlr4/draft_2
-          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser.draft_2 WdlDraft2Parser.g4 WdlDraft2Lexer.g4
-          cd ${GITHUB_WORKSPACE}/src/main/antlr4/v1_0
-          java -jar ${GITHUB_WORKSPACE}/antlr-4.8-complete.jar -o ${GITHUB_WORKSPACE}/src/main/java -visitor -package org.openwdl.wdl.parser.v1_0 WdlV1Parser.g4 WdlV1Lexer.g4
+          # compile antlr4 sources
+          cd ${GITHUB_WORKSPACE}
+          make
 
           # install sbt
           echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list

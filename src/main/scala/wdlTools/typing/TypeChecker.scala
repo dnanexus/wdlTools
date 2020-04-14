@@ -3,7 +3,6 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
-import wdlTools.util.Util.prettyFormat
 
 case class TypeChecker(stdlib: Stdlib) {
 
@@ -124,7 +123,7 @@ case class TypeChecker(stdlib: Stdlib) {
     t match {
       case _: TypeInt   => WT_Int
       case _: TypeFloat => WT_Float
-      case _            => throw new TypeException(s"${prettyFormat(expr)} must be an integer or a float", expr.text)
+      case _            => throw new TypeException(s"${exprToString(expr)} must be an integer or a float", expr.text)
     }
   }
 
@@ -152,7 +151,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_File, WT_File) => WT_File
 
       case (_, _) => throw new TypeException(
-        s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} cannot be added",
+        s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
         a.text)
     }
   }
@@ -167,7 +166,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Float, WT_Float) => WT_Float
       case (_, _) =>
         throw new TypeException(
-          s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} must be integers or floats",
+          s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
           a.text)
     }
   }
@@ -178,7 +177,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case WT_Boolean => WT_Boolean
       case other =>
         throw new TypeException(
-          s"${prettyFormat(expr)} must be a boolean, it is ${WdlTypes.toString(other)}",
+          s"${exprToString(expr)} must be a boolean, it is ${Util.toString(other)}",
           expr.text)
     }
   }
@@ -189,7 +188,7 @@ case class TypeChecker(stdlib: Stdlib) {
     (at, bt) match {
       case (WT_Boolean, WT_Boolean) => WT_Boolean
       case (_, _) =>
-        throw new TypeException(s"${prettyFormat(a)} and ${prettyFormat(b)} must have boolean type", a.text)
+        throw new TypeException(s"${exprToString(a)} and ${exprToString(b)} must have boolean type", a.text)
     }
   }
 
@@ -208,7 +207,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Float, WT_Int) => WT_Boolean
       case (_, _) =>
         throw new TypeException(
-          s"Expressions ${prettyFormat(a)} and ${prettyFormat(b)} must have the same type",
+          s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
           a.text)
     }
   }
@@ -234,12 +233,12 @@ case class TypeChecker(stdlib: Stdlib) {
           case (ValueString(fName, _), e) => fName -> e
           case (_, _)                     =>
             throw new TypeException(
-              s"map ${prettyFormat(expr)} isn't made up of string field names",
+              s"map ${exprToString(expr)} isn't made up of string field names",
               text)
         }
       case ExprObject(m, _) => m
       case _                => throw new TypeException(
-        s"Expression ${prettyFormat(expr)} cannot be coereced into a struct",
+        s"Expression ${exprToString(expr)} cannot be coereced into a struct",
         text)
     }
 
@@ -252,7 +251,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (fieldName, fieldType) =>
         val e = rhsFields(fieldName)
         val t = typeEval(e, ctx)
-        if (!isCoercibleTo(fieldType, t))
+        if (!Util.isCoercibleTo(fieldType, t))
           throw new TypeException(s"field ${fieldName} is badly typed", text)
     }
   }
@@ -302,9 +301,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprCompoundString(vec, _) =>
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
-          if (!isCoercibleTo(WT_String, t))
+          if (!Util.isCoercibleTo(WT_String, t))
             throw new TypeException(
-              s"expression ${prettyFormat(expr)} of type ${t} is not coercible to string",
+              s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
               expr.text)
         }
         WT_String
@@ -317,7 +316,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val t = vecTypes.head
-        if (!vecTypes.tail.forall(isCoercibleTo(t, _)))
+        if (!vecTypes.tail.forall(Util.isCoercibleTo(t, _)))
           throw new TypeException(s"Array elements do not all have type ${t}", expr.text)
         WT_Array(t)
 
@@ -334,10 +333,10 @@ case class TypeChecker(stdlib: Stdlib) {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
         val tk = mTypes.keys.head
-        if (!mTypes.keys.tail.forall(isCoercibleTo(_, tk)))
+        if (!mTypes.keys.tail.forall(Util.isCoercibleTo(_, tk)))
           throw new TypeException(s"Map keys do not all have type ${tk}", expr.text)
         val tv = mTypes.values.head
-        if (!mTypes.values.tail.forall(isCoercibleTo(_, tv)))
+        if (!mTypes.values.tail.forall(Util.isCoercibleTo(_, tv)))
           throw new TypeException(s"Map values do not all have type ${tv}", expr.text)
         WT_Map(tk, tv)
 
@@ -348,14 +347,14 @@ case class TypeChecker(stdlib: Stdlib) {
         val fType = typeEval(f, ctx)
         if (fType != tType)
           throw new TypeException(
-            s"""|subexpressions ${prettyFormat(t)} and ${prettyFormat(f)}
-                |in ${prettyFormat(expr)} must have the same type"""
+            s"""|subexpressions ${exprToString(t)} and ${exprToString(f)}
+                |in ${exprToString(expr)} must have the same type"""
               .stripMargin.replaceAll("\n", " "),
             expr.text)
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
-              s"${value} in ${prettyFormat(expr)} should have boolean type, it has type ${WdlTypes.toString(tv)} instead",
+              s"${value} in ${exprToString(expr)} should have boolean type, it has type ${Util.toString(tv)} instead",
               expr.text
           )
         tType
@@ -369,7 +368,7 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${prettyFormat(value)} must have type optional(${WdlTypes.toString(dt)})
+                s"""|Subxpression ${exprToString(value)} must have type optional(${Util.toString(dt)})
                     |it has type ${vt} instead""".stripMargin
                   .replaceAll("\n", " "),
                 expr.text
@@ -384,7 +383,7 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"separator ${sep} in ${expr} must have string type", expr.text)
         val vt = typeEval(value, ctx)
         vt match {
-          case WT_Array(t) if isCoercibleTo(WT_String, t) =>
+          case WT_Array(t) if Util.isCoercibleTo(WT_String, t) =>
             WT_String
           case other =>
             throw new TypeException(
@@ -516,6 +515,7 @@ case class TypeChecker(stdlib: Stdlib) {
   private def applyDecl(decl: Declaration, ctx: Context): (String, WT) = {
     val lhsType: WT = typeTranslate(decl.wdlType, decl.text, ctx)
     (lhsType, decl.expr) match {
+      // Int x
       case (_, None) =>
         ()
 
@@ -535,7 +535,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (_, Some(expr)) =>
         val rhsType = typeEval(expr, ctx)
-        if (!isCoercibleTo(lhsType, rhsType))
+        if (!Util.isCoercibleTo(lhsType, rhsType))
           throw new TypeException(s"declaration ${decl.name} is badly typed", decl.text)
     }
     (decl.name, lhsType)
@@ -620,9 +620,9 @@ case class TypeChecker(stdlib: Stdlib) {
     // check that all expressions in the command section are strings
     task.command.parts.foreach { expr =>
       val t = typeEval(expr, ctxDecl)
-      if (!isCoercibleTo(WT_String, t))
+      if (!Util.isCoercibleTo(WT_String, t))
         throw new TypeException(
-            s"Expression ${prettyFormat(expr)} in the command section is not coercible to a string",
+            s"Expression ${exprToString(expr)} in the command section is not coercible to a string",
             expr.text
         )
     }
@@ -666,7 +666,7 @@ case class TypeChecker(stdlib: Stdlib) {
                 call.text
             )
           case Some((calleeType, _)) =>
-            if (!isCoercibleTo(calleeType, wdlType))
+            if (!Util.isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text

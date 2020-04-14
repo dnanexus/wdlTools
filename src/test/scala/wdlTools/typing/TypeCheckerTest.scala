@@ -18,7 +18,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
               Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
           )
       ),
-      verbosity = Verbosity.Quiet
+      verbosity = Verbosity.Verbose
   )
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
@@ -73,11 +73,13 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check workflows (positive cases)" in {
+  it should "type check workflows (positive cases)" taggedAs(Edge) in {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
+      .filter(x => x.toString contains "polymorphic")
     for (pc <- positiveCases) {
+      System.out.println("polymorphic")
       val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
@@ -110,7 +112,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" taggedAs (Edge) in {
+  ignore should "be able to handle GATK" taggedAs (Edge) in {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
