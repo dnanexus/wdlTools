@@ -73,7 +73,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check workflows (positive cases)" taggedAs(Edge) in {
+  it should "type check workflows (positive cases)" taggedAs (Edge) in {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)

@@ -11,6 +11,15 @@ object WdlTypes {
   case object WT_Int extends WT
   case object WT_Float extends WT
 
+  // There are cases where we don't know the type. For example, an empty array, or an empty map.
+  // While evaluating the right hand side we don't know the type.
+  //
+  // Array[Int] names = []
+  // Map[String, File] locations = {}
+  //
+  // Polymorphic functions are another place where type variables appear
+  case class WT_Var(i: Int) extends WT
+
   // a user defined struct name
   case class WT_Identifier(id: String) extends WT
 
@@ -51,6 +60,7 @@ object WdlTypes {
   // A standard library function implemented by the engine.
   sealed trait WT_StdlibFunc extends WT {
     val name: String
+    val output: WT
   }
 
   // WT representation for an stdlib function.
@@ -72,13 +82,4 @@ object WdlTypes {
   // String sub(String, String, String)
   case class WT_Function3(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
       extends WT_StdlibFunc
-
-  // There are cases where we don't know the type. For example, an empty array, or an empty map.
-  // While evaluating the right hand side we don't know the type.
-  //
-  // Array[Int] names = []
-  // Map[String, File] locations = {}
-  //
-  // Do to polymorphic functions we also need to handle type variables
-  case class WT_Var(i : Int) extends WT
 }

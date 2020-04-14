@@ -123,7 +123,8 @@ case class TypeChecker(stdlib: Stdlib) {
     t match {
       case _: TypeInt   => WT_Int
       case _: TypeFloat => WT_Float
-      case _            => throw new TypeException(s"${exprToString(expr)} must be an integer or a float", expr.text)
+      case _ =>
+        throw new TypeException(s"${exprToString(expr)} must be an integer or a float", expr.text)
     }
   }
 
@@ -150,9 +151,11 @@ case class TypeChecker(stdlib: Stdlib) {
       // adding files is equivalent to concatenating paths
       case (WT_File, WT_File) => WT_File
 
-      case (_, _) => throw new TypeException(
-        s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
-        a.text)
+      case (_, _) =>
+        throw new TypeException(
+            s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
+            a.text
+        )
     }
   }
 
@@ -166,8 +169,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Float, WT_Float) => WT_Float
       case (_, _) =>
         throw new TypeException(
-          s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
-          a.text)
+            s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
+            a.text
+        )
     }
   }
 
@@ -177,8 +181,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case WT_Boolean => WT_Boolean
       case other =>
         throw new TypeException(
-          s"${exprToString(expr)} must be a boolean, it is ${Util.toString(other)}",
-          expr.text)
+            s"${exprToString(expr)} must be a boolean, it is ${Util.toString(other)}",
+            expr.text
+        )
     }
   }
 
@@ -188,7 +193,8 @@ case class TypeChecker(stdlib: Stdlib) {
     (at, bt) match {
       case (WT_Boolean, WT_Boolean) => WT_Boolean
       case (_, _) =>
-        throw new TypeException(s"${exprToString(a)} and ${exprToString(b)} must have boolean type", a.text)
+        throw new TypeException(s"${exprToString(a)} and ${exprToString(b)} must have boolean type",
+                                a.text)
     }
   }
 
@@ -207,8 +213,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Float, WT_Int) => WT_Boolean
       case (_, _) =>
         throw new TypeException(
-          s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
-          a.text)
+            s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
+            a.text
+        )
     }
   }
 
@@ -231,15 +238,18 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprMap(m: Map[Expr, Expr], _) =>
         m.map {
           case (ValueString(fName, _), e) => fName -> e
-          case (_, _)                     =>
+          case (_, _) =>
             throw new TypeException(
-              s"map ${exprToString(expr)} isn't made up of string field names",
-              text)
+                s"map ${exprToString(expr)} isn't made up of string field names",
+                text
+            )
         }
       case ExprObject(m, _) => m
-      case _                => throw new TypeException(
-        s"Expression ${exprToString(expr)} cannot be coereced into a struct",
-        text)
+      case _ =>
+        throw new TypeException(
+            s"Expression ${exprToString(expr)} cannot be coereced into a struct",
+            text
+        )
     }
 
     // Check that the all the struct fields are defined
@@ -293,7 +303,7 @@ case class TypeChecker(stdlib: Stdlib) {
       // an identifier has to be bound to a known type
       case ExprIdentifier(id, _) =>
         ctx.declarations.get(id) match {
-          case None => throw new TypeException(s"Identifier ${id} is not defined", expr.text)
+          case None    => throw new TypeException(s"Identifier ${id} is not defined", expr.text)
           case Some(t) => t
         }
 
@@ -303,15 +313,16 @@ case class TypeChecker(stdlib: Stdlib) {
           val t = typeEval(subExpr, ctx)
           if (!Util.isCoercibleTo(WT_String, t))
             throw new TypeException(
-              s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
-              expr.text)
+                s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
+                expr.text
+            )
         }
         WT_String
 
       case ExprPair(l, r, _)                => WT_Pair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec, _) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
-        WT_Array(WT_Unknown)
+        WT_Array(WT_Var(0))
 
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
@@ -322,7 +333,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case ExprMap(m, _) if m.isEmpty =>
         // The map type is unknown
-        WT_Map(WT_Unknown, WT_Unknown)
+        WT_Map(WT_Var(0), WT_Var(1))
 
       case _: ExprObject =>
         WT_Object
@@ -346,11 +357,10 @@ case class TypeChecker(stdlib: Stdlib) {
         val tType = typeEval(t, ctx)
         val fType = typeEval(f, ctx)
         if (fType != tType)
-          throw new TypeException(
-            s"""|subexpressions ${exprToString(t)} and ${exprToString(f)}
-                |in ${exprToString(expr)} must have the same type"""
-              .stripMargin.replaceAll("\n", " "),
-            expr.text)
+          throw new TypeException(s"""|subexpressions ${exprToString(t)} and ${exprToString(f)}
+                                      |in ${exprToString(expr)} must have the same type""".stripMargin
+                                    .replaceAll("\n", " "),
+                                  expr.text)
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
@@ -368,7 +378,8 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${exprToString(value)} must have type optional(${Util.toString(dt)})
+                s"""|Subxpression ${exprToString(value)} must have type optional(${Util
+                     .toString(dt)})
                     |it has type ${vt} instead""".stripMargin
                   .replaceAll("\n", " "),
                 expr.text
