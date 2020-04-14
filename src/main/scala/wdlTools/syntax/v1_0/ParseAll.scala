@@ -2,6 +2,7 @@ package wdlTools.syntax.v1_0
 
 import java.net.URL
 
+import wdlTools.syntax.v1_0.Translators._
 import wdlTools.syntax.{AbstractSyntax, WdlParser}
 import wdlTools.util.{Options, SourceCode}
 
