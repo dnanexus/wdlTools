@@ -13,7 +13,7 @@ import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.Options
 
-case class ParseOne(opts: Options,
+case class ParseTop(opts: Options,
                     grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
                     docSourceURL: Option[URL] = None)
     extends WdlDraft2ParserBaseVisitor[Element] {

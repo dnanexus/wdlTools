@@ -7,12 +7,12 @@ case class ParseFragment(opts: Options) extends WdlFragmentParser {
   private val grammarFactory = WdlDraft2GrammarFactory(opts)
 
   override def parseExpr(text: String): AbstractSyntax.Expr = {
-    val parser = ParseOne(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
     Translators.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AbstractSyntax.Type = {
-    val parser = ParseOne(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
     Translators.translateType(parser.parseWdlType)
   }
 }

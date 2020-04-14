@@ -34,7 +34,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseOne(conf, grammarFactory.createGrammar(sourceCode.toString), Some(sourceCode.url)).parseDocument
+    ParseTop(conf, grammarFactory.createGrammar(sourceCode.toString), Some(sourceCode.url)).parseDocument
   }
 
   it should "handle various types" in {

@@ -4,6 +4,7 @@ package wdlTools.syntax.v1_0
 
 import java.net.URL
 
+import com.sun.tools.javac.resources.ct
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
@@ -15,7 +16,7 @@ import wdlTools.util.{Options, Util}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-case class ParseOne(opts: Options,
+case class ParseTop(opts: Options,
                     grammar: Grammar[WdlV1Lexer, WdlV1Parser],
                     docSourceURL: Option[URL] = None)
     extends WdlV1ParserBaseVisitor[Element] {
