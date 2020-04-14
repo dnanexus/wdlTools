@@ -215,4 +215,34 @@ object Translators {
         wf.comment
     )
   }
+
+  def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
+                         importedDoc: AbstractSyntax.Document): AbstractSyntax.ImportDoc = {
+    val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
+      case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
+    }
+
+    // Replace the original statement with a new one
+    AbstractSyntax.ImportDoc(importDoc.name,
+                             aliasesAbst,
+                             importDoc.url,
+                             importedDoc,
+                             importDoc.text,
+                             importDoc.comment)
+  }
+
+  def translateTask(task: ConcreteSyntax.Task): AbstractSyntax.Task = {
+    AbstractSyntax.Task(
+        task.name,
+        task.input.map(translateInputSection),
+        task.output.map(translateOutputSection),
+        translateCommandSection(task.command),
+        task.declarations.map(translateDeclaration),
+        task.meta.map(translateMetaSection),
+        task.parameterMeta.map(translateParameterMetaSection),
+        task.runtime.map(translateRuntimeSection),
+        task.text,
+        task.comment
+    )
+  }
 }

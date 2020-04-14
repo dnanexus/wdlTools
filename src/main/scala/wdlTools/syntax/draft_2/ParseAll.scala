@@ -45,39 +45,11 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   private def dfs(doc: ConcreteSyntax.Document): AbstractSyntax.Document = {
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
-      case ConcreteSyntax.ImportDoc(name, aliases, url, text, comment) =>
-        val importedDoc = followImport(url)
-        val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = aliases.map {
-          case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
-        }
-
-        // Replace the original statement with a new one
-        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc, text, comment)
-
-      case ConcreteSyntax.Task(name,
-                               input,
-                               output,
-                               command,
-                               declarations,
-                               meta,
-                               parameterMeta,
-                               runtime,
-                               text,
-                               comment) =>
-        AbstractSyntax.Task(
-            name,
-            input.map(translateInputSection),
-            output.map(translateOutputSection),
-            translateCommandSection(command),
-            declarations.map(translateDeclaration),
-            meta.map(translateMetaSection),
-            parameterMeta.map(translateParameterMetaSection),
-            runtime.map(translateRuntimeSection),
-            text,
-            comment
-        )
-
-      case other => throw new Exception(s"unrecognized document element ${other}")
+      case importDoc: ConcreteSyntax.ImportDoc =>
+        val importedDoc = followImport(importDoc.url)
+        translateImportDoc(importDoc, importedDoc)
+      case task: ConcreteSyntax.Task => translateTask(task)
+      case other                     => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)

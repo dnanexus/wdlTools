@@ -4,7 +4,6 @@ package wdlTools.syntax.v1_0
 
 import java.net.URL
 
-import com.sun.tools.javac.resources.ct
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._

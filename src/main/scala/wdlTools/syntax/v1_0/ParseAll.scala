@@ -34,50 +34,12 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
-      case ConcreteSyntax.TypeStruct(name, members, text, comment) =>
-        AbstractSyntax.TypeStruct(
-            name,
-            members.map {
-              case ConcreteSyntax.StructMember(name, t, memberText, memberComment) =>
-                AbstractSyntax.StructMember(name, translateType(t), memberText, memberComment)
-            },
-            text,
-            comment
-        )
-
-      case ConcreteSyntax.ImportDoc(name, aliases, url, text, comment) =>
-        val importedDoc = followImport(url)
-        val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = aliases.map {
-          case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
-        }
-
-        // Replace the original statement with a new one
-        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc, text, comment)
-
-      case ConcreteSyntax.Task(name,
-                               input,
-                               output,
-                               command,
-                               declarations,
-                               meta,
-                               parameterMeta,
-                               runtime,
-                               text,
-                               comment) =>
-        AbstractSyntax.Task(
-            name,
-            input.map(translateInputSection),
-            output.map(translateOutputSection),
-            translateCommandSection(command),
-            declarations.map(translateDeclaration),
-            meta.map(translateMetaSection),
-            parameterMeta.map(translateParameterMetaSection),
-            runtime.map(translateRuntimeSection),
-            text,
-            comment
-        )
-
-      case other => throw new Exception(s"unrecognized document element ${other}")
+      case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
+      case importDoc: ConcreteSyntax.ImportDoc =>
+        val importedDoc = followImport(importDoc.url)
+        translateImportDoc(importDoc, importedDoc)
+      case task: ConcreteSyntax.Task => translateTask(task)
+      case other                     => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
@@ -98,7 +60,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     false
   }
 
-  def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
+  override def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
     val grammar = grammarFactory.createGrammar(sourceCode.toString)
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
