@@ -10,24 +10,20 @@ import scala.collection.mutable
 
 case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
-  private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
+  private lazy val parsers: Map[WdlVersion, WdlDocumentParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
       WdlVersion.V1 -> v1_0.ParseAll(opts, loader)
   )
-  private lazy val typeParsers: Map[WdlVersion, WdlTypeParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseType(opts),
-      WdlVersion.V1 -> v1_0.ParseType(opts)
-  )
-  private lazy val exprParsers: Map[WdlVersion, WdlExprParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseExpr(opts),
-      WdlVersion.V1 -> v1_0.ParseExpr(opts)
+  private lazy val fragmentParsers: Map[WdlVersion, WdlFragmentParser] = Map(
+      WdlVersion.Draft_2 -> draft_2.ParseFragment(opts),
+      WdlVersion.V1 -> v1_0.ParseFragment(opts)
   )
 
-  def getParser(url: URL): WdlParser = {
+  def getParser(url: URL): WdlDocumentParser = {
     getParser(loader.apply(url))
   }
 
-  def getParser(sourceCode: SourceCode): WdlParser = {
+  def getParser(sourceCode: SourceCode): WdlDocumentParser = {
     WdlVersion.All.foreach { ver =>
       val parser = parsers(ver)
       if (parser.canParse(sourceCode)) {
@@ -37,7 +33,7 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
     throw new Exception(s"No parser is able to parse document ${sourceCode.url}")
   }
 
-  def getParser(wdlVersion: WdlVersion): WdlParser = {
+  def getParser(wdlVersion: WdlVersion): WdlDocumentParser = {
     parsers(wdlVersion)
   }
 
@@ -60,11 +56,7 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
     parser.Walker(url, Some(sourceCode), results)
   }
 
-  def getTypeParser(wdlVersion: WdlVersion): WdlTypeParser = {
-    typeParsers(wdlVersion)
-  }
-
-  def getExprParser(wdlVersion: WdlVersion): WdlExprParser = {
-    exprParsers(wdlVersion)
+  def getFragmentParser(wdlVersion: WdlVersion): WdlFragmentParser = {
+    fragmentParsers(wdlVersion)
   }
 }

@@ -7,6 +7,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 
 import collection.JavaConverters._
 import org.antlr.v4.runtime.{
+  BaseErrorListener,
   BufferedTokenStream,
   CharStream,
   CodePointBuffer,
@@ -15,6 +16,8 @@ import org.antlr.v4.runtime.{
   Lexer,
   Parser,
   ParserRuleContext,
+  RecognitionException,
+  Recognizer,
   Token
 }
 import wdlTools.syntax
@@ -23,18 +26,39 @@ import wdlTools.util.{Options, Verbosity}
 import scala.collection.mutable
 
 object Antlr4Util {
-  trait Antlr4ParserListenerContext[C <: ParserRuleContext] {
-    def getHiddenTokens(channel: String = "HIDDEN", before: Boolean = true): Vector[Token]
+  trait Antlr4ParserListener[C <: ParserRuleContext] {
+    def notify(ctx: C)
   }
 
-  trait Antlr4ParserListener[E, C <: ParserRuleContext] {
-    def notify(element: E, ctx: Antlr4ParserListenerContext[C])
+  case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
+
+  case class ErrorListener(conf: Options) extends BaseErrorListener {
+    var errors = Vector.empty[SyntaxError]
+
+    override def syntaxError(recognizer: Recognizer[_, _],
+                             offendingSymbol: Any,
+                             line: Int,
+                             charPositionInLine: Int,
+                             msg: String,
+                             e: RecognitionException): Unit = {
+      val symbolText =
+        offendingSymbol match {
+          case tok: Token =>
+            tok.getText
+          case _ =>
+            offendingSymbol.toString
+        }
+      val err = SyntaxError(symbolText, line, charPositionInLine, msg)
+      errors = errors :+ err
+    }
+
+    def getAllErrors: Vector[SyntaxError] = errors
   }
 
   case class Grammar[L <: Lexer, P <: Parser, T](
       lexer: L,
       parser: P,
-      parserListeners: Map[Int, Vector[Antlr4ParserListener[T, ParserRuleContext]]] = Map.empty,
+      parserListeners: Map[Int, Vector[Antlr4ParserListener[ParserRuleContext]]] = Map.empty,
       errListener: ErrorListener,
       commentChannelName: String,
       opts: Options
@@ -61,16 +85,13 @@ object Antlr4Util {
       }
     }
 
-    def notifyListeners[E <: T, C <: ParserRuleContext](
-        key: Int,
-        element: E,
-        ctx: Antlr4ParserListenerContext[C]
-    ): Unit = {
+    def notifyParserListeners[C <: ParserRuleContext](ctx: C): Unit = {
+      val key = ctx.getRuleIndex
       if (parserListeners.nonEmpty && parserListeners.contains(key)) {
         parserListeners(key).foreach { listener =>
           listener
-            .asInstanceOf[Antlr4ParserListener[E, C]]
-            .notify(element, ctx)
+            .asInstanceOf[Antlr4ParserListener[C]]
+            .notify(ctx)
         }
       }
     }
@@ -173,19 +194,19 @@ object Antlr4Util {
       commentChannelName: String = "COMMENTS"
   ) {
 
-    private val listeners
-        : mutable.Map[Int, mutable.Buffer[Antlr4ParserListener[T, ParserRuleContext]]] =
+    private val parserListeners
+        : mutable.Map[Int, mutable.Buffer[Antlr4ParserListener[ParserRuleContext]]] =
       mutable.HashMap.empty
 
-    def addListener[E <: T, C <: ParserRuleContext](
+    def addParserListener[C <: ParserRuleContext](
         key: Int,
-        listener: Antlr4ParserListener[E, C]
+        listener: Antlr4ParserListener[C]
     ): Unit = {
-      if (!listeners.contains(key)) {
-        listeners(key) = mutable.ArrayBuffer.empty
+      if (!parserListeners.contains(key)) {
+        parserListeners(key) = mutable.ArrayBuffer.empty
       }
-      listeners(key).append(
-          listener.asInstanceOf[Antlr4ParserListener[T, ParserRuleContext]]
+      parserListeners(key).append(
+          listener.asInstanceOf[Antlr4ParserListener[ParserRuleContext]]
       )
     }
 
@@ -208,7 +229,7 @@ object Antlr4Util {
 
       Grammar(lexer,
               parser,
-              listeners.toMap.map { case (k, v) => k -> v.toVector },
+              parserListeners.toMap.map { case (k, v) => k -> v.toVector },
               errListener,
               commentChannelName,
               opts)

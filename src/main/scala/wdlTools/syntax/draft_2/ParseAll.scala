@@ -4,29 +4,31 @@ import java.net.URL
 
 import org.antlr.v4.runtime.ParserRuleContext
 import wdlTools.syntax.draft_2.Translators._
-import wdlTools.syntax.{AbstractSyntax, Antlr4Util, WdlParser}
+import wdlTools.syntax.{AbstractSyntax, Antlr4Util, WdlDocumentParser}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
 
 // parse and follow imports
-case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(opts, loader) {
+case class ParseAll(opts: Options, loader: SourceCode.Loader)
+    extends WdlDocumentParser(opts, loader) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
   private val grammarFactory: WdlDraft2GrammarFactory = WdlDraft2GrammarFactory(opts)
 
-  override def addListener[E <: ConcreteSyntax.Element, C <: ParserRuleContext](
-      listener: Antlr4Util.Antlr4ParserListener[E, C]
+  override def addParserListener[C <: ParserRuleContext](
+      key: Int,
+      listener: Antlr4Util.Antlr4ParserListener[C]
   ): Unit = {
-    grammarFactory.addListener[E, C](listener)
+    grammarFactory.addParserListener[C](key, listener)
   }
 
   private def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
         val grammar = grammarFactory.createGrammar(loader.apply(url).toString)
-        val visitor = ParseDocument(grammar, url, opts)
-        val cDoc: ConcreteSyntax.Document = visitor.apply()
+        val visitor = ParseTop(opts, grammar, Some(url))
+        val cDoc: ConcreteSyntax.Document = visitor.parseDocument
         val aDoc = dfs(cDoc)
         docCache(url) = aDoc
         aDoc
@@ -52,39 +54,11 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
   private def dfs(doc: ConcreteSyntax.Document): AbstractSyntax.Document = {
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
-      case ConcreteSyntax.ImportDoc(name, aliases, url, text, comment) =>
-        val importedDoc = followImport(url)
-        val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = aliases.map {
-          case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
-        }
-
-        // Replace the original statement with a new one
-        AbstractSyntax.ImportDoc(name, aliasesAbst, url, importedDoc, text, comment)
-
-      case ConcreteSyntax.Task(name,
-                               input,
-                               output,
-                               command,
-                               declarations,
-                               meta,
-                               parameterMeta,
-                               runtime,
-                               text,
-                               comment) =>
-        AbstractSyntax.Task(
-            name,
-            input.map(translateInputSection),
-            output.map(translateOutputSection),
-            translateCommandSection(command),
-            declarations.map(translateDeclaration),
-            meta.map(translateMetaSection),
-            parameterMeta.map(translateParameterMetaSection),
-            runtime.map(translateRuntimeSection),
-            text,
-            comment
-        )
-
-      case other => throw new Exception(s"unrecognized document element ${other}")
+      case importDoc: ConcreteSyntax.ImportDoc =>
+        val importedDoc = followImport(importDoc.url)
+        translateImportDoc(importDoc, importedDoc)
+      case task: ConcreteSyntax.Task => translateTask(task)
+      case other                     => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
@@ -97,8 +71,8 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {
     val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = ParseDocument(grammar, sourceCode.url, opts)
-    val top: ConcreteSyntax.Document = visitor.apply()
+    val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
+    val top: ConcreteSyntax.Document = visitor.parseDocument
     dfs(top)
   }
 }

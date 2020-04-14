@@ -6,7 +6,7 @@ import java.nio.file.Path
 import wdlTools.formatter.WdlV1Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Parsers, WdlExprParser, WdlTypeParser, WdlVersion}
+import wdlTools.syntax.{Parsers, WdlFragmentParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
 import scala.collection.mutable
@@ -38,8 +38,7 @@ case class ProjectGenerator(opts: Options,
   lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
   lazy val parsers: Parsers = Parsers(opts)
-  lazy val typeParser: WdlTypeParser = parsers.getTypeParser(wdlVersion)
-  lazy val exprParser: WdlExprParser = parsers.getExprParser(wdlVersion)
+  lazy val fragParser: WdlFragmentParser = parsers.getFragmentParser(wdlVersion)
 
   val basicTypeChoices = Vector(
       "String",
@@ -109,7 +108,7 @@ case class ProjectGenerator(opts: Options,
         val label = console.askOnce[String](prompt = "Label", optional = true)
         val help = console.askOnce[String](prompt = "Help", optional = true)
         val optional = console.askYesNo(prompt = "Optional", default = Some(false))
-        val dataType: Type = typeParser.apply(
+        val dataType: Type = fragParser.parseType(
             console
               .askRequired[String](prompt = "Type",
                                    choices = Some(basicTypeChoices),
@@ -122,7 +121,7 @@ case class ProjectGenerator(opts: Options,
         }
 
         def askDefault: Option[Expr] = {
-          console.askOnce[String](prompt = "Default", optional = true).map(exprParser.apply)
+          console.askOnce[String](prompt = "Default", optional = true).map(fragParser.parseExpr)
         }
 
         var default: Option[Expr] = askDefault
@@ -134,7 +133,7 @@ case class ProjectGenerator(opts: Options,
           def askChoices: Seq[Expr] = {
             console
               .ask[String](promptPrefix = "Choice", optional = true, multiple = true)
-              .map(exprParser.apply)
+              .map(fragParser.parseExpr)
           }
 
           var choiceList = askChoices

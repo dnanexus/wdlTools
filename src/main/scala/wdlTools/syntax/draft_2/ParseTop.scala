@@ -8,7 +8,7 @@ import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
-import wdlTools.syntax.Antlr4Util.{Antlr4ParserListener, Grammar, GrammarFactory}
+import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.Options
@@ -41,37 +41,17 @@ object ListenerKeys {
   }
 }
 
-abstract class WdlV1ParserListener[E <: Element, C <: ParserRuleContext]
-    extends Antlr4ParserListener[E, C]
-
-case class WdlDraft2GrammarFactory(opts: Options)
-    extends GrammarFactory[WdlDraft2Lexer, WdlDraft2Parser, Element](opts) {
-  override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
-    new WdlDraft2Lexer(charStream)
-  }
-
-  override def createParser(tokenStream: CommonTokenStream): WdlDraft2Parser = {
-    new WdlDraft2Parser(tokenStream)
-  }
-
-  def addListener[E <: Element, C <: ParserRuleContext](
-      listener: Antlr4ParserListener[E, C]
-  ): Unit = {
-    addListener[E, C](ListenerKeys.get[E], listener)
-  }
-}
-
-case class ParseDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser, Element],
-                         docSourceURL: URL,
-                         opts: Options)
+case class ParseTop(opts: Options,
+                    grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser, Element],
+                    docSourceURL: Option[URL] = None)
     extends WdlDraft2ParserBaseVisitor[Element] {
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, Some(docSourceURL))
+    grammar.getSourceText(ctx, docSourceURL)
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, Some(docSourceURL))
+    grammar.getSourceText(symbol, docSourceURL)
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
@@ -1209,9 +1189,39 @@ document
     Document(WdlVersion.Draft_2, elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
-  def apply(): Document = {
-    val doc = visitDocument(grammar.parser.document)
+  def parseDocument: Document = {
+    apply match {
+      case d: Document => d
+      case _           => throw new Exception("WDL file does not contain a valid document")
+    }
+  }
+
+  def parseExpr: Expr = {
+    apply match {
+      case e: Expr => e
+      case _       => throw new Exception("Not a Valid expression")
+    }
+  }
+
+  def parseWdlType: Type = {
+    apply match {
+      case t: Type => t
+      case _       => throw new Exception("Not a valid WDL type")
+    }
+  }
+
+  def apply: Element = {
+    val ctx = grammar.parser.top.document_or_fragment
+    val result = if (ctx.document != null) {
+      visitDocument(ctx.document)
+    } else if (ctx.expr != null) {
+      visitExpr(ctx.expr)
+    } else if (ctx.wdl_type != null) {
+      visitWdl_type(ctx.wdl_type)
+    } else {
+      throw new Exception(s"No valid document or fragment")
+    }
     grammar.verify()
-    doc
+    result
   }
 }

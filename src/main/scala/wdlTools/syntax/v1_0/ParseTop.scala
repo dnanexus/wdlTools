@@ -7,97 +7,33 @@ import java.net.URL
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
-import wdlTools.syntax.Antlr4Util.{
-  Antlr4ParserListener,
-  Antlr4ParserListenerContext,
-  Grammar,
-  GrammarFactory
-}
+import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.{Options, Util}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.reflect.runtime.universe
 
-object ListenerKeys {
-  private val baseTypes: Map[String, Int] = Map(
-      "Element" -> -1,
-      "StatementElement" -> -2,
-      "WorkflowElement" -> -3,
-      "DocumentElement" -> -4,
-      "Type" -> -5,
-      "Expr" -> -6,
-      "PlaceHolderPart" -> -7
-  )
-
-  def getBaseType(sym: universe.Symbol): Option[Int] = {
-    baseTypes.get(sym.name.toString)
-  }
-
-  def get[T <: Element](implicit tag: universe.TypeTag[T]): Int = {
-    tag.tpe match {
-      case TypeStruct => WdlV1Parser.RULE_struct
-
-      case other => getBaseType(other.baseClasses.head).get
-    }
-  }
-
-  def getAll[T <: Element](implicit tag: universe.TypeTag[T]): Vector[Int] = {
-    Vector(get[T]) ++ tag.tpe.baseClasses.toVector.tail.flatMap(getBaseType)
-  }
-}
-
-abstract class WdlV1ParserListener[E <: Element, C <: ParserRuleContext]
-    extends Antlr4ParserListener[E, C]
-
-case class WdlV1GrammarFactory(opts: Options)
-    extends GrammarFactory[WdlV1Lexer, WdlV1Parser, Element](opts) {
-  override def createLexer(charStream: CharStream): WdlV1Lexer = {
-    new WdlV1Lexer(charStream)
-  }
-
-  override def createParser(tokenStream: CommonTokenStream): WdlV1Parser = {
-    new WdlV1Parser(tokenStream)
-  }
-
-  def addListener[E <: Element, C <: ParserRuleContext](
-      listener: Antlr4ParserListener[E, C]
-  ): Unit = {
-    addListener[E, C](ListenerKeys.get[E], listener)
-  }
-}
-
-case class ParseDocument(grammar: Grammar[WdlV1Lexer, WdlV1Parser, Element],
-                         docSourceURL: URL,
-                         opts: Options)
+case class ParseTop(opts: Options,
+                    grammar: Grammar[WdlV1Lexer, WdlV1Parser, Element],
+                    docSourceURL: Option[URL] = None)
     extends WdlV1ParserBaseVisitor[Element] {
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, Some(docSourceURL))
+    grammar.getSourceText(ctx, docSourceURL)
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, Some(docSourceURL))
+    grammar.getSourceText(symbol, docSourceURL)
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
     grammar.getComment(ctx)
   }
 
-  private case class ListenerContext[C <: ParserRuleContext](ctx: C)
-      extends Antlr4ParserListenerContext[C] {
-    def getHiddenTokens(channel: String = "HIDDEN", before: Boolean = true): Vector[Token] = {
-      grammar.getHiddenTokens(ctx, grammar.getChannel(channel), before = before)
-    }
-  }
-
-  private def notify[E <: Element, C <: ParserRuleContext](element: E, ctx: C): E = {
-    val keys = ListenerKeys.getAll[E]
-    val listenerContext = ListenerContext[C](ctx)
-    keys.foreach(grammar.notifyListeners[E, C](_, element, listenerContext))
-    element
+  private def notify[C <: ParserRuleContext](ctx: C): Unit = {
+    grammar.notifyParserListeners[C](ctx)
   }
 
   /*
@@ -126,10 +62,9 @@ struct
       memberNames.add(member.name)
     }
 
-    notify[TypeStruct, WdlV1Parser.StructContext](
-        TypeStruct(sName, members, getSourceText(ctx), getComment(ctx)),
-        ctx
-    )
+    notify[WdlV1Parser.StructContext](ctx)
+
+    TypeStruct(sName, members, getSourceText(ctx), getComment(ctx))
   }
 
   /*
@@ -1262,9 +1197,39 @@ document
     Document(version, elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
-  def apply(): Document = {
-    val doc = visitDocument(grammar.parser.document)
+  def parseDocument: Document = {
+    apply match {
+      case d: Document => d
+      case _           => throw new Exception("WDL file does not contain a valid document")
+    }
+  }
+
+  def parseExpr: Expr = {
+    apply match {
+      case e: Expr => e
+      case _       => throw new Exception("Not a Valid expression")
+    }
+  }
+
+  def parseWdlType: Type = {
+    apply match {
+      case t: Type => t
+      case _       => throw new Exception("Not a valid WDL type")
+    }
+  }
+
+  def apply: Element = {
+    val ctx = grammar.parser.top.document_or_fragment
+    val result = if (ctx.document != null) {
+      visitDocument(ctx.document)
+    } else if (ctx.expr != null) {
+      visitExpr(ctx.expr)
+    } else if (ctx.wdl_type != null) {
+      visitWdl_type(ctx.wdl_type)
+    } else {
+      throw new Exception(s"No valid document or fragment")
+    }
     grammar.verify()
-    doc
+    result
   }
 }
