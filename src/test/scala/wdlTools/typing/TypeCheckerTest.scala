@@ -128,7 +128,9 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   it should "handle compound expressions" taggedAs (Edge) in {
     val src =
-      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/compound_expr_bug.wdl").getPath)
+      Paths.get(
+          getClass.getResource("/typing/v1_0/workflows/positive/compound_expr_bug.wdl").getPath
+      )
     val doc = parser.parse(Util.getURL(src))
     val wf = doc.workflow.get
 
