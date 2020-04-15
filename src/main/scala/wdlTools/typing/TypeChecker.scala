@@ -697,6 +697,9 @@ case class TypeChecker(stdlib: Stdlib) {
             )
           case Some(_) => ()
         }
+      case (_, (_, _)) =>
+        // an optional argument, it may not be provided
+        ()
     }
 
     // The name of the call may not contain dots. Examples:

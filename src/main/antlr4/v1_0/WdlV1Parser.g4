@@ -119,20 +119,20 @@ expr_infix5
 	;
 
 expr_core
-	: LPAREN expr RPAREN #expression_group
-	| primitive_literal #primitives
-	| LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
-	| LPAREN expr COMMA expr RPAREN #pair_literal
-	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
-	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
-	| NOT expr #negate
-	| (PLUS | MINUS) expr #unirarysigned
-	| expr_core LBRACK expr RBRACK #at
-	| IF expr THEN expr ELSE expr #ifthenelse
-	| Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
-	| Identifier #left_name
-	| expr_core DOT Identifier #get_name
-	;
+        : Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
+        | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
+        | LPAREN expr COMMA expr RPAREN #pair_literal
+        | LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
+        | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+        | IF expr THEN expr ELSE expr #ifthenelse
+        | LPAREN expr RPAREN #expression_group
+        | expr_core LBRACK expr RBRACK #at
+        | expr_core DOT Identifier #get_name
+        | NOT expr #negate
+        | (PLUS | MINUS) expr #unirarysigned
+        | primitive_literal #primitives
+        | Identifier #left_name
+        ;
 
 version
 	: VERSION RELEASE_VERSION
