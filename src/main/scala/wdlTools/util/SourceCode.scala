@@ -3,8 +3,6 @@ package wdlTools.util
 import java.net.URL
 import java.nio.file.Paths
 
-import wdlTools.util.Verbosity._
-
 import scala.io.Source
 
 /**
@@ -36,10 +34,6 @@ object SourceCode {
     }
 
     def apply(url: URL): SourceCode = {
-      if (opts.verbosity > Normal) {
-        System.out.println(s"looking for ${url}")
-      }
-
       val lines = url.getProtocol match {
         case "http"  => fetchHttpAddress(url)
         case "https" => fetchHttpAddress(url)

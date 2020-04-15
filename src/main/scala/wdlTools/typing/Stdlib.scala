@@ -93,8 +93,8 @@ case class Stdlib(conf: Options) {
       case _                                        => throw new TypeException(s"function ${funcDesc.name} is undefined", text)
     }
     try {
-      val typeBindings: Map[WT_Var, WT] = Util.unify(args, inputTypes, text)
-      val t = Util.substitute(funcDesc.output, typeBindings, text)
+      val typeBindings: Map[WT_Var, WT] = TUtil.unify(args, inputTypes, text)
+      val t = TUtil.substitute(funcDesc.output, typeBindings, text)
       Some(t)
     } catch {
       case _: TypeUnificationException =>
@@ -118,8 +118,8 @@ case class Stdlib(conf: Options) {
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(Util.toString(_)).mkString("\n")
-        val candidatesStr = candidates.map(Util.toString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(TUtil.toString(_)).mkString("\n")
+        val candidatesStr = candidates.map(TUtil.toString(_)).mkString("\n")
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}

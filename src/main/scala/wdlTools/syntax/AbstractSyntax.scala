@@ -234,7 +234,7 @@ object AbstractSyntax {
         s"ExprCompoundString(${vec})"
       case ExprPair(l, r, _) => s"(${exprToString(l)}, ${exprToString(r)})"
       case ExprArray(value: Vector[Expr], _) =>
-        "[" + value.map(exprToString) mkString (", ") + "]"
+        "[" + value.map(exprToString).mkString(", ") + "]"
       case ExprMap(value: Map[Expr, Expr], _) =>
         val m = value
           .map {

@@ -181,7 +181,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case WT_Boolean => WT_Boolean
       case other =>
         throw new TypeException(
-            s"${exprToString(expr)} must be a boolean, it is ${Util.toString(other)}",
+            s"${exprToString(expr)} must be a boolean, it is ${TUtil.toString(other)}",
             expr.text
         )
     }
@@ -261,7 +261,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (fieldName, fieldType) =>
         val e = rhsFields(fieldName)
         val t = typeEval(e, ctx)
-        if (!Util.isCoercibleTo(fieldType, t))
+        if (!TUtil.isCoercibleTo(fieldType, t))
           throw new TypeException(s"field ${fieldName} is badly typed", text)
     }
   }
@@ -311,7 +311,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprCompoundString(vec, _) =>
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
-          if (!Util.isCoercibleTo(WT_String, t))
+          if (!TUtil.isCoercibleTo(WT_String, t))
             throw new TypeException(
                 s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
                 expr.text
@@ -327,7 +327,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val t = vecTypes.head
-        if (!vecTypes.tail.forall(Util.isCoercibleTo(t, _)))
+        if (!vecTypes.tail.forall(TUtil.isCoercibleTo(t, _)))
           throw new TypeException(s"Array elements do not all have type ${t}", expr.text)
         WT_Array(t)
 
@@ -344,10 +344,10 @@ case class TypeChecker(stdlib: Stdlib) {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
         val tk = mTypes.keys.head
-        if (!mTypes.keys.tail.forall(Util.isCoercibleTo(_, tk)))
+        if (!mTypes.keys.tail.forall(TUtil.isCoercibleTo(_, tk)))
           throw new TypeException(s"Map keys do not all have type ${tk}", expr.text)
         val tv = mTypes.values.head
-        if (!mTypes.values.tail.forall(Util.isCoercibleTo(_, tv)))
+        if (!mTypes.values.tail.forall(TUtil.isCoercibleTo(_, tv)))
           throw new TypeException(s"Map values do not all have type ${tv}", expr.text)
         WT_Map(tk, tv)
 
@@ -364,7 +364,7 @@ case class TypeChecker(stdlib: Stdlib) {
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
-              s"${value} in ${exprToString(expr)} should have boolean type, it has type ${Util.toString(tv)} instead",
+              s"${value} in ${exprToString(expr)} should have boolean type, it has type ${TUtil.toString(tv)} instead",
               expr.text
           )
         tType
@@ -378,8 +378,9 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${exprToString(value)} must have type optional(${Util
-                     .toString(dt)})
+                s"""|Subxpression ${exprToString(value)} must have type optional(${TUtil.toString(
+                       dt
+                   )})
                     |it has type ${vt} instead""".stripMargin
                   .replaceAll("\n", " "),
                 expr.text
@@ -394,7 +395,7 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"separator ${sep} in ${expr} must have string type", expr.text)
         val vt = typeEval(value, ctx)
         vt match {
-          case WT_Array(t) if Util.isCoercibleTo(WT_String, t) =>
+          case WT_Array(t) if TUtil.isCoercibleTo(WT_String, t) =>
             WT_String
           case other =>
             throw new TypeException(
@@ -546,7 +547,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (_, Some(expr)) =>
         val rhsType = typeEval(expr, ctx)
-        if (!Util.isCoercibleTo(lhsType, rhsType))
+        if (!TUtil.isCoercibleTo(lhsType, rhsType))
           throw new TypeException(s"declaration ${decl.name} is badly typed", decl.text)
     }
     (decl.name, lhsType)
@@ -631,7 +632,7 @@ case class TypeChecker(stdlib: Stdlib) {
     // check that all expressions in the command section are strings
     task.command.parts.foreach { expr =>
       val t = typeEval(expr, ctxDecl)
-      if (!Util.isCoercibleTo(WT_String, t))
+      if (!TUtil.isCoercibleTo(WT_String, t))
         throw new TypeException(
             s"Expression ${exprToString(expr)} in the command section is not coercible to a string",
             expr.text
@@ -677,7 +678,7 @@ case class TypeChecker(stdlib: Stdlib) {
                 call.text
             )
           case Some((calleeType, _)) =>
-            if (!Util.isCoercibleTo(calleeType, wdlType))
+            if (!TUtil.isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text

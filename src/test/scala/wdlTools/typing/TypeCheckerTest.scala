@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
+import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
@@ -73,13 +74,12 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check workflows (positive cases)" taggedAs (Edge) in {
+  it should "type check workflows (positive cases)" in {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
-      .filter(x => x.toString contains "polymorphic")
+
     for (pc <- positiveCases) {
-      System.out.println("polymorphic")
       val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
@@ -119,4 +119,26 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val doc = parser.parse(url)
     checker.apply(doc)
   }
+
+  /*  it should "type check polymorphic functions" taggedAs (Edge) in {
+    val src = Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/polymorphic_types.wdl").getPath)
+    val doc = parser.parse(Util.getURL(src))
+    checker.apply(doc)
+  } */
+
+  ignore should "handle compound expressions" taggedAs (Edge) in {
+    val src =
+      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/compound_expr.wdl").getPath)
+    val doc = parser.parse(Util.getURL(src))
+    val wf = doc.workflow.get
+
+    val decls = wf.body.collect {
+      case x: Declaration => x
+    }
+    decls.size shouldBe 1
+    val decl = decls.head
+    System.out.println(s"expr=${exprToString(decl.expr.get)}")
+    checker.apply(doc)
+  }
+
 }

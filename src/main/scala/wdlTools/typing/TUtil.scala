@@ -4,7 +4,7 @@ import wdlTools.syntax.TextSource
 import WdlTypes._
 
 // This is the WDL typesystem
-object Util {
+object TUtil {
   // check if the right hand side of an assignment matches the left hand side
   //
   // Negative examples:
@@ -23,7 +23,21 @@ object Util {
     }
   }
 
+  // Check if a type contains no type-variables
+  private def containsTypeVariables(t: WT): Boolean = {
+    t match {
+      case WT_String | WT_File | WT_Boolean | WT_Int | WT_Float => false
+      case WT_Optional(t2)                                      => containsTypeVariables(t2)
+      case WT_Array(t2)                                         => containsTypeVariables(t2)
+      case WT_Map(k, v)                                         => containsTypeVariables(k) || containsTypeVariables(v)
+      case WT_Pair(l, r)                                        => containsTypeVariables(l) || containsTypeVariables(r)
+      case _: WT_Var                                            => true
+      case _                                                    => false
+    }
+  }
+
   def isCoercibleTo(left: WT, right: WT): Boolean = {
+    //System.out.println(s"isCoercibleTo ${toString(left)} ${toString(right)} ")
     (left, right) match {
       case (WT_String, x) if isPrimitive(x) => true
       // A null value is converted to the string "null"
@@ -47,7 +61,13 @@ object Util {
 
       case (WT_Object, WT_Object)           => true
       case (WT_Var(i), WT_Var(j)) if i == j => true
-      case _                                => false
+
+      // Array[Var(0)] <- Array[String]
+      case (WT_Var(_), other) if !containsTypeVariables(other) => true
+
+      // Array[String] <- Array[Var(0)]
+      case (other, WT_Var(_)) if !containsTypeVariables(other) => true
+      case _                                                   => false
     }
   }
 
