@@ -20,7 +20,7 @@ struct
 	;
    */
   override def visitStruct(ctx: WdlV1Parser.StructContext): TypeStruct = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
 
     val sName = ctx.Identifier().getText
     val members: Vector[StructMember] = ctx
@@ -51,7 +51,7 @@ map_type
 	;
    */
   override def visitMap_type(ctx: WdlV1Parser.Map_typeContext): Type = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val kt: Type = visitWdl_type(ctx.wdl_type(0))
     val vt: Type = visitWdl_type(ctx.wdl_type(1))
     TypeMap(kt, vt, grammar.getSourceText(ctx))
@@ -63,7 +63,7 @@ array_type
 	;
    */
   override def visitArray_type(ctx: WdlV1Parser.Array_typeContext): Type = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val t: Type = visitWdl_type(ctx.wdl_type())
     val nonEmpty = ctx.PLUS() != null
     TypeArray(t, nonEmpty, grammar.getSourceText(ctx))
@@ -75,7 +75,7 @@ pair_type
 	;
    */
   override def visitPair_type(ctx: WdlV1Parser.Pair_typeContext): Type = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val lt: Type = visitWdl_type(ctx.wdl_type(0))
     val rt: Type = visitWdl_type(ctx.wdl_type(1))
     TypePair(lt, rt, grammar.getSourceText(ctx))
@@ -90,7 +90,7 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlV1Parser.Type_baseContext): Type = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.array_type() != null)
       return visitArray_type(ctx.array_type())
     if (ctx.map_type() != null)
@@ -120,7 +120,7 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlV1Parser.Wdl_typeContext): Type = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val t = visitType_base(ctx.type_base())
     if (ctx.OPTIONAL() != null) {
       TypeOptional(t, grammar.getSourceText(ctx))
@@ -132,7 +132,7 @@ wdl_type
   // EXPRESSIONS
 
   override def visitNumber(ctx: WdlV1Parser.NumberContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.IntLiteral() != null) {
       return ExprInt(ctx.getText.toInt, grammar.getSourceText(ctx))
     }
@@ -151,7 +151,7 @@ wdl_type
   override def visitExpression_placeholder_option(
       ctx: WdlV1Parser.Expression_placeholder_optionContext
   ): PlaceHolderPart = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val expr: Expr =
       if (ctx.string() != null)
         visitString(ctx.string())
@@ -225,7 +225,7 @@ wdl_type
   : StringPart*
   ; */
   override def visitString_part(ctx: WdlV1Parser.String_partContext): ExprCompoundString = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val parts: Vector[Expr] = ctx
       .StringPart()
       .asScala
@@ -238,7 +238,7 @@ wdl_type
   : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ; */
   override def visitString_expr_part(ctx: WdlV1Parser.String_expr_partContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val pHolder: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
@@ -254,7 +254,7 @@ wdl_type
   override def visitString_expr_with_string_part(
       ctx: WdlV1Parser.String_expr_with_string_partContext
   ): ExprCompoundString = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val strPart = visitString_part(ctx.string_part())
     ExprCompoundString(Vector(exprPart, strPart), grammar.getSourceText(ctx))
@@ -267,7 +267,7 @@ string
   ;
    */
   override def visitString(ctx: WdlV1Parser.StringContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val stringPart = ExprString(ctx.string_part().getText, grammar.getSourceText(ctx.string_part()))
     val exprPart: Vector[ExprCompoundString] = ctx
       .string_expr_with_string_part()
@@ -291,7 +291,7 @@ string
 	| Identifier
 	; */
   override def visitPrimitive_literal(ctx: WdlV1Parser.Primitive_literalContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.BoolLiteral() != null) {
       val value = ctx.getText.toLowerCase() == "true"
       return ExprBoolean(value, grammar.getSourceText(ctx))
@@ -316,7 +316,7 @@ string
   }
 
   override def visitLand(ctx: WdlV1Parser.LandContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val arg0 = visitExpr_infix1(ctx.expr_infix1())
     val arg1 = visitExpr_infix2(ctx.expr_infix2())
     ExprLand(arg0, arg1, grammar.getSourceText(ctx))
@@ -506,7 +506,7 @@ string
 	; */
 
   private def visitExpr_infix0(ctx: WdlV1Parser.Expr_infix0Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case lor: WdlV1Parser.LorContext => visitLor(lor)
       case infix1: WdlV1Parser.Infix1Context =>
@@ -519,7 +519,7 @@ string
 	| expr_infix2 #infix2
 	; */
   private def visitExpr_infix1(ctx: WdlV1Parser.Expr_infix1Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case land: WdlV1Parser.LandContext     => visitLand(land)
       case infix2: WdlV1Parser.Infix2Context => visitInfix2(infix2).asInstanceOf[Expr]
@@ -537,7 +537,7 @@ string
 	; */
 
   private def visitExpr_infix2(ctx: WdlV1Parser.Expr_infix2Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case eqeq: WdlV1Parser.EqeqContext => visitEqeq(eqeq)
       case neq: WdlV1Parser.NeqContext   => visitNeq(neq)
@@ -556,7 +556,7 @@ string
 	| expr_infix4 #infix4
 	; */
   private def visitExpr_infix3(ctx: WdlV1Parser.Expr_infix3Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case add: WdlV1Parser.AddContext => visitAdd(add)
       case sub: WdlV1Parser.SubContext => visitSub(sub)
@@ -572,7 +572,7 @@ string
 	| expr_infix5 #infix5
 	;  */
   private def visitExpr_infix4(ctx: WdlV1Parser.Expr_infix4Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case mul: WdlV1Parser.MulContext       => visitMul(mul)
       case divide: WdlV1Parser.DivideContext => visitDivide(divide)
@@ -586,7 +586,7 @@ string
 	; */
 
   override def visitExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     visitExpr_core(ctx.expr_core())
   }
 
@@ -594,7 +594,7 @@ string
 	: expr_infix
 	; */
   override def visitExpr(ctx: WdlV1Parser.ExprContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     visitChildren(ctx).asInstanceOf[Expr]
   }
 
@@ -614,7 +614,7 @@ string
 	| expr_core DOT Identifier #get_name
 	; */
   private def visitExpr_core(ctx: WdlV1Parser.Expr_coreContext): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     ctx match {
       case group: WdlV1Parser.Expression_groupContext => visitExpression_group(group)
       case primitives: WdlV1Parser.PrimitivesContext =>
@@ -639,7 +639,7 @@ unbound_decls
 	;
    */
   override def visitUnbound_decls(ctx: WdlV1Parser.Unbound_declsContext): Declaration = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     Declaration(name, wdlType, None, grammar.getSourceText(ctx), grammar.getComment(ctx))
@@ -651,7 +651,7 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlV1Parser.Bound_declsContext): Declaration = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     if (ctx.expr() == null)
@@ -667,7 +667,7 @@ any_decls
 	;
    */
   override def visitAny_decls(ctx: WdlV1Parser.Any_declsContext): Declaration = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.unbound_decls() != null)
       return visitUnbound_decls(ctx.unbound_decls())
     if (ctx.bound_decls() != null)
@@ -679,7 +679,7 @@ any_decls
    : Identifier COLON expr
    ; */
   override def visitMeta_kv(ctx: WdlV1Parser.Meta_kvContext): MetaKV = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val id = ctx.Identifier().getText
     val expr = visitExpr(ctx.expr())
     MetaKV(id, expr, grammar.getSourceText(ctx), grammar.getComment(ctx))
@@ -689,7 +689,7 @@ any_decls
   override def visitParameter_meta(
       ctx: WdlV1Parser.Parameter_metaContext
   ): ParameterMetaSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val kvs: Vector[MetaKV] = ctx
       .meta_kv()
       .asScala
@@ -700,7 +700,7 @@ any_decls
 
   //  META LBRACE meta_kv* RBRACE #meta
   override def visitMeta(ctx: WdlV1Parser.MetaContext): MetaSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val kvs: Vector[MetaKV] = ctx
       .meta_kv()
       .asScala
@@ -713,7 +713,7 @@ any_decls
  : Identifier COLON expr
  ; */
   override def visitTask_runtime_kv(ctx: WdlV1Parser.Task_runtime_kvContext): RuntimeKV = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val id: String = ctx.Identifier.getText
     val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr, grammar.getSourceText(ctx), grammar.getComment(ctx))
@@ -723,7 +723,7 @@ any_decls
  : RUNTIME LBRACE (task_runtime_kv)* RBRACE
  ; */
   override def visitTask_runtime(ctx: WdlV1Parser.Task_runtimeContext): RuntimeSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val kvs = ctx
       .task_runtime_kv()
       .asScala
@@ -738,7 +738,7 @@ task_input
 	;
    */
   override def visitTask_input(ctx: WdlV1Parser.Task_inputContext): InputSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val decls = ctx
       .any_decls()
       .asScala
@@ -751,7 +751,7 @@ task_input
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	; */
   override def visitTask_output(ctx: WdlV1Parser.Task_outputContext): OutputSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val decls = ctx
       .bound_decls()
       .asScala
@@ -766,7 +766,7 @@ task_input
   override def visitTask_command_string_part(
       ctx: WdlV1Parser.Task_command_string_partContext
   ): ExprString = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val text: String = ctx
       .CommandStringPart()
       .asScala
@@ -781,7 +781,7 @@ task_input
   override def visitTask_command_expr_part(
       ctx: WdlV1Parser.Task_command_expr_partContext
   ): Expr = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val placeHolders: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
@@ -797,7 +797,7 @@ task_input
   override def visitTask_command_expr_with_string(
       ctx: WdlV1Parser.Task_command_expr_with_stringContext
   ): ExprCompoundString = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val exprPart: Expr = visitTask_command_expr_part(ctx.task_command_expr_part())
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
@@ -810,7 +810,7 @@ task_input
   | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
   ; */
   override def visitTask_command(ctx: WdlV1Parser.Task_commandContext): CommandSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val start: Expr = visitTask_command_string_part(ctx.task_command_string_part())
     val parts: Vector[Expr] = ctx
       .task_command_expr_with_string()
@@ -908,7 +908,7 @@ task_input
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: WdlV1Parser.TaskContext): Task = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val name = ctx.Identifier().getText
     val elems = ctx.task_element().asScala.map(visitTask_element).toVector
 
@@ -954,7 +954,7 @@ task_input
 	: ALIAS Identifier AS Identifier
 	;*/
   override def visitImport_alias(ctx: WdlV1Parser.Import_aliasContext): ImportAlias = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val ids = ctx
       .Identifier()
       .asScala
@@ -973,7 +973,7 @@ import_as
 	;
    */
   override def visitImport_doc(ctx: WdlV1Parser.Import_docContext): ImportDoc = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val url = ctx.string().getText.replaceAll("\"", "")
     val name =
       if (ctx.import_as() == null)
@@ -993,7 +993,7 @@ import_as
 	: AS Identifier
 	; */
   override def visitCall_alias(ctx: WdlV1Parser.Call_aliasContext): CallAlias = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     CallAlias(ctx.Identifier().getText, grammar.getSourceText(ctx))
   }
 
@@ -1001,7 +1001,7 @@ import_as
 	: Identifier EQUAL expr
 	; */
   override def visitCall_input(ctx: WdlV1Parser.Call_inputContext): CallInput = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val expr = visitExpr(ctx.expr())
     CallInput(ctx.Identifier().getText, expr, grammar.getSourceText(ctx))
   }
@@ -1010,7 +1010,7 @@ import_as
 	: INPUT COLON (call_input (COMMA call_input)*)
 	; */
   override def visitCall_inputs(ctx: WdlV1Parser.Call_inputsContext): CallInputs = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val inputs: Vector[CallInput] = ctx
       .call_input()
       .asScala
@@ -1025,7 +1025,7 @@ import_as
 	: LBRACE call_inputs? RBRACE
 	; */
   override def visitCall_body(ctx: WdlV1Parser.Call_bodyContext): CallInputs = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.call_inputs() == null) {
       CallInputs(Vector.empty, grammar.getSourceText(ctx))
     } else {
@@ -1037,7 +1037,7 @@ import_as
 	: CALL Identifier call_alias?  call_body?
 	; */
   override def visitCall(ctx: WdlV1Parser.CallContext): Call = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val name = ctx.call_name().getText
 
     val alias: Option[CallAlias] =
@@ -1062,7 +1062,7 @@ scatter
 	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
  ; */
   override def visitScatter(ctx: WdlV1Parser.ScatterContext): Scatter = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val id = ctx.Identifier.getText
     val expr = visitExpr(ctx.expr())
     val body = ctx
@@ -1077,7 +1077,7 @@ scatter
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	; */
   override def visitConditional(ctx: WdlV1Parser.ConditionalContext): Conditional = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val expr = visitExpr(ctx.expr())
     val body = ctx
       .inner_workflow_element()
@@ -1091,7 +1091,7 @@ scatter
 	: INPUT LBRACE (any_decls)* RBRACE
 	; */
   override def visitWorkflow_input(ctx: WdlV1Parser.Workflow_inputContext): InputSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val decls = ctx
       .any_decls()
       .asScala
@@ -1105,7 +1105,7 @@ scatter
 	;
    */
   override def visitWorkflow_output(ctx: WdlV1Parser.Workflow_outputContext): OutputSection = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val decls = ctx
       .bound_decls()
       .asScala
@@ -1123,7 +1123,7 @@ scatter
   override def visitInner_workflow_element(
       ctx: WdlV1Parser.Inner_workflow_elementContext
   ): WorkflowElement = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.bound_decls() != null)
       return visitBound_decls(ctx.bound_decls())
     if (ctx.call() != null)
@@ -1149,7 +1149,7 @@ workflow
 	;
    */
   override def visitWorkflow(ctx: WdlV1Parser.WorkflowContext): Workflow = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val name = ctx.Identifier().getText
     val elems: Vector[WdlV1Parser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
@@ -1195,7 +1195,7 @@ document_element
 	;
    */
   override def visitDocument_element(ctx: WdlV1Parser.Document_elementContext): DocumentElement = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     visitChildren(ctx).asInstanceOf[DocumentElement]
   }
 
@@ -1203,7 +1203,7 @@ document_element
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: WdlV1Parser.VersionContext): Version = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     if (ctx.RELEASE_VERSION() == null)
       throw new Exception("version not specified")
     val value = ctx.RELEASE_VERSION().getText
@@ -1216,7 +1216,7 @@ document
 	;
    */
   override def visitDocument(ctx: WdlV1Parser.DocumentContext): Document = {
-    grammar.notifyParserListeners(ctx)
+    // grammar.notifyParserListeners(ctx)
     val version = visitVersion(ctx.version())
 
     val elems: Vector[DocumentElement] =

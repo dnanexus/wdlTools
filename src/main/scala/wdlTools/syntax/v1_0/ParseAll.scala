@@ -1,19 +1,18 @@
 package wdlTools.syntax.v1_0
 
+import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1_0.Translators._
 import wdlTools.syntax.{AbstractSyntax, ParseAllBase}
-import wdlTools.syntax.Antlr4Util.Antlr4ParserListener
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options, loader: SourceCode.Loader) extends ParseAllBase(opts, loader) {
   private val grammarFactory: WdlV1GrammarFactory = WdlV1GrammarFactory(opts)
 
-  override def addParserListener(
-      listener: Antlr4ParserListener,
-      keys: String*
+  override def addParserListenerFactory(
+      listenerFactory: ParseTreeListenerFactory
   ): Unit = {
-    grammarFactory.addParserListener(listener, keys.toVector)
+    grammarFactory.addParserListenerFactory(listenerFactory)
   }
 
   // start from a document [doc], and recursively dive into all the imported

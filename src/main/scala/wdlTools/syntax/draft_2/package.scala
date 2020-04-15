@@ -7,8 +7,6 @@ import wdlTools.util.Options
 
 case class WdlDraft2GrammarFactory(opts: Options)
     extends GrammarFactory[WdlDraft2Lexer, WdlDraft2Parser](opts) {
-  lazy override val parserListenerKeys: Vector[String] = WdlDraft2Parser.ruleNames.toVector
-
   override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
     new WdlDraft2Lexer(charStream)
   }

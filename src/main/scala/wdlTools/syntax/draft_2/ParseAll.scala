@@ -1,18 +1,18 @@
 package wdlTools.syntax.draft_2
 
+import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.draft_2.Translators._
-import wdlTools.syntax.{AbstractSyntax, Antlr4Util, ParseAllBase, TextSource, WdlVersion}
+import wdlTools.syntax.{AbstractSyntax, ParseAllBase, TextSource, WdlVersion}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options, loader: SourceCode.Loader) extends ParseAllBase(opts, loader) {
   private val grammarFactory: WdlDraft2GrammarFactory = WdlDraft2GrammarFactory(opts)
 
-  override def addParserListener(
-      listener: Antlr4Util.Antlr4ParserListener,
-      keys: String*
+  override def addParserListenerFactory(
+      listenerFactory: ParseTreeListenerFactory
   ): Unit = {
-    grammarFactory.addParserListener(listener, keys.toVector)
+    grammarFactory.addParserListenerFactory(listenerFactory)
   }
 
   override def canParse(sourceCode: SourceCode): Boolean = {
