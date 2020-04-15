@@ -4,13 +4,6 @@ package wdlTools.typing
 object WdlTypes {
   sealed trait WT
 
-  // There are cases where we don't know the type. For example, an empty array, or an empty map.
-  // While evaluating the right hand side we don't know the type.
-  //
-  // Array[Int] names = []
-  // Map[String, File] locations = {}
-  case object WT_Unknown extends WT
-
   // primitive types
   case object WT_String extends WT
   case object WT_File extends WT
@@ -18,7 +11,16 @@ object WdlTypes {
   case object WT_Int extends WT
   case object WT_Float extends WT
 
-  // a variable
+  // There are cases where we don't know the type. For example, an empty array, or an empty map.
+  // While evaluating the right hand side we don't know the type.
+  //
+  // Array[Int] names = []
+  // Map[String, File] locations = {}
+  //
+  // Polymorphic functions are another place where type variables appear
+  case class WT_Var(i: Int) extends WT
+
+  // a user defined struct name
   case class WT_Identifier(id: String) extends WT
 
   // compound types
@@ -58,34 +60,26 @@ object WdlTypes {
   // A standard library function implemented by the engine.
   sealed trait WT_StdlibFunc extends WT {
     val name: String
+    val output: WT
   }
 
   // WT representation for an stdlib function.
   // For example, stdout()
-  case class WT_FunctionUnit(name: String, output: WT) extends WT_StdlibFunc
+  case class WT_Function0(name: String, output: WT) extends WT_StdlibFunc
 
   // A function with one argument
-  // For example: read_int(FILE_NAME)
-  case class WT_Function1Arg(name: String, input: WT, output: WT) extends WT_StdlibFunc
+  // Example:
+  //   read_int(FILE_NAME)
+  //   Array[Array[X]] transpose(Array[Array[X]])
+  case class WT_Function1(name: String, input: WT, output: WT) extends WT_StdlibFunc
 
   // A function with two arguments. For example:
-  // Float size(File, [String])
-  case class WT_Function2Arg(name: String, arg1: WT, arg2: WT, output: WT) extends WT_StdlibFunc
+  //   Float size(File, [String])
+  //   Array[Pair(X,Y)] zip(Array[X], Array[Y])
+  case class WT_Function2(name: String, arg1: WT, arg2: WT, output: WT) extends WT_StdlibFunc
 
   // A function with three arguments. For example:
   // String sub(String, String, String)
-  case class WT_Function3Arg(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
-      extends WT_StdlibFunc
-
-  // A function that obays parametric polymorphism. For example:
-  //
-  // Array[Array[X]] transpose(Array[Array[X]])
-  //
-  case class WT_FunctionParamPoly1Arg(name: String, io: WT => (WT, WT)) extends WT_StdlibFunc
-
-  // A function that obays parametric polymorphism with two inputs.
-  //
-  // Array[Pair[X,Y]] zip(Array[X], Array[Y])
-  case class WT_FunctionParamPoly2Arg(name: String, io: (WT, WT) => ((WT, WT), WT))
+  case class WT_Function3(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
       extends WT_StdlibFunc
 }

@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.v1_0.ParseAll
+import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
@@ -18,7 +19,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
               Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
           )
       ),
-      verbosity = Verbosity.Quiet
+      verbosity = Verbosity.Verbose
   )
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
@@ -36,13 +37,16 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   it should "type check tasks (positive cases)" in {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/tasks/positive").getPath)
-    val positiveCases = getWdlSourceFiles(positivePath)
+    val positiveCases =
+      getWdlSourceFiles(positivePath)
+
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
-        case _: Throwable =>
+        case e: Throwable =>
+          System.out.println(e.getMessage)
           throw new RuntimeException(s"Type error in file ${pc}")
       }
     }
@@ -74,6 +78,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val positivePath =
       Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
+
     for (pc <- positiveCases) {
       val doc = parser.parse(Util.getURL(pc))
       try {
@@ -115,8 +120,25 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     checker.apply(doc)
   }
 
-  it should "size stdlib" taggedAs Edge in {
-    val doc = parser.parse(opts.getURL("stdlib.wdl"))
+  /*  it should "type check polymorphic functions" taggedAs (Edge) in {
+    val src = Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/polymorphic_types.wdl").getPath)
+    val doc = parser.parse(Util.getURL(src))
+    checker.apply(doc)
+  } */
+
+  ignore should "handle compound expressions" taggedAs (Edge) in {
+    val src =
+      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/compound_expr.wdl").getPath)
+    val doc = parser.parse(Util.getURL(src))
+    val wf = doc.workflow.get
+
+    val decls = wf.body.collect {
+      case x: Declaration => x
+    }
+    decls.size shouldBe 1
+    val decl = decls.head
+    System.out.println(s"expr=${exprToString(decl.expr.get)}")
     checker.apply(doc)
   }
+
 }
