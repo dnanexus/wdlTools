@@ -666,8 +666,12 @@ case class TypeChecker(stdlib: Stdlib) {
   // 2. all the compulsory callee arguments must be specified. Optionals
   //    and arguments that have defaults can be skipped.
   private def applyCall(call: Call, ctx: Context): (String, WT_Call) = {
-    val callerInputs = call.inputs.map {
-      case (name, expr) => name -> typeEval(expr, ctx)
+    val callerInputs: Map[String, WT] = call.inputs match {
+      case Some(CallInputs(value, _)) =>
+        value.map { inp =>
+          inp.name -> typeEval(inp.expr, ctx)
+        }.toMap
+      case None => Map.empty
     }
 
     val (calleeInputs, calleeOutputs) = ctx.callables.get(call.name) match {
@@ -723,7 +727,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case None =>
         val parts = call.name.split("\\.")
         parts.last
-      case Some(alias) => alias
+      case Some(alias) => alias.name
     }
 
     if (ctx.declarations contains callName)
@@ -895,9 +899,9 @@ case class TypeChecker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val nsName = iStat.url.getFile().replaceAll("/", "")
+            val nsName = iStat.url.getFile.replaceAll("/", "")
             if (nsName.endsWith(".wdl"))
-              nsName.dropRight(".wdl".size)
+              nsName.dropRight(".wdl".length)
             else
               nsName
           case Some(x) => x

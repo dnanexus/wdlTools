@@ -38,7 +38,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       Paths.get(getClass.getResource("/typing/v1_0/tasks/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
-      val doc = parser.parse(Util.getURL(pc))
+      val doc = parser.apply(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -53,7 +53,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       Paths.get(getClass.getResource("/typing/v1_0/tasks/negative").getPath)
     val negativeCases = getWdlSourceFiles(negativePath)
     for (pc <- negativeCases) {
-      val doc = parser.parse(Util.getURL(pc))
+      val doc = parser.apply(Util.getURL(pc))
       val checkVal =
         try {
           checker.apply(doc)
@@ -75,7 +75,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       Paths.get(getClass.getResource("/typing/v1_0/workflows/positive").getPath)
     val positiveCases = getWdlSourceFiles(positivePath)
     for (pc <- positiveCases) {
-      val doc = parser.parse(Util.getURL(pc))
+      val doc = parser.apply(Util.getURL(pc))
       try {
         checker.apply(doc)
       } catch {
@@ -91,7 +91,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
     val negativeCases = getWdlSourceFiles(negativePath)
     for (nc <- negativeCases) {
-      val doc = parser.parse(Util.getURL(nc))
+      val doc = parser.apply(Util.getURL(nc))
       val checkVal =
         try {
           checker.apply(doc)
@@ -111,12 +111,12 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
-    val doc = parser.parse(url)
+    val doc = parser.apply(url)
     checker.apply(doc)
   }
 
   it should "size stdlib" taggedAs Edge in {
-    val doc = parser.parse(opts.getURL("stdlib.wdl"))
+    val doc = parser.apply(opts.getURL("stdlib.wdl"))
     checker.apply(doc)
   }
 }

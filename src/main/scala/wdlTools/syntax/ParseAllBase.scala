@@ -2,7 +2,6 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import org.antlr.v4.runtime.ParserRuleContext
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 import wdlTools.syntax.Antlr4Util.Antlr4ParserListener
 import wdlTools.util.{Options, SourceCode}
@@ -13,21 +12,36 @@ trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
 
-abstract class WdlDocumentParser(opts: Options, loader: SourceCode.Loader) {
-  def addParserListener[C <: ParserRuleContext](key: Int, listener: Antlr4ParserListener[C]): Unit
+abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
+  // cache of documents that have already been fetched and parsed.
+  private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
+
+  protected def followImport(url: URL): AbstractSyntax.Document = {
+    docCache.get(url) match {
+      case None =>
+        val aDoc = apply(loader.apply(url))
+        docCache(url) = aDoc
+        aDoc
+      case Some(aDoc) => aDoc
+    }
+  }
+
+  def addParserListener(listener: Antlr4ParserListener, keys: String*): Unit
 
   def canParse(sourceCode: SourceCode): Boolean
 
-  def apply(url: URL): Document
-
-  def apply(sourceCode: SourceCode): Document
-
-  def parse(url: URL): Document = {
+  def apply(url: URL): AbstractSyntax.Document = {
     apply(loader.apply(url))
   }
 
-  case class Walker[T](rootURL: URL,
-                       sourceCode: Option[SourceCode] = None,
+  def apply(sourceCode: SourceCode): Document
+
+  def getWalker[T](url: URL,
+                   results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]): Walker[T] = {
+    Walker[T](loader.apply(url), results)
+  }
+
+  case class Walker[T](sourceCode: SourceCode,
                        results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
@@ -49,8 +63,8 @@ abstract class WdlDocumentParser(opts: Options, loader: SourceCode.Loader) {
         }
       }
 
-      val document = apply(sourceCode.getOrElse(loader.apply(rootURL)))
-      addDocument(rootURL, document)
+      val document = apply(sourceCode)
+      addDocument(sourceCode.url, document)
       results.toMap
     }
   }

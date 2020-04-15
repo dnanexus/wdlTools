@@ -20,6 +20,11 @@ object WdlVersion {
 // source location in a WDL program. We add it to each syntax element
 // so we could do accurate error reporting.
 //
+// Note: 'line' and 'col' may be < 0 for "implicit" elements. Currently,
+// the only example of this is Version, which in draft-2 documents has
+// an implicit value of WdlVersion.Draft_2, but there is no actual version
+// statement.
+//
 // line: line number
 // col : column number
 // URL:  original file or web URL
@@ -27,7 +32,7 @@ object WdlVersion {
 case class TextSource(line: Int, col: Int, url: Option[URL] = None) {
   override def toString: String = {
     if (url.isDefined) {
-      s"line ${line} col ${col} of ${url}"
+      s"line ${line} col ${col} of ${url.get}"
     } else {
       s"line ${line} col ${col}"
     }

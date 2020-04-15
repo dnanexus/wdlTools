@@ -34,7 +34,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, grammarFactory.createGrammar(sourceCode.toString), Some(sourceCode.url)).parseDocument
+    ParseTop(conf, grammarFactory.createGrammar(sourceCode)).parseDocument
   }
 
   it should "handle various types" in {
@@ -428,7 +428,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
     calls.size shouldBe 1
     calls(0) should matchPattern {
-      case Call("bar", Some("boz"), _, _, _) =>
+      case Call("bar", Some(CallAlias("boz", _)), _, _, _) =>
     }
     calls(0).inputs.toVector should matchPattern {
       case Vector(("i", ExprIdentifier("s", _))) =>

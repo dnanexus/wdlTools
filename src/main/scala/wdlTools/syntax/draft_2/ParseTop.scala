@@ -6,61 +6,16 @@ import java.net.URL
 
 import collection.JavaConverters._
 import org.antlr.v4.runtime._
-import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
+import wdlTools.syntax.SyntaxException
 import wdlTools.util.Options
 
-import scala.reflect.runtime.universe
-
-object ListenerKeys {
-  private val baseTypes: Map[String, Int] = Map(
-      "Element" -> -1,
-      "StatementElement" -> -2,
-      "WorkflowElement" -> -3,
-      "DocumentElement" -> -4,
-      "Type" -> -5,
-      "Expr" -> -6,
-      "PlaceHolderPart" -> -7
-  )
-
-  def getBaseType(sym: universe.Symbol): Option[Int] = {
-    baseTypes.get(sym.name.toString)
-  }
-
-  def get[T <: Element](implicit tag: universe.TypeTag[T]): Int = {
-    tag.tpe match {
-      case other => getBaseType(other.baseClasses.head).get
-    }
-  }
-
-  def getAll[T <: Element](implicit tag: universe.TypeTag[T]): Vector[Int] = {
-    Vector(get[T]) ++ tag.tpe.baseClasses.toVector.tail.flatMap(getBaseType)
-  }
-}
-
 case class ParseTop(opts: Options,
-                    grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser, Element],
+                    grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
                     docSourceURL: Option[URL] = None)
     extends WdlDraft2ParserBaseVisitor[Element] {
-
-  private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, docSourceURL)
-  }
-
-  private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, docSourceURL)
-  }
-
-  private def getComment(ctx: ParserRuleContext): Option[Comment] = {
-    grammar.getComment(ctx)
-  }
-
-//  private def notify[E <: Element, C <: ParserRuleContext](element: E, ctx: C): E = {
-//    grammar.notifyListeners[E, C](element, ctx)
-//  }
 
   /*
 map_type
@@ -70,7 +25,7 @@ map_type
   override def visitMap_type(ctx: WdlDraft2Parser.Map_typeContext): Type = {
     val kt: Type = visitWdl_type(ctx.wdl_type(0))
     val vt: Type = visitWdl_type(ctx.wdl_type(1))
-    TypeMap(kt, vt, getSourceText(ctx))
+    TypeMap(kt, vt, grammar.getSourceText(ctx))
   }
 
   /*
@@ -81,7 +36,7 @@ array_type
   override def visitArray_type(ctx: WdlDraft2Parser.Array_typeContext): Type = {
     val t: Type = visitWdl_type(ctx.wdl_type())
     val nonEmpty = ctx.PLUS() != null
-    TypeArray(t, nonEmpty, getSourceText(ctx))
+    TypeArray(t, nonEmpty, grammar.getSourceText(ctx))
   }
 
   /*
@@ -92,7 +47,7 @@ pair_type
   override def visitPair_type(ctx: WdlDraft2Parser.Pair_typeContext): Type = {
     val lt: Type = visitWdl_type(ctx.wdl_type(0))
     val rt: Type = visitWdl_type(ctx.wdl_type(1))
-    TypePair(lt, rt, getSourceText(ctx))
+    TypePair(lt, rt, grammar.getSourceText(ctx))
   }
 
   /*
@@ -111,18 +66,18 @@ type_base
     if (ctx.pair_type() != null)
       return visitPair_type(ctx.pair_type())
     if (ctx.STRING() != null)
-      return TypeString(getSourceText(ctx))
+      return TypeString(grammar.getSourceText(ctx))
     if (ctx.FILE() != null)
-      return TypeFile(getSourceText(ctx))
+      return TypeFile(grammar.getSourceText(ctx))
     if (ctx.BOOLEAN() != null)
-      return TypeBoolean(getSourceText(ctx))
+      return TypeBoolean(grammar.getSourceText(ctx))
     if (ctx.OBJECT() != null)
-      return TypeObject(getSourceText(ctx))
+      return TypeObject(grammar.getSourceText(ctx))
     if (ctx.INT() != null)
-      return TypeInt(getSourceText(ctx))
+      return TypeInt(grammar.getSourceText(ctx))
     if (ctx.FLOAT() != null)
-      return TypeFloat(getSourceText(ctx))
-    throw new SyntaxException("sanity: unrecgonized type case", getSourceText(ctx))
+      return TypeFloat(grammar.getSourceText(ctx))
+    throw new SyntaxException("sanity: unrecgonized type case", grammar.getSourceText(ctx))
   }
 
   /*
@@ -133,7 +88,7 @@ wdl_type
   override def visitWdl_type(ctx: WdlDraft2Parser.Wdl_typeContext): Type = {
     val t = visitType_base(ctx.type_base())
     if (ctx.OPTIONAL() != null) {
-      TypeOptional(t, getSourceText(ctx))
+      TypeOptional(t, grammar.getSourceText(ctx))
     } else {
       t
     }
@@ -143,12 +98,12 @@ wdl_type
 
   override def visitNumber(ctx: WdlDraft2Parser.NumberContext): Expr = {
     if (ctx.IntLiteral() != null) {
-      return ExprInt(ctx.getText.toInt, getSourceText(ctx))
+      return ExprInt(ctx.getText.toInt, grammar.getSourceText(ctx))
     }
     if (ctx.FloatLiteral() != null) {
-      return ExprFloat(ctx.getText.toDouble, getSourceText(ctx))
+      return ExprFloat(ctx.getText.toDouble, grammar.getSourceText(ctx))
     }
-    throw new SyntaxException("Not an integer nor a float", getSourceText(ctx))
+    throw new SyntaxException("Not an integer nor a float", grammar.getSourceText(ctx))
   }
 
   /* expression_placeholder_option
@@ -165,20 +120,20 @@ wdl_type
       else if (ctx.number() != null)
         visitNumber(ctx.number())
       else
-        throw new SyntaxException("sanity: not a string or a number", getSourceText(ctx))
+        throw new SyntaxException("sanity: not a string or a number", grammar.getSourceText(ctx))
 
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
-      return ExprPlaceholderPartEqual(b, expr, getSourceText(ctx))
+      return ExprPlaceholderPartEqual(b, expr, grammar.getSourceText(ctx))
     }
     if (ctx.DEFAULT() != null) {
-      return ExprPlaceholderPartDefault(expr, getSourceText(ctx))
+      return ExprPlaceholderPartDefault(expr, grammar.getSourceText(ctx))
     }
     if (ctx.SEP() != null) {
-      return ExprPlaceholderPartSep(expr, getSourceText(ctx))
+      return ExprPlaceholderPartSep(expr, grammar.getSourceText(ctx))
     }
     throw new SyntaxException(s"Not one of three known variants of a placeholder",
-                              getSourceText(ctx))
+                              grammar.getSourceText(ctx))
   }
 
   // These are full expressions of the same kind
@@ -195,7 +150,7 @@ wdl_type
       // ${x + 3}
       return expr
     }
-    val source = getSourceText(ctx)
+    val source = grammar.getSourceText(ctx)
 
     // This is a place-holder such as
     //   ${default="foo" optional_value}
@@ -207,7 +162,7 @@ wdl_type
         case ExprPlaceholderPartSep(sep, _) =>
           return ExprPlaceholderSep(sep, expr, source)
         case _ =>
-          throw new SyntaxException("invalid place holder", getSourceText(ctx))
+          throw new SyntaxException("invalid place holder", grammar.getSourceText(ctx))
       }
     }
 
@@ -219,13 +174,13 @@ wdl_type
         case (ExprPlaceholderPartEqual(false, x, _), ExprPlaceholderPartEqual(true, y, _)) =>
           return ExprPlaceholderEqual(y, x, expr, source)
         case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
-          throw new SyntaxException("invalid boolean place holder", getSourceText(ctx))
+          throw new SyntaxException("invalid boolean place holder", grammar.getSourceText(ctx))
         case (_, _) =>
-          throw new SyntaxException("invalid place holder", getSourceText(ctx))
+          throw new SyntaxException("invalid place holder", grammar.getSourceText(ctx))
       }
     }
 
-    throw new SyntaxException("invalid place holder", getSourceText(ctx))
+    throw new SyntaxException("invalid place holder", grammar.getSourceText(ctx))
   }
 
   /* string_part
@@ -235,9 +190,9 @@ wdl_type
     val parts: Vector[Expr] = ctx
       .StringPart()
       .asScala
-      .map(x => ExprString(x.getText, getSourceText(x)))
+      .map(x => ExprString(x.getText, grammar.getSourceText(x)))
       .toVector
-    ExprCompoundString(parts, getSourceText(ctx))
+    ExprCompoundString(parts, grammar.getSourceText(ctx))
   }
 
   /* string_expr_part
@@ -261,7 +216,7 @@ wdl_type
   ): ExprCompoundString = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val strPart = visitString_part(ctx.string_part())
-    ExprCompoundString(Vector(exprPart, strPart), getSourceText(ctx))
+    ExprCompoundString(Vector(exprPart, strPart), grammar.getSourceText(ctx))
   }
 
   /*
@@ -271,7 +226,7 @@ string
   ;
    */
   override def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
-    val stringPart = ExprString(ctx.string_part().getText, getSourceText(ctx.string_part()))
+    val stringPart = ExprString(ctx.string_part().getText, grammar.getSourceText(ctx.string_part()))
     val exprPart: Vector[ExprCompoundString] = ctx
       .string_expr_with_string_part()
       .asScala
@@ -283,7 +238,7 @@ string
       stringPart
     } else {
       // A string that includes interpolation
-      ExprCompoundString(Vector(stringPart) ++ exprPart2, getSourceText(ctx))
+      ExprCompoundString(Vector(stringPart) ++ exprPart2, grammar.getSourceText(ctx))
     }
   }
 
@@ -296,7 +251,7 @@ string
   override def visitPrimitive_literal(ctx: WdlDraft2Parser.Primitive_literalContext): Expr = {
     if (ctx.BoolLiteral() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return ExprBoolean(value, getSourceText(ctx))
+      return ExprBoolean(value, grammar.getSourceText(ctx))
     }
     if (ctx.number() != null) {
       return visitNumber(ctx.number())
@@ -305,87 +260,87 @@ string
       return visitString(ctx.string())
     }
     if (ctx.Identifier() != null) {
-      return ExprIdentifier(ctx.getText, getSourceText(ctx))
+      return ExprIdentifier(ctx.getText, grammar.getSourceText(ctx))
     }
     throw new SyntaxException("Not one of four supported variants of primitive_literal",
-                              getSourceText(ctx))
+                              grammar.getSourceText(ctx))
   }
 
   override def visitLor(ctx: WdlDraft2Parser.LorContext): Expr = {
     val arg0: Expr = visitExpr_infix0(ctx.expr_infix0())
     val arg1: Expr = visitExpr_infix1(ctx.expr_infix1())
-    ExprLor(arg0, arg1, getSourceText(ctx))
+    ExprLor(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitLand(ctx: WdlDraft2Parser.LandContext): Expr = {
     val arg0 = visitExpr_infix1(ctx.expr_infix1())
     val arg1 = visitExpr_infix2(ctx.expr_infix2())
-    ExprLand(arg0, arg1, getSourceText(ctx))
+    ExprLand(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitEqeq(ctx: WdlDraft2Parser.EqeqContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprEqeq(arg0, arg1, getSourceText(ctx))
+    ExprEqeq(arg0, arg1, grammar.getSourceText(ctx))
   }
   override def visitLt(ctx: WdlDraft2Parser.LtContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprLt(arg0, arg1, getSourceText(ctx))
+    ExprLt(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitGte(ctx: WdlDraft2Parser.GteContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprGte(arg0, arg1, getSourceText(ctx))
+    ExprGte(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitNeq(ctx: WdlDraft2Parser.NeqContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprNeq(arg0, arg1, getSourceText(ctx))
+    ExprNeq(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitLte(ctx: WdlDraft2Parser.LteContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprLte(arg0, arg1, getSourceText(ctx))
+    ExprLte(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitGt(ctx: WdlDraft2Parser.GtContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
-    ExprGt(arg0, arg1, getSourceText(ctx))
+    ExprGt(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitAdd(ctx: WdlDraft2Parser.AddContext): Expr = {
     val arg0 = visitExpr_infix3(ctx.expr_infix3())
     val arg1 = visitExpr_infix4(ctx.expr_infix4())
-    ExprAdd(arg0, arg1, getSourceText(ctx))
+    ExprAdd(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitSub(ctx: WdlDraft2Parser.SubContext): Expr = {
     val arg0 = visitExpr_infix3(ctx.expr_infix3())
     val arg1 = visitExpr_infix4(ctx.expr_infix4())
-    ExprSub(arg0, arg1, getSourceText(ctx))
+    ExprSub(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitMod(ctx: WdlDraft2Parser.ModContext): Expr = {
     val arg0 = visitExpr_infix4(ctx.expr_infix4())
     val arg1 = visitExpr_infix5(ctx.expr_infix5())
-    ExprMod(arg0, arg1, getSourceText(ctx))
+    ExprMod(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitMul(ctx: WdlDraft2Parser.MulContext): Expr = {
     val arg0 = visitExpr_infix4(ctx.expr_infix4())
     val arg1 = visitExpr_infix5(ctx.expr_infix5())
-    ExprMul(arg0, arg1, getSourceText(ctx))
+    ExprMul(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   override def visitDivide(ctx: WdlDraft2Parser.DivideContext): Expr = {
     val arg0 = visitExpr_infix4(ctx.expr_infix4())
     val arg1 = visitExpr_infix5(ctx.expr_infix5())
-    ExprDivide(arg0, arg1, getSourceText(ctx))
+    ExprDivide(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   // | LPAREN expr RPAREN #expression_group
@@ -400,14 +355,14 @@ string
       .asScala
       .map(x => visitExpr(x))
       .toVector
-    ExprArrayLiteral(elements, getSourceText(ctx))
+    ExprArrayLiteral(elements, grammar.getSourceText(ctx))
   }
 
   // | LPAREN expr COMMA expr RPAREN #pair_literal
   override def visitPair_literal(ctx: WdlDraft2Parser.Pair_literalContext): Expr = {
     val arg0 = visitExpr(ctx.expr(0))
     val arg1 = visitExpr(ctx.expr(1))
-    ExprPair(arg0, arg1, getSourceText(ctx))
+    ExprPair(arg0, arg1, grammar.getSourceText(ctx))
   }
 
   //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
@@ -420,11 +375,12 @@ string
 
     val n = elements.size
     if (n % 2 != 0)
-      throw new SyntaxException("the expressions in a map must come in pairs", getSourceText(ctx))
+      throw new SyntaxException("the expressions in a map must come in pairs",
+                                grammar.getSourceText(ctx))
 
     val m: Map[Expr, Expr] =
       Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
-    ExprMapLiteral(m, getSourceText(ctx))
+    ExprMapLiteral(m, grammar.getSourceText(ctx))
   }
 
   // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
@@ -439,13 +395,13 @@ string
       .asScala
       .map(x => visitExpr(x))
       .toVector
-    ExprObjectLiteral((ids zip elements).toMap, getSourceText(ctx))
+    ExprObjectLiteral((ids zip elements).toMap, grammar.getSourceText(ctx))
   }
 
   // | NOT expr #negate
   override def visitNegate(ctx: WdlDraft2Parser.NegateContext): Expr = {
     val expr = visitExpr(ctx.expr())
-    ExprNegate(expr, getSourceText(ctx))
+    ExprNegate(expr, grammar.getSourceText(ctx))
   }
 
   // | (PLUS | MINUS) expr #unirarysigned
@@ -453,18 +409,18 @@ string
     val expr = visitExpr(ctx.expr())
 
     if (ctx.PLUS() != null)
-      ExprUniraryPlus(expr, getSourceText(ctx))
+      ExprUniraryPlus(expr, grammar.getSourceText(ctx))
     else if (ctx.MINUS() != null)
-      ExprUniraryMinus(expr, getSourceText(ctx))
+      ExprUniraryMinus(expr, grammar.getSourceText(ctx))
     else
-      throw new SyntaxException("sanity", getSourceText(ctx))
+      throw new SyntaxException("sanity", grammar.getSourceText(ctx))
   }
 
   // | expr_core LBRACK expr RBRACK #at
   override def visitAt(ctx: WdlDraft2Parser.AtContext): Expr = {
     val array = visitExpr_core(ctx.expr_core())
     val index = visitExpr(ctx.expr())
-    ExprAt(array, index, getSourceText(ctx))
+    ExprAt(array, index, grammar.getSourceText(ctx))
   }
 
   // | Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
@@ -475,7 +431,7 @@ string
       .asScala
       .map(x => visitExpr(x))
       .toVector
-    ExprApply(funcName, elements, getSourceText(ctx))
+    ExprApply(funcName, elements, grammar.getSourceText(ctx))
   }
 
   // | IF expr THEN expr ELSE expr #ifthenelse
@@ -485,19 +441,19 @@ string
       .asScala
       .map(x => visitExpr(x))
       .toVector
-    ExprIfThenElse(elements(0), elements(1), elements(2), getSourceText(ctx))
+    ExprIfThenElse(elements(0), elements(1), elements(2), grammar.getSourceText(ctx))
   }
 
   override def visitLeft_name(ctx: WdlDraft2Parser.Left_nameContext): Expr = {
     val id = ctx.Identifier().getText
-    ExprIdentifier(id, getSourceText(ctx))
+    ExprIdentifier(id, grammar.getSourceText(ctx))
   }
 
   // | expr_core DOT Identifier #get_name
   override def visitGet_name(ctx: WdlDraft2Parser.Get_nameContext): Expr = {
     val e = visitExpr_core(ctx.expr_core())
     val id = ctx.Identifier.getText
-    ExprGetName(e, id, getSourceText(ctx))
+    ExprGetName(e, id, grammar.getSourceText(ctx))
   }
 
   /*expr_infix0
@@ -630,7 +586,7 @@ unbound_decls
   override def visitUnbound_decls(ctx: WdlDraft2Parser.Unbound_declsContext): Declaration = {
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
-    Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
+    Declaration(name, wdlType, None, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /*
@@ -642,9 +598,9 @@ bound_decls
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     if (ctx.expr() == null)
-      return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
+      return Declaration(name, wdlType, None, grammar.getSourceText(ctx), grammar.getComment(ctx))
     val expr: Expr = visitExpr(ctx.expr())
-    Declaration(name, wdlType, Some(expr), getSourceText(ctx), getComment(ctx))
+    Declaration(name, wdlType, Some(expr), grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /*
@@ -667,7 +623,7 @@ any_decls
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = ctx.Identifier().getText
     val value = ctx.string().string_part().getText
-    MetaKV(id, value, getSourceText(ctx), getComment(ctx))
+    MetaKV(id, value, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
@@ -679,7 +635,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    ParameterMetaSection(kvs, getSourceText(ctx), getComment(ctx))
+    ParameterMetaSection(kvs, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   //  META LBRACE meta_kv* RBRACE #meta
@@ -689,7 +645,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    MetaSection(kvs, getSourceText(ctx), getComment(ctx))
+    MetaSection(kvs, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* task_runtime_kv
@@ -698,7 +654,7 @@ any_decls
   override def visitTask_runtime_kv(ctx: WdlDraft2Parser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
     val expr: Expr = visitExpr(ctx.expr())
-    RuntimeKV(id, expr, getSourceText(ctx), getComment(ctx))
+    RuntimeKV(id, expr, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* task_runtime
@@ -710,7 +666,7 @@ any_decls
       .asScala
       .map(x => visitTask_runtime_kv(x))
       .toVector
-    RuntimeSection(kvs, getSourceText(ctx), getComment(ctx))
+    RuntimeSection(kvs, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /*
@@ -724,7 +680,7 @@ task_input
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), None)
+    InputSection(decls, grammar.getSourceText(ctx), None)
   }
 
   /* task_output
@@ -736,7 +692,7 @@ task_input
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx), getComment(ctx))
+    OutputSection(decls, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* task_command_string_part
@@ -750,7 +706,7 @@ task_input
       .asScala
       .map(x => x.getText)
       .mkString("")
-    ExprString(text, getSourceText(ctx))
+    ExprString(text, grammar.getSourceText(ctx))
   }
 
   /* task_command_expr_part
@@ -778,7 +734,7 @@ task_input
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    ExprCompoundString(Vector(exprPart, stringPart), getSourceText(ctx))
+    ExprCompoundString(Vector(exprPart, stringPart), grammar.getSourceText(ctx))
   }
 
   /* task_command
@@ -804,7 +760,7 @@ task_input
 
     // TODO: do the above until reaching a fixed point
 
-    CommandSection(cleanedParts, getSourceText(ctx), getComment(ctx))
+    CommandSection(cleanedParts, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   // A that should appear zero or once. Make sure this is the case.
@@ -817,7 +773,7 @@ task_input
       case n =>
         throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it cannot appear more than once",
-            getSourceText(ctx)
+            grammar.getSourceText(ctx)
         )
     }
   }
@@ -831,7 +787,7 @@ task_input
       case n =>
         throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it must appear exactly once",
-            getSourceText(ctx)
+            grammar.getSourceText(ctx)
         )
     }
   }
@@ -855,7 +811,7 @@ task_input
     val both = inputVarNames intersect outputVarNames
     if (both.nonEmpty)
       throw new SyntaxException(s"${both} appears in both input and output sections",
-                                getSourceText(ctx))
+                                grammar.getSourceText(ctx))
 
     val ioVarNames = inputVarNames ++ outputVarNames
 
@@ -864,7 +820,7 @@ task_input
         if (!(ioVarNames contains k))
           throw new SyntaxException(
               s"parameter ${k} does not appear in the input or output sections",
-              getSourceText(ctx)
+              grammar.getSourceText(ctx)
           )
     }
   }
@@ -939,8 +895,8 @@ task_input
         meta = meta,
         parameterMeta = parameterMeta,
         runtime = runtime,
-        text = getSourceText(ctx),
-        comment = getComment(ctx)
+        text = grammar.getSourceText(ctx),
+        comment = grammar.getComment(ctx)
     )
   }
 
@@ -961,14 +917,18 @@ import_as
       else
         Some(ctx.import_as().Identifier().getText)
 
-    ImportDoc(name, Vector.empty, opts.getURL(url), getSourceText(ctx), getComment(ctx))
+    ImportDoc(name,
+              Vector.empty,
+              opts.getURL(url),
+              grammar.getSourceText(ctx),
+              grammar.getComment(ctx))
   }
 
   /* call_alias
 	: AS Identifier
 	; */
   override def visitCall_alias(ctx: WdlDraft2Parser.Call_aliasContext): CallAlias = {
-    CallAlias(ctx.Identifier().getText, getSourceText(ctx))
+    CallAlias(ctx.Identifier().getText, grammar.getSourceText(ctx))
   }
 
   /* call_input
@@ -976,22 +936,21 @@ import_as
 	; */
   override def visitCall_input(ctx: WdlDraft2Parser.Call_inputContext): CallInput = {
     val expr = visitExpr(ctx.expr())
-    CallInput(ctx.Identifier().getText, expr, getSourceText(ctx))
+    CallInput(ctx.Identifier().getText, expr, grammar.getSourceText(ctx))
   }
 
   /* call_inputs
 	: INPUT COLON (call_input (COMMA call_input)*)
 	; */
   override def visitCall_inputs(ctx: WdlDraft2Parser.Call_inputsContext): CallInputs = {
-    val inputs: Map[String, Expr] = ctx
+    val inputs: Vector[CallInput] = ctx
       .call_input()
       .asScala
       .map { x =>
-        val inp = visitCall_input(x)
-        inp.name -> inp.expr
+        visitCall_input(x)
       }
-      .toMap
-    CallInputs(inputs, getSourceText(ctx))
+      .toVector
+    CallInputs(inputs, grammar.getSourceText(ctx))
   }
 
   /* call_body
@@ -999,7 +958,7 @@ import_as
 	; */
   override def visitCall_body(ctx: WdlDraft2Parser.Call_bodyContext): CallInputs = {
     if (ctx.call_inputs() == null)
-      CallInputs(Map.empty, getSourceText(ctx))
+      CallInputs(Vector.empty, grammar.getSourceText(ctx))
     else
       visitCall_inputs(ctx.call_inputs())
   }
@@ -1010,22 +969,21 @@ import_as
   override def visitCall(ctx: WdlDraft2Parser.CallContext): Call = {
     val name = ctx.call_name().getText
 
-    val alias: Option[String] =
-      if (ctx.call_alias() == null) None
-      else {
-        val ca: CallAlias = visitCall_alias(ctx.call_alias())
-        Some(ca.name)
-      }
-
-    val inputs: Map[String, Expr] =
-      if (ctx.call_body() == null) {
-        Map.empty[String, Expr]
+    val alias: Option[CallAlias] =
+      if (ctx.call_alias() == null) {
+        None
       } else {
-        val cb = visitCall_body(ctx.call_body())
-        cb.value
+        Some(visitCall_alias(ctx.call_alias()))
       }
 
-    Call(name, alias, inputs, getSourceText(ctx), getComment(ctx))
+    val inputs: Option[CallInputs] =
+      if (ctx.call_body() == null) {
+        None
+      } else {
+        Some(visitCall_body(ctx.call_body()))
+      }
+
+    Call(name, alias, inputs, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /*
@@ -1040,7 +998,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Scatter(id, expr, body, getSourceText(ctx), getComment(ctx))
+    Scatter(id, expr, body, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* conditional
@@ -1053,7 +1011,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Conditional(expr, body, getSourceText(ctx), getComment(ctx))
+    Conditional(expr, body, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* workflow_input
@@ -1065,7 +1023,7 @@ scatter
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), None)
+    InputSection(decls, grammar.getSourceText(ctx), None)
   }
 
   /* workflow_output
@@ -1078,7 +1036,7 @@ scatter
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx), getComment(ctx))
+    OutputSection(decls, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   /* inner_workflow_element
@@ -1151,7 +1109,14 @@ workflow
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Workflow(name, input, output, meta, parameterMeta, wfElems, getSourceText(ctx), getComment(ctx))
+    Workflow(name,
+             input,
+             output,
+             meta,
+             parameterMeta,
+             wfElems,
+             grammar.getSourceText(ctx),
+             grammar.getComment(ctx))
   }
 
   /*
@@ -1186,7 +1151,7 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(WdlVersion.Draft_2, elems, workflow, getSourceText(ctx), getComment(ctx))
+    Document(elems, workflow, grammar.getSourceText(ctx), grammar.getComment(ctx))
   }
 
   def parseDocument: Document = {

@@ -184,9 +184,21 @@ object Translators {
                                    comment)
 
       case ConcreteSyntax.Call(name, alias, inputs, text, comment) =>
-        AbstractSyntax.Call(name, alias, inputs.map {
-          case (name, expr) => name -> translateExpr(expr)
-        }, text, comment)
+        AbstractSyntax.Call(
+            name,
+            alias.map {
+              case ConcreteSyntax.CallAlias(callName, callText) =>
+                AbstractSyntax.CallAlias(callName, callText)
+            },
+            inputs.map {
+              case ConcreteSyntax.CallInputs(inputsVec, inputsText) =>
+                AbstractSyntax.CallInputs(inputsVec.map { inp =>
+                  AbstractSyntax.CallInput(inp.name, translateExpr(inp.expr), inp.text)
+                }, inputsText)
+            },
+            text,
+            comment
+        )
 
       case ConcreteSyntax.Scatter(identifier, expr, body, text, comment) =>
         AbstractSyntax.Scatter(identifier,

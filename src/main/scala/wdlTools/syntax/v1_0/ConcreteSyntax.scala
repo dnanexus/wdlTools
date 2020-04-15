@@ -178,10 +178,10 @@ object ConcreteSyntax {
 
   case class CallAlias(name: String, text: TextSource) extends Element
   case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
-  case class CallInputs(value: Map[String, Expr], text: TextSource) extends Element
+  case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
   case class Call(name: String,
-                  alias: Option[String],
-                  inputs: Map[String, Expr],
+                  alias: Option[CallAlias],
+                  inputs: Option[CallInputs],
                   text: TextSource,
                   comment: Option[Comment])
       extends WorkflowElement

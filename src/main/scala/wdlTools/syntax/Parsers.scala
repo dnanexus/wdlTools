@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
-  private lazy val parsers: Map[WdlVersion, WdlDocumentParser] = Map(
+  private lazy val parsers: Map[WdlVersion, ParseAllBase] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
       WdlVersion.V1 -> v1_0.ParseAll(opts, loader)
   )
@@ -19,11 +19,11 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
       WdlVersion.V1 -> v1_0.ParseFragment(opts)
   )
 
-  def getParser(url: URL): WdlDocumentParser = {
+  def getParser(url: URL): ParseAllBase = {
     getParser(loader.apply(url))
   }
 
-  def getParser(sourceCode: SourceCode): WdlDocumentParser = {
+  def getParser(sourceCode: SourceCode): ParseAllBase = {
     WdlVersion.All.foreach { ver =>
       val parser = parsers(ver)
       if (parser.canParse(sourceCode)) {
@@ -33,7 +33,7 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
     throw new Exception(s"No parser is able to parse document ${sourceCode.url}")
   }
 
-  def getParser(wdlVersion: WdlVersion): WdlDocumentParser = {
+  def getParser(wdlVersion: WdlVersion): ParseAllBase = {
     parsers(wdlVersion)
   }
 
@@ -53,7 +53,7 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
   ): DocumentWalker[T] = {
     val sourceCode = loader.apply(url)
     val parser = getParser(sourceCode)
-    parser.Walker(url, Some(sourceCode), results)
+    parser.Walker(sourceCode, results)
   }
 
   def getFragmentParser(wdlVersion: WdlVersion): WdlFragmentParser = {

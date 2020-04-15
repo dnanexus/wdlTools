@@ -7,7 +7,7 @@ object AbstractSyntax {
   trait Element {
     val text: TextSource // where in the source program does this element belong
   }
-  trait StatementElement {
+  trait StatementElement extends Element {
 
     /**
       * An optional comment that comes before the element.
@@ -155,8 +155,11 @@ object AbstractSyntax {
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource, comment: Option[Comment])
       extends StatementElement
 
+  case class Version(value: WdlVersion, text: TextSource, comment: Option[Comment])
+      extends DocumentElement
+
   // import statement with the AST for the referenced document
-  case class ImportAlias(id1: String, id2: String, text: TextSource)
+  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
   case class ImportDoc(name: Option[String],
                        aliases: Vector[ImportAlias],
                        url: URL,
@@ -179,9 +182,12 @@ object AbstractSyntax {
       extends DocumentElement
 
   // TODO: support comments - only one comment before inputs
+  case class CallAlias(name: String, text: TextSource) extends Element
+  case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
+  case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
   case class Call(name: String,
-                  alias: Option[String],
-                  inputs: Map[String, Expr],
+                  alias: Option[CallAlias],
+                  inputs: Option[CallInputs],
                   text: TextSource,
                   comment: Option[Comment])
       extends WorkflowElement
@@ -210,7 +216,7 @@ object AbstractSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Document(version: WdlVersion,
+  case class Document(version: Version,
                       versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

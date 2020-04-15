@@ -21,13 +21,34 @@ import org.antlr.v4.runtime.{
   Token
 }
 import wdlTools.syntax
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.util.{Options, SourceCode, Verbosity}
 
 import scala.collection.mutable
 
 object Antlr4Util {
-  trait Antlr4ParserListener[C <: ParserRuleContext] {
-    def notify(ctx: C)
+  val AllKey: String = "*"
+
+  def makeWdlException(msg: String,
+                       ctx: ParserRuleContext,
+                       docSourceURL: Option[URL] = None): RuntimeException = {
+    val src = getSourceText(ctx, docSourceURL)
+    new RuntimeException(s"${msg} ${src}")
+  }
+
+  def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
+    getSourceText(ctx.start, docSourceURL)
+  }
+
+  def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
+    getSourceText(symbol.getSymbol, docSourceURL)
+  }
+
+  def getSourceText(token: Token, docSourceURL: Option[URL]): TextSource = {
+    syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
+  }
+
+  trait Antlr4ParserListener {
+    def notify(grammar: Grammar[Lexer, Parser], ctx: ParserRuleContext): Unit
   }
 
   case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
@@ -55,14 +76,24 @@ object Antlr4Util {
     def getAllErrors: Vector[SyntaxError] = errors
   }
 
-  case class Grammar[L <: Lexer, P <: Parser, T](
+  case class Grammar[L <: Lexer, P <: Parser](
       lexer: L,
       parser: P,
-      parserListeners: Map[Int, Vector[Antlr4ParserListener[ParserRuleContext]]] = Map.empty,
+      parserListenerKeys: Vector[String],
+      parserListeners: Map[String, Vector[Antlr4ParserListener]] = Map.empty,
       errListener: ErrorListener,
       commentChannelName: String,
+      docSourceUrl: Option[URL] = None,
       opts: Options
   ) {
+    def getSourceText(ctx: ParserRuleContext): TextSource = {
+      Antlr4Util.getSourceText(ctx, docSourceUrl)
+    }
+
+    def getSourceText(symbol: TerminalNode): TextSource = {
+      Antlr4Util.getSourceText(symbol, docSourceUrl)
+    }
+
     def getChannel(name: String): Int = {
       val channel = lexer.getChannelNames.indexOf(name)
       require(channel >= 0)
@@ -85,32 +116,15 @@ object Antlr4Util {
       }
     }
 
-    def notifyParserListeners[C <: ParserRuleContext](ctx: C): Unit = {
-      val key = ctx.getRuleIndex
-      if (parserListeners.nonEmpty && parserListeners.contains(key)) {
-        parserListeners(key).foreach { listener =>
-          listener
-            .asInstanceOf[Antlr4ParserListener[C]]
-            .notify(ctx)
+    def notifyParserListeners(ctx: ParserRuleContext): Unit = {
+      val keys = Vector(parserListenerKeys(ctx.getRuleIndex), AllKey)
+      keys.foreach { key =>
+        if (parserListeners.nonEmpty && parserListeners.contains(key)) {
+          parserListeners(key).foreach { listener =>
+            listener.notify(this.asInstanceOf[Grammar[Lexer, Parser]], ctx)
+          }
         }
       }
-    }
-
-    def makeWdlException(msg: String,
-                         ctx: ParserRuleContext,
-                         docSourceURL: Option[URL] = None): RuntimeException = {
-      val src = getSourceText(ctx, docSourceURL)
-      new RuntimeException(s"${msg} ${src}")
-    }
-
-    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
-      val token = ctx.start
-      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
-    }
-
-    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
-      val token = symbol.getSymbol
-      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
     }
 
     def getHiddenTokens(ctx: ParserRuleContext,
@@ -189,28 +203,35 @@ object Antlr4Util {
     }
   }
 
-  abstract class GrammarFactory[L <: Lexer, P <: Parser, T](
+  abstract class GrammarFactory[L <: Lexer, P <: Parser](
       opts: Options,
       commentChannelName: String = "COMMENTS"
   ) {
 
-    private val parserListeners
-        : mutable.Map[Int, mutable.Buffer[Antlr4ParserListener[ParserRuleContext]]] =
+    private val parserListeners: mutable.Map[String, mutable.Buffer[Antlr4ParserListener]] =
       mutable.HashMap.empty
 
-    def addParserListener[C <: ParserRuleContext](
-        key: Int,
-        listener: Antlr4ParserListener[C]
+    def parserListenerKeys: Vector[String]
+
+    def addParserListener(
+        listener: Antlr4ParserListener,
+        keys: Vector[String]
     ): Unit = {
-      if (!parserListeners.contains(key)) {
-        parserListeners(key) = mutable.ArrayBuffer.empty
+      keys.foreach { key =>
+        if (!parserListeners.contains(key)) {
+          parserListeners(key) = mutable.ArrayBuffer.empty
+        }
+        parserListeners(key).append(
+            listener.asInstanceOf[Antlr4ParserListener]
+        )
       }
-      parserListeners(key).append(
-          listener.asInstanceOf[Antlr4ParserListener[ParserRuleContext]]
-      )
     }
 
-    def createGrammar(inp: String): Grammar[L, P, T] = {
+    def createGrammar(sourceCode: SourceCode): Grammar[L, P] = {
+      createGrammar(sourceCode.toString, Some(sourceCode.url))
+    }
+
+    def createGrammar(inp: String, docSourceUrl: Option[URL] = None): Grammar[L, P] = {
       val codePointBuffer: CodePointBuffer =
         CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
       val lexer: L = createLexer(CodePointCharStream.fromBuffer(codePointBuffer))
@@ -227,12 +248,9 @@ object Antlr4Util {
         parser.setTrace(true)
       }
 
-      Grammar(lexer,
-              parser,
-              parserListeners.toMap.map { case (k, v) => k -> v.toVector },
-              errListener,
-              commentChannelName,
-              opts)
+      Grammar(lexer, parser, parserListenerKeys, parserListeners.toMap.map {
+        case (k, v) => k -> v.toVector
+      }, errListener, commentChannelName, docSourceUrl, opts)
     }
 
     def createLexer(charStream: CharStream): L
