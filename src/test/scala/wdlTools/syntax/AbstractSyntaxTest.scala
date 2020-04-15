@@ -60,4 +60,5 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
 
     doc.version shouldBe WdlVersion.V1_0
   }
+
 }

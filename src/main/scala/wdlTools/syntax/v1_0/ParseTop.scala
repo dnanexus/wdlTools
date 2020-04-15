@@ -3,50 +3,29 @@ package wdlTools.syntax.v1_0
 // Parse one document. Do not follow imports.
 
 import java.net.URL
+
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_0._
-import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
+import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.v1_0.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{Options, Util}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-object ParseDocument {
-  case class V1_0GrammarFactory(opts: Options)
-      extends GrammarFactory[WdlV1Lexer, WdlV1Parser](opts) {
-    override def createLexer(charStream: CharStream): WdlV1Lexer = {
-      new WdlV1Lexer(charStream)
-    }
-
-    override def createParser(tokenStream: CommonTokenStream): WdlV1Parser = {
-      new WdlV1Parser(tokenStream)
-    }
-  }
-
-  def apply(sourceCode: SourceCode, opts: Options): Document = {
-    val grammarFactory = V1_0GrammarFactory(opts)
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = new ParseDocument(grammar, sourceCode.url, opts)
-    val document = visitor.apply()
-    grammar.verify()
-    document
-  }
-}
-
-case class ParseDocument(grammar: Grammar[WdlV1Lexer, WdlV1Parser],
-                         docSourceURL: URL,
-                         opts: Options)
+case class ParseTop(opts: Options,
+                    grammar: Grammar[WdlV1Lexer, WdlV1Parser],
+                    docSourceURL: Option[URL] = None)
     extends WdlV1ParserBaseVisitor[Element] {
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, Some(docSourceURL))
+    grammar.getSourceText(ctx, docSourceURL)
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, Some(docSourceURL))
+    grammar.getSourceText(symbol, docSourceURL)
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
@@ -154,10 +133,11 @@ wdl_type
    */
   override def visitWdl_type(ctx: WdlV1Parser.Wdl_typeContext): Type = {
     val t = visitType_base(ctx.type_base())
-    if (ctx.OPTIONAL() != null)
+    if (ctx.OPTIONAL() != null) {
       TypeOptional(t, getSourceText(ctx))
-    else
+    } else {
       t
+    }
   }
 
   // EXPRESSIONS
@@ -528,8 +508,9 @@ string
 
   private def visitExpr_infix0(ctx: WdlV1Parser.Expr_infix0Context): Expr = {
     ctx match {
-      case lor: WdlV1Parser.LorContext       => visitLor(lor)
-      case infix1: WdlV1Parser.Infix1Context => visitInfix1(infix1).asInstanceOf[Expr]
+      case lor: WdlV1Parser.LorContext => visitLor(lor)
+      case infix1: WdlV1Parser.Infix1Context =>
+        visitInfix1(infix1).asInstanceOf[Expr]
     }
   }
 
@@ -556,13 +537,14 @@ string
 
   private def visitExpr_infix2(ctx: WdlV1Parser.Expr_infix2Context): Expr = {
     ctx match {
-      case eqeq: WdlV1Parser.EqeqContext     => visitEqeq(eqeq)
-      case neq: WdlV1Parser.NeqContext       => visitNeq(neq)
-      case lte: WdlV1Parser.LteContext       => visitLte(lte)
-      case gte: WdlV1Parser.GteContext       => visitGte(gte)
-      case lt: WdlV1Parser.LtContext         => visitLt(lt)
-      case gt: WdlV1Parser.GtContext         => visitGt(gt)
-      case infix3: WdlV1Parser.Infix3Context => visitInfix3(infix3).asInstanceOf[Expr]
+      case eqeq: WdlV1Parser.EqeqContext => visitEqeq(eqeq)
+      case neq: WdlV1Parser.NeqContext   => visitNeq(neq)
+      case lte: WdlV1Parser.LteContext   => visitLte(lte)
+      case gte: WdlV1Parser.GteContext   => visitGte(gte)
+      case lt: WdlV1Parser.LtContext     => visitLt(lt)
+      case gt: WdlV1Parser.GtContext     => visitGt(gt)
+      case infix3: WdlV1Parser.Infix3Context =>
+        visitInfix3(infix3).asInstanceOf[Expr]
     }
   }
 
@@ -573,9 +555,10 @@ string
 	; */
   private def visitExpr_infix3(ctx: WdlV1Parser.Expr_infix3Context): Expr = {
     ctx match {
-      case add: WdlV1Parser.AddContext       => visitAdd(add)
-      case sub: WdlV1Parser.SubContext       => visitSub(sub)
-      case infix4: WdlV1Parser.Infix4Context => visitInfix4(infix4).asInstanceOf[Expr]
+      case add: WdlV1Parser.AddContext => visitAdd(add)
+      case sub: WdlV1Parser.SubContext => visitSub(sub)
+      case infix4: WdlV1Parser.Infix4Context =>
+        visitInfix4(infix4).asInstanceOf[Expr]
     }
   }
 
@@ -877,9 +860,7 @@ task_input
     if (both.nonEmpty) {
       for (varName <- both) {
         // issue a warning with the exact text where this occurs
-        val decl: Declaration = inputSection.get.declarations.find {
-          case decl => decl.name == varName
-        }.get
+        val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
         val text = decl.text
         Util.warning(
             s"""|Warning: "${varName}" appears in both input and output sections.
@@ -1210,7 +1191,39 @@ document
     Document(version, elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
-  def apply(): Document = {
-    visitDocument(grammar.parser.document)
+  def parseDocument: Document = {
+    apply match {
+      case d: Document => d
+      case _           => throw new Exception("WDL file does not contain a valid document")
+    }
+  }
+
+  def parseExpr: Expr = {
+    apply match {
+      case e: Expr => e
+      case _       => throw new Exception("Not a Valid expression")
+    }
+  }
+
+  def parseWdlType: Type = {
+    apply match {
+      case t: Type => t
+      case _       => throw new Exception("Not a valid WDL type")
+    }
+  }
+
+  def apply: Element = {
+    val ctx = grammar.parser.top.document_or_fragment
+    val result = if (ctx.document != null) {
+      visitDocument(ctx.document)
+    } else if (ctx.expr != null) {
+      visitExpr(ctx.expr)
+    } else if (ctx.wdl_type != null) {
+      visitWdl_type(ctx.wdl_type)
+    } else {
+      throw new Exception(s"No valid document or fragment")
+    }
+    grammar.verify()
+    result
   }
 }

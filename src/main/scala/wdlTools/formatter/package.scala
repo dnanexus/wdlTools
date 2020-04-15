@@ -17,10 +17,13 @@ object Wrapping extends Enumeration {
 }
 
 trait Chunk {
+  def wrapAll: Boolean = false
+
   def format(lineFormatter: LineFormatter): Unit
 }
 
-abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented) {
+abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
+                             defaultSpacing: String = " ") {
   def preformatted(): LineFormatter
 
   def indented(indenting: Indenting = defaultIndenting): LineFormatter
@@ -39,9 +42,11 @@ abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndent
 
   def appendString(value: String): Unit
 
-  def appendChunk(chunk: Chunk): Unit
+  def appendChunk(chunk: Chunk, spacing: String = defaultSpacing): Unit
 
-  def appendAll(chunks: Seq[Chunk], wrapping: Wrapping = Wrapping.AsNeeded): Unit
+  def appendAll(chunks: Seq[Chunk],
+                wrapping: Wrapping = Wrapping.AsNeeded,
+                spacing: String = defaultSpacing): Unit
 
   def toSeq: Seq[String]
 }

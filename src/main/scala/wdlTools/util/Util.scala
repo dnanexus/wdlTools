@@ -1,8 +1,11 @@
 package wdlTools.util
 
+import java.io.IOException
+
 import collection.JavaConverters._
 import java.net.URL
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
 
@@ -78,25 +81,28 @@ object Util {
     *
     * @param url a URL, which might be a local path, a file:// uri, or an http(s):// uri)
     * @param parent The directory to which the local file should be made relative
-    * @param selfOk Whether it is allowed to return the absolute path of a URI that is a local file, rather than making
-    *               it relative to the current directory; ignored if `parent` is defined
+    * @param existsOk Whether it is allowed to return the absolute path of a URI that is a local file that already
+    *                  exists, rather than making it relative to the current directory; ignored if `parent` is defined
     * @return The Path to the local file
     */
-  def getLocalPath(url: URL, parent: Option[Path] = None, selfOk: Boolean = true): Path = {
-    url.getProtocol match {
+  def getLocalPath(url: URL, parent: Option[Path] = None, existsOk: Boolean = true): Path = {
+    val resolved = url.getProtocol match {
       case null | "" | "file" =>
         val path = Paths.get(url.getPath)
-
         if (parent.isDefined) {
           parent.get.resolve(path.getFileName)
-        } else if (selfOk || !Files.exists(path)) {
-          path.toAbsolutePath
+        } else if (path.isAbsolute) {
+          path
         } else {
-          Paths.get("").toAbsolutePath.resolve(path.getFileName)
+          Paths.get("").toAbsolutePath.resolve(path)
         }
       case _ =>
         parent.getOrElse(Paths.get("")).resolve(Paths.get(url.getPath).getFileName)
     }
+    if (!existsOk && Files.exists(resolved)) {
+      throw new Exception(s"File already exists: ${resolved}")
+    }
+    resolved
   }
 
   /**
@@ -139,6 +145,22 @@ object Util {
     }
   }
 
+  def rmdir(dir: Path): Unit = {
+    Files.walkFileTree(
+        dir,
+        new SimpleFileVisitor[Path] {
+          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+            Files.delete(file)
+            FileVisitResult.CONTINUE
+          }
+          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+            Files.delete(dir)
+            FileVisitResult.CONTINUE
+          }
+        }
+    )
+  }
+
   /**
     * Write a collection of documents, which is a map of URIs to contents, to disk by converting
     * each URI to a local path.
@@ -147,11 +169,12 @@ object Util {
     * @param overwrite whether it is okay to overwrite an existing file
     */
   def writeContentsToFiles(docs: Map[URL, String],
-                           outputDir: Option[Path],
+                           outputDir: Option[Path] = None,
                            overwrite: Boolean = false): Unit = {
     docs.foreach {
       case (url, contents) =>
         val outputPath = Util.getLocalPath(url, outputDir, overwrite)
+        Files.createDirectories(outputPath.getParent)
         Files.write(outputPath, contents.getBytes())
     }
   }
@@ -218,6 +241,32 @@ object Util {
         }
       // If we haven't specialized this type, just use its toString.
       case _ => a.toString
+    }
+  }
+
+  case class BiMap[X, Y](keys: Seq[X], values: Seq[Y]) {
+    require(keys.size == values.size, "no 1 to 1 relation")
+    private lazy val kvMap: Map[X, Y] = keys.zip(values).toMap
+    private lazy val vkMap: Map[Y, X] = values.zip(keys).toMap
+
+    def size: Int = keys.size
+
+    def fromKey(x: X): Y = kvMap(x)
+
+    def fromValue(y: Y): X = vkMap(y)
+
+    def filterKeys(p: X => Boolean): BiMap[X, Y] = {
+      BiMap.fromPairs(keys.zip(values).filter(item => p(item._1)))
+    }
+  }
+
+  object BiMap {
+    def fromPairs[X, Y](pairs: Seq[(X, Y)]): BiMap[X, Y] = {
+      BiMap(pairs.map(_._1), pairs.map(_._2))
+    }
+
+    def fromMap[X, Y](map: Map[X, Y]): BiMap[X, Y] = {
+      fromPairs(map.toVector)
     }
   }
 

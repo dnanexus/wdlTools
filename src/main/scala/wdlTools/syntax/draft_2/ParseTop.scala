@@ -8,44 +8,22 @@ import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
-import wdlTools.syntax.Antlr4Util.{Grammar, GrammarFactory}
+import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.util.Options
 
-object ParseDocument {
-  case class Draft2GrammarFactory(opts: Options)
-      extends GrammarFactory[WdlDraft2Lexer, WdlDraft2Parser](opts) {
-    override def createLexer(charStream: CharStream): WdlDraft2Lexer = {
-      new WdlDraft2Lexer(charStream)
-    }
-
-    override def createParser(tokenStream: CommonTokenStream): WdlDraft2Parser = {
-      new WdlDraft2Parser(tokenStream)
-    }
-  }
-
-  def apply(sourceCode: SourceCode, opts: Options): Document = {
-    val grammarFactory = Draft2GrammarFactory(opts)
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = new ParseDocument(grammar, sourceCode.url, opts)
-    val document = visitor.apply()
-    grammar.verify()
-    document
-  }
-}
-
-case class ParseDocument(grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
-                         docSourceURL: URL,
-                         opts: Options)
+case class ParseTop(opts: Options,
+                    grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
+                    docSourceURL: Option[URL] = None)
     extends WdlDraft2ParserBaseVisitor[Element] {
 
   private def getSourceText(ctx: ParserRuleContext): TextSource = {
-    grammar.getSourceText(ctx, Some(docSourceURL))
+    grammar.getSourceText(ctx, docSourceURL)
   }
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
-    grammar.getSourceText(symbol, Some(docSourceURL))
+    grammar.getSourceText(symbol, docSourceURL)
   }
 
   private def getComment(ctx: ParserRuleContext): Option[Comment] = {
@@ -122,10 +100,11 @@ wdl_type
    */
   override def visitWdl_type(ctx: WdlDraft2Parser.Wdl_typeContext): Type = {
     val t = visitType_base(ctx.type_base())
-    if (ctx.OPTIONAL() != null)
+    if (ctx.OPTIONAL() != null) {
       TypeOptional(t, getSourceText(ctx))
-    else
+    } else {
       t
+    }
   }
 
   // EXPRESSIONS
@@ -1178,7 +1157,39 @@ document
     Document(WdlVersion.Draft_2, elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
-  def apply(): Document = {
-    visitDocument(grammar.parser.document)
+  def parseDocument: Document = {
+    apply match {
+      case d: Document => d
+      case _           => throw new Exception("WDL file does not contain a valid document")
+    }
+  }
+
+  def parseExpr: Expr = {
+    apply match {
+      case e: Expr => e
+      case _       => throw new Exception("Not a Valid expression")
+    }
+  }
+
+  def parseWdlType: Type = {
+    apply match {
+      case t: Type => t
+      case _       => throw new Exception("Not a valid WDL type")
+    }
+  }
+
+  def apply: Element = {
+    val ctx = grammar.parser.top.document_or_fragment
+    val result = if (ctx.document != null) {
+      visitDocument(ctx.document)
+    } else if (ctx.expr != null) {
+      visitExpr(ctx.expr)
+    } else if (ctx.wdl_type != null) {
+      visitWdl_type(ctx.wdl_type)
+    } else {
+      throw new Exception(s"No valid document or fragment")
+    }
+    grammar.verify()
+    result
   }
 }

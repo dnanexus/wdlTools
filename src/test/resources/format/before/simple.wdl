@@ -32,4 +32,8 @@ version 1.0
     runtime {
         docker: "debian:stretch-slim"
     }
+
+    parameter_meta {
+    	s: {foo: "bar", baz: "blorf"}
+    }
 }

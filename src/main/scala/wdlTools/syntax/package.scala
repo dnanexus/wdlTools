@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc}
+import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -100,4 +100,9 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
       results.toMap
     }
   }
+}
+
+trait WdlFragmentParser {
+  def parseExpr(text: String): Expr
+  def parseType(text: String): Type
 }

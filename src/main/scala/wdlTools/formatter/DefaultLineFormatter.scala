@@ -10,10 +10,10 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
                                 initialIndent: String = "",
                                 indentation: String = " ",
                                 indentStep: Int = 2,
-                                spacing: String = " ",
+                                defaultSpacing: String = " ",
                                 maxLineWidth: Int = 100,
                                 lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty)
-    extends LineFormatter(defaultIndenting) {
+    extends LineFormatter(defaultIndenting, defaultSpacing) {
   private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
   private val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
 
@@ -30,7 +30,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
 
   def preformatted(): LineFormatter = {
     DefaultLineFormatter(
-        spacing = "",
+        defaultSpacing = "",
         maxLineWidth = maxLineWidth,
         lines = lines
     )
@@ -90,7 +90,8 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
 
   def buildSubstring(
       chunks: Seq[Chunk],
-      builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth)
+      builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth),
+      spacing: String = defaultSpacing
   ): StringBuilder = {
     chunks.foreach { chunk =>
       if (builder.nonEmpty && !(builder.last.isWhitespace || builder.last == indentation.last)) {
@@ -139,15 +140,17 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     currentLine.append(value)
   }
 
-  def appendChunk(chunk: Chunk): Unit = {
-    buildSubstring(Vector(chunk), currentLine)
+  def appendChunk(chunk: Chunk, spacing: String = defaultSpacing): Unit = {
+    buildSubstring(Vector(chunk), currentLine, spacing)
   }
 
-  def appendAll(chunks: Seq[Chunk], wrapping: Wrapping = Wrapping.AsNeeded): Unit = {
+  def appendAll(chunks: Seq[Chunk],
+                wrapping: Wrapping = Wrapping.AsNeeded,
+                spacing: String = defaultSpacing): Unit = {
     if (wrapping == Wrapping.Never) {
       buildSubstring(chunks, currentLine)
     } else {
-      val substr = buildSubstring(chunks)
+      val substr = buildSubstring(chunks, spacing = spacing)
       if (wrapping == Wrapping.Always) {
         endLine(wrap = true)
       }
@@ -156,7 +159,14 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
       } else {
         spacing
       }
-      if (wrapping != Wrapping.Never && lengthRemaining < space.length + substr.length) {
+      val wrap = if (wrapping == Wrapping.Never) {
+        false
+      } else if (lengthRemaining < space.length + substr.length) {
+        true
+      } else {
+        chunks.exists(_.wrapAll)
+      }
+      if (wrap) {
         chunks.foreach { chunk =>
           chunk.format(lineFormatter = this)
         }
