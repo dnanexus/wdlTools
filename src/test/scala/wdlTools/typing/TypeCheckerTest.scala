@@ -112,7 +112,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "be able to handle GATK" taggedAs Edge in {
+  it should "be able to handle GATK" taggedAs Edge in {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
@@ -126,9 +126,9 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     checker.apply(doc)
   } */
 
-  ignore should "handle compound expressions" taggedAs (Edge) in {
+  it should "handle compound expressions" taggedAs (Edge) in {
     val src =
-      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/compound_expr.wdl").getPath)
+      Paths.get(getClass.getResource("/typing/v1_0/workflows/positive/compound_expr_bug.wdl").getPath)
     val doc = parser.parse(Util.getURL(src))
     val wf = doc.workflow.get
 
