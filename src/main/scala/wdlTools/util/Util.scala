@@ -9,33 +9,7 @@ import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
 
-/**
-  * Enumeration for verbosity level.
-  * The values are in increasing order, so that they can be compared using integer comparison
-  * operators, e.g. `if (verbosity > Normal) { println("debugging") }`.
-  */
-object Verbosity extends Enumeration {
-  type Verbosity = Value
-  val Quiet, Normal, Verbose = Value
-}
 import Verbosity._
-
-/**
-  * Common configuration options.
-  * @param localDirectories local directories to search for imports.
-  * @param followImports whether to follow imports when parsing.
-  * @param verbosity verbosity level.
-  * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
-  */
-case class Options(localDirectories: Option[Vector[Path]] = None,
-                   followImports: Boolean = false,
-                   verbosity: Verbosity = Normal,
-                   antlr4Trace: Boolean = false) {
-
-  def getURL(pathOrUrl: String): URL = {
-    Util.getURL(pathOrUrl, localDirectories)
-  }
-}
 
 object Util {
 

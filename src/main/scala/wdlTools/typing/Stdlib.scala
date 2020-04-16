@@ -4,6 +4,7 @@ import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
 import wdlTools.syntax.{AbstractSyntax, TextSource}
+//import wdlTools.util.Util
 
 case class Stdlib(conf: Options) {
 
@@ -90,7 +91,7 @@ case class Stdlib(conf: Options) {
       case WT_Function1(_, arg1, _)                 => Vector(arg1)
       case WT_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
       case WT_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                        => throw new TypeException(s"function ${funcDesc.name} is undefined", text)
+      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text)
     }
     try {
       val typeBindings: Map[WT_Var, WT] = TUtil.unify(args, inputTypes, text)
@@ -124,6 +125,7 @@ case class Stdlib(conf: Options) {
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
                                     |""".stripMargin, expr.text)
+        //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
       case n =>

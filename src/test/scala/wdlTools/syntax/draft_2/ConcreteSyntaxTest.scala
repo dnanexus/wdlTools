@@ -416,7 +416,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "parse a simple workflow" taggedAs Edge in {
+  it should "parse a simple workflow" in {
     val doc = getDocument(getWorkflowSource("I.wdl"))
     doc.elements.size shouldBe 0
 
@@ -499,7 +499,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val _ = getDocument(getWorkflowSource("bad_declaration.wdl"))
   }
 
-  it should "handle chained operations" taggedAs Edge in {
+  it should "handle chained operations" in {
     val doc = getDocument(getTaskSource("bug16-chained-operations.wdl"))
 
     doc.elements.size shouldBe 1
@@ -517,7 +517,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle chained operations in a workflow" taggedAs Edge in {
+  it should "handle chained operations in a workflow" in {
     val doc = getDocument(getWorkflowSource("chained_expr.wdl"))
     doc.elements.size shouldBe 0
 
@@ -530,6 +530,27 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.name shouldBe "b"
     decl.expr.get should matchPattern {
       case ExprAdd(ExprAdd(ExprInt(1, _), ExprInt(2, _), _), ExprInt(3, _), _) =>
+    }
+  }
+
+  it should "handle compound expression" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("compound_expr_bug.wdl"))
+    doc.elements.size shouldBe 0
+
+    doc.version shouldBe WdlVersion.Draft_2
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val decl = wf.body.head.asInstanceOf[Declaration]
+    decl.name shouldBe "a"
+    decl.expr.get should matchPattern {
+      case ExprApply("select_first",
+                     Vector(ExprArrayLiteral(
+                              Vector(ExprInt(3, _),
+                                     ExprApply("round", Vector(ExprInt(100, _)), _)),
+                              _)),
+                     _) => ()
     }
   }
 }

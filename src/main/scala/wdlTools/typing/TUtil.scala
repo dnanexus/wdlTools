@@ -4,7 +4,7 @@ import wdlTools.syntax.TextSource
 import WdlTypes._
 
 // This is the WDL typesystem
-object TUtil {
+case class TUtil(conf: Options) {
   // check if the right hand side of an assignment matches the left hand side
   //
   // Negative examples:
@@ -26,7 +26,6 @@ object TUtil {
   // Check if a type contains no type-variables
   private def containsTypeVariables(t: WT): Boolean = {
     t match {
-      case WT_String | WT_File | WT_Boolean | WT_Int | WT_Float => false
       case WT_Optional(t2)                                      => containsTypeVariables(t2)
       case WT_Array(t2)                                         => containsTypeVariables(t2)
       case WT_Map(k, v)                                         => containsTypeVariables(k) || containsTypeVariables(v)
@@ -36,7 +35,7 @@ object TUtil {
     }
   }
 
-  def isCoercibleTo(left: WT, right: WT): Boolean = {
+  private def isCoercibleToLenient(left: WT, right: WT) : Boolean = {
     //System.out.println(s"isCoercibleTo ${toString(left)} ${toString(right)} ")
     (left, right) match {
       case (WT_String, x) if isPrimitive(x) => true
@@ -47,27 +46,80 @@ object TUtil {
       case (WT_Int, WT_Int)                              => true
       case (WT_Float, WT_Int | WT_Float)                 => true
 
-      case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo(l, r)
+      case (WT_Optional(l), WT_Optional(r)) => isCoercibleToLenient(l, r)
 
-      // An Int is coercible to Int?
-      case (WT_Optional(l), r) => isCoercibleTo(l, r)
+      // A T is coercible to T?
+      case (WT_Optional(l), r) => isCoercibleToLenient(l, r)
 
-      case (WT_Array(l), WT_Array(r))         => isCoercibleTo(l, r)
-      case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo(kl, kr) && isCoercibleTo(vl, vr)
-      case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo(l1, r1) && isCoercibleTo(l2, r2)
+      case (WT_Array(l), WT_Array(r))         => isCoercibleToLenient(l, r)
+      case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleToLenient(kl, kr) && isCoercibleToLenient(vl, vr)
+      case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleToLenient(l1, r1) && isCoercibleToLenient(l2, r2)
 
+        // structures are equivalent iff they have the same name
       case (WT_Identifier(structNameL), WT_Identifier(structNameR)) =>
         structNameL == structNameR
 
       case (WT_Object, WT_Object)           => true
       case (WT_Var(i), WT_Var(j)) if i == j => true
 
-      // Array[Var(0)] <- Array[String]
-      case (WT_Var(_), other) if !containsTypeVariables(other) => true
-
-      // Array[String] <- Array[Var(0)]
-      case (other, WT_Var(_)) if !containsTypeVariables(other) => true
+      case (_, WT_Any) => true
       case _                                                   => false
+    }
+  }
+
+  private def isCoercibleToStrict(left: WT, right: WT) : Boolean = {
+    //System.out.println(s"isCoercibleTo ${toString(left)} ${toString(right)} ")
+    (left, right) match {
+      case (WT_String, WT_String) => true
+      case (WT_File, WT_File)                => true
+      case (WT_Boolean, WT_Boolean)                      => true
+      case (WT_Int, WT_Int)                              => true
+      case (WT_Float, WT_Int | WT_Float)                 => true
+
+      case (WT_Optional(l), WT_Optional(r)) => isCoercibleToStrict(l, r)
+      case (WT_Array(l), WT_Array(r))         => isCoercibleToStrict(l, r)
+      case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleToStrict(kl, kr) && isCoercibleToStrict(vl, vr)
+      case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleToStrict(l1, r1) && isCoercibleToStrict(l2, r2)
+
+        // structures are equivalent iff they have the same name
+      case (WT_Identifier(structNameL), WT_Identifier(structNameR)) =>
+        structNameL == structNameR
+
+      case (WT_Object, WT_Object)           => true
+      case (WT_Var(i), WT_Var(j)) if i == j => true
+
+      case (_, WT_Any) => true
+      case _                                                   => false
+    }
+  }
+
+  private def isASpecialCase(left: WT, right: WT) : Boolean = {
+    (left, right) match {
+      case (WT_String, x) if isPrimitive(x) => true
+      case (WT_File, WT_String | WT_File)                => true
+      case (WT_Boolean, WT_Boolean)                      => true
+      case (WT_Int, WT_Int)                              => true
+      case (WT_Float, WT_Int | WT_Float)                 => true
+
+      // a primitive T can be coerced to a T?
+      case (Optional(x), x) if isPrimitive(x) => true
+
+        // an array of primitives Array[T] can be coerced to an Array[T?]
+      case WT_Array(Optional(x)), WT_Array(x) if isPrimitive(x) => true
+
+        // anything else is not a special case
+      case (_, _) => false
+    }
+  }
+
+  def isCoercibleTo(left: WT, right: WT): Boolean = {
+    if (isASecialCase(left, right))
+      return true
+    conf.typeChecking match {
+      case TypeCheckingRegime.Strict =>
+        isCoercibleToStrict(left, right)
+      case TypeCheckingRegime.Lenient =>
+        isCoercibleToLenient(left, right)
     }
   }
 
@@ -83,6 +135,17 @@ object TUtil {
     throw new TypeUnificationException(s"$x and $y cannot be unified", text)
   }
 
+  // The least type that all the members are coercible to.
+  //
+  // For example,  [Int?, Int, Int?]  -> Int?
+  // But we don't want to have:
+  //
+  // Array[String] s = ["a", 1, 3.1]
+  // even if that makes sense, we don't want to have:
+  // Array[Array[String]] = [[1], ["2"], [1.1]]
+  //
+  def generalType(vecTypes : Vector[WT], text : TextSource, debugMsg : String) : WT = ???
+
   // when calling a polymorphic function things get complicated.
   // For example:
   //    select_first([null, 6])
@@ -91,7 +154,7 @@ object TUtil {
   // we need to figure out that X is Int.
   //
   //
-  def unifyPair(x: WT, y: WT, bindings: Map[WT_Var, WT], text: TextSource): Map[WT_Var, WT] = {
+  private def unifyPair(x: WT, y: WT, bindings: Map[WT_Var, WT], text: TextSource): Map[WT_Var, WT] = {
     (x, y) match {
       // base case, primitive types
       case (_, _) if (isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y)) =>
@@ -176,12 +239,12 @@ object TUtil {
         case a: WT_Var if !(typeBindings contains a) =>
           throw new TypeException(s"type variable ${toString(a)} does not have a binding", srcText)
         case a: WT_Var        => typeBindings(a)
-        case _: WT_Identifier => t
+        case id: WT_Identifier => id
         case WT_Pair(l, r)    => WT_Pair(sub(l), sub(r))
         case WT_Array(t)      => WT_Array(sub(t))
         case WT_Map(k, v)     => WT_Map(sub(k), sub(v))
         case WT_Object        => WT_Object
-        case WT_Optional(t)   => WT_Optional(sub(t))
+        case WT_Optional(t1)   => WT_Optional(sub(t1))
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
                                   srcText)

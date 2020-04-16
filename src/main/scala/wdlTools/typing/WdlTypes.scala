@@ -17,6 +17,10 @@ object WdlTypes {
   // Array[Int] names = []
   // Map[String, File] locations = {}
   //
+  // Note: it would be cleaner to handle the two polymorphic cases together,
+  // but we aren't doing it right now.
+  case object WT_Any
+
   // Polymorphic functions are another place where type variables appear
   case class WT_Var(i: Int) extends WT
 

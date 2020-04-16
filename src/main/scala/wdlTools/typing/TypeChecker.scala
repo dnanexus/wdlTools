@@ -3,6 +3,7 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
+import wdlTools.util.{TypeCheckingRegime, Util}
 
 case class TypeChecker(stdlib: Stdlib) {
 
@@ -322,18 +323,16 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprPair(l, r, _)                => WT_Pair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec, _) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
-        WT_Array(WT_Var(0))
+        WT_Array(WT_Any)
 
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
-        val t = vecTypes.head
-        if (!vecTypes.tail.forall(TUtil.isCoercibleTo(t, _)))
-          throw new TypeException(s"Array elements do not all have type ${t}", expr.text)
+        val t = TUtil.generalType(vecTypes, expr.text, "array elements")
         WT_Array(t)
 
       case ExprMap(m, _) if m.isEmpty =>
         // The map type is unknown
-        WT_Map(WT_Var(0), WT_Var(1))
+        WT_Map(WT_Any, WT_Any)
 
       case _: ExprObject =>
         WT_Object
@@ -343,12 +342,8 @@ case class TypeChecker(stdlib: Stdlib) {
         val mTypes: Map[WT, WT] = m.map {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
-        val tk = mTypes.keys.head
-        if (!mTypes.keys.tail.forall(TUtil.isCoercibleTo(_, tk)))
-          throw new TypeException(s"Map keys do not all have type ${tk}", expr.text)
-        val tv = mTypes.values.head
-        if (!mTypes.values.tail.forall(TUtil.isCoercibleTo(_, tv)))
-          throw new TypeException(s"Map values do not all have type ${tv}", expr.text)
+        val tk = TUtil.generalType(mType.keys, expr.text, "map keys")
+        val tv = TUtil.generalType(mType.keys, expr.text, "map values")
         WT_Map(tk, tv)
 
       // These are expressions like:
@@ -378,11 +373,10 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${exprToString(value)} must have type optional(${TUtil.toString(
-                       dt
-                   )})
-                    |it has type ${vt} instead""".stripMargin
-                  .replaceAll("\n", " "),
+              s"""|Subxpression ${exprToString(value)} must have type
+                  |optional(${TUtil.toString(dt)})
+                  |it has type ${vt} instead
+                  |""".stripMargin.replaceAll("\n", " "),
                 expr.text
             )
         }
@@ -395,7 +389,7 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"separator ${sep} in ${expr} must have string type", expr.text)
         val vt = typeEval(value, ctx)
         vt match {
-          case WT_Array(t) if TUtil.isCoercibleTo(WT_String, t) =>
+          case WT_Array(WT_String) =>
             WT_String
           case other =>
             throw new TypeException(
@@ -547,8 +541,12 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (_, Some(expr)) =>
         val rhsType = typeEval(expr, ctx)
-        if (!TUtil.isCoercibleTo(lhsType, rhsType))
-          throw new TypeException(s"declaration ${decl.name} is badly typed", decl.text)
+        if (!TUtil.isCoercibleTo(lhsType, rhsType)) {
+          throw new TypeException(s"""|${decl.name} is of type ${TUtil.toString(lhsType)}
+                                      |but is assigned ${TUtil.toString(rhsType)}
+                                      |""".stripMargin.replaceAll("\n", " "),
+                                  decl.text)
+        }
     }
     (decl.name, lhsType)
   }
@@ -677,12 +675,19 @@ case class TypeChecker(stdlib: Stdlib) {
                 s"call ${call} has argument ${argName} that does not exist in the callee",
                 call.text
             )
-          case Some((calleeType, _)) =>
-            if (!TUtil.isCoercibleTo(calleeType, wdlType))
-              throw new TypeException(
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Strict =>
+            if (calleeType != wdlType)
+                throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text
+                )
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Lenient =>
+            if (!TUtil.isCoercibleTo(calleeType, wdlType))
+              throw new TypeException(
+                s"argument ${argName} has type ${wdlType}, it is not coercible to ${calleeType}",
+                call.text
               )
+          case _ => ()
         }
     }
 
