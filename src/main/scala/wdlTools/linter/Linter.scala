@@ -10,11 +10,18 @@ import scala.collection.mutable
 
 case class Linter(opts: Options) {
   def apply(url: URL): Unit = {
-    val parsers = Parsers(opts)
-    val parser: ParseAll = parsers.getParser(WdlVersion.V1).asInstanceOf[ParseAll]
     val errors: mutable.Buffer[LinterError] = mutable.ArrayBuffer.empty
-    parser.addParserListenerFactory(LinterParserRuleFactory[Rules.WhitespaceTabsRule](errors))
-    parser.apply(url)
+    val listenerFactories = Vector(
+        LinterParserRuleFactory[Rules.WhitespaceTabsRule](errors)
+    )
+    val parsers = Parsers(opts, listenerFactories = listenerFactories)
+    val parser: ParseAll = parsers.getParser(WdlVersion.V1).asInstanceOf[ParseAll]
+    val doc = parser.apply(url)
+
+    val visitors = Vector()
+    val astWalker = LinterASTWalker(opts, visitors)
+    astWalker.apply(doc)
+
     errors.foreach { err =>
       println(s"${err.textSource} ${err.ruleId}")
     }

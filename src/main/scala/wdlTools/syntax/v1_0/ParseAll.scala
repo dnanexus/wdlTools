@@ -6,14 +6,11 @@ import wdlTools.syntax.{AbstractSyntax, ParseAllBase}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
-case class ParseAll(opts: Options, loader: SourceCode.Loader) extends ParseAllBase(opts, loader) {
-  private val grammarFactory: WdlV1GrammarFactory = WdlV1GrammarFactory(opts)
-
-  override def addParserListenerFactory(
-      listenerFactory: ParseTreeListenerFactory
-  ): Unit = {
-    grammarFactory.addParserListenerFactory(listenerFactory)
-  }
+case class ParseAll(opts: Options,
+                    loader: SourceCode.Loader,
+                    listeners: Vector[ParseTreeListenerFactory] = Vector.empty)
+    extends ParseAllBase(opts, loader) {
+  private val grammarFactory: WdlV1GrammarFactory = WdlV1GrammarFactory(opts, listeners)
 
   // start from a document [doc], and recursively dive into all the imported
   // documents. Replace all the raw import statements with fully elaborated ones.

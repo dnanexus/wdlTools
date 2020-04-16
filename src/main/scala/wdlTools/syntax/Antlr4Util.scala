@@ -190,16 +190,9 @@ object Antlr4Util {
 
   abstract class GrammarFactory[L <: Lexer, P <: Parser](
       opts: Options,
+      listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
       commentChannelName: String = "COMMENTS"
   ) {
-
-    private val parserListenerFactories: mutable.Buffer[ParseTreeListenerFactory] =
-      mutable.ArrayBuffer.empty
-
-    def addParserListenerFactory(listenerFactory: ParseTreeListenerFactory): Unit = {
-      parserListenerFactories.append(listenerFactory)
-    }
-
     def createGrammar(sourceCode: SourceCode): Grammar[L, P] = {
       createGrammar(sourceCode.toString, Some(sourceCode.url))
     }
@@ -224,7 +217,7 @@ object Antlr4Util {
       val grammar = Grammar(lexer, parser, errListener, commentChannelName, docSourceUrl, opts)
 
       // add listeners
-      parserListenerFactories.foreach { factory =>
+      listenerFactories.foreach { factory =>
         val listener = factory.createParseTreeListener(grammar.asInstanceOf[Grammar[Lexer, Parser]])
         parser.addParseListener(listener)
       }

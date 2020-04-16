@@ -20,7 +20,7 @@ class ASTVisitor {
 
   def visitStructMember(ctx: Context[StructMember]): Unit = {}
 
-  def visitExpression(expr: Context[Expr]): Unit = {}
+  def visitExpression(ctx: Context[Expr]): Unit = {}
 
   def visitDeclaration(ctx: Context[Declaration]): Unit = {}
 

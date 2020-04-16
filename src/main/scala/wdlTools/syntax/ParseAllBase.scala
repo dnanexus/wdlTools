@@ -3,7 +3,6 @@ package wdlTools.syntax
 import java.net.URL
 
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -25,8 +24,6 @@ abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
       case Some(aDoc) => aDoc
     }
   }
-
-  def addParserListenerFactory(listenerFactory: ParseTreeListenerFactory): Unit
 
   def canParse(sourceCode: SourceCode): Boolean
 

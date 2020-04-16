@@ -6,14 +6,11 @@ import wdlTools.syntax.{AbstractSyntax, ParseAllBase, TextSource, WdlVersion}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
-case class ParseAll(opts: Options, loader: SourceCode.Loader) extends ParseAllBase(opts, loader) {
-  private val grammarFactory: WdlDraft2GrammarFactory = WdlDraft2GrammarFactory(opts)
-
-  override def addParserListenerFactory(
-      listenerFactory: ParseTreeListenerFactory
-  ): Unit = {
-    grammarFactory.addParserListenerFactory(listenerFactory)
-  }
+case class ParseAll(opts: Options,
+                    loader: SourceCode.Loader,
+                    listeners: Vector[ParseTreeListenerFactory] = Vector.empty)
+    extends ParseAllBase(opts, loader) {
+  private val grammarFactory: WdlDraft2GrammarFactory = WdlDraft2GrammarFactory(opts, listeners)
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>

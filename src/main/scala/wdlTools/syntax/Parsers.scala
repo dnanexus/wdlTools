@@ -4,15 +4,18 @@ import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.Document
+import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
 
-case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
+case class Parsers(opts: Options = Options(),
+                   defaultLoader: Option[SourceCode.Loader] = None,
+                   listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty) {
   private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
   private lazy val parsers: Map[WdlVersion, ParseAllBase] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
-      WdlVersion.V1 -> v1_0.ParseAll(opts, loader)
+      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader, listenerFactories),
+      WdlVersion.V1 -> v1_0.ParseAll(opts, loader, listenerFactories)
   )
   private lazy val fragmentParsers: Map[WdlVersion, WdlFragmentParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseFragment(opts),
