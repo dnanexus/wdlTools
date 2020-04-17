@@ -7,6 +7,7 @@ import wdlTools.syntax.{AbstractSyntax, TextSource}
 //import wdlTools.util.Util
 
 case class Stdlib(conf: Options) {
+  val tUtil = TUtil(conf)
 
   private val stdlibV1_0: Vector[WT_StdlibFunc] = Vector(
       WT_Function0("stdout", WT_File),
@@ -57,6 +58,7 @@ case class Stdlib(conf: Options) {
       WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_String),
       WT_Function1("select_first", WT_Array(WT_Optional(WT_Var(0))), WT_Var(0)),
+      WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
       // simple functions again
       WT_Function1("basename", WT_String, WT_String),
@@ -94,8 +96,8 @@ case class Stdlib(conf: Options) {
       case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text)
     }
     try {
-      val typeBindings: Map[WT_Var, WT] = TUtil.unify(args, inputTypes, text)
-      val t = TUtil.substitute(funcDesc.output, typeBindings, text)
+      val typeBindings: Map[WT_Var, WT] = tUtil.unify(args, inputTypes, text)
+      val t = tUtil.substitute(funcDesc.output, typeBindings, text)
       Some(t)
     } catch {
       case _: TypeUnificationException =>
@@ -119,13 +121,13 @@ case class Stdlib(conf: Options) {
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(TUtil.toString(_)).mkString("\n")
-        val candidatesStr = candidates.map(TUtil.toString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(tUtil.toString(_)).mkString("\n")
+        val candidatesStr = candidates.map(tUtil.toString(_)).mkString("\n")
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
                                     |""".stripMargin, expr.text)
-        //Util.warning(e.getMessage, conf.verbosity)
+      //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
       case n =>

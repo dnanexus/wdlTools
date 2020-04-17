@@ -529,7 +529,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "have real world GATK tasks" in{
+  it should "have real world GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
@@ -561,11 +561,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.name shouldBe "a"
     decl.expr.get should matchPattern {
       case ExprApply("select_first",
-                     Vector(ExprArrayLiteral(
-                              Vector(ExprInt(3, _),
-                                     ExprApply("round", Vector(ExprInt(100, _)), _)),
-                              _)),
-                     _) => ()
+                     Vector(
+                         ExprArrayLiteral(Vector(ExprInt(3, _),
+                                                 ExprApply("round", Vector(ExprInt(100, _)), _)),
+                                          _)
+                     ),
+                     _) =>
+        ()
     }
   }
 }

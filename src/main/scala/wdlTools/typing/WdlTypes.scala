@@ -19,7 +19,7 @@ object WdlTypes {
   //
   // Note: it would be cleaner to handle the two polymorphic cases together,
   // but we aren't doing it right now.
-  case object WT_Any
+  case object WT_Any extends WT
 
   // Polymorphic functions are another place where type variables appear
   case class WT_Var(i: Int) extends WT

@@ -546,11 +546,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     decl.name shouldBe "a"
     decl.expr.get should matchPattern {
       case ExprApply("select_first",
-                     Vector(ExprArrayLiteral(
-                              Vector(ExprInt(3, _),
-                                     ExprApply("round", Vector(ExprInt(100, _)), _)),
-                              _)),
-                     _) => ()
+                     Vector(
+                         ExprArrayLiteral(Vector(ExprInt(3, _),
+                                                 ExprApply("round", Vector(ExprInt(100, _)), _)),
+                                          _)
+                     ),
+                     _) =>
+        ()
     }
   }
 }
