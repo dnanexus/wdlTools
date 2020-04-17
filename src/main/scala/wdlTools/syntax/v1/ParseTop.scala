@@ -589,6 +589,7 @@ string
 	: expr_infix
 	; */
   override def visitExpr(ctx: WdlV1Parser.ExprContext): Expr = {
+    assert(ctx != null)
     visitChildren(ctx).asInstanceOf[Expr]
   }
 

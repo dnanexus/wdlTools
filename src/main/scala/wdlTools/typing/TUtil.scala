@@ -31,14 +31,19 @@ case class TUtil(conf: Options) {
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
     //System.out.println(s"isCoercibleTo ${left} ${right} ")
     (left, right) match {
-      case (WT_String, WT_String | WT_File)            => true
-      case (WT_String, WT_Int | WT_Float | WT_Boolean) =>
-        // Undocumented in the spec
-        true
+      case (WT_String, WT_String | WT_File) => true
+
+      // Undocumented in spec 1.0
+      case (WT_String, WT_Int | WT_Float | WT_Boolean) => true
+
       case (WT_File, WT_String | WT_File) => true
       case (WT_Boolean, WT_Boolean)       => true
       case (WT_Int, WT_Int)               => true
       case (WT_Float, WT_Int | WT_Float)  => true
+
+      // Undocumented in spec 1.0.
+      // The user should specify ciel/round/... instead of this coercion
+      case (WT_Int, WT_Float) => true
 
       // This is going to require a runtime check. For example:
       // Int a = "1"

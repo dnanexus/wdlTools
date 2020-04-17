@@ -157,13 +157,15 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   }
 
   it should "be able to handle GATK" taggedAs (Edge) in {
-    val opts2 = opts.copy(typeChecking = Lenient)
+    val opts2 = opts.copy(typeChecking = Lenient, antlr4Trace = true)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
     val sources = Vector(
-        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-//      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl"
+//      "https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
     )
 
     for (src <- sources) {
