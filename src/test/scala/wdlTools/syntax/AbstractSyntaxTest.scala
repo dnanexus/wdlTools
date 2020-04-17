@@ -28,7 +28,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   it should "handle import statements" in {
     val doc = parser.apply(getWorkflowSource("imports.wdl"))
 
-    doc.version shouldBe WdlVersion.V1
+    doc.version.value shouldBe WdlVersion.V1
 
     val imports = doc.elements.collect {
       case x: ImportDoc => x
@@ -40,7 +40,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
 
   it should "handle optionals" in {
     val doc = parser.apply(getTaskSource("missing_type_bug.wdl"))
-    doc.version shouldBe WdlVersion.V1
+    doc.version.value shouldBe WdlVersion.V1
   }
 
   it should "type check GATK tasks" in {
@@ -49,7 +49,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     val sourceCode = loader.apply(Util.getURL(url))
     val doc = parser.apply(sourceCode)
 
-    doc.version shouldBe WdlVersion.V1
+    doc.version.value shouldBe WdlVersion.V1
   }
 
   it should "type check GATK joint genotyping workflow" taggedAs Edge in {
@@ -58,7 +58,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     val sourceCode = loader.apply(Util.getURL(url))
     val doc = parser.apply(sourceCode)
 
-    doc.version shouldBe WdlVersion.V1
+    doc.version.value shouldBe WdlVersion.V1
   }
 
 }

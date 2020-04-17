@@ -23,7 +23,7 @@ class BaseTest extends FlatSpec with Matchers {
 
   it should "handle the runtime section correctly" in {
     val doc = parser.parse(getWdlURL(fname = "simple.wdl", subdir = "after"))
-    doc.version shouldBe WdlVersion.V1
+    doc.version.value shouldBe WdlVersion.V1
   }
 
   def getWdlSource(fname: String, subdir: String): String = {

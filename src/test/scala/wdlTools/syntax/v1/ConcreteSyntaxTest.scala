@@ -428,10 +428,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
     calls.size shouldBe 1
     calls(0) should matchPattern {
-      case Call("bar", Some("boz"), _, _, _) =>
+      case Call("bar", Some(CallAlias("boz", _)), _, _, _) =>
     }
-    calls(0).inputs.toVector should matchPattern {
-      case Vector(("i", ExprIdentifier("s", _))) =>
+    calls(0).inputs.get.value should matchPattern {
+      case Vector(CallInput("i", ExprIdentifier("s", _), _)) =>
     }
 
     val scatters = wf.body.collect {
@@ -447,8 +447,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case Call("add", None, _, _, _) =>
     }
     val call = scatters(0).body(0).asInstanceOf[Call]
-    call.inputs.toVector should matchPattern {
-      case Vector(("x", ExprIdentifier("i", _))) =>
+    call.inputs.get.value should matchPattern {
+      case Vector(CallInput("x", ExprIdentifier("i", _), _)) =>
     }
 
     val conditionals = wf.body.collect {
