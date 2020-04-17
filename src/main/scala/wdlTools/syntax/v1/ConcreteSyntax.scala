@@ -1,4 +1,4 @@
-package wdlTools.syntax.v1_0
+package wdlTools.syntax.v1
 
 import java.net.URL
 
@@ -7,7 +7,6 @@ import wdlTools.syntax.{Comment, TextSource, WdlVersion}
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
 object ConcreteSyntax {
-
   sealed trait Element {
     val text: TextSource // where in the source program does this element belong
   }
@@ -179,10 +178,10 @@ object ConcreteSyntax {
 
   case class CallAlias(name: String, text: TextSource) extends Element
   case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
-  case class CallInputs(value: Map[String, Expr], text: TextSource) extends Element
+  case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
   case class Call(name: String,
-                  alias: Option[String],
-                  inputs: Map[String, Expr],
+                  alias: Option[CallAlias],
+                  inputs: Option[CallInputs],
                   text: TextSource,
                   comment: Option[Comment])
       extends WorkflowElement
@@ -208,7 +207,7 @@ object ConcreteSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Version(value: WdlVersion = WdlVersion.V1_0, text: TextSource) extends Element
+  case class Version(value: WdlVersion = WdlVersion.V1, text: TextSource) extends Element
   case class Document(version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

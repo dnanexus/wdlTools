@@ -12,7 +12,7 @@ case class Format(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.format.url()
     val opts = conf.format.getOptions
-    val formatter = V1_0Formatter(opts)
+    val formatter = WdlV1Formatter(opts)
     formatter.formatDocuments(url)
     formatter.documents.foreach {
       case (uri, lines) =>

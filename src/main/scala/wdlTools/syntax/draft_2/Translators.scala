@@ -184,9 +184,21 @@ object Translators {
                                    comment)
 
       case ConcreteSyntax.Call(name, alias, inputs, text, comment) =>
-        AbstractSyntax.Call(name, alias, inputs.map {
-          case (name, expr) => name -> translateExpr(expr)
-        }, text, comment)
+        AbstractSyntax.Call(
+            name,
+            alias.map {
+              case ConcreteSyntax.CallAlias(callName, callText) =>
+                AbstractSyntax.CallAlias(callName, callText)
+            },
+            inputs.map {
+              case ConcreteSyntax.CallInputs(inputsVec, inputsText) =>
+                AbstractSyntax.CallInputs(inputsVec.map { inp =>
+                  AbstractSyntax.CallInput(inp.name, translateExpr(inp.expr), inp.text)
+                }, inputsText)
+            },
+            text,
+            comment
+        )
 
       case ConcreteSyntax.Scatter(identifier, expr, body, text, comment) =>
         AbstractSyntax.Scatter(identifier,
@@ -217,7 +229,7 @@ object Translators {
   }
 
   def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
-                         importedDoc: AbstractSyntax.Document): AbstractSyntax.ImportDoc = {
+                         importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
     val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
       case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
     }

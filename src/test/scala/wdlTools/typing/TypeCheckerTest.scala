@@ -4,7 +4,7 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.v1_0.ParseAll
+import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 import wdlTools.util.TypeCheckingRegime._
 
@@ -16,7 +16,8 @@ class TypeCheckerTest extends FlatSpec with Matchers {
               Paths.get(getClass.getResource("/typing/v1_0").getPath)
           )
       ),
-      verbosity = Verbosity.Verbose
+      verbosity = Verbosity.Quiet,
+      followImports = true
   )
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)

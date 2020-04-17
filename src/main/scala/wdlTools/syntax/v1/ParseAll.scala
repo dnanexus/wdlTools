@@ -1,8 +1,8 @@
-package wdlTools.syntax.v1_0
+package wdlTools.syntax.v1
 
 import java.net.URL
 
-import wdlTools.syntax.v1_0.Translators._
+import wdlTools.syntax.v1.Translators._
 import wdlTools.syntax.{AbstractSyntax, WdlParser}
 import wdlTools.util.{Options, SourceCode}
 
@@ -36,19 +36,19 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
       case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
       case importDoc: ConcreteSyntax.ImportDoc =>
-        val importedDoc = followImport(importDoc.url)
+        val importedDoc = if (opts.followImports) {
+          Some(followImport(importDoc.url))
+        } else {
+          None
+        }
         translateImportDoc(importDoc, importedDoc)
       case task: ConcreteSyntax.Task => translateTask(task)
       case other                     => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
-    AbstractSyntax.Document(doc.version.value,
-                            Some(doc.version.text),
-                            elems,
-                            aWf,
-                            doc.text,
-                            doc.comment)
+    val version = AbstractSyntax.Version(doc.version.value, doc.version.text, None)
+    AbstractSyntax.Document(version, Some(doc.version.text), elems, aWf, doc.text, doc.comment)
   }
 
   override def canParse(sourceCode: SourceCode): Boolean = {

@@ -1,4 +1,4 @@
-package wdlTools.syntax.v1_0
+package wdlTools.syntax.v1
 
 import wdlTools.syntax.{AbstractSyntax, WdlFragmentParser}
 import wdlTools.util.Options
