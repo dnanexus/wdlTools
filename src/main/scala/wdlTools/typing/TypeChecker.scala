@@ -14,7 +14,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
   // An entire context
   //
-  // There separate namespaces for variables, struct definitions, and callables (tasks/workflows).
+  // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
   // An additional variable holds a list of all imported namespaces.
   case class Context(declarations: Map[String, WT],
                      structs: Map[String, WT_Struct],
@@ -324,36 +324,44 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprPair(l, r, _)                => WT_Pair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec, _) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
+        // TODO: replace the Any type with a type-parameter
         WT_Array(WT_Any)
 
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
-        val t = tUtil.generalType(vecTypes) match {
-          case None    => throw new TypeException("array elements must have the same type", expr.text)
-          case Some(t) => t
-        }
+        val (t, _) =
+          try { tUtil.unifyCollection(vecTypes, Map.empty) }
+          catch {
+            case _ : TypeUnificationException =>
+              throw new TypeException("array elements must have the same type, or be coercible to one", expr.text)
+          }
         WT_Array(t)
-
-      case ExprMap(m, _) if m.isEmpty =>
-        // The map type is unknown
-        WT_Map(WT_Any, WT_Any)
 
       case _: ExprObject =>
         WT_Object
+
+      case ExprMap(m, _) if m.isEmpty =>
+        // The map type is unknown.
+        // TODO: replace the Any type with a type-parameter
+        WT_Map(WT_Any, WT_Any)
 
       case ExprMap(m, _) =>
         // figure out the types from the first element
         val mTypes: Map[WT, WT] = m.map {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
-        val tk = tUtil.generalType(mTypes.keys.toVector) match {
-          case None    => throw new TypeException("map keys must have the same type", expr.text)
-          case Some(t) => t
-        }
-        val tv = tUtil.generalType(mTypes.values.toVector) match {
-          case None    => throw new TypeException("map values must have the same type", expr.text)
-          case Some(t) => t
-        }
+        val (tk, _) =
+          try { tUtil.unifyCollection(mTypes.keys, Map.empty) }
+          catch {
+            case _: TypeUnificationException =>
+              throw new TypeException("map keys must have the same type, or be coercible to one", expr.text)
+          }
+        val (tv, _) =
+          try { tUtil.unifyCollection(mTypes.values, Map.empty) }
+          catch {
+            case _ : TypeUnificationException =>
+              throw new TypeException("map values must have the same type, or be coercible to one", expr.text)
+          }
         WT_Map(tk, tv)
 
       // These are expressions like:
@@ -455,8 +463,11 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"condition ${exprToString(cond)} must be a boolean", expr.text)
         val tBranchT = typeEval(tBranch, ctx)
         val fBranchT = typeEval(fBranch, ctx)
-        tUtil.generalType(Vector(tBranchT, fBranchT)) match {
-          case None =>
+        try {
+          val (t, _) = tUtil.unify(tBranchT, fBranchT, Map.empty)
+          t
+        } catch {
+          case _ : TypeUnificationException =>
             throw new TypeException(
                 s"""|The branches of a conditional expression must be coercable to the same type
                     |expression: ${exprToString(expr)}
@@ -465,7 +476,6 @@ case class TypeChecker(stdlib: Stdlib) {
                     |""".stripMargin,
                 expr.text
             )
-          case Some(mgt) => mgt
         }
 
       // Apply a standard library function to arguments. For example:

@@ -96,8 +96,8 @@ case class Stdlib(conf: Options) {
       case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text)
     }
     try {
-      val typeBindings: Map[WT_Var, WT] = tUtil.unify(args, inputTypes, text)
-      val t = tUtil.substitute(funcDesc.output, typeBindings, text)
+      val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
+      val t = tUtil.substitute(funcDesc.output, ctx, text)
       Some(t)
     } catch {
       case _: TypeUnificationException =>

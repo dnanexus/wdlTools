@@ -18,6 +18,7 @@ workflow foo {
 
   # https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/JointGenotyping-terra.wdl#L475
   # converting Array[String] to Array[Int]
+  Int d = "3"
   Array[Int] numbers = ["1", "2"]
 
   # https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/JointGenotyping-terra.wdl#L556

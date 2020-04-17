@@ -29,9 +29,12 @@ case class TUtil(conf: Options) {
   }
 
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
-    //System.out.println(s"isCoercibleTo ${toString(left)} ${toString(right)} ")
+    //System.out.println(s"isCoercibleTo ${left} ${right} ")
     (left, right) match {
       case (WT_String, WT_String | WT_File) => true
+      case (WT_String, WT_Int | WT_Float | WT_Boolean) =>
+        // Undocumented in the spec
+        true
       case (WT_File, WT_String | WT_File)   => true
       case (WT_Boolean, WT_Boolean)         => true
       case (WT_Int, WT_Int)                 => true
@@ -40,11 +43,11 @@ case class TUtil(conf: Options) {
       // This is going to require a runtime check. For example:
       // Int a = "1"
       case (WT_Int, WT_String) if regime == Lenient => true
+      case (WT_Optional(l), WT_Optional(r))   => isCoercibleTo2(l, r)
 
       // T is coercible to T?
       case (WT_Optional(l), r) if regime == Lenient => isCoercibleTo2(l, r)
 
-      case (WT_Optional(l), WT_Optional(r))   => isCoercibleTo2(l, r)
       case (WT_Array(l), WT_Array(r))         => isCoercibleTo2(l, r)
       case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)
       case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo2(l1, r1) && isCoercibleTo2(l2, r2)
@@ -61,50 +64,30 @@ case class TUtil(conf: Options) {
     }
   }
 
-  private def specialCases(left: WT, right: WT): Boolean = {
+  def isCoercibleTo(left: WT, right: WT): Boolean = {
     (left, right) match {
-      case (WT_String, WT_Int | WT_Float) =>
-        // Undocumented in the spec
-        true
+      // List of special cases goes here
 
       // a type T can be coerced to a T?
       // I don't think this is such a great idea.
       case (WT_Optional(l), r) if l == r => true
 
-      // anything else is not a special case
-      case (_, _) => false
+      // normal cases
+      case (_, _) =>
+        isCoercibleTo2(left, right)
     }
   }
 
-  def isCoercibleTo(left: WT, right: WT): Boolean = {
-    if (specialCases(left, right))
-      return true
-    isCoercibleTo2(left, right)
-  }
-
-  // The least type that all the members are coercible to.
+  // The least type that [x] and [y] are coercible to.
   // For example:
-  //    [Int?, Int, Int?]  -> Int?
+  //    [Int?, Int]  -> Int?
   //
   // But we don't want to have:
   //    Array[String] s = ["a", 1, 3.1]
   // even if that makes sense, we don't want to have:
   //    Array[Array[String]] = [[1], ["2"], [1.1]]
   //
-  // mgt === Most General Type
-  def generalType(vecTypes: Vector[WT]): Option[WT] = {
-    assert(vecTypes.nonEmpty)
-    val mgt = vecTypes.head
-    val result = vecTypes.tail.foldLeft(mgt) {
-      case (x, y) if x == y              => x
-      case (WT_Optional(x), y) if x == y => WT_Optional(x)
-      case (x, WT_Optional(y)) if x == y => WT_Optional(x)
-      case (_, _) =>
-        return None
-    }
-    Some(result)
-  }
-
+  //
   // when calling a polymorphic function things get complicated.
   // For example:
   //    select_first([null, 6])
@@ -113,59 +96,69 @@ case class TUtil(conf: Options) {
   // we need to figure out that X is Int.
   //
   //
-  private def unifyPair(x: WT,
-                        y: WT,
-                        bindings: Map[WT_Var, WT],
-                        text: TextSource): Map[WT_Var, WT] = {
+  def unify(x: WT, y: WT, ctx: TypeUnificationContext): (WT, TypeUnificationContext) = {
     (x, y) match {
       // base case, primitive types
       case (_, _) if (isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y)) =>
-        bindings
-      case (WT_Optional(l), WT_Optional(r)) => unifyPair(l, r, bindings, text)
-      case (WT_Optional(l), r)              =>
-        // I'm not sure this is such a great idea. We are allowing an X to
-        // become an X?
-        unifyPair(l, r, bindings, text)
+        (x, ctx)
+      case (WT_Optional(l), WT_Optional(r)) =>
+        val (t, ctx2) = unify(l, r, ctx)
+        (WT_Optional(t), ctx2)
 
-      case (WT_Array(l), WT_Array(r)) => unifyPair(l, r, bindings, text)
+      // These two cases are really questionable to me. We are allowing an X to
+      // become an X?
+      case (WT_Optional(l), r)              =>
+        val (t, ctx2) = unify(l, r, ctx)
+        (WT_Optional(t), ctx2)
+      case (l, WT_Optional(r))  =>
+        val (t, ctx2) = unify(l, r, ctx)
+        (WT_Optional(t), ctx2)
+
+      case (WT_Array(l), WT_Array(r)) =>
+        val (t, ctx2) = unify(l, r, ctx)
+        (WT_Array(t), ctx2)
       case (WT_Map(k1, v1), WT_Map(k2, v2)) =>
-        val bindings1 = unifyPair(k1, k2, bindings, text)
-        unifyPair(v1, v2, bindings1, text)
+        val (kt, ctx2) = unify(k1, k2, ctx)
+        val (vt, ctx3) = unify(v1, v2, ctx2)
+        (WT_Map(kt, vt), ctx3)
       case (WT_Pair(l1, r1), WT_Pair(l2, r2)) =>
-        val bindings1 = unifyPair(l1, l2, bindings, text)
-        unifyPair(r1, r2, bindings1, text)
+        val (lt, ctx2) = unify(l1, l2, ctx)
+        val (rt, ctx3) = unify(r1, r2, ctx2)
+        (WT_Pair(lt, rt), ctx3)
       case (WT_Identifier(l), WT_Identifier(r)) if l == r =>
-        bindings
+        // a user defined type
+        (WT_Identifier(l), ctx)
       case (WT_Var(i), WT_Var(j)) if (i == j) =>
-        bindings
+        (WT_Var(i), ctx)
+
       case (a: WT_Var, b: WT_Var) =>
         // found a type equality between two variables
-        (bindings.get(a), bindings.get(b)) match {
+        val ctx3 : TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
           case (None, None) =>
-            bindings + (a -> b)
+            ctx + (a -> b)
           case (None, Some(z)) =>
-            bindings + (a -> z)
+            ctx + (a -> z)
           case (Some(z), None) =>
-            bindings + (b -> z)
+            ctx + (b -> z)
           case (Some(z), Some(w)) =>
-            if (z != w)
-              throw new TypeUnificationException(s"Types $z and $w do not match", text)
-            bindings
+            val (_, ctx2) = unify(z, w, ctx)
+            ctx2
         }
-      case (a: WT_Var, _) if !(bindings contains a) =>
-        // found a new binding for a type variable
-        bindings + (a -> y)
+        (ctx3(a), ctx3)
 
-      case (a: WT_Var, _) =>
-        // a binding already exists, choose the more general
-        // type
-        val w = bindings(a)
-        if (w != y)
-          throw new TypeUnificationException(s"Types $w and $y do not match", text)
-        bindings
+      case (a: WT_Var, z) =>
+        if (!(ctx contains a)) {
+          // found a binding for a type variable
+          (z, (ctx + (a -> z)))
+        } else {
+          // a binding already exists, choose the more general
+          // type
+          val w = ctx(a)
+          unify(w, z, ctx)
+        }
 
       case _ =>
-        throw new TypeUnificationException(s"Types $x and $y do not match", text)
+        throw new TypeUnificationException(s"Types $x and $y do not match")
     }
   }
 
@@ -187,11 +180,23 @@ case class TUtil(conf: Options) {
   //    WT_Var(0) -> WT_Int
   //    WT_Var(1) -> WT_String
   //
-  def unify(x: Vector[WT], y: Vector[WT], text: TextSource): Map[WT_Var, WT] = {
-    val pairs = x zip y
-    pairs.foldLeft(Map.empty[WT_Var, WT]) {
-      case (bindings, (lt, rt)) =>
-        unifyPair(lt, rt, bindings, text)
+  def unifyFunctionArguments(x: Vector[WT],
+                             y: Vector[WT],
+                             ctx : TypeUnificationContext): (Vector[WT], TypeUnificationContext) = {
+    (x zip y).foldLeft((Vector.empty[WT], ctx)) {
+      case ((tVec, ctx), (lt, rt)) =>
+        val (t, ctx2) = unify(lt, rt, ctx)
+        (tVec :+ t, ctx2)
+    }
+  }
+
+  // Unify elements in a collection. For example, a vector of values.
+  def unifyCollection(tVec : Iterable[WT],
+                      ctx : TypeUnificationContext) : (WT, TypeUnificationContext) = {
+    assert(tVec.nonEmpty)
+    tVec.tail.foldLeft((tVec.head, ctx)) {
+      case ((t, ctx), t2) =>
+        unify(t, t2, ctx)
     }
   }
 

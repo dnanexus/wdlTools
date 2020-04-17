@@ -63,6 +63,10 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "simple.wdl" -> TResult(false)
   )
 
+  // test to include/exclude
+  private val includeList : Option[Set[String]] = None //Some(Set("coercions_questionable.wdl"))
+  private val excludeList : Option[Set[String]] = None
+
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
     val opts2 = flag match {
       case None    => opts
@@ -103,6 +107,18 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
+  private def includeExcludeCheck(name : String) : Boolean = {
+    excludeList match {
+      case Some(l) if (l contains name) => return false
+      case _ => ()
+    }
+    includeList match {
+      case None => return true
+      case Some(l) if (l contains name) => return true
+      case Some(_) => return false
+    }
+  }
+
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/typing/v1_0").getPath)
@@ -112,10 +128,14 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val testFiles2 = testFiles.flatMap {
       case testFile =>
         val name = testFile.getFileName().toString
-        controlTable.get(name) match {
-          case None => None
-          case Some(tResult) =>
-            Some(testFile, tResult)
+        if (!includeExcludeCheck(name)) {
+          None
+        } else {
+          controlTable.get(name) match {
+            case None => None
+            case Some(tResult) =>
+              Some(testFile, tResult)
+          }
         }
     }
 
@@ -127,21 +147,28 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" in {
+  ignore should "coerce types" in {
+    val tUtil = TUtil(opts)
+    import WdlTypes._
+
+    tUtil.isCoercibleTo(WT_Array(WT_Optional(WT_String)),
+                        WT_Array(WT_Optional(WT_String))) shouldBe(true)
+  }
+
+  it should "be able to handle GATK" taggedAs(Edge) in {
     val opts2 = opts.copy(typeChecking = Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
-    val url = Util.getURL(
-        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+    val sources = Vector(
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+//      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
     )
-    val doc = parser.parse(url)
-    checker.apply(doc)
+
+    for (src <- sources) {
+      val url = Util.getURL(src)
+      val doc = parser.parse(url)
+      checker.apply(doc)
+    }
   }
-
-  /*  it should "type check strict coercions" taggedAs Edge in {
-    val testFile = Paths.get(getClass.getResource("/typing/v1_0/coercions_strict.wdl").getPath)
-    checkCorrect(testFile, Some(Strict))
-  }*/
-
 }

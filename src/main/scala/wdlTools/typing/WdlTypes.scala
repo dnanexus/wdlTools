@@ -86,4 +86,12 @@ object WdlTypes {
   // String sub(String, String, String)
   case class WT_Function3(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
       extends WT_StdlibFunc
+
+
+  // A value for each type variable.
+  //
+  // This is used when we have polymorphic types,
+  // such as when calling standard library functions. We need to keep
+  // track of the latest value for each type variable.
+  type TypeUnificationContext = Map[WT_Var, WT]
 }
