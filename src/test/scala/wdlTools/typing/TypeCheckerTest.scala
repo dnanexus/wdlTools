@@ -157,7 +157,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   }
 
   it should "be able to handle GATK" taggedAs (Edge) in {
-    val opts2 = opts.copy(typeChecking = Lenient, antlr4Trace = true)
+    val opts2 = opts.copy(typeChecking = Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
