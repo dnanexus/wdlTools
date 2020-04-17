@@ -539,7 +539,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     doc.elements.size shouldBe 19
   }
 
-  it should "be able to handle GATK workflow" taggedAs Edge in {
+  it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
@@ -569,5 +569,24 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                      _) =>
         ()
     }
+  }
+
+  it should "handle call with extra comma" in {
+    val doc = getDocument(getWorkflowSource("call_bug.wdl"))
+    doc.elements.size shouldBe 1
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+  }
+
+  // This doesn't pass right now
+  ignore should "handle call with dot in expression" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("call_bug2.wdl"))
+    doc.elements.size shouldBe 1
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
   }
 }

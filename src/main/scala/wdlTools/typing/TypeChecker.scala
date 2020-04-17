@@ -396,12 +396,12 @@ case class TypeChecker(stdlib: Stdlib) {
         val vt = typeEval(value, ctx)
         val dt = typeEval(default, ctx)
         vt match {
-          case WT_Optional(vt2) if vt2 == dt => dt
+          case WT_Optional(vt2) if tUtil.isCoercibleTo(dt, vt2) => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${exprToString(value)} must have type
-                    |optional(${tUtil.toString(dt)})
-                    |it has type ${vt} instead
+                s"""|Subxpression (${exprToString(value)}) must have type coercible to
+                    |Optional(${tUtil.toString(dt)})
+                    |it has type (${vt}) instead
                     |""".stripMargin.replaceAll("\n", " "),
                 expr.text
             )

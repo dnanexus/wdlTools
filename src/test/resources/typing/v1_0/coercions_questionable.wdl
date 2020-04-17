@@ -27,4 +27,7 @@ workflow foo {
   Array[String] birds = ["finch", "hawk"]
   Array[String?] mammals = []
   Array[String?] zoo = if (true) then birds else mammals
+
+  # https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/haplotypecaller-gvcf-gatk4.wdl#L211
+  Int z = 1.3
 }
