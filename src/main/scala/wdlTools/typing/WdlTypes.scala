@@ -17,6 +17,10 @@ object WdlTypes {
   // Array[Int] names = []
   // Map[String, File] locations = {}
   //
+  // Note: it would be cleaner to handle the two polymorphic cases together,
+  // but we aren't doing it right now.
+  case object WT_Any extends WT
+
   // Polymorphic functions are another place where type variables appear
   case class WT_Var(i: Int) extends WT
 
@@ -82,4 +86,11 @@ object WdlTypes {
   // String sub(String, String, String)
   case class WT_Function3(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
       extends WT_StdlibFunc
+
+  // A value for each type variable.
+  //
+  // This is used when we have polymorphic types,
+  // such as when calling standard library functions. We need to keep
+  // track of the latest value for each type variable.
+  type TypeUnificationContext = Map[WT_Var, WT]
 }

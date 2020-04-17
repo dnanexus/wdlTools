@@ -300,7 +300,7 @@ object AbstractSyntax {
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
       case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
-        s"if ${exprToString(cond)} then ${exprToString(tBranch)} else ${exprToString(fBranch)}"
+        s"if (${exprToString(cond)}) then ${exprToString(tBranch)} else ${exprToString(fBranch)}"
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")

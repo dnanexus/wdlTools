@@ -3,8 +3,10 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
+import wdlTools.util.TypeCheckingRegime
 
 case class TypeChecker(stdlib: Stdlib) {
+  val tUtil = TUtil(stdlib.conf)
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -12,7 +14,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
   // An entire context
   //
-  // There separate namespaces for variables, struct definitions, and callables (tasks/workflows).
+  // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
   // An additional variable holds a list of all imported namespaces.
   case class Context(declarations: Map[String, WT],
                      structs: Map[String, WT_Struct],
@@ -181,7 +183,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case WT_Boolean => WT_Boolean
       case other =>
         throw new TypeException(
-            s"${exprToString(expr)} must be a boolean, it is ${TUtil.toString(other)}",
+            s"${exprToString(expr)} must be a boolean, it is ${tUtil.toString(other)}",
             expr.text
         )
     }
@@ -261,7 +263,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (fieldName, fieldType) =>
         val e = rhsFields(fieldName)
         val t = typeEval(e, ctx)
-        if (!TUtil.isCoercibleTo(fieldType, t))
+        if (!tUtil.isCoercibleTo(fieldType, t))
           throw new TypeException(s"field ${fieldName} is badly typed", text)
     }
   }
@@ -311,7 +313,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprCompoundString(vec, _) =>
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
-          if (!TUtil.isCoercibleTo(WT_String, t))
+          if (!tUtil.isCoercibleTo(WT_String, t))
             throw new TypeException(
                 s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
                 expr.text
@@ -322,33 +324,52 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprPair(l, r, _)                => WT_Pair(typeEval(l, ctx), typeEval(r, ctx))
       case ExprArray(vec, _) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
-        WT_Array(WT_Var(0))
+        // TODO: replace the Any type with a type-parameter
+        WT_Array(WT_Any)
 
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
-        val t = vecTypes.head
-        if (!vecTypes.tail.forall(TUtil.isCoercibleTo(t, _)))
-          throw new TypeException(s"Array elements do not all have type ${t}", expr.text)
+        val (t, _) =
+          try {
+            tUtil.unifyCollection(vecTypes, Map.empty)
+          } catch {
+            case _: TypeUnificationException =>
+              throw new TypeException(
+                  "array elements must have the same type, or be coercible to one",
+                  expr.text
+              )
+          }
         WT_Array(t)
-
-      case ExprMap(m, _) if m.isEmpty =>
-        // The map type is unknown
-        WT_Map(WT_Var(0), WT_Var(1))
 
       case _: ExprObject =>
         WT_Object
+
+      case ExprMap(m, _) if m.isEmpty =>
+        // The map type is unknown.
+        // TODO: replace the Any type with a type-parameter
+        WT_Map(WT_Any, WT_Any)
 
       case ExprMap(m, _) =>
         // figure out the types from the first element
         val mTypes: Map[WT, WT] = m.map {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
-        val tk = mTypes.keys.head
-        if (!mTypes.keys.tail.forall(TUtil.isCoercibleTo(_, tk)))
-          throw new TypeException(s"Map keys do not all have type ${tk}", expr.text)
-        val tv = mTypes.values.head
-        if (!mTypes.values.tail.forall(TUtil.isCoercibleTo(_, tv)))
-          throw new TypeException(s"Map values do not all have type ${tv}", expr.text)
+        val (tk, _) =
+          try {
+            tUtil.unifyCollection(mTypes.keys, Map.empty)
+          } catch {
+            case _: TypeUnificationException =>
+              throw new TypeException("map keys must have the same type, or be coercible to one",
+                                      expr.text)
+          }
+        val (tv, _) =
+          try {
+            tUtil.unifyCollection(mTypes.values, Map.empty)
+          } catch {
+            case _: TypeUnificationException =>
+              throw new TypeException("map values must have the same type, or be coercible to one",
+                                      expr.text)
+          }
         WT_Map(tk, tv)
 
       // These are expressions like:
@@ -364,7 +385,7 @@ case class TypeChecker(stdlib: Stdlib) {
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
-              s"${value} in ${exprToString(expr)} should have boolean type, it has type ${TUtil.toString(tv)} instead",
+              s"${value} in ${exprToString(expr)} should have boolean type, it has type ${tUtil.toString(tv)} instead",
               expr.text
           )
         tType
@@ -378,11 +399,10 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Optional(vt2) if vt2 == dt => dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression ${exprToString(value)} must have type optional(${TUtil.toString(
-                       dt
-                   )})
-                    |it has type ${vt} instead""".stripMargin
-                  .replaceAll("\n", " "),
+                s"""|Subxpression ${exprToString(value)} must have type
+                    |optional(${tUtil.toString(dt)})
+                    |it has type ${vt} instead
+                    |""".stripMargin.replaceAll("\n", " "),
                 expr.text
             )
         }
@@ -395,11 +415,11 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"separator ${sep} in ${expr} must have string type", expr.text)
         val vt = typeEval(value, ctx)
         vt match {
-          case WT_Array(t) if TUtil.isCoercibleTo(WT_String, t) =>
+          case WT_Array(x) if tUtil.isCoercibleTo(WT_String, x) =>
             WT_String
           case other =>
             throw new TypeException(
-                s"expression ${value} should be of type Array[String], but it is ${other}",
+                s"expression ${value} should be coercible to Array[String], but it is ${other}",
                 expr.text
             )
         }
@@ -448,15 +468,23 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
         val condType = typeEval(cond, ctx)
         if (condType != WT_Boolean)
-          throw new TypeException(s"condition ${cond} must be a boolean", expr.text)
+          throw new TypeException(s"condition ${exprToString(cond)} must be a boolean", expr.text)
         val tBranchT = typeEval(tBranch, ctx)
         val fBranchT = typeEval(fBranch, ctx)
-        if (tBranchT != fBranchT)
-          throw new TypeException(
-              s"The branches of conditional (${expr}) expression must the same type",
-              expr.text
-          )
-        tBranchT
+        try {
+          val (t, _) = tUtil.unify(tBranchT, fBranchT, Map.empty)
+          t
+        } catch {
+          case _: TypeUnificationException =>
+            throw new TypeException(
+                s"""|The branches of a conditional expression must be coercable to the same type
+                    |expression: ${exprToString(expr)}
+                    |  true branch: ${tUtil.toString(tBranchT)}
+                    |  flase branch: ${tUtil.toString(fBranchT)}
+                    |""".stripMargin,
+                expr.text
+            )
+        }
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
@@ -547,8 +575,11 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case (_, Some(expr)) =>
         val rhsType = typeEval(expr, ctx)
-        if (!TUtil.isCoercibleTo(lhsType, rhsType))
-          throw new TypeException(s"declaration ${decl.name} is badly typed", decl.text)
+        if (!tUtil.isCoercibleTo(lhsType, rhsType)) {
+          throw new TypeException(s"""|${decl.name} is of type ${tUtil.toString(lhsType)}
+                                      |but is assigned ${tUtil.toString(rhsType)}
+                                      |""".stripMargin.replaceAll("\n", " "), decl.text)
+        }
     }
     (decl.name, lhsType)
   }
@@ -629,10 +660,16 @@ case class TypeChecker(stdlib: Stdlib) {
         accu.bindVar(varName, typ, decl.text)
     }
 
-    // check that all expressions in the command section are strings
+    // check that all expressions can be coereced to a string inside
+    // the command section
     task.command.parts.foreach { expr =>
       val t = typeEval(expr, ctxDecl)
-      if (!TUtil.isCoercibleTo(WT_String, t))
+      val valid = t match {
+        case x if tUtil.isPrimitive(x)              => true
+        case WT_Optional(x) if tUtil.isPrimitive(x) => true
+        case _                                      => false
+      }
+      if (!valid)
         throw new TypeException(
             s"Expression ${exprToString(expr)} in the command section is not coercible to a string",
             expr.text
@@ -681,12 +718,19 @@ case class TypeChecker(stdlib: Stdlib) {
                 s"call ${call} has argument ${argName} that does not exist in the callee",
                 call.text
             )
-          case Some((calleeType, _)) =>
-            if (!TUtil.isCoercibleTo(calleeType, wdlType))
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Strict =>
+            if (calleeType != wdlType)
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text
               )
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Lenient =>
+            if (!tUtil.isCoercibleTo(calleeType, wdlType))
+              throw new TypeException(
+                  s"argument ${argName} has type ${wdlType}, it is not coercible to ${calleeType}",
+                  call.text
+              )
+          case _ => ()
         }
     }
 
@@ -750,36 +794,36 @@ case class TypeChecker(stdlib: Stdlib) {
     val bodyBindings: Bindings = scatter.body.foldLeft(Map.empty[String, WT]) {
       case (accu: Bindings, decl: Declaration) =>
         val (varName, typ) = applyDecl(decl, ctxInner.bindVarList(accu, decl.text))
-        accu + (varName -> WT_Array(typ))
+        accu + (varName -> typ)
 
       case (accu: Bindings, call: Call) =>
         val (callName, callType) = applyCall(call, ctxInner.bindVarList(accu, call.text))
-        val callOutput = callType.output.map {
-          case (name, t) => name -> WT_Array(t)
-        }
-        accu + (callName -> WT_Call(callType.name, callOutput))
+        accu + (callName -> callType)
 
       case (accu: Bindings, subSct: Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, ctxInner.bindVarList(accu, subSct.text))
-        val sctBindings2 = sctBindings.map {
-          case (varName, typ) => varName -> WT_Array(typ)
-        }
-        accu ++ sctBindings2
+        accu ++ sctBindings
 
       case (accu: Bindings, cond: Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, ctxInner.bindVarList(accu, cond.text))
-        val condBindings2 = condBindings.map {
-          case (varName, typ) => varName -> WT_Array(typ)
-        }
-        accu ++ condBindings2
+        accu ++ condBindings
 
       case (_, other) =>
         throw new Exception(s"Sanity: ${other}")
     }
+
     // The iterator identifier is not exported outside the scatter
-    bodyBindings
+    bodyBindings.map {
+      case (callName, callType: WT_Call) =>
+        val callOutput = callType.output.map {
+          case (name, t) => name -> WT_Array(t)
+        }
+        callName -> WT_Call(callType.name, callOutput)
+      case (varName, typ: WT) =>
+        varName -> WT_Array(typ)
+    }
   }
 
   // The body of a conditional is accessible to the statements that come after it.
@@ -791,40 +835,41 @@ case class TypeChecker(stdlib: Stdlib) {
     if (condType != WT_Boolean)
       throw new Exception(s"Expression ${cond.expr} must have boolean type")
 
-    // Add an array type to all variables defined in the scatter body
+    // keep track of the inner/outer bindings. Within the block we need [inner],
+    // [outer] is what we produce, which has the optional modifier applied to
+    // everything.
     val bodyBindings = cond.body.foldLeft(Map.empty[String, WT]) {
       case (accu: Bindings, decl: Declaration) =>
         val (varName, typ) = applyDecl(decl, ctxOuter.bindVarList(accu, decl.text))
-        accu + (varName -> WT_Optional(typ))
+        accu + (varName -> typ)
 
       case (accu: Bindings, call: Call) =>
         val (callName, callType) = applyCall(call, ctxOuter.bindVarList(accu, call.text))
-        val callOutput = callType.output.map {
-          case (name, t) => name -> WT_Optional(t)
-        }
-        accu + (callName -> WT_Call(callType.name, callOutput))
+        accu + (callName -> callType)
 
       case (accu: Bindings, subSct: Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, ctxOuter.bindVarList(accu, subSct.text))
-        val sctBindings2 = sctBindings.map {
-          case (varName, typ) => varName -> WT_Optional(typ)
-        }
-        accu ++ sctBindings2
+        accu ++ sctBindings
 
       case (accu: Bindings, cond: Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, ctxOuter.bindVarList(accu, cond.text))
-        val condBindings2 = condBindings.map {
-          case (varName, typ) => varName -> WT_Optional(typ)
-        }
-        accu ++ condBindings2
+        accu ++ condBindings
 
       case (_, other) =>
         throw new Exception(s"Sanity: ${other}")
     }
 
-    bodyBindings
+    bodyBindings.map {
+      case (callName, callType: WT_Call) =>
+        val callOutput = callType.output.map {
+          case (name, t) => name -> WT_Optional(t)
+        }
+        callName -> WT_Call(callType.name, callOutput)
+      case (varName, typ: WT) =>
+        varName -> WT_Optional(typ)
+    }
   }
 
   private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
