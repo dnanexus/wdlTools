@@ -887,7 +887,7 @@ case class TypeChecker(stdlib: Stdlib) {
         accu.bindCallable(tt, task.text)
 
       case (accu: Context, iStat: ImportDoc) =>
-        val iCtx = apply(iStat.doc, contextEmpty)
+        val iCtx = apply(iStat.doc.get, contextEmpty)
 
         // Figure out what to name the sub-document
         val namespace = iStat.name match {

@@ -43,8 +43,8 @@ abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, url, doc, _, _) => Some(url -> doc)
-        case _                               => None
+        case ImportDoc(_, _, url, doc, _, _) if doc.isDefined => Some(url -> doc.get)
+        case _                                                => None
       }.toMap
     }
 

@@ -28,12 +28,12 @@ import Verbosity._
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
 case class Options(localDirectories: Option[Vector[Path]] = None,
-                   followImports: Boolean = false,
+                   followImports: Boolean = true,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false) {
 
-  def getURL(pathOrUrl: String): URL = {
-    Util.getURL(pathOrUrl, localDirectories)
+  def getURL(pathOrUrl: String, mustExist: Boolean = true): URL = {
+    Util.getURL(pathOrUrl, localDirectories, exists = mustExist)
   }
 }
 
@@ -48,7 +48,9 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Option[Vector[Path]] = None): URL = {
+  def getURL(pathOrUrl: String,
+             searchPath: Option[Vector[Path]] = None,
+             exists: Boolean = true): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
@@ -61,12 +63,16 @@ object Util {
           case fp if Files.exists(fp) => fp
         }
       } else None
-      if (resolved.isEmpty) {
-        throw new Exception(
-            s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
-        )
+      val result = resolved.getOrElse {
+        if (exists) {
+          throw new Exception(
+              s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+          )
+        } else {
+          path
+        }
       }
-      new URL(s"file://${resolved.get.toAbsolutePath}")
+      new URL(s"file://${result.toAbsolutePath}")
     }
   }
 

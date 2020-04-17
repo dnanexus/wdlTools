@@ -916,10 +916,11 @@ import_as
         None
       else
         Some(ctx.import_as().Identifier().getText)
-
+    // We let URL potentially be invalid here - an error will be thrown if we actually
+    // try to parse the invalid imported document
     ImportDoc(name,
               Vector.empty,
-              opts.getURL(url),
+              opts.getURL(url, mustExist = false),
               grammar.getSourceText(ctx),
               grammar.getComment(ctx))
   }

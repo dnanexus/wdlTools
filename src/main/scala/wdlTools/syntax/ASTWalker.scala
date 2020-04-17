@@ -2,6 +2,7 @@ package wdlTools.syntax
 
 import wdlTools.syntax.ASTVisitor.Context
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.util.Options
 
 class ASTVisitor {
   def visitDocument(ctx: Context[Document]): Unit = {}
@@ -65,7 +66,7 @@ object ASTVisitor {
   }
 }
 
-class ASTWalker(walkImports: Boolean = false) extends ASTVisitor {
+class ASTWalker(opts: Options) extends ASTVisitor {
   override def visitDocument(ctx: Context[Document]): Unit = {
     visitVersion(createContext[Version, Document](ctx.element.version, ctx))
 
@@ -98,8 +99,8 @@ class ASTWalker(walkImports: Boolean = false) extends ASTVisitor {
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(createContext[ImportAlias, ImportDoc](alias, ctx))
     }
-    if (walkImports) {
-      visitDocument(createContext[Document, ImportDoc](ctx.element.doc, ctx))
+    if (opts.followImports) {
+      visitDocument(createContext[Document, ImportDoc](ctx.element.doc.get, ctx))
     }
   }
 

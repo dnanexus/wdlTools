@@ -246,7 +246,7 @@ object Translators {
   }
 
   def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
-                         importedDoc: AbstractSyntax.Document): AbstractSyntax.ImportDoc = {
+                         importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
     val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
       case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
     }

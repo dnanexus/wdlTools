@@ -986,7 +986,13 @@ import_as
       .asScala
       .map(x => visitImport_alias(x))
       .toVector
-    ImportDoc(name, aliases, opts.getURL(url), grammar.getSourceText(ctx), grammar.getComment(ctx))
+    // We let URL potentially be invalid here - an error will be thrown if we actually
+    // try to parse the invalid imported document
+    ImportDoc(name,
+              aliases,
+              opts.getURL(url, mustExist = false),
+              grammar.getSourceText(ctx),
+              grammar.getComment(ctx))
   }
 
   /* call_alias

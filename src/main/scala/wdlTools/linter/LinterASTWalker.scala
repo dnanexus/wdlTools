@@ -5,8 +5,7 @@ import wdlTools.syntax.{ASTVisitor, ASTWalker}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Options
 
-case class LinterASTWalker(opts: Options, visitors: Vector[ASTVisitor])
-    extends ASTWalker(walkImports = opts.followImports) {
+case class LinterASTWalker(opts: Options, visitors: Vector[ASTVisitor]) extends ASTWalker(opts) {
   def visitEveryRule(ctx: Context[Element]): Unit = {}
 
   override def visitDocument(ctx: Context[Document]): Unit = {

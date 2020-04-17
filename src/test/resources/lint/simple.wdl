@@ -1,4 +1,6 @@
 version 1.0
 
-	workflow wf {
+import "foo.wdl" as bar
+
+	  workflow wf {
 	}

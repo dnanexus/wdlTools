@@ -6,23 +6,18 @@ import wdlTools.syntax.{Parsers, WdlVersion}
 import wdlTools.syntax.v1_0.ParseAll
 import wdlTools.util.Options
 
-import scala.collection.mutable
-
 case class Linter(opts: Options) {
   def apply(url: URL): Unit = {
-    val errors: mutable.Buffer[LinterError] = mutable.ArrayBuffer.empty
-    val listenerFactories = Vector(
-        LinterParserRuleFactory[Rules.WhitespaceTabsRule](errors)
-    )
-    val parsers = Parsers(opts, listenerFactories = listenerFactories)
+    val ruleSet = RuleSet()
+
+    val parsers = Parsers(opts, listenerFactories = ruleSet.parserRuleFactories)
     val parser: ParseAll = parsers.getParser(WdlVersion.V1).asInstanceOf[ParseAll]
     val doc = parser.apply(url)
 
-    val visitors = Vector()
-    val astWalker = LinterASTWalker(opts, visitors)
+    val astWalker = LinterASTWalker(opts, ruleSet.astVisitors)
     astWalker.apply(doc)
 
-    errors.foreach { err =>
+    ruleSet.errors.foreach { err =>
       println(s"${err.textSource} ${err.ruleId}")
     }
   }

@@ -163,7 +163,7 @@ object AbstractSyntax {
   case class ImportDoc(name: Option[String],
                        aliases: Vector[ImportAlias],
                        url: URL,
-                       doc: Document,
+                       doc: Option[Document],
                        text: TextSource,
                        comment: Option[Comment])
       extends DocumentElement

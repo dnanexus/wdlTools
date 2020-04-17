@@ -30,7 +30,11 @@ case class ParseAll(opts: Options,
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
       case importDoc: ConcreteSyntax.ImportDoc =>
-        val importedDoc = followImport(importDoc.url)
+        val importedDoc = if (opts.followImports) {
+          Some(followImport(importDoc.url))
+        } else {
+          None
+        }
         translateImportDoc(importDoc, importedDoc)
       case task: ConcreteSyntax.Task => translateTask(task)
       case other                     => throw new Exception(s"unrecognized document element ${other}")

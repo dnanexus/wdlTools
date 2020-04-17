@@ -19,7 +19,11 @@ case class ParseAll(opts: Options,
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
       case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
       case importDoc: ConcreteSyntax.ImportDoc =>
-        val importedDoc = followImport(importDoc.url)
+        val importedDoc = if (opts.followImports) {
+          Some(followImport(importDoc.url))
+        } else {
+          None
+        }
         translateImportDoc(importDoc, importedDoc)
       case task: ConcreteSyntax.Task => translateTask(task)
       case other                     => throw new Exception(s"unrecognized document element ${other}")
