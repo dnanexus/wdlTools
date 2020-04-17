@@ -4,7 +4,7 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.v1_0.ParseAll
+import wdlTools.syntax.v1.ParseAll
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 

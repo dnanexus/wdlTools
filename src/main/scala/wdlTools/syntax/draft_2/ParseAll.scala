@@ -3,7 +3,7 @@ package wdlTools.syntax.draft_2
 import java.net.URL
 
 import wdlTools.syntax.draft_2.Translators._
-import wdlTools.syntax.{AbstractSyntax, WdlParser}
+import wdlTools.syntax.{AbstractSyntax, TextSource, WdlParser, WdlVersion}
 import wdlTools.util.{Options, SourceCode}
 
 import scala.collection.mutable
@@ -46,14 +46,19 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     // translate all the elements of the document to the abstract syntax
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
       case importDoc: ConcreteSyntax.ImportDoc =>
-        val importedDoc = followImport(importDoc.url)
+        val importedDoc = if (opts.followImports) {
+          Some(followImport(importDoc.url))
+        } else {
+          None
+        }
         translateImportDoc(importDoc, importedDoc)
       case task: ConcreteSyntax.Task => translateTask(task)
       case other                     => throw new Exception(s"unrecognized document element ${other}")
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
-    AbstractSyntax.Document(doc.version, None, elems, aWf, doc.text, doc.comment)
+    val version = AbstractSyntax.Version(WdlVersion.Draft_2, TextSource(-1, -1), None)
+    AbstractSyntax.Document(version, None, elems, aWf, doc.text, doc.comment)
   }
 
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {

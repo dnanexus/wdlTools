@@ -8,8 +8,8 @@ import wdlTools.util.{Options, Util, Verbosity}
 
 import scala.collection.mutable
 
-case class V1_0Formatter(opts: Options,
-                         documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
+case class WdlV1Formatter(opts: Options,
+                          documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
 
   abstract class Group(prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
@@ -567,11 +567,11 @@ case class V1_0Formatter(opts: Options,
     }
   }
 
-  case class CallInputsStatement(inputs: Map[String, Expr]) extends Statement {
+  case class CallInputsStatement(inputs: CallInputs) extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
-      val args = inputs.map {
-        case (lhs, rhs) => Spaced(Vector(Token(lhs), Token.Assignment, buildExpression(rhs)))
-      }.toVector
+      val args = inputs.value.map { inp =>
+        Spaced(Vector(Token(inp.name), Token.Assignment, buildExpression(inp.expr)))
+      }
       lineFormatter.beginLine()
       lineFormatter.appendAll(
           Vector(Adjacent(Vector(Token.Input, Token.KeyValueDelimiter)), Container(args))
@@ -584,12 +584,12 @@ case class V1_0Formatter(opts: Options,
       extends BlockStatement(
           Token.Call,
           Some(if (call.alias.isDefined) {
-            Spaced(Vector(Token(call.name), Token.As, Token(call.alias.get)))
+            Spaced(Vector(Token(call.name), Token.As, Token(call.alias.get.name)))
           } else {
             Token(call.name)
           }),
-          if (call.inputs.nonEmpty) {
-            Some(CallInputsStatement(call.inputs))
+          if (call.inputs.isDefined) {
+            Some(CallInputsStatement(call.inputs.get))
           } else {
             None
           },
@@ -762,6 +762,7 @@ case class V1_0Formatter(opts: Options,
         case imp: ImportDoc     => imports.append(imp)
         case struct: TypeStruct => structs.append(struct)
         case task: Task         => tasks.append(task)
+        case _: Version         => Unit
       }
 
       statements.append(VersionStatement("1.0"))

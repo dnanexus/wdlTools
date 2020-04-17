@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
+import wdlTools.syntax.{Comment, SyntaxException, TextSource}
 import wdlTools.util.Options
 
 case class ParseTop(opts: Options,
@@ -951,14 +951,13 @@ import_as
 	: INPUT COLON (call_input (COMMA call_input)*)
 	; */
   override def visitCall_inputs(ctx: WdlDraft2Parser.Call_inputsContext): CallInputs = {
-    val inputs: Map[String, Expr] = ctx
+    val inputs: Vector[CallInput] = ctx
       .call_input()
       .asScala
       .map { x =>
-        val inp = visitCall_input(x)
-        inp.name -> inp.expr
+        visitCall_input(x)
       }
-      .toMap
+      .toVector
     CallInputs(inputs, getSourceText(ctx))
   }
 
@@ -967,7 +966,7 @@ import_as
 	; */
   override def visitCall_body(ctx: WdlDraft2Parser.Call_bodyContext): CallInputs = {
     if (ctx.call_inputs() == null)
-      CallInputs(Map.empty, getSourceText(ctx))
+      CallInputs(Vector.empty, getSourceText(ctx))
     else
       visitCall_inputs(ctx.call_inputs())
   }
@@ -978,19 +977,18 @@ import_as
   override def visitCall(ctx: WdlDraft2Parser.CallContext): Call = {
     val name = ctx.call_name().getText
 
-    val alias: Option[String] =
-      if (ctx.call_alias() == null) None
-      else {
-        val ca: CallAlias = visitCall_alias(ctx.call_alias())
-        Some(ca.name)
+    val alias: Option[CallAlias] =
+      if (ctx.call_alias() == null) {
+        None
+      } else {
+        Some(visitCall_alias(ctx.call_alias()))
       }
 
-    val inputs: Map[String, Expr] =
+    val inputs: Option[CallInputs] =
       if (ctx.call_body() == null) {
-        Map.empty[String, Expr]
+        None
       } else {
-        val cb = visitCall_body(ctx.call_body())
-        cb.value
+        Some(visitCall_body(ctx.call_body()))
       }
 
     Call(name, alias, inputs, getSourceText(ctx), getComment(ctx))
@@ -1154,7 +1152,7 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(WdlVersion.Draft_2, elems, workflow, getSourceText(ctx), getComment(ctx))
+    Document(elems, workflow, getSourceText(ctx), getComment(ctx))
   }
 
   def parseDocument: Document = {

@@ -27,7 +27,7 @@ class BaseTest extends FlatSpec with Matchers {
     val (beforeURL, afterPath) = getBeforeAfterPair("simple.wdl")
     val expected = Util.readFromFile(afterPath)
     val upgrader = Upgrader(opts)
-    val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1_0)
+    val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1)
     documents(beforeURL).mkString("\n") shouldBe expected
   }
 }
