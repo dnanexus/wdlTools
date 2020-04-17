@@ -3,7 +3,7 @@ package wdlTools.generators
 import java.net.URL
 import java.nio.file.Path
 
-import wdlTools.formatter.V1_0Formatter
+import wdlTools.formatter.WdlV1Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Parsers, WdlFragmentParser, WdlVersion}
@@ -15,7 +15,7 @@ import util.control.Breaks._
 case class ProjectGenerator(opts: Options,
                             name: String,
                             outputDir: Path,
-                            wdlVersion: WdlVersion = WdlVersion.V1_0,
+                            wdlVersion: WdlVersion = WdlVersion.V1,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
                             developerReadmes: Boolean = false,
@@ -29,7 +29,7 @@ case class ProjectGenerator(opts: Options,
   val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
 
   val defaultDockerImage = "debian:stretch-slim"
-  lazy val formatter: V1_0Formatter = V1_0Formatter(opts)
+  lazy val formatter: WdlV1Formatter = WdlV1Formatter(opts)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
     ReadmeGenerator(developerReadmes = developerReadmes,
@@ -223,7 +223,7 @@ case class ProjectGenerator(opts: Options,
       taskModels.map(_.toTask)
     }
 
-    val doc = Document(wdlVersion,
+    val doc = Document(Version(wdlVersion, null, None),
                        null,
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
@@ -383,19 +383,19 @@ object ProjectGenerator {
     def toWorkflow(tasksAndLinkedInputs: Vector[(Task, Set[String])]): Workflow = {
       val calls: Vector[Call] = tasksAndLinkedInputs.map {
         case (task, linkedInputs) =>
-          val callInputs: Map[String, Expr] = if (task.input.isDefined) {
-            def getInputValue(inp: Declaration): Option[(String, Expr)] = {
+          val callInputs: Option[CallInputs] = if (task.input.isDefined) {
+            def getInputValue(inp: Declaration): Option[CallInput] = {
               if (linkedInputs.contains(inp.name)) {
-                Some(inp.name -> ExprIdentifier(inp.name, null))
+                Some(CallInput(inp.name, ExprIdentifier(inp.name, null), null))
               } else if (inp.wdlType.isInstanceOf[TypeOptional]) {
                 None
               } else {
-                Some(inp.name -> ValueString("set my value!", null))
+                Some(CallInput(inp.name, ValueString("set my value!", null), null))
               }
             }
-            task.input.get.declarations.flatMap(getInputValue).toMap
+            Some(CallInputs(task.input.get.declarations.flatMap(getInputValue), null))
           } else {
-            Map.empty
+            None
           }
           Call(task.name, None, callInputs, null, None)
       }

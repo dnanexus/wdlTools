@@ -1,4 +1,4 @@
-package wdlTools.syntax.v1_0
+package wdlTools.syntax.v1
 
 import org.antlr.v4.runtime.{CharStream, CommonTokenStream}
 import org.openwdl.wdl.parser.v1_0.{WdlV1Lexer, WdlV1Parser}

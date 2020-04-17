@@ -4,7 +4,7 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.v1_0.ParseAll
+import wdlTools.syntax.v1.ParseAll
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
@@ -19,7 +19,8 @@ class TypeCheckerTest extends FlatSpec with Matchers {
               Paths.get(getClass.getResource("/typing/v1_0/workflows/negative").getPath)
           )
       ),
-      verbosity = Verbosity.Verbose
+      verbosity = Verbosity.Verbose,
+      followImports = true
   )
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
@@ -112,7 +113,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" taggedAs Edge in {
+  ignore should "be able to handle GATK" taggedAs Edge in {
     val url = Util.getURL(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     )
@@ -126,7 +127,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     checker.apply(doc)
   } */
 
-  it should "handle compound expressions" taggedAs (Edge) in {
+  it should "handle compound expressions" taggedAs Edge in {
     val src =
       Paths.get(
           getClass.getResource("/typing/v1_0/workflows/positive/compound_expr_bug.wdl").getPath

@@ -3,14 +3,7 @@ package wdlTools.syntax.draft_2
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{
-  CommentCompound,
-  CommentEmpty,
-  CommentLine,
-  CommentPreformatted,
-  Edge,
-  WdlVersion
-}
+import wdlTools.syntax.{CommentCompound, CommentEmpty, CommentLine, CommentPreformatted, Edge}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
@@ -91,7 +84,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle types and expressions" in {
     val doc = getDocument(getTaskSource("expressions.wdl"))
 
-    doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -266,7 +258,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle get name" in {
     val doc = getDocument(getTaskSource("get_name_bug.wdl"))
 
-    doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -294,7 +285,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse a task with an output section only" in {
     val doc = getDocument(getTaskSource("output_section.wdl"))
 
-    doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -311,7 +301,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse a task" in {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
-    doc.version shouldBe WdlVersion.Draft_2
     doc.comment shouldBe Some(
         CommentLine("A task that counts how many lines a file has")
     )
@@ -391,7 +380,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle string interpolation" in {
     val doc = getDocument(getTaskSource("interpolation.wdl"))
 
-    doc.version shouldBe WdlVersion.Draft_2
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -420,7 +408,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val doc = getDocument(getWorkflowSource("I.wdl"))
     doc.elements.size shouldBe 0
 
-    doc.version shouldBe WdlVersion.Draft_2
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -432,10 +419,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
     calls.size shouldBe 1
     calls(0) should matchPattern {
-      case Call("bar", Some("boz"), _, _, _) =>
+      case Call("bar", Some(CallAlias("boz", _)), _, _, _) =>
     }
-    calls(0).inputs.toVector should matchPattern {
-      case Vector(("i", ExprIdentifier("s", _))) =>
+    calls(0).inputs.get.value should matchPattern {
+      case Vector(CallInput("i", ExprIdentifier("s", _), _)) =>
     }
 
     val scatters = wf.body.collect {
@@ -451,8 +438,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case Call("add", None, _, _, _) =>
     }
     val call = scatters(0).body(0).asInstanceOf[Call]
-    call.inputs.toVector should matchPattern {
-      case Vector(("x", ExprIdentifier("i", _))) =>
+    call.inputs.get.value should matchPattern {
+      case Vector(CallInput("x", ExprIdentifier("i", _), _)) =>
     }
 
     val conditionals = wf.body.collect {
@@ -477,8 +464,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "handle import statements" in {
     val doc = getDocument(getWorkflowSource("imports.wdl"))
-
-    doc.version shouldBe WdlVersion.Draft_2
 
     val imports = doc.elements.collect {
       case x: ImportDoc => x
@@ -521,7 +506,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val doc = getDocument(getWorkflowSource("chained_expr.wdl"))
     doc.elements.size shouldBe 0
 
-    doc.version shouldBe WdlVersion.Draft_2
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 

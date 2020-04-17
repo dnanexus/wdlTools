@@ -13,9 +13,9 @@ sealed abstract class WdlVersion(val name: String, val order: Int) extends Order
 
 object WdlVersion {
   case object Draft_2 extends WdlVersion("draft-2", 0)
-  case object V1_0 extends WdlVersion("1.0", 1)
+  case object V1 extends WdlVersion("1.0", 1)
 
-  val All: Vector[WdlVersion] = Vector(V1_0, Draft_2).sortWith(_ < _)
+  val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
 
   def fromName(name: String): WdlVersion = {
     All.collectFirst { case v if v.name == name => v }.get
@@ -78,8 +78,8 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, url, doc, _, _) => Some(url -> doc)
-        case _                               => None
+        case ImportDoc(_, _, url, doc, _, _) if doc.isDefined => Some(url -> doc.get)
+        case _                                                => None
       }.toMap
     }
 

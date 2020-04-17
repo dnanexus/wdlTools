@@ -35,11 +35,6 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
               |
               |Options:
               |""".stripMargin)
-    val followImports: ScallopOption[Boolean] = toggle(
-        descrYes = "format imported files in addition to the main file",
-        descrNo = "only format the main file",
-        default = Some(true)
-    )
     val localDir: ScallopOption[List[Path]] =
       opt[List[Path]](descr =
         "directory in which to search for imports; ignored if --noFollowImports is specified"
@@ -71,8 +66,27 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         .getOptions
         .copy(
             localDirectories = Some(this.localDirectories(Set(wdlDir))),
-            followImports = this.followImports()
+            followImports = true
         )
+    }
+  }
+
+  class ParserSubcommandWithFollowOption(name: String, description: String)
+      extends ParserSubcommand(name, description) {
+    val followImports: ScallopOption[Boolean] = toggle(
+        descrYes = "(Default) format imported files in addition to the main file",
+        descrNo = "only format the main file",
+        default = Some(true)
+    )
+
+    override def getOptions: Options = {
+      val opts = super.getOptions
+      val followImports = this.followImports()
+      if (followImports != opts.followImports) {
+        opts.copy(followImports = followImports)
+      } else {
+        opts
+      }
     }
   }
 
@@ -89,45 +103,49 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val check = new ParserSubcommand("check", "Type check WDL file.")
   addSubcommand(check)
 
-  val format =
-    new ParserSubcommand("format",
-                         "Reformat WDL file and all its dependencies according to style rules.") {
-      val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
-          descr = "WDL version to generate; currently only v1.0 is supported",
-          default = Some(WdlVersion.V1_0)
-      )
-      validateOpt(wdlVersion) {
-        case Some(version) if version != WdlVersion.V1_0 =>
-          Left("Only WDL v1.0 is supported currently")
-        case _ => Right(Unit)
-      }
-      val outputDir: ScallopOption[Path] = opt[Path](descr =
-        "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
-      )
-      val overwrite: ScallopOption[Boolean] = toggle(
-          descrYes = "Overwrite existing files",
-          descrNo = "(Default) Do not overwrite existing files",
-          default = Some(false)
-      )
-      validateOpt(outputDir, overwrite) {
-        case (None, Some(false) | None) =>
-          Left("--outputDir is required unless --overwrite is specified")
-        case _ => Right(Unit)
-      }
+  val format = new ParserSubcommandWithFollowOption(
+      name = "format",
+      description = "Reformat WDL file and all its dependencies according to style rules."
+  ) {
+    val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version to generate; currently only v1.0 is supported",
+        default = Some(WdlVersion.V1)
+    )
+    validateOpt(wdlVersion) {
+      case Some(version) if version != WdlVersion.V1 =>
+        Left("Only WDL v1.0 is supported currently")
+      case _ => Right(Unit)
     }
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+    validateOpt(outputDir, overwrite) {
+      case (None, Some(false) | None) =>
+        Left("--outputDir is required unless --overwrite is specified")
+      case _ => Right(Unit)
+    }
+  }
   addSubcommand(format)
 
-  val upgrade = new ParserSubcommand("upgrade", "Upgrade a WDL file to a more recent version") {
+  val upgrade = new ParserSubcommandWithFollowOption(
+      name = "upgrade",
+      description = "Upgrade a WDL file to a more recent version"
+  ) {
     val srcVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version of the document being upgraded",
         default = None
     )
     val destVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version of the document being upgraded",
-        default = Some(WdlVersion.V1_0)
+        default = Some(WdlVersion.V1)
     )
     validateOpt(destVersion) {
-      case Some(version) if version != WdlVersion.V1_0 =>
+      case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(Unit)
     }
@@ -153,11 +171,13 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(upgrade)
 
-  val printAST =
-    new ParserSubcommand("printAST", "Print the Abstract Syntax Tree for a WDL file.")
+  val printAST = new ParserSubcommandWithFollowOption(
+      name = "printAST",
+      description = "Print the Abstract Syntax Tree for a WDL file."
+  )
   addSubcommand(printAST)
 
-  val generate = new Subcommand("new") {
+  val generate = new Subcommand(commandNameAndAliases = "new") {
     banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
              |Generate a new WDL task, workflow, or project.
              |
@@ -166,10 +186,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
     val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version to generate; currently only v1.0 is supported",
-        default = Some(WdlVersion.V1_0)
+        default = Some(WdlVersion.V1)
     )
     validateOpt(wdlVersion) {
-      case Some(version) if version != WdlVersion.V1_0 =>
+      case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(Unit)
     }
@@ -218,21 +238,23 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(generate)
 
-  val readmes =
-    new ParserSubcommand("readmes", "Generate README file stubs for tasks and workflows.") {
-      val developerReadmes: ScallopOption[Boolean] = toggle(
-          descrYes = "also generate developer READMEs",
-          default = Some(false)
-      )
-      val outputDir: ScallopOption[Path] = opt[Path](descr =
-        "Directory in which to output README files; if not specified, the current directory is used"
-      )
-      val overwrite: ScallopOption[Boolean] = toggle(
-          descrYes = "Overwrite existing files",
-          descrNo = "(Default) Do not overwrite existing files",
-          default = Some(false)
-      )
-    }
+  val readmes = new ParserSubcommandWithFollowOption(
+      name = "readmes",
+      description = "Generate README file stubs for tasks and workflows."
+  ) {
+    val developerReadmes: ScallopOption[Boolean] = toggle(
+        descrYes = "also generate developer READMEs",
+        default = Some(false)
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](descr =
+      "Directory in which to output README files; if not specified, the current directory is used"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+  }
   addSubcommand(readmes)
 
   verify()

@@ -2,7 +2,7 @@ package wdlTools.syntax.draft_2
 
 import java.net.URL
 
-import wdlTools.syntax.{Comment, TextSource, WdlVersion}
+import wdlTools.syntax.{Comment, TextSource}
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
@@ -178,10 +178,10 @@ object ConcreteSyntax {
 
   case class CallAlias(name: String, text: TextSource) extends Element
   case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
-  case class CallInputs(value: Map[String, Expr], text: TextSource) extends Element
+  case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
   case class Call(name: String,
-                  alias: Option[String],
-                  inputs: Map[String, Expr],
+                  alias: Option[CallAlias],
+                  inputs: Option[CallInputs],
                   text: TextSource,
                   comment: Option[Comment])
       extends WorkflowElement
@@ -207,8 +207,7 @@ object ConcreteSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Document(version: WdlVersion = WdlVersion.Draft_2,
-                      elements: Vector[DocumentElement],
+  case class Document(elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,
                       comment: Option[Comment])
