@@ -330,10 +330,14 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val (t, _) =
-          try { tUtil.unifyCollection(vecTypes, Map.empty) }
-          catch {
-            case _ : TypeUnificationException =>
-              throw new TypeException("array elements must have the same type, or be coercible to one", expr.text)
+          try {
+            tUtil.unifyCollection(vecTypes, Map.empty)
+          } catch {
+            case _: TypeUnificationException =>
+              throw new TypeException(
+                  "array elements must have the same type, or be coercible to one",
+                  expr.text
+              )
           }
         WT_Array(t)
 
@@ -351,16 +355,20 @@ case class TypeChecker(stdlib: Stdlib) {
           case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
         }
         val (tk, _) =
-          try { tUtil.unifyCollection(mTypes.keys, Map.empty) }
-          catch {
+          try {
+            tUtil.unifyCollection(mTypes.keys, Map.empty)
+          } catch {
             case _: TypeUnificationException =>
-              throw new TypeException("map keys must have the same type, or be coercible to one", expr.text)
+              throw new TypeException("map keys must have the same type, or be coercible to one",
+                                      expr.text)
           }
         val (tv, _) =
-          try { tUtil.unifyCollection(mTypes.values, Map.empty) }
-          catch {
-            case _ : TypeUnificationException =>
-              throw new TypeException("map values must have the same type, or be coercible to one", expr.text)
+          try {
+            tUtil.unifyCollection(mTypes.values, Map.empty)
+          } catch {
+            case _: TypeUnificationException =>
+              throw new TypeException("map values must have the same type, or be coercible to one",
+                                      expr.text)
           }
         WT_Map(tk, tv)
 
@@ -467,7 +475,7 @@ case class TypeChecker(stdlib: Stdlib) {
           val (t, _) = tUtil.unify(tBranchT, fBranchT, Map.empty)
           t
         } catch {
-          case _ : TypeUnificationException =>
+          case _: TypeUnificationException =>
             throw new TypeException(
                 s"""|The branches of a conditional expression must be coercable to the same type
                     |expression: ${exprToString(expr)}

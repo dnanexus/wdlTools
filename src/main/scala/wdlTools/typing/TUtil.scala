@@ -31,19 +31,19 @@ case class TUtil(conf: Options) {
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
     //System.out.println(s"isCoercibleTo ${left} ${right} ")
     (left, right) match {
-      case (WT_String, WT_String | WT_File) => true
+      case (WT_String, WT_String | WT_File)            => true
       case (WT_String, WT_Int | WT_Float | WT_Boolean) =>
         // Undocumented in the spec
         true
-      case (WT_File, WT_String | WT_File)   => true
-      case (WT_Boolean, WT_Boolean)         => true
-      case (WT_Int, WT_Int)                 => true
-      case (WT_Float, WT_Int | WT_Float)    => true
+      case (WT_File, WT_String | WT_File) => true
+      case (WT_Boolean, WT_Boolean)       => true
+      case (WT_Int, WT_Int)               => true
+      case (WT_Float, WT_Int | WT_Float)  => true
 
       // This is going to require a runtime check. For example:
       // Int a = "1"
       case (WT_Int, WT_String) if regime == Lenient => true
-      case (WT_Optional(l), WT_Optional(r))   => isCoercibleTo2(l, r)
+      case (WT_Optional(l), WT_Optional(r))         => isCoercibleTo2(l, r)
 
       // T is coercible to T?
       case (WT_Optional(l), r) if regime == Lenient => isCoercibleTo2(l, r)
@@ -107,10 +107,10 @@ case class TUtil(conf: Options) {
 
       // These two cases are really questionable to me. We are allowing an X to
       // become an X?
-      case (WT_Optional(l), r)              =>
+      case (WT_Optional(l), r) =>
         val (t, ctx2) = unify(l, r, ctx)
         (WT_Optional(t), ctx2)
-      case (l, WT_Optional(r))  =>
+      case (l, WT_Optional(r)) =>
         val (t, ctx2) = unify(l, r, ctx)
         (WT_Optional(t), ctx2)
 
@@ -133,7 +133,7 @@ case class TUtil(conf: Options) {
 
       case (a: WT_Var, b: WT_Var) =>
         // found a type equality between two variables
-        val ctx3 : TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
+        val ctx3: TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
           case (None, None) =>
             ctx + (a -> b)
           case (None, Some(z)) =>
@@ -182,7 +182,7 @@ case class TUtil(conf: Options) {
   //
   def unifyFunctionArguments(x: Vector[WT],
                              y: Vector[WT],
-                             ctx : TypeUnificationContext): (Vector[WT], TypeUnificationContext) = {
+                             ctx: TypeUnificationContext): (Vector[WT], TypeUnificationContext) = {
     (x zip y).foldLeft((Vector.empty[WT], ctx)) {
       case ((tVec, ctx), (lt, rt)) =>
         val (t, ctx2) = unify(lt, rt, ctx)
@@ -191,8 +191,8 @@ case class TUtil(conf: Options) {
   }
 
   // Unify elements in a collection. For example, a vector of values.
-  def unifyCollection(tVec : Iterable[WT],
-                      ctx : TypeUnificationContext) : (WT, TypeUnificationContext) = {
+  def unifyCollection(tVec: Iterable[WT],
+                      ctx: TypeUnificationContext): (WT, TypeUnificationContext) = {
     assert(tVec.nonEmpty)
     tVec.tail.foldLeft((tVec.head, ctx)) {
       case ((t, ctx), t2) =>

@@ -87,7 +87,6 @@ object WdlTypes {
   case class WT_Function3(name: String, arg1: WT, arg2: WT, arg3: WT, output: WT)
       extends WT_StdlibFunc
 
-
   // A value for each type variable.
   //
   // This is used when we have polymorphic types,

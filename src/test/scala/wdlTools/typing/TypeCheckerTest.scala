@@ -65,8 +65,8 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   )
 
   // test to include/exclude
-  private val includeList : Option[Set[String]] = None //Some(Set("coercions_questionable.wdl"))
-  private val excludeList : Option[Set[String]] = None
+  private val includeList: Option[Set[String]] = None //Some(Set("coercions_questionable.wdl"))
+  private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
     val opts2 = flag match {
@@ -108,15 +108,15 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  private def includeExcludeCheck(name : String) : Boolean = {
+  private def includeExcludeCheck(name: String): Boolean = {
     excludeList match {
       case Some(l) if (l contains name) => return false
-      case _ => ()
+      case _                            => ()
     }
     includeList match {
-      case None => return true
+      case None                         => return true
       case Some(l) if (l contains name) => return true
-      case Some(_) => return false
+      case Some(_)                      => return false
     }
   }
 
@@ -152,17 +152,17 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val tUtil = TUtil(opts)
     import WdlTypes._
 
-    tUtil.isCoercibleTo(WT_Array(WT_Optional(WT_String)),
-                        WT_Array(WT_Optional(WT_String))) shouldBe(true)
+    tUtil
+      .isCoercibleTo(WT_Array(WT_Optional(WT_String)), WT_Array(WT_Optional(WT_String))) shouldBe (true)
   }
 
-  it should "be able to handle GATK" taggedAs(Edge) in {
+  it should "be able to handle GATK" taggedAs (Edge) in {
     val opts2 = opts.copy(typeChecking = Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
     val sources = Vector(
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
 //      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
     )
 
