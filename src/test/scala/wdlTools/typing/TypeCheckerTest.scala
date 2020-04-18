@@ -36,32 +36,32 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   val controlTable: Map[String, TResult] = Map(
       // workflows
-      "census.wdl" -> TResult(true),
-      "compound_expr_bug.wdl" -> TResult(true),
-      "imports.wdl" -> TResult(true),
-      "linear.wdl" -> TResult(true),
-      "nested.wdl" -> TResult(true),
-      "types.wdl" -> TResult(true),
-      "coercions_questionable.wdl" -> TResult(true, Some(Lenient)),
-      "coercions_strict.wdl" -> TResult(true),
-      "bad_stdlib_calls.wdl" -> TResult(false),
-      "scatter_II.wdl" -> TResult(false),
-      "scatter_I.wdl" -> TResult(false),
-      "shadow_II.wdl" -> TResult(false),
-      "shadow.wdl" -> TResult(false),
+      "census.wdl" -> TResult(correct = true),
+      "compound_expr_bug.wdl" -> TResult(correct = true),
+      "imports.wdl" -> TResult(correct = true),
+      "linear.wdl" -> TResult(correct = true),
+      "nested.wdl" -> TResult(correct = true),
+      "types.wdl" -> TResult(correct = true),
+      "coercions_questionable.wdl" -> TResult(correct = true, Some(Lenient)),
+      "coercions_strict.wdl" -> TResult(correct = true),
+      "bad_stdlib_calls.wdl" -> TResult(correct = false),
+      "scatter_II.wdl" -> TResult(correct = false),
+      "scatter_I.wdl" -> TResult(correct = false),
+      "shadow_II.wdl" -> TResult(correct = false),
+      "shadow.wdl" -> TResult(correct = false),
       // correct tasks
-      "command_string.wdl" -> TResult(true),
-      "comparisons.wdl" -> TResult(true),
-      "library.wdl" -> TResult(true),
-      "null.wdl" -> TResult(true),
-      "simple.wdl" -> TResult(true),
-      "stdlib.wdl" -> TResult(true),
+      "command_string.wdl" -> TResult(correct = true),
+      "comparisons.wdl" -> TResult(correct = true),
+      "library.wdl" -> TResult(correct = true),
+      "null.wdl" -> TResult(correct = true),
+      "simple.wdl" -> TResult(correct = true),
+      "stdlib.wdl" -> TResult(correct = true),
       // incorrect tasks
-      "comparison1.wdl" -> TResult(false),
-      "comparison2.wdl" -> TResult(false),
-      "comparison4.wdl" -> TResult(false),
-      "declaration_shadowing.wdl" -> TResult(false),
-      "simple.wdl" -> TResult(false)
+      "comparison1.wdl" -> TResult(correct = false),
+      "comparison2.wdl" -> TResult(correct = false),
+      "comparison4.wdl" -> TResult(correct = false),
+      "declaration_shadowing.wdl" -> TResult(correct = false),
+      "simple.wdl" -> TResult(correct = false)
   )
 
   // test to include/exclude
@@ -110,34 +110,33 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   private def includeExcludeCheck(name: String): Boolean = {
     excludeList match {
-      case Some(l) if (l contains name) => return false
-      case _                            => ()
+      case Some(l) if l contains name => return false
+      case _                          => ()
     }
     includeList match {
-      case None                         => return true
-      case Some(l) if (l contains name) => return true
-      case Some(_)                      => return false
+      case None                       => true
+      case Some(l) if l contains name => true
+      case Some(_)                    => false
     }
   }
 
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/typing/v1_0").getPath)
+        Paths.get(getClass.getResource(name = "/typing/v1_0").getPath)
     )
 
     // filter out files that do not appear in the control table
-    val testFiles2 = testFiles.flatMap {
-      case testFile =>
-        val name = testFile.getFileName().toString
-        if (!includeExcludeCheck(name)) {
-          None
-        } else {
-          controlTable.get(name) match {
-            case None => None
-            case Some(tResult) =>
-              Some(testFile, tResult)
-          }
+    val testFiles2 = testFiles.flatMap { testFile =>
+      val name = testFile.getFileName.toString
+      if (!includeExcludeCheck(name)) {
+        None
+      } else {
+        controlTable.get(name) match {
+          case None => None
+          case Some(tResult) =>
+            Some(testFile, tResult)
         }
+      }
     }
 
     testFiles2.foreach {
@@ -153,17 +152,17 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     import WdlTypes._
 
     tUtil
-      .isCoercibleTo(WT_Array(WT_Optional(WT_String)), WT_Array(WT_Optional(WT_String))) shouldBe (true)
+      .isCoercibleTo(WT_Array(WT_Optional(WT_String)), WT_Array(WT_Optional(WT_String))) shouldBe true
   }
 
-  it should "be able to handle GATK" taggedAs (Edge) in {
+  it should "be able to handle GATK" taggedAs Edge in {
     val opts2 = opts.copy(typeChecking = Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
     val sources = Vector(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-//      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
+        //      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
     )
 
     for (src <- sources) {

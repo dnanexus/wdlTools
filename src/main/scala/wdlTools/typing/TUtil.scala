@@ -8,7 +8,7 @@ import WdlTypes._
 // This is the WDL typesystem
 case class TUtil(conf: Options) {
   // Type checking rules, are we lenient or strict in checking coercions.
-  val regime = conf.typeChecking
+  private val regime = conf.typeChecking
 
   // check if the right hand side of an assignment matches the left hand side
   //
@@ -99,7 +99,7 @@ case class TUtil(conf: Options) {
   def unify(x: WT, y: WT, ctx: TypeUnificationContext): (WT, TypeUnificationContext) = {
     (x, y) match {
       // base case, primitive types
-      case (_, _) if (isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y)) =>
+      case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
         (x, ctx)
       case (WT_Optional(l), WT_Optional(r)) =>
         val (t, ctx2) = unify(l, r, ctx)
@@ -128,7 +128,7 @@ case class TUtil(conf: Options) {
       case (WT_Identifier(l), WT_Identifier(r)) if l == r =>
         // a user defined type
         (WT_Identifier(l), ctx)
-      case (WT_Var(i), WT_Var(j)) if (i == j) =>
+      case (WT_Var(i), WT_Var(j)) if i == j =>
         (WT_Var(i), ctx)
 
       case (a: WT_Var, b: WT_Var) =>
@@ -149,7 +149,7 @@ case class TUtil(conf: Options) {
       case (a: WT_Var, z) =>
         if (!(ctx contains a)) {
           // found a binding for a type variable
-          (z, (ctx + (a -> z)))
+          (z, ctx + (a -> z))
         } else {
           // a binding already exists, choose the more general
           // type
@@ -239,7 +239,7 @@ case class TUtil(conf: Options) {
       case WT_Optional(t)    => s"Optional[${toString(t)}]"
 
       // a user defined structure
-      case WT_Struct(name, members) => s"Struct($name)"
+      case WT_Struct(name, _) => s"Struct($name)"
 
       case WT_Task(name, input, output) =>
         val inputs = input

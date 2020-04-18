@@ -46,18 +46,11 @@ class SyntaxException private (ex: Exception) extends Exception(ex) {
 }
 
 /**
-  * Type hierarchy for comments.
-  *
-  * # this is a line comment
-  * # that's split across two lines
-  * #
-  * ## this is a preformatted comment
+  * A WDL comment.
+  * @param value the comment string, including prefix ('#')
+  * @param text the location of the comment in the source file
   */
-abstract class Comment {}
-case class CommentLine(text: String) extends Comment
-case class CommentEmpty() extends Comment
-case class CommentPreformatted(lines: Seq[String]) extends Comment
-case class CommentCompound(comments: Seq[Comment]) extends Comment
+case class Comment(value: String, text: TextSource)
 
 trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
@@ -78,8 +71,8 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, url, doc, _, _) if doc.isDefined => Some(url -> doc.get)
-        case _                                                => None
+        case ImportDoc(_, _, url, doc, _) if doc.isDefined => Some(url -> doc.get)
+        case _                                             => None
       }.toMap
     }
 

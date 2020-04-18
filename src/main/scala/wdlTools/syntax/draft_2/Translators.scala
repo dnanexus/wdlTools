@@ -116,47 +116,42 @@ object Translators {
   }
 
   def translateMetaKV(kv: ConcreteSyntax.MetaKV): AbstractSyntax.MetaKV = {
-    AbstractSyntax.MetaKV(kv.id, AbstractSyntax.ValueString(kv.value, kv.text), kv.text, kv.comment)
+    AbstractSyntax.MetaKV(kv.id, AbstractSyntax.ValueString(kv.value, kv.text), kv.text)
   }
 
   def translateInputSection(
       inp: ConcreteSyntax.InputSection
   ): AbstractSyntax.InputSection = {
-    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration), inp.text, inp.comment)
+    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration), inp.text)
   }
 
   def translateOutputSection(
       output: ConcreteSyntax.OutputSection
   ): AbstractSyntax.OutputSection = {
-    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration),
-                                 output.text,
-                                 output.comment)
+    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration), output.text)
   }
 
   def translateCommandSection(
       cs: ConcreteSyntax.CommandSection
   ): AbstractSyntax.CommandSection = {
-    AbstractSyntax.CommandSection(cs.parts.map(translateExpr), cs.text, cs.comment)
+    AbstractSyntax.CommandSection(cs.parts.map(translateExpr), cs.text)
   }
 
   def translateDeclaration(decl: ConcreteSyntax.Declaration): AbstractSyntax.Declaration = {
     AbstractSyntax.Declaration(decl.name,
                                translateType(decl.wdlType),
                                decl.expr.map(translateExpr),
-                               decl.text,
-                               decl.comment)
+                               decl.text)
   }
 
   def translateMetaSection(meta: ConcreteSyntax.MetaSection): AbstractSyntax.MetaSection = {
-    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV), meta.text, meta.comment)
+    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV), meta.text)
   }
 
   def translateParameterMetaSection(
       paramMeta: ConcreteSyntax.ParameterMetaSection
   ): AbstractSyntax.ParameterMetaSection = {
-    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
-                                        paramMeta.text,
-                                        paramMeta.comment)
+    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text)
   }
 
   def translateRuntimeSection(
@@ -164,11 +159,10 @@ object Translators {
   ): AbstractSyntax.RuntimeSection = {
     AbstractSyntax.RuntimeSection(
         runtime.kvs.map {
-          case ConcreteSyntax.RuntimeKV(id, expr, text, comment) =>
-            AbstractSyntax.RuntimeKV(id, translateExpr(expr), text, comment)
+          case ConcreteSyntax.RuntimeKV(id, expr, text) =>
+            AbstractSyntax.RuntimeKV(id, translateExpr(expr), text)
         },
-        runtime.text,
-        runtime.comment
+        runtime.text
     )
   }
 
@@ -176,14 +170,10 @@ object Translators {
       elem: ConcreteSyntax.WorkflowElement
   ): AbstractSyntax.WorkflowElement = {
     elem match {
-      case ConcreteSyntax.Declaration(name, wdlType, expr, text, comment) =>
-        AbstractSyntax.Declaration(name,
-                                   translateType(wdlType),
-                                   expr.map(translateExpr),
-                                   text,
-                                   comment)
+      case ConcreteSyntax.Declaration(name, wdlType, expr, text) =>
+        AbstractSyntax.Declaration(name, translateType(wdlType), expr.map(translateExpr), text)
 
-      case ConcreteSyntax.Call(name, alias, inputs, text, comment) =>
+      case ConcreteSyntax.Call(name, alias, inputs, text) =>
         AbstractSyntax.Call(
             name,
             alias.map {
@@ -196,22 +186,17 @@ object Translators {
                   AbstractSyntax.CallInput(inp.name, translateExpr(inp.expr), inp.text)
                 }, inputsText)
             },
-            text,
-            comment
+            text
         )
 
-      case ConcreteSyntax.Scatter(identifier, expr, body, text, comment) =>
+      case ConcreteSyntax.Scatter(identifier, expr, body, text) =>
         AbstractSyntax.Scatter(identifier,
                                translateExpr(expr),
                                body.map(translateWorkflowElement),
-                               text,
-                               comment)
+                               text)
 
-      case ConcreteSyntax.Conditional(expr, body, text, comment) =>
-        AbstractSyntax.Conditional(translateExpr(expr),
-                                   body.map(translateWorkflowElement),
-                                   text,
-                                   comment)
+      case ConcreteSyntax.Conditional(expr, body, text) =>
+        AbstractSyntax.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text)
     }
   }
 
@@ -223,8 +208,7 @@ object Translators {
         wf.meta.map(translateMetaSection),
         wf.parameterMeta.map(translateParameterMetaSection),
         wf.body.map(translateWorkflowElement),
-        wf.text,
-        wf.comment
+        wf.text
     )
   }
 
@@ -239,8 +223,7 @@ object Translators {
                              aliasesAbst,
                              importDoc.url,
                              importedDoc,
-                             importDoc.text,
-                             importDoc.comment)
+                             importDoc.text)
   }
 
   def translateTask(task: ConcreteSyntax.Task): AbstractSyntax.Task = {
@@ -253,8 +236,7 @@ object Translators {
         task.meta.map(translateMetaSection),
         task.parameterMeta.map(translateParameterMetaSection),
         task.runtime.map(translateRuntimeSection),
-        task.text,
-        task.comment
+        task.text
     )
   }
 }

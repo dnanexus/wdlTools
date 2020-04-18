@@ -13,6 +13,8 @@ import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource}
 import wdlTools.util.Options
 
+import scala.collection.mutable
+
 case class ParseTop(opts: Options,
                     grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
                     docSourceURL: Option[URL] = None)
@@ -24,10 +26,6 @@ case class ParseTop(opts: Options,
 
   private def getSourceText(symbol: TerminalNode): TextSource = {
     grammar.getSourceText(symbol, docSourceURL)
-  }
-
-  private def getComment(ctx: ParserRuleContext): Option[Comment] = {
-    grammar.getComment(ctx)
   }
 
   /*
@@ -598,7 +596,7 @@ unbound_decls
   override def visitUnbound_decls(ctx: WdlDraft2Parser.Unbound_declsContext): Declaration = {
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
-    Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
+    Declaration(name, wdlType, None, getSourceText(ctx))
   }
 
   /*
@@ -610,9 +608,9 @@ bound_decls
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = ctx.Identifier().getText
     if (ctx.expr() == null)
-      return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
+      return Declaration(name, wdlType, None, getSourceText(ctx))
     val expr: Expr = visitExpr(ctx.expr())
-    Declaration(name, wdlType, Some(expr), getSourceText(ctx), getComment(ctx))
+    Declaration(name, wdlType, Some(expr), getSourceText(ctx))
   }
 
   /*
@@ -635,7 +633,7 @@ any_decls
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = ctx.Identifier().getText
     val value = ctx.string().string_part().getText
-    MetaKV(id, value, getSourceText(ctx), getComment(ctx))
+    MetaKV(id, value, getSourceText(ctx))
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
@@ -647,7 +645,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    ParameterMetaSection(kvs, getSourceText(ctx), getComment(ctx))
+    ParameterMetaSection(kvs, getSourceText(ctx))
   }
 
   //  META LBRACE meta_kv* RBRACE #meta
@@ -657,7 +655,7 @@ any_decls
       .asScala
       .map(x => visitMeta_kv(x))
       .toVector
-    MetaSection(kvs, getSourceText(ctx), getComment(ctx))
+    MetaSection(kvs, getSourceText(ctx))
   }
 
   /* task_runtime_kv
@@ -666,7 +664,7 @@ any_decls
   override def visitTask_runtime_kv(ctx: WdlDraft2Parser.Task_runtime_kvContext): RuntimeKV = {
     val id: String = ctx.Identifier.getText
     val expr: Expr = visitExpr(ctx.expr())
-    RuntimeKV(id, expr, getSourceText(ctx), getComment(ctx))
+    RuntimeKV(id, expr, getSourceText(ctx))
   }
 
   /* task_runtime
@@ -678,7 +676,7 @@ any_decls
       .asScala
       .map(x => visitTask_runtime_kv(x))
       .toVector
-    RuntimeSection(kvs, getSourceText(ctx), getComment(ctx))
+    RuntimeSection(kvs, getSourceText(ctx))
   }
 
   /*
@@ -692,7 +690,7 @@ task_input
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), None)
+    InputSection(decls, getSourceText(ctx))
   }
 
   /* task_output
@@ -704,7 +702,7 @@ task_input
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx), getComment(ctx))
+    OutputSection(decls, getSourceText(ctx))
   }
 
   /* task_command_string_part
@@ -772,7 +770,7 @@ task_input
 
     // TODO: do the above until reaching a fixed point
 
-    CommandSection(cleanedParts, getSourceText(ctx), getComment(ctx))
+    CommandSection(cleanedParts, getSourceText(ctx))
   }
 
   // A that should appear zero or once. Make sure this is the case.
@@ -828,7 +826,7 @@ task_input
     val ioVarNames = inputVarNames ++ outputVarNames
 
     paramMeta.kvs.foreach {
-      case MetaKV(k, _, _, _) =>
+      case MetaKV(k, _, _) =>
         if (!(ioVarNames contains k))
           throw new SyntaxException(
               s"parameter ${k} does not appear in the input or output sections",
@@ -872,7 +870,7 @@ task_input
       val newInput = if (noEvalDecls.isEmpty) {
         None
       } else {
-        Some(InputSection(noEvalDecls, taskInput.text, None))
+        Some(InputSection(noEvalDecls, taskInput.text))
       }
       (newInput, evalDecls)
     }
@@ -907,8 +905,7 @@ task_input
         meta = meta,
         parameterMeta = parameterMeta,
         runtime = runtime,
-        text = getSourceText(ctx),
-        comment = getComment(ctx)
+        text = getSourceText(ctx)
     )
   }
 
@@ -929,7 +926,7 @@ import_as
       else
         Some(ctx.import_as().Identifier().getText)
 
-    ImportDoc(name, Vector.empty, opts.getURL(url), getSourceText(ctx), getComment(ctx))
+    ImportDoc(name, Vector.empty, opts.getURL(url), getSourceText(ctx))
   }
 
   /* call_alias
@@ -991,7 +988,7 @@ import_as
         Some(visitCall_body(ctx.call_body()))
       }
 
-    Call(name, alias, inputs, getSourceText(ctx), getComment(ctx))
+    Call(name, alias, inputs, getSourceText(ctx))
   }
 
   /*
@@ -1006,7 +1003,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Scatter(id, expr, body, getSourceText(ctx), getComment(ctx))
+    Scatter(id, expr, body, getSourceText(ctx))
   }
 
   /* conditional
@@ -1019,7 +1016,7 @@ scatter
       .asScala
       .map(visitInner_workflow_element)
       .toVector
-    Conditional(expr, body, getSourceText(ctx), getComment(ctx))
+    Conditional(expr, body, getSourceText(ctx))
   }
 
   /* workflow_input
@@ -1031,7 +1028,7 @@ scatter
       .asScala
       .map(x => visitAny_decls(x))
       .toVector
-    InputSection(decls, getSourceText(ctx), None)
+    InputSection(decls, getSourceText(ctx))
   }
 
   /* workflow_output
@@ -1044,7 +1041,7 @@ scatter
       .asScala
       .map(x => visitBound_decls(x))
       .toVector
-    OutputSection(decls, getSourceText(ctx), getComment(ctx))
+    OutputSection(decls, getSourceText(ctx))
   }
 
   /* inner_workflow_element
@@ -1092,7 +1089,7 @@ workflow
       val newInput = if (noEvalDecls.isEmpty) {
         None
       } else {
-        Some(InputSection(noEvalDecls, workflowInput.text, None))
+        Some(InputSection(noEvalDecls, workflowInput.text))
       }
       (newInput, evalDecls)
     }
@@ -1117,7 +1114,7 @@ workflow
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Workflow(name, input, output, meta, parameterMeta, wfElems, getSourceText(ctx), getComment(ctx))
+    Workflow(name, input, output, meta, parameterMeta, wfElems, getSourceText(ctx))
   }
 
   /*
@@ -1138,7 +1135,8 @@ document
 	: version document_element* (workflow document_element*)?
 	;
    */
-  override def visitDocument(ctx: WdlDraft2Parser.DocumentContext): Document = {
+  def visitDocument(ctx: WdlDraft2Parser.DocumentContext,
+                    comments: mutable.Map[Int, Comment]): Document = {
     val elems: Vector[DocumentElement] =
       ctx
         .document_element()
@@ -1152,7 +1150,7 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(elems, workflow, getSourceText(ctx), getComment(ctx))
+    Document(elems, workflow, getSourceText(ctx), comments.toMap)
   }
 
   def parseDocument: Document = {
@@ -1179,7 +1177,7 @@ document
   def apply: Element = {
     val ctx = grammar.parser.top.document_or_fragment
     val result = if (ctx.document != null) {
-      visitDocument(ctx.document)
+      visitDocument(ctx.document, grammar.comments)
     } else if (ctx.expr != null) {
       visitExpr(ctx.expr)
     } else if (ctx.wdl_type != null) {

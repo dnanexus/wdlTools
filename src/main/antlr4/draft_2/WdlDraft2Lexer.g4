@@ -90,10 +90,6 @@ WHITESPACE
 	: [ \t\r\n]+ -> channel(HIDDEN)
 	;
 
-COMMENT
-	: '#' ~[\r\n]* -> channel(HIDDEN)
-	;
-
 Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;

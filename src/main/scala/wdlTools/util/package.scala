@@ -26,6 +26,7 @@ import TypeCheckingRegime._
   * @param followImports whether to follow imports when parsing.
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
+  * @param typeChecking strictness of type-checking
   */
 case class Options(localDirectories: Option[Vector[Path]] = None,
                    followImports: Boolean = false,

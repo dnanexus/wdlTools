@@ -55,12 +55,12 @@ case class ProjectGenerator(opts: Options,
 
   def containsFile(dataType: Type): Boolean = {
     dataType match {
-      case _: TypeFile                  => true
-      case TypeArray(t, _, _)           => containsFile(t)
-      case TypeMap(k, v, _)             => containsFile(k) || containsFile(v)
-      case TypePair(l, r, _)            => containsFile(l) || containsFile(r)
-      case TypeStruct(_, members, _, _) => members.exists(x => containsFile(x.dataType))
-      case _                            => false
+      case _: TypeFile               => true
+      case TypeArray(t, _, _)        => containsFile(t)
+      case TypeMap(k, v, _)          => containsFile(k) || containsFile(v)
+      case TypePair(l, r, _)         => containsFile(l) || containsFile(r)
+      case TypeStruct(_, members, _) => members.exists(x => containsFile(x.dataType))
+      case _                         => false
     }
   }
 
@@ -223,12 +223,12 @@ case class ProjectGenerator(opts: Options,
       taskModels.map(_.toTask)
     }
 
-    val doc = Document(Version(wdlVersion, null, None),
+    val doc = Document(Version(wdlVersion, null),
                        null,
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
                        null,
-                       None)
+                       Map.empty)
     val wdlName = s"${name}.wdl"
     val docUrl = Util.getURL(outputDir.resolve(wdlName))
     generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
@@ -266,7 +266,7 @@ object ProjectGenerator {
                         choices: Seq[Expr] = Vector.empty,
                         linked: Boolean = false) {
     def toDeclaration: Declaration = {
-      Declaration(name, dataType, None, null, None)
+      Declaration(name, dataType, None, null)
     }
 
     def toMeta: Option[MetaKV] = {
@@ -290,7 +290,7 @@ object ProjectGenerator {
       if (metaMap.isEmpty) {
         None
       } else {
-        Some(MetaKV(name, ExprObject(metaMap, null), null, None))
+        Some(MetaKV(name, ExprObject(metaMap, null), null))
       }
     }
   }
@@ -299,7 +299,7 @@ object ProjectGenerator {
     if (inputs.isEmpty) {
       (None, Set.empty)
     } else {
-      val inputSection = InputSection(inputs.map(_.toDeclaration), null, None)
+      val inputSection = InputSection(inputs.map(_.toDeclaration), null)
       val linkedInputs = inputs.collect {
         case f: FieldModel if f.linked => f.name
       }.toSet
@@ -311,7 +311,7 @@ object ProjectGenerator {
     if (outputs.isEmpty) {
       None
     } else {
-      Some(OutputSection(outputs.map(_.toDeclaration), null, None))
+      Some(OutputSection(outputs.map(_.toDeclaration), null))
     }
   }
 
@@ -321,8 +321,8 @@ object ProjectGenerator {
     } else {
       Some(
           MetaSection(items.map {
-            case (key, value) => MetaKV(key, ValueString(value, null), null, None)
-          }.toVector, null, None)
+            case (key, value) => MetaKV(key, ValueString(value, null), null)
+          }.toVector, null)
       )
     }
   }
@@ -335,7 +335,7 @@ object ProjectGenerator {
       if (inputMetaKVs.isEmpty) {
         None
       } else {
-        Some(ParameterMetaSection(inputMetaKVs, null, None))
+        Some(ParameterMetaSection(inputMetaKVs, null))
       }
     }
   }
@@ -353,7 +353,7 @@ object ProjectGenerator {
           name.get,
           inputSection,
           getOutput(outputs.toVector),
-          CommandSection(Vector.empty, null, None),
+          CommandSection(Vector.empty, null),
           Vector.empty,
           getMeta(
               Map("title" -> title, "summary" -> summary, description -> "description").collect {
@@ -362,12 +362,9 @@ object ProjectGenerator {
           ),
           getParameterMeta(inputs.toVector),
           Some(
-              RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null, None)),
-                             null,
-                             None)
+              RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null)), null)
           ),
-          null,
-          None
+          null
       )
       (task, linkedInputs)
     }
@@ -397,7 +394,7 @@ object ProjectGenerator {
           } else {
             None
           }
-          Call(task.name, None, callInputs, null, None)
+          Call(task.name, None, callInputs, null)
       }
 
       val (wfInputSection, _) = getInput(inputs.toVector)
@@ -412,8 +409,7 @@ object ProjectGenerator {
           ),
           getParameterMeta(inputs.toVector),
           calls,
-          null,
-          None
+          null
       )
     }
   }

@@ -157,10 +157,10 @@ object Util {
     * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
-    * @param a - The value to pretty print.
-    * @param indentSize - Number of spaces for each indent.
-    * @param maxElementWidth - Largest element size before wrapping.
-    * @param depth - Initial depth to pretty print indents.
+    * @param a The value to pretty print.
+    * @param indentSize Number of spaces for each indent.
+    * @param maxElementWidth Largest element size before wrapping.
+    * @param depth Initial depth to pretty print indents.
     * @return
     */
   def prettyFormat(a: Any,
@@ -218,6 +218,13 @@ object Util {
     }
   }
 
+  /**
+    * Simple bi-directional Map class.
+    * @param keys map keys
+    * @param values map values - must be unique, i.e. you must be able to map values -> keys without collisions
+    * @tparam X keys Type
+    * @tparam Y values Type
+    */
   case class BiMap[X, Y](keys: Seq[X], values: Seq[Y]) {
     require(keys.size == values.size, "no 1 to 1 relation")
     private lazy val kvMap: Map[X, Y] = keys.zip(values).toMap

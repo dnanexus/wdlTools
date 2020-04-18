@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Edge, WdlVersion}
+import wdlTools.syntax.{Comment, Edge, TextSource, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
@@ -302,7 +302,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.output.get should matchPattern {
-      case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _, _)),
+      case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _)),
                          _,
                          _) =>
     }
@@ -310,6 +310,28 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   it should "parse a task" in {
     val doc = getDocument(getTaskSource("wc.wdl"))
+
+    doc.comments.get(0) should matchPattern {
+      case Comment("# A task that counts how many lines a file has", TextSource(0, 0, _)) =>
+    }
+    doc.comments.get(7) should matchPattern {
+      case Comment("# Just a random declaration with a multi-line comment", TextSource(7, 2, _)) =>
+    }
+    doc.comments.get(10) should matchPattern {
+      case Comment("# comment after bracket", TextSource(10, 12, _)) =>
+    }
+    doc.comments.get(11) should matchPattern {
+      case Comment("# Int num_lines = read_int(stdout())", TextSource(11, 4, _)) =>
+    }
+    doc.comments.get(12) should matchPattern {
+      case Comment("# end-of-line comment", TextSource(12, 23, _)) =>
+    }
+    doc.comments.get(19) should matchPattern {
+      case Comment("# The comment below is empty", TextSource(11, 4, _)) =>
+    }
+    doc.comments.get(20) should matchPattern {
+      case Comment("#", TextSource(19, 4, _)) =>
+    }
 
     doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
@@ -319,10 +341,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.input.get should matchPattern {
-      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _, _)), _, _) =>
+      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _)), _, _) =>
     }
     task.output.get should matchPattern {
-      case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _, _)),
+      case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _)),
                          _,
                          _) =>
     }
@@ -399,16 +421,16 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     structs(0).name shouldBe "Address"
     structs(0).members.size shouldBe 3
     structs(0).members should matchPattern {
-      case Vector(StructMember("street", TypeString(_), _, _),
-                  StructMember("city", TypeString(_), _, _),
-                  StructMember("zipcode", TypeInt(_), _, _)) =>
+      case Vector(StructMember("street", TypeString(_), _),
+                  StructMember("city", TypeString(_), _),
+                  StructMember("zipcode", TypeInt(_), _)) =>
     }
 
     structs(1).name shouldBe "Data"
     structs(1).members should matchPattern {
-      case Vector(StructMember("history", TypeFile(_), _, _),
-                  StructMember("date", TypeInt(_), _, _),
-                  StructMember("month", TypeString(_), _, _)) =>
+      case Vector(StructMember("history", TypeFile(_), _),
+                  StructMember("date", TypeInt(_), _),
+                  StructMember("month", TypeString(_), _)) =>
     }
   }
 
@@ -459,13 +481,13 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case ExprEqeq(ExprBoolean(true, _), ExprBoolean(false, _), _) =>
     }
     conditionals(0).body should matchPattern {
-      case Vector(Call("sub", None, _, _, _)) =>
+      case Vector(Call("sub", None, _, _)) =>
     }
     conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe 0
 
     wf.meta.get shouldBe a[MetaSection]
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _, _)) =>
+      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _)) =>
     }
   }
 

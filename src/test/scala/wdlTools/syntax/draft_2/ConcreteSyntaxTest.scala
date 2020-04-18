@@ -3,7 +3,7 @@ package wdlTools.syntax.draft_2
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{CommentCompound, CommentEmpty, CommentLine, CommentPreformatted, Edge}
+import wdlTools.syntax.{Comment, Edge, TextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
@@ -40,7 +40,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    val InputSection(decls, _, _) = task.input.get
+    val InputSection(decls, _) = task.input.get
     decls(0) should matchPattern { case Declaration("i", TypeInt(_), None, _, _)     => }
     decls(1) should matchPattern { case Declaration("s", TypeString(_), None, _, _)  => }
     decls(2) should matchPattern { case Declaration("x", TypeFloat(_), None, _, _)   => }
@@ -292,7 +292,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.output.get should matchPattern {
-      case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _, _)),
+      case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _)),
                          _,
                          _) =>
     }
@@ -301,9 +301,28 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "parse a task" in {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
-    doc.comment shouldBe Some(
-        CommentLine("A task that counts how many lines a file has")
-    )
+    doc.comments.get(0) should matchPattern {
+      case Comment("# A task that counts how many lines a file has", TextSource(0, 0, _)) =>
+    }
+    doc.comments.get(3) should matchPattern {
+      case Comment("# Just a random declaration with a multi-line comment", TextSource(3, 2, _)) =>
+    }
+    doc.comments.get(6) should matchPattern {
+      case Comment("# comment after bracket", TextSource(6, 12, _)) =>
+    }
+    doc.comments.get(7) should matchPattern {
+      case Comment("# Int num_lines = read_int(stdout())", TextSource(7, 4, _)) =>
+    }
+    doc.comments.get(8) should matchPattern {
+      case Comment("# end-of-line comment", TextSource(8, 23, _)) =>
+    }
+    doc.comments.get(17) should matchPattern {
+      case Comment("# The comment below is empty", TextSource(11, 4, _)) =>
+    }
+    doc.comments.get(18) should matchPattern {
+      case Comment("#", TextSource(19, 4, _)) =>
+    }
+
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -311,29 +330,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.input.get should matchPattern {
-      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _, _)), _, _) =>
+      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _)), _, _) =>
     }
     task.declarations should matchPattern {
       case Vector(
-          Declaration("i",
-                      TypeInt(_),
-                      Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)),
-                      _,
-                      Some(CommentLine("Just a random declaration with a multi-line comment")))
+          Declaration("i", TypeInt(_), Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _)
           ) =>
     }
     task.output.get should matchPattern {
-      case OutputSection(Vector(
-                             Declaration("num_lines",
-                                         _: TypeInt,
-                                         Some(ExprInt(3, _)),
-                                         _,
-                                         Some(
-                                             CommentLine("Int num_lines = read_int(stdout())")
-                                         ))
-                         ),
-                         _,
-                         _) =>
+      case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _)), _) =>
     }
     task.command shouldBe a[CommandSection]
     task.command.parts.size shouldBe 3
@@ -348,19 +353,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author",
-                  "Robin Hood",
-                  _,
-                  Some(
-                      CommentCompound(
-                          Vector(
-                              CommentPreformatted(Vector("This is a pre-formatted", "comment")),
-                              CommentLine("mixed with a regular comment"),
-                              CommentEmpty(),
-                              CommentLine("that has an empty line")
-                          )
-                      )
-                  )) =>
+      case MetaKV("author", "Robin Hood", _) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
@@ -450,7 +443,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       case ExprEqeq(ExprBoolean(true, _), ExprBoolean(false, _), _) =>
     }
     conditionals(0).body should matchPattern {
-      case Vector(Call("sub", None, _, _, _)) =>
+      case Vector(Call("sub", None, _, _)) =>
     }
     conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe 0
 
@@ -458,7 +451,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.meta.get.kvs.size shouldEqual 1
     wf.meta.get.kvs.head.value shouldEqual "Robert Heinlein"
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", "Robert Heinlein", _, _)) =>
+      case Vector(MetaKV("author", "Robert Heinlein", _)) =>
     }
   }
 

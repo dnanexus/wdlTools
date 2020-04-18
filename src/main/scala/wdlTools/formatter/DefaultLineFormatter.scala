@@ -2,7 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.{Comment, CommentEmpty, CommentLine, CommentPreformatted, CommentCompound}
+import wdlTools.syntax.Comment
 
 import scala.collection.mutable
 
