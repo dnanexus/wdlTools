@@ -58,7 +58,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
     val aWf = doc.workflow.map(translateWorkflow)
     val version = AbstractSyntax.Version(WdlVersion.Draft_2, TextSource(-1, -1))
-    AbstractSyntax.Document(version, None, elems, aWf, doc.text, comments)
+    AbstractSyntax.Document(version, None, elems, aWf, doc.text, doc.comments)
   }
 
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {

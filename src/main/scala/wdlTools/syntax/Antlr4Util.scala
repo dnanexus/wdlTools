@@ -43,15 +43,15 @@ object Antlr4Util {
       }
     }
 
-    override def enterEveryRule(ctx: ParserRuleContext): Unit = {
-      if (ctx.getStart.getTokenIndex >= 0) {
+    override def exitEveryRule(ctx: ParserRuleContext): Unit = {
+      if (ctx.getStart != null && ctx.getStart.getTokenIndex >= 0) {
         val beforeComments =
           tokenStream.getHiddenTokensToLeft(ctx.getStart.getTokenIndex, channelIndex)
         if (beforeComments != null) {
           addComments(beforeComments.asScala.toVector)
         }
       }
-      if (ctx.getStop.getTokenIndex >= 0) {
+      if (ctx.getStop != null && ctx.getStop.getTokenIndex >= 0) {
         val afterComments =
           tokenStream.getHiddenTokensToRight(ctx.getStop.getTokenIndex, channelIndex)
         if (afterComments != null) {

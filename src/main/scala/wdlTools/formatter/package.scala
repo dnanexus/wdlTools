@@ -2,7 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.Comment
+//import wdlTools.syntax.Comment
 
 import scala.collection.mutable
 
@@ -38,7 +38,7 @@ abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndent
 
   def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
 
-  def appendComment(comment: Comment): Unit
+  //def appendComment(comment: Comment): Unit
 
   def appendString(value: String): Unit
 
