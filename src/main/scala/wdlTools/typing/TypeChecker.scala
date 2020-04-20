@@ -3,7 +3,7 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
-import wdlTools.util.TypeCheckingRegime
+import wdlTools.util.TypeCheckingRegime._
 
 case class TypeChecker(stdlib: Stdlib) {
   val tUtil = TUtil(stdlib.conf)
@@ -135,6 +135,15 @@ case class TypeChecker(stdlib: Stdlib) {
   // 2)    -"-                   floats   -"-   float
   // 3)    -"-                   strings  -"-   string
   private def typeEvalAdd(a: Expr, b: Expr, ctx: Context): WT = {
+    def isPseudoString(x : WT) : Boolean = {
+      x match {
+        case WT_String => true
+        case WT_Optional(WT_String) => true
+        case WT_File => true
+        case WT_Optional(WT_File) => true
+        case _ => false
+      }
+    }
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
@@ -149,6 +158,12 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_String, WT_Float)  => WT_String
       case (WT_Int, WT_String)    => WT_String
       case (WT_Float, WT_String)  => WT_String
+
+      // NON STANDARD
+      // there are WDL programs where we add optional strings
+      case (WT_String, x) if isPseudoString(x) => WT_String
+      case (WT_String, WT_Optional(WT_Int)) if stdlib.conf.typeChecking == Lenient => WT_String
+      case (WT_String, WT_Optional(WT_Float)) if stdlib.conf.typeChecking == Lenient => WT_String
 
       // adding files is equivalent to concatenating paths
       case (WT_File, WT_File) => WT_File
@@ -718,13 +733,13 @@ case class TypeChecker(stdlib: Stdlib) {
                 s"call ${call} has argument ${argName} that does not exist in the callee",
                 call.text
             )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Strict =>
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == Strict =>
             if (calleeType != wdlType)
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text
               )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Lenient =>
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == Lenient =>
             if (!tUtil.isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
                   s"argument ${argName} has type ${wdlType}, it is not coercible to ${calleeType}",
