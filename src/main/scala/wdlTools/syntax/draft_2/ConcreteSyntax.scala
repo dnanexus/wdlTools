@@ -130,10 +130,11 @@ object ConcreteSyntax {
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 
   // imports
+  case class ImportName(value: String, text: TextSource) extends Element
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
 
   // import statement as read from the document
-  case class ImportDoc(name: Option[String],
+  case class ImportDoc(name: Option[ImportName],
                        aliases: Vector[ImportAlias],
                        url: URL,
                        text: TextSource)

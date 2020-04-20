@@ -939,7 +939,7 @@ case class TypeChecker(stdlib: Stdlib) {
               nsName.dropRight(".wdl".length)
             else
               nsName
-          case Some(x) => x
+          case Some(x) => x.value
         }
 
         // add the externally visible definitions to the context

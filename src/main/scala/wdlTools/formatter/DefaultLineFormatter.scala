@@ -104,7 +104,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
 
 //  private lazy val whitespace = "[ \t\n\r]+".r
 //
-//  override def appendComment(comment: Comment): Unit = {
+//  override def appendComments(comment: Seq[Comment]): Unit = {
 //    require(atLineStart)
 //    comment match {
 //      case CommentEmpty() =>

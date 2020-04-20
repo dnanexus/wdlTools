@@ -2,6 +2,7 @@ package wdlTools.formatter
 
 import java.net.URL
 
+import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.{Options, Util, Verbosity}
@@ -9,7 +10,63 @@ import wdlTools.util.{Options, Util, Verbosity}
 import scala.collection.mutable
 
 case class WdlV1Formatter(opts: Options,
-                          documents: mutable.Map[URL, Seq[String]] = mutable.Map.empty) {
+                          documents: mutable.Map[URL, Vector[String]] = mutable.Map.empty) {
+
+  case class StringLiteral(value: Any, sourceLine: Int) extends Atom {
+    override def toString: String = {
+      s"${'"'}${value}${'"'}"
+    }
+
+    override def length: Int = {
+      toString.length
+    }
+
+    override def sourceLineSpan: Option[(Int, Int)] = Some(sourceLine, sourceLine)
+  }
+
+  abstract class AtomSequence(atoms: Vector[Atom]) extends Atom {
+    override def sourceLineSpan: Option[(Int, Int)] = {
+      val spans = atoms.flatMap(_.sourceLineSpan)
+      if (spans.nonEmpty) {
+        Some(spans.head._1, spans.last._2)
+      } else {
+        None
+      }
+    }
+  }
+
+  /**
+    * A sequence of adjacent atoms (with no spacing or wrapping)
+    * @param atoms the atoms
+    */
+  case class Adjacent(atoms: Vector[Atom]) extends AtomSequence(atoms) {
+    override def toString: String = {
+      atoms.mkString("")
+    }
+
+    override def length: Int = {
+      atoms.map(_.length).sum
+    }
+  }
+
+  /**
+    * A sequence of atoms separated by a space
+    * @param atoms the atoms
+    */
+  case class Spaced(atoms: Vector[Atom], wrapping: Wrapping = Wrapping.Never)
+      extends AtomSequence(atoms) {
+    override def toString: String = {
+      atoms.mkString(" ")
+    }
+
+    override def length: Int = {
+      atoms.map(_.length).sum + atoms.length - 1
+    }
+
+    override def format(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendAll(atoms, wrapping = wrapping)
+    }
+  }
 
   abstract class Group(prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
@@ -49,7 +106,7 @@ case class WdlV1Formatter(opts: Options,
     def wrapBody(lineFormatter: LineFormatter): Unit
   }
 
-  case class Container(items: Seq[Atom],
+  case class Container(items: Vector[Atom],
                        delimiter: Token = Token.ArrayDelimiter,
                        prefix: Option[Atom] = None,
                        suffix: Option[Atom] = None,
@@ -204,7 +261,7 @@ case class WdlV1Formatter(opts: Options,
   case class Placeholder(value: Atom,
                          open: Token = Token.PlaceholderOpenDollar,
                          close: Token = Token.PlaceholderClose,
-                         options: Option[Seq[Atom]] = None)
+                         options: Option[Vector[Atom]] = None)
       extends Group(prefix = Some(open), suffix = Some(close), wrapAll = false) {
 
     override def toString: String = {
@@ -232,10 +289,11 @@ case class WdlV1Formatter(opts: Options,
                       placeholderOpen: Token = Token.PlaceholderOpenDollar,
                       inString: Boolean = false,
                       inPlaceholder: Boolean = false,
-                      inOperation: Boolean = false): Atom = {
+                      inOperation: Boolean = false): Atom with Span = {
 
     /**
       * Creates a Token or a StringLiteral, depending on whether we're already inside a string literal
+      *
       * @param value the value to wrap
       * @return an Atom
       */
@@ -250,11 +308,12 @@ case class WdlV1Formatter(opts: Options,
     /**
       * Builds an expression that occurs nested within another expression. By default, passes all the current
       * parameter values to the nested call.
+      *
       * @param nestedExpression the nested Expr
-      * @param placeholderOpen override the current value of `placeholderOpen`
-      * @param inString override the current value of `inString`
-      * @param inPlaceholder override the current value of `inPlaceholder`
-      * @param inOperation override the current value of `inOperation`
+      * @param placeholderOpen  override the current value of `placeholderOpen`
+      * @param inString         override the current value of `inString`
+      * @param inPlaceholder    override the current value of `inPlaceholder`
+      * @param inOperation      override the current value of `inOperation`
       * @return an Atom
       */
     def nested(nestedExpression: Expr,
@@ -372,8 +431,9 @@ case class WdlV1Formatter(opts: Options,
           case ExprAt(array, index, _) =>
             Container(
                 Vector(nested(index, inPlaceholder = inString)),
-                prefix =
-                  Some(Adjacent(Vector(nested(array, inPlaceholder = inString), Token.IndexOpen))),
+                prefix = Some(
+                    Adjacent(Vector(nested(array, inPlaceholder = inString), Token.IndexOpen))
+                ),
                 suffix = Some(Token.IndexClose)
             )
           case ExprIfThenElse(cond, tBranch, fBranch, _) =>
@@ -406,21 +466,96 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  case class CommentSection(comment: Comment) extends Statement {
+  /**
+    * Marker base class for Statements.
+    */
+  abstract class Statement extends Chunk with Span with Ordered[Statement] {
+    override def compare(that: Statement): Int = {
+      sourceLine - that.sourceLine
+    }
+
+    override def format(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.beginLine()
+      formatChunks(lineFormatter)
+      lineFormatter.endLine()
+    }
+
+    def formatChunks(lineFormatter: LineFormatter): Unit
+  }
+
+  abstract class StatementGroup extends Statement {
+    def statements: Vector[Statement]
+
+    override def sourceLine: Int = statements.head.sourceLine
+
+    override def endSourceLine: Int = statements.last.endSourceLine
+
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
-      //lineFormatter.appendComment(comment)
+      statements.foreach { stmt =>
+        stmt.format(lineFormatter)
+      }
     }
   }
 
-  case class VersionStatement(version: String) extends Statement {
+  abstract class SectionsStatement extends Statement {
+    def sections: Vector[Statement]
+
+    override def sourceLine: Int = sections.head.sourceLine
+
+    override def endSourceLine: Int = sections.last.endSourceLine
+
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      if (sections.nonEmpty) {
+        val sortedSections = sections.sortWith(_ < _)
+
+        sections.head.format(lineFormatter)
+        sections.tail.foreach { section =>
+          lineFormatter.emptyLine()
+          section.format(lineFormatter)
+        }
+      }
+    }
+  }
+
+  class Sections extends SectionsStatement {
+    val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
+
+    lazy override val sections: Vector[Statement] = statements.toVector
+  }
+
+  case class CommentSection(comments: Vector[Comment]) extends Statement {
+    override def sourceLine: Int = comments.head.text.line
+
+    override def endSourceLine: Int = comments.last.text.line
+
+    override def formatChunks(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendComments(comments)
+    }
+  }
+
+  case class VersionStatement(version: Version) extends Statement {
+    override def sourceLine: Int = version.text.line
+
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
-      lineFormatter.appendAll(Vector(Token.Version, Token(version)), Wrapping.Never)
+      lineFormatter.appendAll(Vector(Token.Version, Token(version.value.name)), Wrapping.Never)
       lineFormatter.endLine()
     }
   }
 
   case class ImportStatement(importDoc: ImportDoc) extends Statement {
+    override def sourceLine: Int = importDoc.text.line
+
+    override def endSourceLine: Int = {
+      if (importDoc.aliases.nonEmpty) {
+        importDoc.aliases.map { _.text.line }.max
+      } else if (importDoc.name.isDefined) {
+        importDoc.name.get.text.line
+      } else {
+        importDoc.text.line
+      }
+    }
+
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
 //      if (importDoc.comment.isDefined) {
 //        lineFormatter.appendComment(importDoc.comment.get)
@@ -429,7 +564,8 @@ case class WdlV1Formatter(opts: Options,
       lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
                               Wrapping.Never)
       if (importDoc.name.isDefined) {
-        lineFormatter.appendAll(Vector(Token.As, Token(importDoc.name.get)), Wrapping.AsNeeded)
+        lineFormatter.appendAll(Vector(Token.As, Token(importDoc.name.get.value)),
+                                Wrapping.AsNeeded)
       }
       importDoc.aliases.foreach { alias =>
         lineFormatter.appendAll(Vector(Token.Alias, Token(alias.id1), Token.As, Token(alias.id2)),
@@ -439,44 +575,61 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  case class ImportsSection(imports: Seq[ImportDoc]) extends StatementGroup {
-    override def statements: Seq[Statement] = {
+  case class ImportsSection(imports: Vector[ImportDoc]) extends StatementGroup {
+    override def statements: Vector[Statement] = {
       imports.map(ImportStatement)
     }
   }
 
-  case class DeclarationStatement(name: String, wdlType: Type, expr: Option[Expr] = None)
+  abstract class DeclarationBase(name: String, wdlType: Type, expr: Option[Expr] = None)
       extends Statement {
+
+    val exprAtom = expr.map(Expression)
+
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
 //      if (comment.isDefined) {
 //        lineFormatter.appendComment(comment.get)
 //      }
       lineFormatter.beginLine()
       lineFormatter.appendAll(Vector(DataType.fromWdlType(wdlType), Token(name)))
-      if (expr.isDefined) {
-        lineFormatter.appendAll(Vector(Token.Assignment, buildExpression(expr.get)))
+      if (exprAtom.isDefined) {
+        lineFormatter.appendAll(Vector(Token.Assignment, exprAtom))
       }
       lineFormatter.endLine()
     }
   }
 
-  case class MembersSection(members: Seq[StructMember]) extends StatementGroup {
-    override def statements: Seq[Statement] = {
-      members.map {
-        case StructMember(name, dt, _) => DeclarationStatement(name, dt, None)
-      }.toVector
-    }
-  }
+  case class DeclarationStatement(decl: Declaration)
+      extends DeclarationBase(decl.name, decl.wdlType, decl.expr) {
+    override def sourceLine: Int = decl.text.line
 
-  case class DeclarationsSection(declarations: Seq[Declaration]) extends StatementGroup {
-    override def statements: Seq[Statement] = {
-      declarations.map { decl =>
-        DeclarationStatement(decl.name, decl.wdlType, decl.expr)
+    override def endSourceLine: Int = {
+      if (decl.expr.isDefined) {
+        decl.expr.get.text.line
+      } else {
+        decl.text.line
       }
     }
   }
 
-  case class MetaKVStatement(id: String, expr: Expr) extends Statement {
+  case class StructMemberStatement(member: StructMember)
+      extends DeclarationBase(member.name, member.dataType) {
+    override def sourceLine: Int = member.text.line
+  }
+
+  case class MembersSection(members: Vector[StructMember]) extends StatementGroup {
+    override def statements: Vector[Statement] = {
+      members.map(StructMemberStatement)
+    }
+  }
+
+  case class DeclarationsSection(declarations: Vector[Declaration]) extends StatementGroup {
+    override def statements: Vector[Statement] = {
+      declarations.map(DeclarationStatement)
+    }
+  }
+
+  abstract class KVStatement(id: String, expr: Expr) extends Statement {
     override def formatChunks(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
       lineFormatter.appendAll(
@@ -486,8 +639,14 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  case class MetadataSection(metaKV: Seq[MetaKV]) extends StatementGroup {
-    override def statements: Seq[Statement] = {
+  case class MetaKVStatement(metaKV: MetaKV) extends KVStatement(metaKV.id, metaKV.expr) {
+    override def sourceLine: Int = metaKV.text.line
+
+    override def endSourceLine: Int = {}
+  }
+
+  case class MetadataSection(metaKV: Vector[MetaKV]) extends StatementGroup {
+    override def statements: Vector[Statement] = {
       metaKV.map(kv => MetaKVStatement(kv.id, kv.expr))
     }
   }
@@ -526,8 +685,8 @@ case class WdlV1Formatter(opts: Options,
   case class ParameterMetaBlock(parameterMeta: ParameterMetaSection)
       extends BlockStatement(Token.ParameterMeta, body = Some(MetadataSection(parameterMeta.kvs)))
 
-  case class WorkflowElementBody(elements: Seq[WorkflowElement]) extends SectionsStatement {
-    override def sections: Seq[Statement] = {
+  case class WorkflowElementBody(elements: Vector[WorkflowElement]) extends SectionsStatement {
+    override def sections: Vector[Statement] = {
       val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
       val declarations: mutable.Buffer[Declaration] = mutable.ArrayBuffer.empty
 
@@ -690,8 +849,8 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  case class RuntimeMetadataSection(runtimeKV: Seq[RuntimeKV]) extends StatementGroup {
-    override def statements: Seq[Statement] = {
+  case class RuntimeMetadataSection(runtimeKV: Vector[RuntimeKV]) extends StatementGroup {
+    override def statements: Vector[Statement] = {
       runtimeKV.map(kv => MetaKVStatement(kv.id, kv.expr))
     }
   }
@@ -730,37 +889,31 @@ case class WdlV1Formatter(opts: Options,
   case class TaskBlock(task: Task)
       extends BlockStatement(Token.Task, Some(Token(task.name)), Some(TaskSections(task)))
 
+  def getCommentsBetween(element: Element,
+                         comments: Map[Int, Comment],
+                         prevLine: Int = -1): Vector[Comment] = {
+    (prevLine + 1 until element.text.line).flatMap(comments.get).toVector
+  }
+
   case class FormatterDocument(document: Document) extends Sections {
-    def format(): Seq[String] = {
-      val imports: mutable.ArrayBuffer[ImportDoc] = mutable.ArrayBuffer.empty
-      val structs: mutable.ArrayBuffer[TypeStruct] = mutable.ArrayBuffer.empty
-      val tasks: mutable.ArrayBuffer[Task] = mutable.ArrayBuffer.empty
+    def format(): Vector[String] = {
+      statements.append(VersionStatement(document.version))
 
-      document.elements.foreach {
-        case imp: ImportDoc     => imports.append(imp)
-        case struct: TypeStruct => structs.append(struct)
-        case task: Task         => tasks.append(task)
-        case _: Version         => Unit
-      }
-
-      statements.append(VersionStatement("1.0"))
-
-//      if (document.comment.isDefined) {
-//        statements.append(CommentSection(document.comment.get))
-//      }
-
+      val imports = document.elements.collect { case imp: ImportDoc => imp }
       if (imports.nonEmpty) {
         statements.append(ImportsSection(imports))
       }
 
-      structs.map(StructBlock)
+      document.elements.foreach {
+        case struct: TypeStruct => statements.append(StructBlock(struct))
+      }
 
       if (document.workflow.isDefined) {
         statements.append(WorkflowBlock(document.workflow.get))
       }
 
-      if (tasks.nonEmpty) {
-        tasks.foreach(task => statements.append(TaskBlock(task)))
+      document.elements.foreach {
+        case task: Task => statements.append(TaskBlock(task))
       }
 
       if (opts.verbosity == Verbosity.Verbose) {
@@ -775,12 +928,12 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  def formatDocument(doc: Document): Seq[String] = {
+  def formatDocument(doc: Document): Vector[String] = {
     FormatterDocument(doc).format()
   }
 
   def formatDocuments(url: URL): Unit = {
-    Parsers(opts).getDocumentWalker[Seq[String]](url, documents).walk { (url, doc, results) =>
+    Parsers(opts).getDocumentWalker[Vector[String]](url, documents).walk { (url, doc, results) =>
       results(url) = formatDocument(doc)
     }
   }

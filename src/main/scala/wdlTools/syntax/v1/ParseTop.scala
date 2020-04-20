@@ -936,10 +936,15 @@ task_input
   }
 
   /*
-import_as
-    : AS Identifier
-    ;
+    import_as
+        : AS Identifier
+        ;
+   */
+  override def visitImport_as(ctx: WdlV1Parser.Import_asContext): ImportName = {
+    ImportName(ctx.Identifier().getText, getSourceText(ctx))
+  }
 
+  /*
  import_doc
 	: IMPORT string import_as? (import_alias)*
 	;
@@ -950,7 +955,7 @@ import_as
       if (ctx.import_as() == null)
         None
       else
-        Some(ctx.import_as().Identifier().getText)
+        Some(visitImport_as(ctx.import_as()))
 
     val aliases = ctx
       .import_alias()

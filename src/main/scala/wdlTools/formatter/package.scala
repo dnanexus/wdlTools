@@ -2,9 +2,7 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
-//import wdlTools.syntax.Comment
-
-import scala.collection.mutable
+import wdlTools.syntax.Comment
 
 object Indenting extends Enumeration {
   type Indenting = Value
@@ -38,17 +36,17 @@ abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndent
 
   def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
 
-  //def appendComment(comment: Comment): Unit
+  def appendComments(comment: Vector[Comment]): Unit
 
   def appendString(value: String): Unit
 
   def appendChunk(chunk: Chunk, spacing: String = defaultSpacing): Unit
 
-  def appendAll(chunks: Seq[Chunk],
+  def appendAll(chunks: Vector[Chunk],
                 wrapping: Wrapping = Wrapping.AsNeeded,
                 spacing: String = defaultSpacing): Unit
 
-  def toSeq: Seq[String]
+  def toVector: Vector[String]
 }
 
 abstract class Atom extends Chunk {
@@ -68,20 +66,18 @@ abstract class Atom extends Chunk {
       lineFormatter.appendChunk(this)
     }
   }
+
+  def sourceLineSpan: Option[(Int, Int)] = None
 }
 
 case class Token(value: String) extends Atom {
-  override def toString: String = {
-    value
-  }
+  override def length: Int = value.length
 
-  override def length: Int = {
-    value.length
-  }
+  override def toString: String = value
 }
 
 /**
-  * Pre-defined Tokens.
+  * Pre-defined Strings.
   */
 object Token {
   // keywords
@@ -173,7 +169,7 @@ object Token {
   val Comment: Token = Token("#")
   val PreformattedComment: Token = Token("##")
 
-  val tokenPairs = Map(
+  val TokenPairs = Map(
       ArrayLiteralOpen -> ArrayLiteralClose,
       BlockOpen -> BlockClose,
       ClauseOpen -> ClauseClose,
@@ -188,95 +184,4 @@ object Token {
       QuoteOpen -> QuoteClose,
       TypeParamOpen -> TypeParamClose
   )
-}
-
-case class StringLiteral(value: Any) extends Atom {
-  override def toString: String = {
-    s"${'"'}${value}${'"'}"
-  }
-
-  override def length: Int = {
-    toString.length
-  }
-}
-
-/**
-  * A sequence of adjacent atoms (with no spacing or wrapping)
-  * @param atoms the atoms
-  */
-case class Adjacent(atoms: Seq[Atom]) extends Atom {
-  override def toString: String = {
-    atoms.mkString("")
-  }
-
-  override def length: Int = {
-    atoms.map(_.length).sum
-  }
-}
-
-/**
-  * A sequence of atoms separated by a space
-  * @param atoms the atoms
-  */
-case class Spaced(atoms: Seq[Atom], wrapping: Wrapping = Wrapping.Never) extends Atom {
-  override def toString: String = {
-    atoms.mkString(" ")
-  }
-
-  override def length: Int = {
-    atoms.map(_.length).sum + atoms.length - 1
-  }
-
-  override def format(lineFormatter: LineFormatter): Unit = {
-    lineFormatter.appendAll(atoms, wrapping = wrapping)
-  }
-}
-
-/**
-  * Marker base class for Statements.
-  */
-abstract class Statement extends Chunk {
-  override def format(lineFormatter: LineFormatter): Unit = {
-    lineFormatter.beginLine()
-    formatChunks(lineFormatter)
-    lineFormatter.endLine()
-  }
-
-  def formatChunks(lineFormatter: LineFormatter): Unit
-}
-
-case class SimpleStatement(chunks: Seq[Chunk]) extends Statement {
-  def formatChunks(lineFormatter: LineFormatter): Unit = {
-    lineFormatter.appendAll(chunks)
-  }
-}
-
-abstract class StatementGroup extends Statement {
-  def statements: Seq[Statement]
-
-  override def formatChunks(lineFormatter: LineFormatter): Unit = {
-    statements.foreach { stmt =>
-      stmt.format(lineFormatter)
-    }
-  }
-}
-
-abstract class SectionsStatement extends Statement {
-  def sections: Seq[Statement]
-
-  override def formatChunks(lineFormatter: LineFormatter): Unit = {
-    if (sections.nonEmpty) {
-      sections.head.format(lineFormatter)
-      sections.tail.foreach { section =>
-        lineFormatter.emptyLine()
-        section.format(lineFormatter)
-      }
-    }
-  }
-}
-
-class Sections extends SectionsStatement {
-  val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
-
-  lazy override val sections: Seq[Statement] = statements.toVector
 }
