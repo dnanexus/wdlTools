@@ -51,7 +51,7 @@ case class TUtil(conf: Options) {
       case (WT_Optional(l), WT_Optional(r))         => isCoercibleTo2(l, r)
 
       // T is coercible to T?
-      case (WT_Optional(l), r) if regime == Lenient => isCoercibleTo2(l, r)
+      case (WT_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)
 
       case (WT_Array(l), WT_Array(r))         => isCoercibleTo2(l, r)
       case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)

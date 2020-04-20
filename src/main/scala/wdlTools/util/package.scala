@@ -14,11 +14,14 @@ object Verbosity extends Enumeration {
 }
 
 object TypeCheckingRegime extends Enumeration {
-  type TypeCheckingRegime = Value
-  val Strict, Lenient = Value
+  val Strict, Moderate, Lenient = Value
+
+  def fromName(name: String): TypeCheckingRegime.Value = {
+    val x = this.values.find (x => x.toString.toLowerCase() == name.toLowerCase())
+    x.get
+  }
 }
 import Verbosity._
-import TypeCheckingRegime._
 
 /**
   * Common configuration options.
@@ -31,7 +34,7 @@ case class Options(localDirectories: Option[Vector[Path]] = None,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false,
-                   typeChecking: TypeCheckingRegime = Strict) {
+                   typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
 
   def getURL(pathOrUrl: String): URL = {
     Util.getURL(pathOrUrl, localDirectories)

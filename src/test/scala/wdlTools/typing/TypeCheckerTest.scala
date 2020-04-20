@@ -5,16 +5,14 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Options, SourceCode, Util, Verbosity}
-import wdlTools.util.TypeCheckingRegime._
+import wdlTools.util.{Options, SourceCode, TypeCheckingRegime, Util, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Some(
           Vector(
-              Paths.get(getClass.getResource("/typing/v1_0").getPath),
-              Paths.get(getClass.getResource("/typing/gatk").getPath)
+              Paths.get(getClass.getResource("/typing/v1_0").getPath)
           )
       ),
       verbosity = Verbosity.Normal,
@@ -33,7 +31,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   // Expected results for a test, and any additional flags required
   // to run it.
-  case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime] = None)
+  case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
 
   val controlTable: Map[String, TResult] = Map(
       // workflows
@@ -43,7 +41,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "linear.wdl" -> TResult(true),
       "nested.wdl" -> TResult(true),
       "types.wdl" -> TResult(true),
-      "coercions_questionable.wdl" -> TResult(true, Some(Lenient)),
+      "coercions_questionable.wdl" -> TResult(true, Some(TypeCheckingRegime.Lenient)),
       "coercions_strict.wdl" -> TResult(true),
       "bad_stdlib_calls.wdl" -> TResult(false),
       "scatter_II.wdl" -> TResult(false),
@@ -69,7 +67,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   private val includeList: Option[Set[String]] = Some(Set("coercions_questionable.wdl"))
   private val excludeList: Option[Set[String]] = None
 
-  private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
+  private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
@@ -86,7 +84,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  private def checkIncorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
+  private def checkIncorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
@@ -150,7 +148,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   }
 
   it should "be able to handle GATK" taggedAs (Edge) in {
-    val opts2 = opts.copy(typeChecking = Lenient)
+    val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
