@@ -3,9 +3,9 @@ package wdlTools.typing
 import wdlTools.syntax.TextSource
 
 // Type error exception
-final class TypeException(message : String) extends Exception(message) {
+final class TypeException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource) =
     this(s"${msg} in file ${text.url} line ${text.line} col ${text.col}")
 }
 
-final class TypeUnificationException(message : String) extends Exception(message)
+final class TypeUnificationException(message: String) extends Exception(message)
