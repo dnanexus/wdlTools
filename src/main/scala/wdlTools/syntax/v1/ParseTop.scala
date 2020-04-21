@@ -595,8 +595,12 @@ string
 	: expr_infix
 	; */
   override def visitExpr(ctx: WdlV1Parser.ExprContext): Expr = {
-    assert(ctx != null)
-    visitChildren(ctx).asInstanceOf[Expr]
+    try {
+      visitChildren(ctx).asInstanceOf[Expr]
+    } catch {
+      case ex: NullPointerException =>
+        throw new SyntaxException("bad expression", getSourceText(ctx))
+    }
   }
 
   /* expr_core
@@ -644,8 +648,6 @@ unbound_decls
     if (ctx.wdl_type() == null)
       throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    if (ctx.Identifier == null)
-      throw new SyntaxException("identifier missing in declaration", getSourceText(ctx))
     val name: String = getIdentifier(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
   }
