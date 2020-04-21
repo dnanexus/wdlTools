@@ -6,7 +6,7 @@ import java.net.URL
 
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
-import org.openwdl.wdl.parser.v1_0._
+import org.openwdl.wdl.parser.v1._
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.syntax.{Comment, SyntaxException, TextSource, WdlVersion}
