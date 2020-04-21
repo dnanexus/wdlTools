@@ -9,7 +9,7 @@ import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
-  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1_0").getPath)
+  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")

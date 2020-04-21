@@ -12,7 +12,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       antlr4Trace = false,
       localDirectories = Some(
           Vector(
-              Paths.get(getClass.getResource("/typing/v1_0").getPath)
+              Paths.get(getClass.getResource("/typing/v1").getPath)
           )
       ),
       verbosity = Verbosity.Normal,
@@ -124,7 +124,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/typing/v1_0").getPath)
+        Paths.get(getClass.getResource("/typing/v1").getPath)
     )
 
     // filter out files that do not appear in the control table
