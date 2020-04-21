@@ -1,5 +1,6 @@
 package wdlTools.typing
 
+import java.nio.file.Paths
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
@@ -972,7 +973,7 @@ case class TypeChecker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val nsName = iStat.url.getFile.replaceAll("/", "")
+            val nsName = Paths.get(iStat.url.getFile).getFileName.toString
             if (nsName.endsWith(".wdl"))
               nsName.dropRight(".wdl".length)
             else

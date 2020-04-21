@@ -581,12 +581,9 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   // This doesn't pass right now
-  ignore should "handle call with dot in expression" taggedAs Edge in {
-    val doc = getDocument(getWorkflowSource("call_bug2.wdl"))
-    doc.elements.size shouldBe 1
-
-    doc.version.value shouldBe WdlVersion.V1
-    val wf = doc.workflow.get
-    wf shouldBe a[Workflow]
+  it should "version is a reserved keyword" taggedAs Edge in {
+    assertThrows[Exception] {
+      val _ = getDocument(getWorkflowSource("call_bug2.wdl"))
+    }
   }
 }
