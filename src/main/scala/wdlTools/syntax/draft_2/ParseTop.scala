@@ -30,6 +30,12 @@ case class ParseTop(opts: Options,
     grammar.getComment(ctx)
   }
 
+  private def getIdentifier(identifier: TerminalNode, ctx: ParserRuleContext): String = {
+    if (identifier == null)
+      throw new SyntaxException("missing identifier", getSourceText(ctx))
+    identifier.getText()
+  }
+
   /*
 map_type
 	: MAP LBRACK wdl_type COMMA wdl_type RBRACK
@@ -457,7 +463,7 @@ string
   }
 
   override def visitLeft_name(ctx: WdlDraft2Parser.Left_nameContext): Expr = {
-    val id = ctx.Identifier().getText
+    val id = getIdentifier(ctx.Identifier(), ctx)
     ExprIdentifier(id, getSourceText(ctx))
   }
 
@@ -553,7 +559,12 @@ string
 	: expr_infix
 	; */
   override def visitExpr(ctx: WdlDraft2Parser.ExprContext): Expr = {
-    visitChildren(ctx).asInstanceOf[Expr]
+    try {
+      visitChildren(ctx).asInstanceOf[Expr]
+    } catch {
+      case ex: NullPointerException =>
+        throw new SyntaxException("bad expression", getSourceText(ctx))
+    }
   }
 
   /* expr_core
@@ -596,8 +607,10 @@ unbound_decls
 	;
    */
   override def visitUnbound_decls(ctx: WdlDraft2Parser.Unbound_declsContext): Declaration = {
+    if (ctx.wdl_type() == null)
+      throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    val name: String = ctx.Identifier().getText
+    val name: String = getIdentifier(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
   }
 
@@ -607,8 +620,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlDraft2Parser.Bound_declsContext): Declaration = {
+    if (ctx.wdl_type() == null)
+      throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    val name: String = ctx.Identifier().getText
+    val name: String = getIdentifier(ctx.Identifier(), ctx)
     if (ctx.expr() == null)
       return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
     val expr: Expr = visitExpr(ctx.expr())
@@ -626,14 +641,14 @@ any_decls
       return visitUnbound_decls(ctx.unbound_decls())
     if (ctx.bound_decls() != null)
       return visitBound_decls(ctx.bound_decls())
-    throw new Exception("sanity")
+    throw new SyntaxException("bad declaration format", getSourceText(ctx))
   }
 
   /* meta_kv
    : Identifier COLON expr
    ; */
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
-    val id = ctx.Identifier().getText
+    val id = getIdentifier(ctx.Identifier(), ctx)
     val value = ctx.string().string_part().getText
     MetaKV(id, value, getSourceText(ctx), getComment(ctx))
   }
@@ -861,7 +876,7 @@ task_input
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: WdlDraft2Parser.TaskContext): Task = {
-    val name = ctx.Identifier().getText
+    val name = getIdentifier(ctx.Identifier(), ctx)
     // split inputs into those that do not require evalutation (which can be task inputs)
     // and those that do (which must be non-overideable decLarations)
     val (input, topDecls) = if (ctx.task_input().any_decls().isEmpty) {
@@ -936,7 +951,7 @@ import_as
 	: AS Identifier
 	; */
   override def visitCall_alias(ctx: WdlDraft2Parser.Call_aliasContext): CallAlias = {
-    CallAlias(ctx.Identifier().getText, getSourceText(ctx))
+    CallAlias(getIdentifier(ctx.Identifier(), ctx), getSourceText(ctx))
   }
 
   /* call_input
@@ -944,7 +959,7 @@ import_as
 	; */
   override def visitCall_input(ctx: WdlDraft2Parser.Call_inputContext): CallInput = {
     val expr = visitExpr(ctx.expr())
-    CallInput(ctx.Identifier().getText, expr, getSourceText(ctx))
+    CallInput(getIdentifier(ctx.Identifier(), ctx), expr, getSourceText(ctx))
   }
 
   /* call_inputs
@@ -1081,7 +1096,7 @@ workflow
 	;
    */
   override def visitWorkflow(ctx: WdlDraft2Parser.WorkflowContext): Workflow = {
-    val name = ctx.Identifier().getText
+    val name = getIdentifier(ctx.Identifier(), ctx)
     // split inputs into those that do not require evalutation (which can be task inputs)
     // and those that do (which must be non-overideable decLarations)
     val (input, topDecls) = if (ctx.workflow_input().any_decls().isEmpty) {
