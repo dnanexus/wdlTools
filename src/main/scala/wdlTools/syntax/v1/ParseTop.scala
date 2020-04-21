@@ -32,7 +32,7 @@ case class ParseTop(opts: Options,
     grammar.getComment(ctx)
   }
 
-  private def getIdentifier(identifier: TerminalNode, ctx: ParserRuleContext): String = {
+  private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null)
       throw new SyntaxException("missing identifier", getSourceText(ctx))
     identifier.getText()
@@ -44,7 +44,7 @@ struct
 	;
    */
   override def visitStruct(ctx: WdlV1Parser.StructContext): TypeStruct = {
-    val sName = getIdentifier(ctx.Identifier(), ctx)
+    val sName = getIdentifierText(ctx.Identifier(), ctx)
     val members: Vector[StructMember] = ctx
       .unbound_decls()
       .asScala
@@ -476,7 +476,7 @@ string
 
   // | Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
   override def visitApply(ctx: WdlV1Parser.ApplyContext): Expr = {
-    val funcName = getIdentifier(ctx.Identifier(), ctx)
+    val funcName = getIdentifierText(ctx.Identifier(), ctx)
     val elements = ctx
       .expr()
       .asScala
@@ -496,7 +496,7 @@ string
   }
 
   override def visitLeft_name(ctx: WdlV1Parser.Left_nameContext): Expr = {
-    val id = getIdentifier(ctx.Identifier(), ctx)
+    val id = getIdentifierText(ctx.Identifier(), ctx)
     ExprIdentifier(id, getSourceText(ctx))
   }
 
@@ -648,7 +648,7 @@ unbound_decls
     if (ctx.wdl_type() == null)
       throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    val name: String = getIdentifier(ctx.Identifier(), ctx)
+    val name: String = getIdentifierText(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
   }
 
@@ -661,7 +661,7 @@ bound_decls
     if (ctx.wdl_type() == null)
       throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType = visitWdl_type(ctx.wdl_type())
-    val name: String = getIdentifier(ctx.Identifier(), ctx)
+    val name: String = getIdentifierText(ctx.Identifier(), ctx)
     if (ctx.expr() == null)
       return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
     val expr: Expr = visitExpr(ctx.expr())
@@ -686,7 +686,7 @@ any_decls
    : Identifier COLON expr
    ; */
   override def visitMeta_kv(ctx: WdlV1Parser.Meta_kvContext): MetaKV = {
-    val id = getIdentifier(ctx.Identifier(), ctx)
+    val id = getIdentifierText(ctx.Identifier(), ctx)
     val expr = visitExpr(ctx.expr())
     MetaKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
@@ -717,7 +717,7 @@ any_decls
  : Identifier COLON expr
  ; */
   override def visitTask_runtime_kv(ctx: WdlV1Parser.Task_runtime_kvContext): RuntimeKV = {
-    val id: String = getIdentifier(ctx.Identifier(), ctx)
+    val id: String = getIdentifierText(ctx.Identifier(), ctx)
     val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
@@ -904,7 +904,7 @@ task_input
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: WdlV1Parser.TaskContext): Task = {
-    val name = getIdentifier(ctx.Identifier(), ctx)
+    val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems = ctx.task_element().asScala.map(visitTask_element).toVector
 
     val input: Option[InputSection] = atMostOneSection(elems.collect {
@@ -972,21 +972,29 @@ import_as
       if (ctx.import_as() == null)
         None
       else
-        Some(ctx.import_as().Identifier().getText)
+        Some(getIdentifierText(ctx.import_as().Identifier(), ctx))
 
     val aliases = ctx
       .import_alias()
       .asScala
       .map(x => visitImport_alias(x))
       .toVector
-    ImportDoc(name, aliases, opts.getURL(url), getSourceText(ctx), getComment(ctx))
+
+    val docUrl =
+      try {
+        opts.getURL(url)
+      } catch {
+        case e: Exception =>
+          throw new SyntaxException(e.getMessage, getSourceText(ctx))
+      }
+    ImportDoc(name, aliases, docUrl, getSourceText(ctx), getComment(ctx))
   }
 
   /* call_alias
 	: AS Identifier
 	; */
   override def visitCall_alias(ctx: WdlV1Parser.Call_aliasContext): CallAlias = {
-    CallAlias(getIdentifier(ctx.Identifier(), ctx), getSourceText(ctx))
+    CallAlias(getIdentifierText(ctx.Identifier(), ctx), getSourceText(ctx))
   }
 
   /* call_input
@@ -994,7 +1002,7 @@ import_as
 	; */
   override def visitCall_input(ctx: WdlV1Parser.Call_inputContext): CallInput = {
     val expr = visitExpr(ctx.expr())
-    CallInput(getIdentifier(ctx.Identifier(), ctx), expr, getSourceText(ctx))
+    CallInput(getIdentifierText(ctx.Identifier(), ctx), expr, getSourceText(ctx))
   }
 
   /* call_inputs
@@ -1049,7 +1057,7 @@ scatter
 	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
  ; */
   override def visitScatter(ctx: WdlV1Parser.ScatterContext): Scatter = {
-    val id = getIdentifier(ctx.Identifier(), ctx)
+    val id = getIdentifierText(ctx.Identifier(), ctx)
     val expr = visitExpr(ctx.expr())
     val body = ctx
       .inner_workflow_element()
@@ -1131,7 +1139,7 @@ workflow
 	;
    */
   override def visitWorkflow(ctx: WdlV1Parser.WorkflowContext): Workflow = {
-    val name = getIdentifier(ctx.Identifier(), ctx)
+    val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems: Vector[WdlV1Parser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
 
