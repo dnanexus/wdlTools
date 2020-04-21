@@ -16,7 +16,6 @@ import wdlTools.util.TypeCheckingRegime
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, Util}
 
-
 /**
   * Base class for wdlTools CLI commands.
   */
@@ -105,12 +104,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
   val check = new ParserSubcommand(
-    name = "check",
-    description = "Type check WDL file."
+      name = "check",
+      description = "Type check WDL file."
   ) {
-    val typeCheckRegime : ScallopOption[TypeCheckingRegime.Value] = opt[TypeCheckingRegime.Value](
-      descr = "",
-      default = Some(TypeCheckingRegime.Moderate)
+    val typeCheckRegime: ScallopOption[TypeCheckingRegime.Value] = opt[TypeCheckingRegime.Value](
+        descr = "",
+        default = Some(TypeCheckingRegime.Moderate)
     )
   }
   addSubcommand(check)

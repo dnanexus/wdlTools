@@ -32,8 +32,7 @@ case class ParseTop(opts: Options,
     grammar.getComment(ctx)
   }
 
-
-  private def getIdentifier(identifier : TerminalNode, ctx : ParserRuleContext) : String = {
+  private def getIdentifier(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null)
       throw new SyntaxException("missing identifier", getSourceText(ctx))
     identifier.getText()

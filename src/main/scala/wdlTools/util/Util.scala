@@ -251,7 +251,7 @@ object Util {
     System.err.println(Console.YELLOW + msg + Console.RESET)
   }
 
-  def error(msg : String) : Unit = {
+  def error(msg: String): Unit = {
     System.err.println(Console.RED + msg + Console.RED)
   }
 }

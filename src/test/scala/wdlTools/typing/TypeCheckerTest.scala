@@ -61,10 +61,9 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "comparison4.wdl" -> TResult(false),
       "declaration_shadowing.wdl" -> TResult(false),
       "simple.wdl" -> TResult(false),
-
-    // expressions
-    "expressions.wdl" -> TResult(true),
-    "expressions_bad.wdl" -> TResult(false)
+      // expressions
+      "expressions.wdl" -> TResult(true),
+      "expressions_bad.wdl" -> TResult(false)
   )
 
   // test to include/exclude
@@ -157,28 +156,24 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val checker = TypeChecker(stdlib)
 
     val sources = Vector(
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl",
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
-
-      // Uses the keyword "version "
-      //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
-
-      "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl",
-
-      // Non standard usage of place holders
-      //"https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
-      //
-      // https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1208
-      //  Array[String]? ignore
-      //  String s2 = {default="null" sep=" IGNORE=" ignore}
-      //
-      //  # syntax error in place-holder
-      //  # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1210
-      //  Boolean? is_outlier_data
-      //  String s3 = ${default='SKIP_MATE_VALIDATION=false' true='SKIP_MATE_VALIDATION=true' false='SKIP_MATE_VALIDATION=false' is_outlier_data}
-      //
-
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
+        // Uses the keyword "version "
+        //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
+        "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl"
+        // Non standard usage of place holders
+        //"https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
+        //
+        // https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1208
+        //  Array[String]? ignore
+        //  String s2 = {default="null" sep=" IGNORE=" ignore}
+        //
+        //  # syntax error in place-holder
+        //  # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1210
+        //  Boolean? is_outlier_data
+        //  String s3 = ${default='SKIP_MATE_VALIDATION=false' true='SKIP_MATE_VALIDATION=true' false='SKIP_MATE_VALIDATION=false' is_outlier_data}
+        //
     )
 
     for (src <- sources) {

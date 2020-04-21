@@ -138,13 +138,13 @@ case class TypeChecker(stdlib: Stdlib) {
   // 2)    -"-                   floats   -"-   float
   // 3)    -"-                   strings  -"-   string
   private def typeEvalAdd(a: Expr, b: Expr, ctx: Context): WT = {
-    def isPseudoString(x : WT) : Boolean = {
+    def isPseudoString(x: WT): Boolean = {
       x match {
-        case WT_String => true
+        case WT_String              => true
         case WT_Optional(WT_String) => true
-        case WT_File => true
-        case WT_Optional(WT_File) => true
-        case _ => false
+        case WT_File                => true
+        case WT_Optional(WT_File)   => true
+        case _                      => false
       }
     }
     val at = typeEval(a, ctx)
@@ -164,8 +164,8 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // NON STANDARD
       // there are WDL programs where we add optional strings
-      case (WT_String, x) if isPseudoString(x) => WT_String
-      case (WT_String, WT_Optional(WT_Int)) if stdlib.conf.typeChecking == Lenient => WT_String
+      case (WT_String, x) if isPseudoString(x)                                       => WT_String
+      case (WT_String, WT_Optional(WT_Int)) if stdlib.conf.typeChecking == Lenient   => WT_String
       case (WT_String, WT_Optional(WT_Float)) if stdlib.conf.typeChecking == Lenient => WT_String
 
       // adding files is equivalent to concatenating paths
@@ -415,7 +415,7 @@ case class TypeChecker(stdlib: Stdlib) {
         val dt = typeEval(default, ctx)
         vt match {
           case WT_Optional(vt2) if tUtil.isCoercibleTo(dt, vt2) => dt
-          case vt2 if tUtil.isCoercibleTo(dt, vt2) =>
+          case vt2 if tUtil.isCoercibleTo(dt, vt2)              =>
             // another unsavory case. The optional_value is NOT optional.
             dt
           case _ =>
@@ -557,8 +557,8 @@ case class TypeChecker(stdlib: Stdlib) {
               case Some(t) => t
             }
 
-            // accessing a pair element
-          case WT_Pair(l, r) if id.toLowerCase() == "left" => l
+          // accessing a pair element
+          case WT_Pair(l, r) if id.toLowerCase() == "left"  => l
           case WT_Pair(l, r) if id.toLowerCase() == "right" => r
           case WT_Pair(_, _) =>
             throw new TypeException(s"accessing a pair with (${id}) is illegal", expr.text)
@@ -858,10 +858,10 @@ case class TypeChecker(stdlib: Stdlib) {
   //   Int? --> Int?
   // Avoid this:
   //   Int?  --> Int??
-  private def makeOptional(t : WT) : WT = {
+  private def makeOptional(t: WT): WT = {
     t match {
       case WT_Optional(x) => x
-      case x => WT_Optional(x)
+      case x              => WT_Optional(x)
     }
   }
 
