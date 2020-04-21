@@ -580,10 +580,33 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf shouldBe a[Workflow]
   }
 
-  // This doesn't pass right now
-  it should "version is a reserved keyword" taggedAs Edge in {
+  it should "version is a reserved keyword" in {
     assertThrows[Exception] {
       val _ = getDocument(getWorkflowSource("call_bug2.wdl"))
     }
+  }
+
+  it should "relative imports" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("relative_imports.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "library.wc"
+  }
+
+  it should "relative imports II" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("relative_imports_II.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "cd.count_dogs"
   }
 }
