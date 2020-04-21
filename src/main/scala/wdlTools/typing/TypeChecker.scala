@@ -237,16 +237,19 @@ case class TypeChecker(stdlib: Stdlib) {
       case Some(WT_Struct(_, fields)) => fields
     }
     val rhsFields: Map[String, Expr] = expr match {
-      case ExprMap(m: Map[Expr, Expr], _) =>
+      case ExprMap(m: Vector[ExprMapItem], _) =>
         m.map {
-          case (ValueString(fName, _), e) => fName -> e
-          case (_, _) =>
+          case ExprMapItem(ValueString(fName, _), e, _) => fName -> e
+          case _ =>
             throw new TypeException(
                 s"map ${exprToString(expr)} isn't made up of string field names",
                 text
             )
-        }
-      case ExprObject(m, _) => m
+        }.toMap
+      case ExprObject(m: Vector[ExprObjectMember], _) =>
+        m.map {
+          case ExprObjectMember(fName, e, _) => fName -> e
+        }.toMap
       case _ =>
         throw new TypeException(
             s"Expression ${exprToString(expr)} cannot be coereced into a struct",
@@ -351,9 +354,9 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case ExprMap(m, _) =>
         // figure out the types from the first element
-        val mTypes: Map[WT, WT] = m.map {
-          case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
-        }
+        val mTypes: Map[WT, WT] = m.map { item: ExprMapItem =>
+          typeEval(item.key, ctx) -> typeEval(item.value, ctx)
+        }.toMap
         val (tk, _) =
           try {
             tUtil.unifyCollection(mTypes.keys, Map.empty)

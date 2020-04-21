@@ -388,24 +388,42 @@ string
     if (n % 2 != 0)
       throw new SyntaxException("the expressions in a map must come in pairs", getSourceText(ctx))
 
-    val m: Map[Expr, Expr] =
-      Vector.tabulate(n / 2)(i => elements(2 * i) -> elements(2 * i + 1)).toMap
+    val m: Vector[ExprMapItem] = Vector.tabulate(n / 2) { i =>
+      val key = elements(2 * i)
+      val value = elements(2 * i + 1)
+      ExprMapItem(key,
+                  value,
+                  TextSource(key.text.line,
+                             key.text.col,
+                             value.text.endLine,
+                             value.text.endCol,
+                             docSourceURL))
+    }
     ExprMapLiteral(m, getSourceText(ctx))
   }
 
   // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
   override def visitObject_literal(ctx: WdlDraft2Parser.Object_literalContext): Expr = {
-    val ids: Vector[String] = ctx
+    val ids: Vector[TerminalNode] = ctx
       .Identifier()
       .asScala
-      .map(x => x.getText)
       .toVector
     val elements: Vector[Expr] = ctx
       .expr()
       .asScala
       .map(x => visitExpr(x))
       .toVector
-    ExprObjectLiteral((ids zip elements).toMap, getSourceText(ctx))
+    val members = ids.zip(elements).map { pair =>
+      val id = pair._1
+      val expr = pair._2
+      val textSource = TextSource(id.getSymbol.getLine,
+                                  id.getSymbol.getCharPositionInLine,
+                                  expr.text.endLine,
+                                  expr.text.endCol,
+                                  docSourceURL)
+      ExprObjectMember(id.getText, expr, textSource)
+    }
+    ExprObjectLiteral(members, getSourceText(ctx))
   }
 
   // | NOT expr #negate
@@ -841,8 +859,8 @@ task_input
       case ExprPair(l, r, _)                                                        => requiresEvaluation(l) || requiresEvaluation(r)
       case ExprArrayLiteral(value, _)                                               => value.exists(requiresEvaluation)
       case ExprMapLiteral(value, _) =>
-        value.exists(elt => requiresEvaluation(elt._1) || requiresEvaluation(elt._2))
-      case ExprObjectLiteral(value, _) => value.values.exists(requiresEvaluation)
+        value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
+      case ExprObjectLiteral(value, _) => value.exists(member => requiresEvaluation(member.value))
       case _                           => true
     }
   }

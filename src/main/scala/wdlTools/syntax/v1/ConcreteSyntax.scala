@@ -44,8 +44,10 @@ object ConcreteSyntax {
   // For example:
   //  "some string part ~{ident + ident} some string part after"
   case class ExprCompoundString(value: Vector[Expr], text: TextSource) extends Expr
-  case class ExprMapLiteral(value: Map[Expr, Expr], text: TextSource) extends Expr
-  case class ExprObjectLiteral(value: Map[String, Expr], text: TextSource) extends Expr
+  case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
+  case class ExprMapLiteral(value: Vector[ExprMapItem], text: TextSource) extends Expr
+  case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
+  case class ExprObjectLiteral(value: Vector[ExprObjectMember], text: TextSource) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr], text: TextSource) extends Expr
 
   case class ExprIdentifier(id: String, text: TextSource) extends Expr

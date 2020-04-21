@@ -34,13 +34,28 @@ object WdlVersion {
 // col : column number
 // URL:  original file or web URL
 //
-case class TextSource(line: Int, col: Int, url: Option[URL] = None) {
+case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int, url: Option[URL] = None) {
   override def toString: String = {
     if (url.isDefined) {
       s"line ${line} col ${col} of ${url}"
     } else {
       s"line ${line} col ${col}"
     }
+  }
+}
+
+object TextSource {
+  lazy val empty: TextSource = TextSource(0, 0, 0, 0)
+
+  def fromSpan(start: TextSource, stop: TextSource): TextSource = {
+    require(start.url == stop.url)
+    TextSource(
+        start.line,
+        start.col,
+        stop.endLine,
+        stop.endCol,
+        start.url
+    )
   }
 }
 
@@ -55,7 +70,9 @@ class SyntaxException private (ex: Exception) extends Exception(ex) {
   * @param value the comment string, including prefix ('#')
   * @param text the location of the comment in the source file
   */
-case class Comment(value: String, text: TextSource)
+case class Comment(value: String, text: TextSource) extends Ordered[Comment] {
+  override def compare(that: Comment): Int = text.line - that.text.line
+}
 
 trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]

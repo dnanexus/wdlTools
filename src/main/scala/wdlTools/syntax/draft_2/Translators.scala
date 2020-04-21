@@ -41,12 +41,12 @@ object Translators {
       case ConcreteSyntax.ExprArrayLiteral(vec, srcText) =>
         AbstractSyntax.ExprArray(vec.map(translateExpr), srcText)
       case ConcreteSyntax.ExprMapLiteral(m, srcText) =>
-        AbstractSyntax.ExprMap(m.map {
-          case (k, v) => translateExpr(k) -> translateExpr(v)
+        AbstractSyntax.ExprMap(m.map { item =>
+          AbstractSyntax.ExprMapItem(translateExpr(item.key), translateExpr(item.value), item.text)
         }, srcText)
       case ConcreteSyntax.ExprObjectLiteral(m, srcText) =>
-        AbstractSyntax.ExprObject(m.map {
-          case (fieldName, v) => fieldName -> translateExpr(v)
+        AbstractSyntax.ExprObject(m.map { member =>
+          AbstractSyntax.ExprObjectMember(member.key, translateExpr(member.value), member.text)
         }, srcText)
 
       // string place holders

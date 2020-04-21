@@ -23,8 +23,17 @@ import wdlTools.util.{Options, SourceCode, Verbosity}
 import scala.collection.mutable
 
 object Antlr4Util {
-  def getSourceText(token: Token, docSourceURL: Option[URL]): TextSource = {
-    syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
+  def getSourceText(startToken: Token,
+                    maybeStopToken: Option[Token] = None,
+                    docSourceURL: Option[URL] = None): TextSource = {
+    val stopToken = maybeStopToken.getOrElse(startToken)
+    syntax.TextSource(
+        line = startToken.getLine,
+        col = startToken.getCharPositionInLine,
+        endLine = stopToken.getLine,
+        endCol = stopToken.getCharPositionInLine + stopToken.getText.length,
+        url = docSourceURL
+    )
   }
 
   case class CommentListener(tokenStream: BufferedTokenStream,
@@ -34,7 +43,7 @@ object Antlr4Util {
       extends AllParseTreeListener {
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
-        val source = Antlr4Util.getSourceText(tok, docSourceUrl)
+        val source = Antlr4Util.getSourceText(tok, None, docSourceUrl)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
@@ -44,6 +53,7 @@ object Antlr4Util {
     }
 
     override def exitEveryRule(ctx: ParserRuleContext): Unit = {
+      // full-line comments
       if (ctx.getStart != null && ctx.getStart.getTokenIndex >= 0) {
         val beforeComments =
           tokenStream.getHiddenTokensToLeft(ctx.getStart.getTokenIndex, channelIndex)
@@ -51,6 +61,7 @@ object Antlr4Util {
           addComments(beforeComments.asScala.toVector)
         }
       }
+      // line-end comments
       if (ctx.getStop != null && ctx.getStop.getTokenIndex >= 0) {
         val afterComments =
           tokenStream.getHiddenTokensToRight(ctx.getStop.getTokenIndex, channelIndex)
@@ -80,16 +91,17 @@ object Antlr4Util {
     }
 
     def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
-      Antlr4Util.getSourceText(ctx.start, docSourceURL)
+      Antlr4Util.getSourceText(ctx.getStart, Some(ctx.getStop), docSourceURL)
     }
 
     def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
-      Antlr4Util.getSourceText(symbol.getSymbol, docSourceURL)
+      Antlr4Util.getSourceText(symbol.getSymbol, None, docSourceURL)
     }
   }
 
-  abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options,
-                                                         commentChannelName: String = "COMMENTS") {
+  abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options) {
+    def commentChannelName: String = "COMMENTS"
+
     def createGrammar(sourceCode: SourceCode): Grammar[L, P] = {
       createGrammar(sourceCode.toString, Some(sourceCode.url))
     }
