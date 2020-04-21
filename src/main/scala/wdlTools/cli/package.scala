@@ -12,8 +12,10 @@ import org.rogach.scallop.{
   singleArgConverter
 }
 import wdlTools.syntax.WdlVersion
+import wdlTools.util.TypeCheckingRegime
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, Util}
+
 
 /**
   * Base class for wdlTools CLI commands.
@@ -27,6 +29,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.fromName)
+  implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime.Value] =
+    singleArgConverter[TypeCheckingRegime.Value](TypeCheckingRegime.fromName)
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly
@@ -100,7 +104,15 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val antlr4Trace: ScallopOption[Boolean] =
     toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
-  val check = new ParserSubcommand("check", "Type check WDL file.")
+  val check = new ParserSubcommand(
+    name = "check",
+    description = "Type check WDL file."
+  ) {
+    val typeCheckRegime : ScallopOption[TypeCheckingRegime.Value] = opt[TypeCheckingRegime.Value](
+      descr = "",
+      default = Some(TypeCheckingRegime.Moderate)
+    )
+  }
   addSubcommand(check)
 
   val format = new ParserSubcommandWithFollowOption(

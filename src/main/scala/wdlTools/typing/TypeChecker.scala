@@ -1,9 +1,10 @@
 package wdlTools.typing
 
+import java.nio.file.Paths
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
-import wdlTools.util.TypeCheckingRegime
+import wdlTools.util.TypeCheckingRegime._
 
 case class TypeChecker(stdlib: Stdlib) {
   val tUtil = TUtil(stdlib.conf)
@@ -109,8 +110,10 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // check that the imported structs do not step over existing definitions
       val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet
-      if (doublyDefinedStructs.nonEmpty)
-        throw new TypeException(s"Structs ${doublyDefinedStructs} are already defined", srcText)
+      for (sname <- doublyDefinedStructs) {
+        if (this.structs(sname) != iStructs(sname))
+          throw new TypeException(s"Struct ${sname} is already defined in a different way", srcText)
+      }
 
       this.copy(structs = structs ++ iStructs,
                 callables = callables ++ iCallables,
@@ -135,6 +138,15 @@ case class TypeChecker(stdlib: Stdlib) {
   // 2)    -"-                   floats   -"-   float
   // 3)    -"-                   strings  -"-   string
   private def typeEvalAdd(a: Expr, b: Expr, ctx: Context): WT = {
+    def isPseudoString(x : WT) : Boolean = {
+      x match {
+        case WT_String => true
+        case WT_Optional(WT_String) => true
+        case WT_File => true
+        case WT_Optional(WT_File) => true
+        case _ => false
+      }
+    }
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
@@ -150,8 +162,14 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Int, WT_String)    => WT_String
       case (WT_Float, WT_String)  => WT_String
 
+      // NON STANDARD
+      // there are WDL programs where we add optional strings
+      case (WT_String, x) if isPseudoString(x) => WT_String
+      case (WT_String, WT_Optional(WT_Int)) if stdlib.conf.typeChecking == Lenient => WT_String
+      case (WT_String, WT_Optional(WT_Float)) if stdlib.conf.typeChecking == Lenient => WT_String
+
       // adding files is equivalent to concatenating paths
-      case (WT_File, WT_File) => WT_File
+      case (WT_File, WT_String | WT_File) => WT_File
 
       case (_, _) =>
         throw new TypeException(
@@ -397,11 +415,13 @@ case class TypeChecker(stdlib: Stdlib) {
         val dt = typeEval(default, ctx)
         vt match {
           case WT_Optional(vt2) if tUtil.isCoercibleTo(dt, vt2) => dt
+          case vt2 if tUtil.isCoercibleTo(dt, vt2) =>
+            // another unsavory case. The optional_value is NOT optional.
+            dt
           case _ =>
             throw new TypeException(
-                s"""|Subxpression (${exprToString(value)}) must have type coercible to
-                    |Optional(${tUtil.toString(dt)})
-                    |it has type (${vt}) instead
+                s"""|Expression (${exprToString(value)}) must have type coercible to
+                    |(${tUtil.toString(dt)}), it has type (${vt}) instead
                     |""".stripMargin.replaceAll("\n", " "),
                 expr.text
             )
@@ -536,6 +556,12 @@ case class TypeChecker(stdlib: Stdlib) {
                                         expr.text)
               case Some(t) => t
             }
+
+            // accessing a pair element
+          case WT_Pair(l, r) if id.toLowerCase() == "left" => l
+          case WT_Pair(l, r) if id.toLowerCase() == "right" => r
+          case WT_Pair(_, _) =>
+            throw new TypeException(s"accessing a pair with (${id}) is illegal", expr.text)
 
           case other =>
             throw new TypeException(s"member access (${id}) in expression is illegal", expr.text)
@@ -718,13 +744,13 @@ case class TypeChecker(stdlib: Stdlib) {
                 s"call ${call} has argument ${argName} that does not exist in the callee",
                 call.text
             )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Strict =>
+          case Some((calleeType, _)) if stdlib.conf.typeChecking == Strict =>
             if (calleeType != wdlType)
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
                   call.text
               )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking == TypeCheckingRegime.Lenient =>
+          case Some((calleeType, _)) if stdlib.conf.typeChecking >= Moderate =>
             if (!tUtil.isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
                   s"argument ${argName} has type ${wdlType}, it is not coercible to ${calleeType}",
@@ -826,6 +852,19 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
+  // Ensure that a type is optional, but avoid making it doubly so.
+  // For example:
+  //   Int --> Int?
+  //   Int? --> Int?
+  // Avoid this:
+  //   Int?  --> Int??
+  private def makeOptional(t : WT) : WT = {
+    t match {
+      case WT_Optional(x) => x
+      case x => WT_Optional(x)
+    }
+  }
+
   // The body of a conditional is accessible to the statements that come after it.
   // This is different than the scoping rules for other programming languages.
   //
@@ -864,11 +903,11 @@ case class TypeChecker(stdlib: Stdlib) {
     bodyBindings.map {
       case (callName, callType: WT_Call) =>
         val callOutput = callType.output.map {
-          case (name, t) => name -> WT_Optional(t)
+          case (name, t) => name -> makeOptional(t)
         }
         callName -> WT_Call(callType.name, callOutput)
       case (varName, typ: WT) =>
-        varName -> WT_Optional(typ)
+        varName -> makeOptional(typ)
     }
   }
 
@@ -934,7 +973,7 @@ case class TypeChecker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val nsName = iStat.url.getFile.replaceAll("/", "")
+            val nsName = Paths.get(iStat.url.getFile).getFileName.toString
             if (nsName.endsWith(".wdl"))
               nsName.dropRight(".wdl".length)
             else

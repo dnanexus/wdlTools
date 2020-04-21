@@ -32,13 +32,20 @@ case class ParseTop(opts: Options,
     grammar.getComment(ctx)
   }
 
+
+  private def getIdentifier(identifier : TerminalNode, ctx : ParserRuleContext) : String = {
+    if (identifier == null)
+      throw new SyntaxException("missing identifier", getSourceText(ctx))
+    identifier.getText()
+  }
+
   /*
 struct
 	: STRUCT Identifier LBRACE (unbound_decls)* RBRACE
 	;
    */
   override def visitStruct(ctx: WdlV1Parser.StructContext): TypeStruct = {
-    val sName = ctx.Identifier().getText
+    val sName = getIdentifier(ctx.Identifier(), ctx)
     val members: Vector[StructMember] = ctx
       .unbound_decls()
       .asScala
@@ -123,7 +130,7 @@ type_base
       return TypeFloat(getSourceText(ctx))
     if (ctx.Identifier() != null)
       return TypeIdentifier(ctx.getText, getSourceText(ctx))
-    throw new SyntaxException("sanity: unrecgonized type case", getSourceText(ctx))
+    throw new SyntaxException("unrecgonized type", getSourceText(ctx))
   }
 
   /*
@@ -458,7 +465,7 @@ string
     else if (ctx.MINUS() != null)
       ExprUniraryMinus(expr, getSourceText(ctx))
     else
-      throw new SyntaxException("sanity", getSourceText(ctx))
+      throw new SyntaxException("bad unirary expression", getSourceText(ctx))
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -470,7 +477,7 @@ string
 
   // | Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
   override def visitApply(ctx: WdlV1Parser.ApplyContext): Expr = {
-    val funcName = ctx.Identifier().getText
+    val funcName = getIdentifier(ctx.Identifier(), ctx)
     val elements = ctx
       .expr()
       .asScala
@@ -490,7 +497,7 @@ string
   }
 
   override def visitLeft_name(ctx: WdlV1Parser.Left_nameContext): Expr = {
-    val id = ctx.Identifier().getText
+    val id = getIdentifier(ctx.Identifier(), ctx)
     ExprIdentifier(id, getSourceText(ctx))
   }
 
@@ -624,6 +631,8 @@ string
       case apply: WdlV1Parser.ApplyContext                 => visitApply(apply)
       case left_name: WdlV1Parser.Left_nameContext         => visitLeft_name(left_name)
       case get_name: WdlV1Parser.Get_nameContext           => visitGet_name(get_name)
+      case _ =>
+        throw new SyntaxException("bad expression", getSourceText(ctx))
     }
   }
 
@@ -633,8 +642,12 @@ unbound_decls
 	;
    */
   override def visitUnbound_decls(ctx: WdlV1Parser.Unbound_declsContext): Declaration = {
+    if (ctx.wdl_type() == null)
+      throw new SyntaxException("type missing in declaration", getSourceText(ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    val name: String = ctx.Identifier().getText
+    if (ctx.Identifier == null)
+      throw new SyntaxException("identifier missing in declaration", getSourceText(ctx))
+    val name: String = getIdentifier(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
   }
 
@@ -644,8 +657,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlV1Parser.Bound_declsContext): Declaration = {
-    val wdlType: Type = visitWdl_type(ctx.wdl_type())
-    val name: String = ctx.Identifier().getText
+    if (ctx.wdl_type() == null)
+      throw new SyntaxException("type missing in declaration", getSourceText(ctx))
+    val wdlType = visitWdl_type(ctx.wdl_type())
+    val name: String = getIdentifier(ctx.Identifier(), ctx)
     if (ctx.expr() == null)
       return Declaration(name, wdlType, None, getSourceText(ctx), getComment(ctx))
     val expr: Expr = visitExpr(ctx.expr())
@@ -663,14 +678,14 @@ any_decls
       return visitUnbound_decls(ctx.unbound_decls())
     if (ctx.bound_decls() != null)
       return visitBound_decls(ctx.bound_decls())
-    throw new Exception("sanity")
+    throw new SyntaxException("bad declaration format", getSourceText(ctx))
   }
 
   /* meta_kv
    : Identifier COLON expr
    ; */
   override def visitMeta_kv(ctx: WdlV1Parser.Meta_kvContext): MetaKV = {
-    val id = ctx.Identifier().getText
+    val id = getIdentifier(ctx.Identifier(), ctx)
     val expr = visitExpr(ctx.expr())
     MetaKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
@@ -701,7 +716,7 @@ any_decls
  : Identifier COLON expr
  ; */
   override def visitTask_runtime_kv(ctx: WdlV1Parser.Task_runtime_kvContext): RuntimeKV = {
-    val id: String = ctx.Identifier.getText
+    val id: String = getIdentifier(ctx.Identifier(), ctx)
     val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr, getSourceText(ctx), getComment(ctx))
   }
@@ -888,7 +903,7 @@ task_input
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
   override def visitTask(ctx: WdlV1Parser.TaskContext): Task = {
-    val name = ctx.Identifier().getText
+    val name = getIdentifier(ctx.Identifier(), ctx)
     val elems = ctx.task_element().asScala.map(visitTask_element).toVector
 
     val input: Option[InputSection] = atMostOneSection(elems.collect {
@@ -970,7 +985,7 @@ import_as
 	: AS Identifier
 	; */
   override def visitCall_alias(ctx: WdlV1Parser.Call_aliasContext): CallAlias = {
-    CallAlias(ctx.Identifier().getText, getSourceText(ctx))
+    CallAlias(getIdentifier(ctx.Identifier(), ctx), getSourceText(ctx))
   }
 
   /* call_input
@@ -978,7 +993,7 @@ import_as
 	; */
   override def visitCall_input(ctx: WdlV1Parser.Call_inputContext): CallInput = {
     val expr = visitExpr(ctx.expr())
-    CallInput(ctx.Identifier().getText, expr, getSourceText(ctx))
+    CallInput(getIdentifier(ctx.Identifier(), ctx), expr, getSourceText(ctx))
   }
 
   /* call_inputs
@@ -1033,7 +1048,7 @@ scatter
 	: SCATTER LPAREN Identifier In expr RPAREN LBRACE inner_workflow_element* RBRACE
  ; */
   override def visitScatter(ctx: WdlV1Parser.ScatterContext): Scatter = {
-    val id = ctx.Identifier.getText
+    val id = getIdentifier(ctx.Identifier(), ctx)
     val expr = visitExpr(ctx.expr())
     val body = ctx
       .inner_workflow_element()
@@ -1115,7 +1130,7 @@ workflow
 	;
    */
   override def visitWorkflow(ctx: WdlV1Parser.WorkflowContext): Workflow = {
-    val name = ctx.Identifier().getText
+    val name = getIdentifier(ctx.Identifier(), ctx)
     val elems: Vector[WdlV1Parser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
 

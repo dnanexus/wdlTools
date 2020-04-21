@@ -31,4 +31,8 @@ workflow foo {
   }
 
   Array[Array[File]]? f4 = f2
+
+
+  File f = "foo"
+  File f2 = f + "/all"
 }
