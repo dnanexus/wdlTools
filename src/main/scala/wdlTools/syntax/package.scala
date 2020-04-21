@@ -40,9 +40,9 @@ case class TextSource(line: Int, col: Int, url: Option[URL] = None) {
 }
 
 // Syntax error exception
-class SyntaxException private (ex: Exception) extends Exception(ex) {
+final class SyntaxException (message: String) extends Exception(message) {
   def this(msg: String, text: TextSource) =
-    this(new Exception(s"${msg} in file ${text.url} line ${text.line} col ${text.col}"))
+    this(s"${msg} in file ${text.url} line ${text.line} col ${text.col}")
 }
 
 /**
