@@ -60,7 +60,11 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "comparison2.wdl" -> TResult(false),
       "comparison4.wdl" -> TResult(false),
       "declaration_shadowing.wdl" -> TResult(false),
-      "simple.wdl" -> TResult(false)
+      "simple.wdl" -> TResult(false),
+
+    // expressions
+    "expressions.wdl" -> TResult(true),
+    "expressions_bad.wdl" -> TResult(false)
   )
 
   // test to include/exclude

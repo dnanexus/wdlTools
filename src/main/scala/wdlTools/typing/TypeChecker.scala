@@ -109,8 +109,10 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // check that the imported structs do not step over existing definitions
       val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet
-      if (doublyDefinedStructs.nonEmpty)
-        throw new TypeException(s"Structs ${doublyDefinedStructs} are already defined", srcText)
+      for (sname <- doublyDefinedStructs) {
+        if (this.structs(sname) != iStructs(sname))
+          throw new TypeException(s"Struct ${sname} is already defined in a different way", srcText)
+      }
 
       this.copy(structs = structs ++ iStructs,
                 callables = callables ++ iCallables,
@@ -166,7 +168,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_String, WT_Optional(WT_Float)) if stdlib.conf.typeChecking == Lenient => WT_String
 
       // adding files is equivalent to concatenating paths
-      case (WT_File, WT_File) => WT_File
+      case (WT_File, WT_String | WT_File) => WT_File
 
       case (_, _) =>
         throw new TypeException(
@@ -553,6 +555,12 @@ case class TypeChecker(stdlib: Stdlib) {
                                         expr.text)
               case Some(t) => t
             }
+
+            // accessing a pair element
+          case WT_Pair(l, r) if id.toLowerCase() == "left" => l
+          case WT_Pair(l, r) if id.toLowerCase() == "right" => r
+          case WT_Pair(_, _) =>
+            throw new TypeException(s"accessing a pair with (${id}) is illegal", expr.text)
 
           case other =>
             throw new TypeException(s"member access (${id}) in expression is illegal", expr.text)
