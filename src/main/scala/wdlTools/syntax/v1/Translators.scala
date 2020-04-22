@@ -1,119 +1,120 @@
 package wdlTools.syntax.v1
 
-import wdlTools.syntax.{AbstractSyntax, SyntaxException}
+import wdlTools.syntax.{AbstractSyntax => AST, SyntaxException}
+import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 
 object Translators {
-  def translateType(t: ConcreteSyntax.Type): AbstractSyntax.Type = {
+  def translateType(t: CST.Type): AST.Type = {
     t match {
-      case ConcreteSyntax.TypeOptional(t, srcText) =>
-        AbstractSyntax.TypeOptional(translateType(t), srcText)
-      case ConcreteSyntax.TypeArray(t, nonEmpty, srcText) =>
-        AbstractSyntax.TypeArray(translateType(t), nonEmpty, srcText)
-      case ConcreteSyntax.TypeMap(k, v, srcText) =>
-        AbstractSyntax.TypeMap(translateType(k), translateType(v), srcText)
-      case ConcreteSyntax.TypePair(l, r, srcText) =>
-        AbstractSyntax.TypePair(translateType(l), translateType(r), srcText)
-      case ConcreteSyntax.TypeString(srcText)         => AbstractSyntax.TypeString(srcText)
-      case ConcreteSyntax.TypeFile(srcText)           => AbstractSyntax.TypeFile(srcText)
-      case ConcreteSyntax.TypeBoolean(srcText)        => AbstractSyntax.TypeBoolean(srcText)
-      case ConcreteSyntax.TypeInt(srcText)            => AbstractSyntax.TypeInt(srcText)
-      case ConcreteSyntax.TypeFloat(srcText)          => AbstractSyntax.TypeFloat(srcText)
-      case ConcreteSyntax.TypeIdentifier(id, srcText) => AbstractSyntax.TypeIdentifier(id, srcText)
-      case ConcreteSyntax.TypeObject(srcText)         => AbstractSyntax.TypeObject(srcText)
-      case ConcreteSyntax.TypeStruct(name, members, srcText, _) =>
-        AbstractSyntax.TypeStruct(name, members.map {
-          case ConcreteSyntax.StructMember(name, t, text, _) =>
-            AbstractSyntax.StructMember(name, translateType(t), text)
+      case CST.TypeOptional(t, srcText) =>
+        AST.TypeOptional(translateType(t), srcText)
+      case CST.TypeArray(t, nonEmpty, srcText) =>
+        AST.TypeArray(translateType(t), nonEmpty, srcText)
+      case CST.TypeMap(k, v, srcText) =>
+        AST.TypeMap(translateType(k), translateType(v), srcText)
+      case CST.TypePair(l, r, srcText) =>
+        AST.TypePair(translateType(l), translateType(r), srcText)
+      case CST.TypeString(srcText)         => AST.TypeString(srcText)
+      case CST.TypeFile(srcText)           => AST.TypeFile(srcText)
+      case CST.TypeBoolean(srcText)        => AST.TypeBoolean(srcText)
+      case CST.TypeInt(srcText)            => AST.TypeInt(srcText)
+      case CST.TypeFloat(srcText)          => AST.TypeFloat(srcText)
+      case CST.TypeIdentifier(id, srcText) => AST.TypeIdentifier(id, srcText)
+      case CST.TypeObject(srcText)         => AST.TypeObject(srcText)
+      case CST.TypeStruct(name, members, srcText, _) =>
+        AST.TypeStruct(name, members.map {
+          case CST.StructMember(name, t, text, _) =>
+            AST.StructMember(name, translateType(t), text)
         }, srcText)
     }
   }
 
-  def translateExpr(e: ConcreteSyntax.Expr): AbstractSyntax.Expr = {
+  def translateExpr(e: CST.Expr): AST.Expr = {
     e match {
       // values
-      case ConcreteSyntax.ExprString(value, srcText)  => AbstractSyntax.ValueString(value, srcText)
-      case ConcreteSyntax.ExprFile(value, srcText)    => AbstractSyntax.ValueFile(value, srcText)
-      case ConcreteSyntax.ExprBoolean(value, srcText) => AbstractSyntax.ValueBoolean(value, srcText)
-      case ConcreteSyntax.ExprInt(value, srcText)     => AbstractSyntax.ValueInt(value, srcText)
-      case ConcreteSyntax.ExprFloat(value, srcText)   => AbstractSyntax.ValueFloat(value, srcText)
+      case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
+      case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
+      case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
+      case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
+      case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
 
       // compound values
-      case ConcreteSyntax.ExprIdentifier(id, srcText) => AbstractSyntax.ExprIdentifier(id, srcText)
-      case ConcreteSyntax.ExprCompoundString(vec, srcText) =>
-        AbstractSyntax.ExprCompoundString(vec.map(translateExpr), srcText)
-      case ConcreteSyntax.ExprPair(l, r, srcText) =>
-        AbstractSyntax.ExprPair(translateExpr(l), translateExpr(r), srcText)
-      case ConcreteSyntax.ExprArrayLiteral(vec, srcText) =>
-        AbstractSyntax.ExprArray(vec.map(translateExpr), srcText)
-      case ConcreteSyntax.ExprMapLiteral(m, srcText) =>
-        AbstractSyntax.ExprMap(m.map {
-          case (k, v) => translateExpr(k) -> translateExpr(v)
+      case CST.ExprIdentifier(id, srcText) => AST.ExprIdentifier(id, srcText)
+      case CST.ExprCompoundString(vec, srcText) =>
+        AST.ExprCompoundString(vec.map(translateExpr), srcText)
+      case CST.ExprPair(l, r, srcText) =>
+        AST.ExprPair(translateExpr(l), translateExpr(r), srcText)
+      case CST.ExprArrayLiteral(vec, srcText) =>
+        AST.ExprArray(vec.map(translateExpr), srcText)
+      case CST.ExprMapLiteral(m, srcText) =>
+        AST.ExprMap(m.map { item =>
+          AST.ExprMapItem(translateExpr(item.key), translateExpr(item.value), item.text)
         }, srcText)
-      case ConcreteSyntax.ExprObjectLiteral(m, srcText) =>
-        AbstractSyntax.ExprObject(m.map {
-          case (fieldName, v) => fieldName -> translateExpr(v)
+      case CST.ExprObjectLiteral(m, srcText) =>
+        AST.ExprObject(m.map { member =>
+          AST.ExprObjectMember(member.key, translateExpr(member.value), member.text)
         }, srcText)
 
       // string place holders
-      case ConcreteSyntax.ExprPlaceholderEqual(t, f, value, srcText) =>
-        AbstractSyntax.ExprPlaceholderEqual(translateExpr(t),
+      case CST.ExprPlaceholderEqual(t, f, value, srcText) =>
+        AST.ExprPlaceholderEqual(translateExpr(t),
                                             translateExpr(f),
                                             translateExpr(value),
                                             srcText)
-      case ConcreteSyntax.ExprPlaceholderDefault(default, value, srcText) =>
-        AbstractSyntax.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
-      case ConcreteSyntax.ExprPlaceholderSep(sep, value, srcText) =>
-        AbstractSyntax.ExprPlaceholderSep(translateExpr(sep), translateExpr(value), srcText)
+      case CST.ExprPlaceholderDefault(default, value, srcText) =>
+        AST.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
+      case CST.ExprPlaceholderSep(sep, value, srcText) =>
+        AST.ExprPlaceholderSep(translateExpr(sep), translateExpr(value), srcText)
 
       // operators on one argument
-      case ConcreteSyntax.ExprUniraryPlus(value, srcText) =>
-        AbstractSyntax.ExprUniraryPlus(translateExpr(value), srcText)
-      case ConcreteSyntax.ExprUniraryMinus(value, srcText) =>
-        AbstractSyntax.ExprUniraryMinus(translateExpr(value), srcText)
-      case ConcreteSyntax.ExprNegate(value, srcText) =>
-        AbstractSyntax.ExprNegate(translateExpr(value), srcText)
+      case CST.ExprUniraryPlus(value, srcText) =>
+        AST.ExprUniraryPlus(translateExpr(value), srcText)
+      case CST.ExprUniraryMinus(value, srcText) =>
+        AST.ExprUniraryMinus(translateExpr(value), srcText)
+      case CST.ExprNegate(value, srcText) =>
+        AST.ExprNegate(translateExpr(value), srcText)
 
       // operators on two arguments
-      case ConcreteSyntax.ExprLor(a, b, srcText) =>
-        AbstractSyntax.ExprLor(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprLand(a, b, srcText) =>
-        AbstractSyntax.ExprLand(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprEqeq(a, b, srcText) =>
-        AbstractSyntax.ExprEqeq(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprLt(a, b, srcText) =>
-        AbstractSyntax.ExprLt(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprGte(a, b, srcText) =>
-        AbstractSyntax.ExprGte(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprNeq(a, b, srcText) =>
-        AbstractSyntax.ExprNeq(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprLte(a, b, srcText) =>
-        AbstractSyntax.ExprLte(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprGt(a, b, srcText) =>
-        AbstractSyntax.ExprGt(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprAdd(a, b, srcText) =>
-        AbstractSyntax.ExprAdd(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprSub(a, b, srcText) =>
-        AbstractSyntax.ExprSub(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprMod(a, b, srcText) =>
-        AbstractSyntax.ExprMod(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprMul(a, b, srcText) =>
-        AbstractSyntax.ExprMul(translateExpr(a), translateExpr(b), srcText)
-      case ConcreteSyntax.ExprDivide(a, b, srcText) =>
-        AbstractSyntax.ExprDivide(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprLor(a, b, srcText) =>
+        AST.ExprLor(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprLand(a, b, srcText) =>
+        AST.ExprLand(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprEqeq(a, b, srcText) =>
+        AST.ExprEqeq(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprLt(a, b, srcText) =>
+        AST.ExprLt(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprGte(a, b, srcText) =>
+        AST.ExprGte(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprNeq(a, b, srcText) =>
+        AST.ExprNeq(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprLte(a, b, srcText) =>
+        AST.ExprLte(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprGt(a, b, srcText) =>
+        AST.ExprGt(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprAdd(a, b, srcText) =>
+        AST.ExprAdd(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprSub(a, b, srcText) =>
+        AST.ExprSub(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprMod(a, b, srcText) =>
+        AST.ExprMod(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprMul(a, b, srcText) =>
+        AST.ExprMul(translateExpr(a), translateExpr(b), srcText)
+      case CST.ExprDivide(a, b, srcText) =>
+        AST.ExprDivide(translateExpr(a), translateExpr(b), srcText)
 
       // Access an array element at [index]
-      case ConcreteSyntax.ExprAt(array, index, srcText) =>
-        AbstractSyntax.ExprAt(translateExpr(array), translateExpr(index), srcText)
+      case CST.ExprAt(array, index, srcText) =>
+        AST.ExprAt(translateExpr(array), translateExpr(index), srcText)
 
-      case ConcreteSyntax.ExprIfThenElse(cond, tBranch, fBranch, srcText) =>
-        AbstractSyntax.ExprIfThenElse(translateExpr(cond),
+      case CST.ExprIfThenElse(cond, tBranch, fBranch, srcText) =>
+        AST.ExprIfThenElse(translateExpr(cond),
                                       translateExpr(tBranch),
                                       translateExpr(fBranch),
                                       srcText)
-      case ConcreteSyntax.ExprApply(funcName, elements, srcText) =>
-        AbstractSyntax.ExprApply(funcName, elements.map(translateExpr), srcText)
-      case ConcreteSyntax.ExprGetName(e, id, srcText) =>
-        AbstractSyntax.ExprGetName(translateExpr(e), id, srcText)
+      case CST.ExprApply(funcName, elements, srcText) =>
+        AST.ExprApply(funcName, elements.map(translateExpr), srcText)
+      case CST.ExprGetName(e, id, srcText) =>
+        AST.ExprGetName(translateExpr(e), id, srcText)
 
       case other =>
         throw new Exception(s"invalid concrete syntax element ${other}")
@@ -126,94 +127,95 @@ object Translators {
   // $meta_object = '{}' | '{' $parameter_meta_kv (, $parameter_meta_kv)* '}'
   // $meta_array = '[]' |  '[' $meta_value (, $meta_value)* ']'
   //
-  private def metaValueToExpr(value : ConcreteSyntax.Expr) : AbstractSyntax.Expr = {
+  private def metaValueToExpr(value : CST.Expr) : AST.Expr = {
     value match {
       // values
-      case ConcreteSyntax.ExprString(value, srcText)  => AbstractSyntax.ValueString(value, srcText)
-      case ConcreteSyntax.ExprFile(value, srcText)    => AbstractSyntax.ValueFile(value, srcText)
-      case ConcreteSyntax.ExprBoolean(value, srcText) => AbstractSyntax.ValueBoolean(value, srcText)
-      case ConcreteSyntax.ExprInt(value, srcText)     => AbstractSyntax.ValueInt(value, srcText)
-      case ConcreteSyntax.ExprFloat(value, srcText)   => AbstractSyntax.ValueFloat(value, srcText)
+      case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
+      case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
+      case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
+      case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
+      case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
 
         // special handling for null. It appears as an identifier here, even though
         // it has not been defined, and it is no identifier.
-      case ConcreteSyntax.ExprIdentifier(id, srcText) if id == "null" =>
-        AbstractSyntax.ExprIdentifier(id, srcText)
-      case ConcreteSyntax.ExprIdentifier(id, srcText) =>
+      case CST.ExprIdentifier(id, srcText) if id == "null" =>
+        AST.ExprIdentifier(id, srcText)
+      case CST.ExprIdentifier(id, srcText) =>
         throw new SyntaxException(s"cannot access identifier (${id}) in a meta section", srcText)
 
       // compound values
-      case ConcreteSyntax.ExprPair(l, r, srcText) =>
-        AbstractSyntax.ExprPair(metaValueToExpr(l), metaValueToExpr(r), srcText)
-      case ConcreteSyntax.ExprArrayLiteral(vec, srcText) =>
-        AbstractSyntax.ExprArray(vec.map(metaValueToExpr), srcText)
-      case ConcreteSyntax.ExprMapLiteral(m, srcText) =>
-        AbstractSyntax.ExprMap(
-          m.map {
-            case (ConcreteSyntax.ExprIdentifier(k, text), v) => AbstractSyntax.ExprIdentifier(k, text) -> metaValueToExpr(v)
-            case (other, _ ) => throw new SyntaxException(s"Illegal meta field value", other.text)
-        }, srcText)
-      case ConcreteSyntax.ExprObjectLiteral(m, srcText) =>
-        AbstractSyntax.ExprObject(m.map {
-          case (fieldName, v) => fieldName -> metaValueToExpr(v)
-                                  }, srcText)
+      case CST.ExprPair(l, r, srcText) =>
+        AST.ExprPair(metaValueToExpr(l), metaValueToExpr(r), srcText)
+      case CST.ExprArrayLiteral(vec, srcText) =>
+        AST.ExprArray(vec.map(metaValueToExpr), srcText)
+      case CST.ExprMapLiteral(m, srcText) =>
+        AST.ExprMap(m.map{
+                      case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
+                        AST.ExprMapItem(AST.ExprIdentifier(k, text2), metaValueToExpr(value), text)
+                      case _ => throw new SyntaxException(s"Illegal meta field value", srcText)
+                    }, srcText)
+      case CST.ExprObjectLiteral(m, srcText) =>
+        AST.ExprObject(m.map {
+                         case CST.ExprObjectMember(fieldName, v, text) =>
+                           AST.ExprObjectMember(fieldName, metaValueToExpr(v), text)
+                       }, srcText)
 
       case other =>
         throw new SyntaxException("illegal expression in meta section", other.text)
     }
   }
 
-  def translateMetaKV(kv: ConcreteSyntax.MetaKV): AbstractSyntax.MetaKV = {
-    AbstractSyntax.MetaKV(kv.id, metaValueToExpr(kv.expr), kv.text, kv.comment)
+  def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
+    AST.MetaKV(kv.id, metaValueToExpr(kv.expr), kv.text, kv.comment)
   }
 
   def translateInputSection(
-      inp: ConcreteSyntax.InputSection
-  ): AbstractSyntax.InputSection = {
-    AbstractSyntax.InputSection(inp.declarations.map(translateDeclaration), inp.text, inp.comment)
+      inp: CST.InputSection
+  ): AST.InputSection = {
+    AST.InputSection(inp.declarations.map(translateDeclaration), inp.text, inp.comment)
   }
 
   def translateOutputSection(
-      output: ConcreteSyntax.OutputSection
-  ): AbstractSyntax.OutputSection = {
-    AbstractSyntax.OutputSection(output.declarations.map(translateDeclaration),
+      output: CST.OutputSection
+  ): AST.OutputSection = {
+    AST.OutputSection(output.declarations.map(translateDeclaration),
                                  output.text,
                                  output.comment)
   }
 
   def translateCommandSection(
-      cs: ConcreteSyntax.CommandSection
-  ): AbstractSyntax.CommandSection = {
-    AbstractSyntax.CommandSection(cs.parts.map(translateExpr), cs.text, cs.comment)
+      cs: CST.CommandSection
+  ): AST.CommandSection = {
+    AST.CommandSection(cs.parts.map(translateExpr), cs.text, cs.comment)
   }
 
-  def translateDeclaration(decl: ConcreteSyntax.Declaration): AbstractSyntax.Declaration = {
-    AbstractSyntax.Declaration(decl.name,
+  def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
+    AST.Declaration(decl.name,
                                translateType(decl.wdlType),
                                decl.expr.map(translateExpr),
                                decl.text,
                                decl.comment)
   }
 
-  def translateMetaSection(meta: ConcreteSyntax.MetaSection): AbstractSyntax.MetaSection = {
-    AbstractSyntax.MetaSection(meta.kvs.map(translateMetaKV), meta.text, meta.comment)
+  def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
+    AST.MetaSection(meta.kvs.map(translateMetaKV), meta.text, meta.comment)
   }
 
   def translateParameterMetaSection(
-      paramMeta: ConcreteSyntax.ParameterMetaSection
-  ): AbstractSyntax.ParameterMetaSection = {
-    AbstractSyntax.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
+      paramMeta: CST.ParameterMetaSection
+  ): AST.ParameterMetaSection = {
+    AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
                                         paramMeta.text,
                                         paramMeta.comment)
   }
 
   def translateRuntimeSection(
-      runtime: ConcreteSyntax.RuntimeSection
-  ): AbstractSyntax.RuntimeSection = {
-    AbstractSyntax.RuntimeSection(
+      runtime: CST.RuntimeSection
+  ): AST.RuntimeSection = {
+    AST.RuntimeSection(
         runtime.kvs.map {
-          case ConcreteSyntax.RuntimeKV(id, expr, text, comment) =>
-            AbstractSyntax.RuntimeKV(id, translateExpr(expr), text, comment)
+          case CST.RuntimeKV(id, expr, text, comment) =>
+            AST.RuntimeKV(id, translateExpr(expr), text, comment)
         },
         runtime.text,
         runtime.comment
@@ -221,50 +223,50 @@ object Translators {
   }
 
   def translateWorkflowElement(
-      elem: ConcreteSyntax.WorkflowElement
-  ): AbstractSyntax.WorkflowElement = {
+      elem: CST.WorkflowElement
+  ): AST.WorkflowElement = {
     elem match {
-      case ConcreteSyntax.Declaration(name, wdlType, expr, text, comment) =>
-        AbstractSyntax.Declaration(name,
+      case CST.Declaration(name, wdlType, expr, text, comment) =>
+        AST.Declaration(name,
                                    translateType(wdlType),
                                    expr.map(translateExpr),
                                    text,
                                    comment)
 
-      case ConcreteSyntax.Call(name, alias, inputs, text, comment) =>
-        AbstractSyntax.Call(
+      case CST.Call(name, alias, inputs, text, comment) =>
+        AST.Call(
             name,
             alias.map {
-              case ConcreteSyntax.CallAlias(callName, callText) =>
-                AbstractSyntax.CallAlias(callName, callText)
+              case CST.CallAlias(callName, callText) =>
+                AST.CallAlias(callName, callText)
             },
             inputs.map {
-              case ConcreteSyntax.CallInputs(inputsMap, inputsText) =>
-                AbstractSyntax.CallInputs(inputsMap.map { inp =>
-                  AbstractSyntax.CallInput(inp.name, translateExpr(inp.expr), inp.text)
+              case CST.CallInputs(inputsMap, inputsText) =>
+                AST.CallInputs(inputsMap.map { inp =>
+                  AST.CallInput(inp.name, translateExpr(inp.expr), inp.text)
                 }, inputsText)
             },
             text,
             comment
         )
 
-      case ConcreteSyntax.Scatter(identifier, expr, body, text, comment) =>
-        AbstractSyntax.Scatter(identifier,
+      case CST.Scatter(identifier, expr, body, text, comment) =>
+        AST.Scatter(identifier,
                                translateExpr(expr),
                                body.map(translateWorkflowElement),
                                text,
                                comment)
 
-      case ConcreteSyntax.Conditional(expr, body, text, comment) =>
-        AbstractSyntax.Conditional(translateExpr(expr),
+      case CST.Conditional(expr, body, text, comment) =>
+        AST.Conditional(translateExpr(expr),
                                    body.map(translateWorkflowElement),
                                    text,
                                    comment)
     }
   }
 
-  def translateWorkflow(wf: ConcreteSyntax.Workflow): AbstractSyntax.Workflow = {
-    AbstractSyntax.Workflow(
+  def translateWorkflow(wf: CST.Workflow): AST.Workflow = {
+    AST.Workflow(
         wf.name,
         wf.input.map(translateInputSection),
         wf.output.map(translateOutputSection),
@@ -276,35 +278,39 @@ object Translators {
     )
   }
 
-  def translateStruct(struct: ConcreteSyntax.TypeStruct): AbstractSyntax.TypeStruct = {
-    AbstractSyntax.TypeStruct(
+  def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
+    AST.TypeStruct(
         struct.name,
         struct.members.map {
-          case ConcreteSyntax.StructMember(name, t, memberText, memberComment) =>
-            AbstractSyntax.StructMember(name, translateType(t), memberText, memberComment)
+          case CST.StructMember(name, t, memberText, memberComment) =>
+            AST.StructMember(name, translateType(t), memberText, memberComment)
         },
         struct.text,
         struct.comment
     )
   }
 
-  def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
-                         importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
-    val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
-      case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
+  def translateImportDoc(importDoc: CST.ImportDoc,
+                         importedDoc: Option[AST.Document]): AST.ImportDoc = {
+    val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.text)
+    val nameAbst = importDoc.name.map {
+      case CST.ImportName(value, text) => AST.ImportName(value, text)
+    }
+    val aliasesAbst: Vector[AST.ImportAlias] = importDoc.aliases.map {
+      case CST.ImportAlias(x, y, alText) => AST.ImportAlias(x, y, alText)
     }
 
     // Replace the original statement with a new one
-    AbstractSyntax.ImportDoc(importDoc.name,
+    AST.ImportDoc(nameAbst,
                              aliasesAbst,
-                             importDoc.url,
+                             addrAbst,
                              importedDoc,
                              importDoc.text,
                              importDoc.comment)
   }
 
-  def translateTask(task: ConcreteSyntax.Task): AbstractSyntax.Task = {
-    AbstractSyntax.Task(
+  def translateTask(task: CST.Task): AST.Task = {
+    AST.Task(
         task.name,
         task.input.map(translateInputSection),
         task.output.map(translateOutputSection),

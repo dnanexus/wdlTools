@@ -12,7 +12,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1/workflows").getPath)
   private val opts =
     Options(antlr4Trace = false,
-            localDirectories = Some(Vector(tasksDir, workflowsDir)),
+            localDirectories = Vector(tasksDir, workflowsDir),
             verbosity = Verbosity.Quiet)
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)

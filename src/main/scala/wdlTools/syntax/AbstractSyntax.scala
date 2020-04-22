@@ -62,8 +62,10 @@ object AbstractSyntax {
   case class ExprCompoundString(value: Vector[Expr], text: TextSource) extends Expr
   case class ExprPair(l: Expr, r: Expr, text: TextSource) extends Expr
   case class ExprArray(value: Vector[Expr], text: TextSource) extends Expr
-  case class ExprMap(value: Map[Expr, Expr], text: TextSource) extends Expr
-  case class ExprObject(value: Map[String, Expr], text: TextSource) extends Expr
+  case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
+  case class ExprMap(value: Vector[ExprMapItem], text: TextSource) extends Expr
+  case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
+  case class ExprObject(value: Vector[ExprObjectMember], text: TextSource) extends Expr
 
   // These are expressions of kind:
   //
@@ -159,10 +161,16 @@ object AbstractSyntax {
       extends DocumentElement
 
   // import statement with the AST for the referenced document
+  case class ImportAddr(value: String, text: TextSource) extends Element {
+    def isLocal: Boolean = {
+      !(value.contains("://") && value.startsWith("file"))
+    }
+  }
+  case class ImportName(value: String, text: TextSource) extends Element
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
-  case class ImportDoc(name: Option[String],
+  case class ImportDoc(name: Option[ImportName],
                        aliases: Vector[ImportAlias],
-                       url: URL,
+                       addr: ImportAddr,
                        doc: Option[Document],
                        text: TextSource,
                        comment: Option[Comment])
@@ -216,7 +224,8 @@ object AbstractSyntax {
                       comment: Option[Comment])
       extends StatementElement
 
-  case class Document(version: Version,
+  case class Document(docSourceURL: URL,
+                      version: Version,
                       versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
@@ -241,23 +250,20 @@ object AbstractSyntax {
       case ExprPair(l, r, _) => s"(${exprToString(l)}, ${exprToString(r)})"
       case ExprArray(value: Vector[Expr], _) =>
         "[" + value.map(exprToString).mkString(", ") + "]"
-      case ExprMap(value: Map[Expr, Expr], _) =>
+      case ExprMap(value: Vector[ExprMapItem], _) =>
         val m = value
-          .map {
-            case (x, y) =>
-              s"${exprToString(x)} : ${exprToString(y)}"
-          }
+          .map(exprToString)
           .mkString(", ")
         "{ " + m + " }"
-      case ExprObject(value: Map[String, Expr], _) =>
+      case ExprMapItem(key, value, _) =>
+        s"${exprToString(key)} : ${exprToString(value)}"
+      case ExprObject(value: Vector[ExprObjectMember], _) =>
         val m = value
-          .map {
-            case (x, y) =>
-              s"${x} : ${exprToString(y)}"
-          }
+          .map(exprToString)
           .mkString(", ")
         s"object($m)"
-
+      case ExprObjectMember(key, value, _) =>
+        s"${key} : ${exprToString(value)}"
       // ~{true="--yes" false="--no" boolean_value}
       case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
         s"{true=${exprToString(t)} false=${exprToString(f)} ${exprToString(value)}"

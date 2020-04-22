@@ -41,12 +41,12 @@ object Translators {
       case ConcreteSyntax.ExprArrayLiteral(vec, srcText) =>
         AbstractSyntax.ExprArray(vec.map(translateExpr), srcText)
       case ConcreteSyntax.ExprMapLiteral(m, srcText) =>
-        AbstractSyntax.ExprMap(m.map {
-          case (k, v) => translateExpr(k) -> translateExpr(v)
+        AbstractSyntax.ExprMap(m.map { item =>
+          AbstractSyntax.ExprMapItem(translateExpr(item.key), translateExpr(item.value), item.text)
         }, srcText)
       case ConcreteSyntax.ExprObjectLiteral(m, srcText) =>
-        AbstractSyntax.ExprObject(m.map {
-          case (fieldName, v) => fieldName -> translateExpr(v)
+        AbstractSyntax.ExprObject(m.map { member =>
+          AbstractSyntax.ExprObjectMember(member.key, translateExpr(member.value), member.text)
         }, srcText)
 
       // string place holders
@@ -230,14 +230,18 @@ object Translators {
 
   def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
                          importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
+    val addrAbst = AbstractSyntax.ImportAddr(importDoc.addr.value, importDoc.addr.text)
+    val nameAbst = importDoc.name.map {
+      case ConcreteSyntax.ImportName(value, text) => AbstractSyntax.ImportName(value, text)
+    }
     val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
       case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
     }
 
     // Replace the original statement with a new one
-    AbstractSyntax.ImportDoc(importDoc.name,
+    AbstractSyntax.ImportDoc(nameAbst,
                              aliasesAbst,
-                             importDoc.url,
+                             addrAbst,
                              importedDoc,
                              importDoc.text,
                              importDoc.comment)

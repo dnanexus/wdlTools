@@ -37,7 +37,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
       case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
       case importDoc: ConcreteSyntax.ImportDoc =>
         val importedDoc = if (opts.followImports) {
-          Some(followImport(importDoc.url))
+          Some(followImport(getDocSourceURL(importDoc.addr.value)))
         } else {
           None
         }
@@ -48,7 +48,13 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
 
     val aWf = doc.workflow.map(translateWorkflow)
     val version = AbstractSyntax.Version(doc.version.value, doc.version.text, None)
-    AbstractSyntax.Document(version, Some(doc.version.text), elems, aWf, doc.text, doc.comment)
+    AbstractSyntax.Document(doc.docSourceURL,
+                            version,
+                            Some(doc.version.text),
+                            elems,
+                            aWf,
+                            doc.text,
+                            doc.comment)
   }
 
   override def canParse(sourceCode: SourceCode): Boolean = {

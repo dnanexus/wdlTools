@@ -22,8 +22,8 @@ OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta';
 META: 'meta';
 
-HEREDOC_COMMAND: 'command' ' '* '<<<' -> pushMode(HereDocCommand);
-COMMAND: 'command' ' '* '{' -> pushMode(Command);
+HEREDOC_COMMAND: 'command' [ \t\r\n]* '<<<' -> pushMode(HereDocCommand);
+COMMAND: 'command' [ \t\r\n]* '{' -> pushMode(Command);
 
 RUNTIME: 'runtime';
 BOOLEAN: 'Boolean';
@@ -88,10 +88,6 @@ DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
 
 WHITESPACE
 	: [ \t\r\n]+ -> channel(HIDDEN)
-	;
-
-COMMENT
-	: '#' ~[\r\n]* -> channel(HIDDEN)
 	;
 
 Identifier: CompleteIdentifier;
