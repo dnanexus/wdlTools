@@ -74,7 +74,7 @@ case class WdlV1Formatter(opts: Options,
     case class Token(value: String, override val textSource: TextSource) extends Atom {
       override def length: Int = value.length
 
-      override def toString: String = value
+      override lazy val toString: String = value
     }
 
     object Token {
@@ -151,7 +151,7 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class StringLiteral(value: Any, override val textSource: TextSource) extends Atom {
-      override def toString: String = s"${'"'}${value}${'"'}"
+      override lazy val toString: String = s"${'"'}${value}${'"'}"
 
       override def length: Int = toString.length
     }
@@ -173,7 +173,7 @@ case class WdlV1Formatter(opts: Options,
     }
 
     abstract class AtomSequence(atoms: Vector[Atom]) extends Atom {
-      override def textSource: TextSource = getTextSourceFromChunks(atoms)
+      override val textSource: TextSource = getTextSourceFromChunks(atoms)
     }
 
     /**
@@ -182,11 +182,11 @@ case class WdlV1Formatter(opts: Options,
       * @param atoms the atoms
       */
     case class Adjacent(atoms: Vector[Atom]) extends AtomSequence(atoms) {
-      override def toString: String = {
+      override lazy val toString: String = {
         atoms.mkString("")
       }
 
-      override def length: Int = {
+      override lazy val length: Int = {
         atoms.map(_.length).sum
       }
     }
@@ -195,8 +195,8 @@ case class WdlV1Formatter(opts: Options,
                          suffix: Option[Atom] = None,
                          override val wrapAll: Boolean = false)
         extends Atom {
-      lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
-      lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
+      protected lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
+      protected lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
 
       override def format(lineFormatter: LineFormatter): Unit = {
         val wrapAndIndent = if (prefix.isEmpty) {
@@ -247,7 +247,7 @@ case class WdlV1Formatter(opts: Options,
         case (item, _) => item
       }
 
-      override def toString: String = {
+      override lazy val toString: String = {
         val open = prefix.map(_.toString).getOrElse("")
         val close = suffix.map(_.toString).getOrElse("")
         s"${open}${itemStr}${close}"
@@ -293,9 +293,9 @@ case class WdlV1Formatter(opts: Options,
                         delimiter: String = Symbols.KeyValueDelimiter,
                         override val textSource: TextSource)
         extends Atom {
-      val delimiterToken: Token = Token.fromPrev(delimiter, key.textSource)
+      private val delimiterToken: Token = Token.fromPrev(delimiter, key.textSource)
 
-      override def toString: String = {
+      override lazy val toString: String = {
         s"${key}${delimiter} ${value}"
       }
 
@@ -319,7 +319,6 @@ case class WdlV1Formatter(opts: Options,
         if (inner1.isDefined) {
           // making the assumption that the open token comes directly after the name
           val openToken = Token.fromPrev(Symbols.TypeParamOpen, nameToken.textSource)
-
           // making the assumption that the close token comes directly before the quantifier (if any)
           val closeToken = Token.fromStop(Symbols.TypeParamClose,
                                           quantifierToken.map(_.textSource).getOrElse(textSource))
@@ -384,7 +383,7 @@ case class WdlV1Formatter(opts: Options,
 
     case class Unirary(oper: String, value: Atom, override val textSource: TextSource)
         extends Atom {
-      override def toString: String = s"${oper}${value}"
+      override lazy val toString: String = s"${oper}${value}"
 
       override def length: Int = oper.length + value.length
     }
@@ -406,7 +405,7 @@ case class WdlV1Formatter(opts: Options,
 
       private val operToken = Token.fromBetween(oper, lhs.textSource, rhs.textSource)
 
-      override def toString: String = {
+      override lazy val toString: String = {
         val str = s"${lhs} ${oper} ${rhs}"
         if (grouped) {
           s"${Symbols.GroupOpen}${str}${Symbols.GroupClose}"
@@ -438,7 +437,7 @@ case class WdlV1Formatter(opts: Options,
                       suffix = Some(Token.fromStop(close, textSource)),
                       wrapAll = false) {
 
-      override def toString: String = {
+      override lazy val toString: String = {
         val optionsStr = options
           .map(_.map { opt =>
             s"${opt} "
@@ -691,7 +690,7 @@ case class WdlV1Formatter(opts: Options,
         }
       }
 
-      override lazy val textSource: TextSource = getTextSourceFromChunks(statements)
+      override val textSource: TextSource = getTextSourceFromChunks(statements)
     }
 
     abstract class SectionsStatement extends Statement {
@@ -787,7 +786,7 @@ case class WdlV1Formatter(opts: Options,
         }
       }
 
-      override lazy val textSource: TextSource = {
+      override val textSource: TextSource = {
         if (sections.nonEmpty) {
           val sortedSources = sections.map(_.textSource).sortWith(_ < _)
           TextSource.fromSpan(sortedSources.head, sortedSources.last)
@@ -842,7 +841,7 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class ImportsSection(imports: Vector[ImportDoc]) extends StatementGroup {
-      override def statements: Vector[Statement] = {
+      override val statements: Vector[Statement] = {
         imports.map(ImportStatement)
       }
     }
@@ -878,24 +877,22 @@ case class WdlV1Formatter(opts: Options,
         extends DeclarationBase(member.name, member.dataType, textSource = member.text)
 
     case class MembersSection(members: Vector[StructMember]) extends StatementGroup {
-      override def statements: Vector[Statement] = {
+      override val statements: Vector[Statement] = {
         members.map(StructMemberStatement)
       }
     }
 
     case class DeclarationsSection(declarations: Vector[Declaration]) extends StatementGroup {
-      override def statements: Vector[Statement] = {
+      override val statements: Vector[Statement] = {
         declarations.map(DeclarationStatement)
       }
     }
 
-    // TODO: handle inline comments
     case class KVStatement(id: String, expr: Expr, override val textSource: TextSource)
         extends Statement {
       private val idToken = Token.fromStart(id, textSource)
       private val delimToken = Token.fromPrev(Symbols.KeyValueDelimiter, idToken.textSource)
       private val lhs = Vector(idToken, delimToken)
-      addCommentLines(lhs)
       private val rhs = buildExpression(expr)
 
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
@@ -904,7 +901,7 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class MetadataSection(metaKV: Vector[MetaKV]) extends StatementGroup {
-      override def statements: Vector[Statement] = {
+      override val statements: Vector[Statement] = {
         metaKV.map(kv => KVStatement(kv.id, kv.expr, kv.text))
       }
     }
@@ -912,36 +909,28 @@ case class WdlV1Formatter(opts: Options,
     sealed abstract class BlockStatement(keyword: String, override val textSource: TextSource)
         extends Statement {
 
-      def keywordToken: Token = Token.fromStart(keyword, textSource)
-
-      def clause: Option[Atom] = None
+      def clause: Option[Chunk] = None
 
       def body: Option[Chunk] = None
 
+      protected val keywordToken: Token = Token.fromStart(keyword, textSource)
+      private val clauseChunk: Option[Chunk] = clause
+      // assume the open brace is on the same line as the keyword/clause
+      private val openToken =
+        Token.fromPrev(Symbols.BlockOpen,
+                       clauseChunk.getOrElse(keywordToken).textSource,
+                       spacing = 1)
+      private val bodyChunk: Option[Chunk] = body
+      private val closeToken = Token.fromStop(Symbols.BlockClose, textSource)
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        // assume the open brace is on the same line as the keyword/clause
-        val openToken =
-          Token.fromPrev(Symbols.BlockOpen, clause.getOrElse(keywordToken).textSource, spacing = 1)
-        lineFormatter.appendAll(Vector(Some(keywordToken), clause, Some(openToken)).flatten)
-        val openLineComments = getCommentsWithin(
-            TextSource.fromSpan(keywordToken.textSource, openToken.textSource)
-        )
-        if (openLineComments.nonEmpty) {
-          lineFormatter.appendInlineComment(openLineComments)
-        }
+        lineFormatter.appendAll(Vector(Some(keywordToken), clauseChunk, Some(openToken)).flatten)
         if (body.isDefined) {
           lineFormatter.endLine()
-          body.get.format(lineFormatter.indented())
-          lineFormatter.beginLine()
-        } else if (openLineComments.nonEmpty) {
-          lineFormatter.endLine()
+          bodyChunk.get.format(lineFormatter.indented())
           lineFormatter.beginLine()
         }
-        lineFormatter.appendChunk(Token.fromStop(Symbols.BlockClose, textSource))
-        val closeLineComment = getCommentAt(textSource.endLine)
-        if (closeLineComment.nonEmpty) {
-          lineFormatter.appendInlineComment(Vector(closeLineComment.get))
-        }
+        lineFormatter.appendChunk(closeToken)
       }
     }
 
@@ -973,7 +962,7 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class WorkflowElementBody(elements: Vector[WorkflowElement]) extends SectionsStatement {
-      override def sections: Vector[Statement] = {
+      override val sections: Vector[Statement] = {
         val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
         val declarations: mutable.Buffer[Declaration] = mutable.ArrayBuffer.empty
 
@@ -1000,23 +989,23 @@ case class WdlV1Formatter(opts: Options,
       }
     }
 
-    // TODO: Handle inline comments
     case class CallInputsStatement(inputs: CallInputs) extends Statement {
+      private val inputChunks =
+        Token.chain(Vector(Symbols.Input, Symbols.KeyValueDelimiter), inputs.text)
+      private val argChunks = inputs.value.map { inp =>
+        val nameToken = Token.fromStart(inp.name, inp.text)
+        SpacedContainer(
+            Vector(nameToken,
+                   Token.fromBetween(Symbols.Assignment, nameToken.textSource, inp.expr.text),
+                   buildExpression(inp.expr)),
+            textSource = inp.text
+        )
+      }
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        val args = inputs.value.map { inp =>
-          val nameToken = Token.fromStart(inp.name, inp.text)
-          SpacedContainer(
-              Vector(nameToken,
-                     Token.fromBetween(Symbols.Assignment, nameToken.textSource, inp.expr.text),
-                     buildExpression(inp.expr)),
-              textSource = inp.text
-          )
-        }
         lineFormatter.appendAll(
-            Vector(Adjacent(
-                       Token.chain(Vector(Symbols.Input, Symbols.KeyValueDelimiter), inputs.text)
-                   ),
-                   DelimitedContainer(args, textSource = getTextSourceFromChunks(args)))
+            Vector(Adjacent(inputChunks),
+                   DelimitedContainer(argChunks, textSource = getTextSourceFromChunks(argChunks)))
         )
       }
 
@@ -1064,7 +1053,7 @@ case class WdlV1Formatter(opts: Options,
         )
       }
 
-      override def body: Option[Chunk] = Some(WorkflowElementBody(scatter.body))
+      override val body: Option[Chunk] = Some(WorkflowElementBody(scatter.body))
     }
 
     case class ConditionalBlock(conditional: Conditional)
@@ -1083,7 +1072,7 @@ case class WdlV1Formatter(opts: Options,
         )
       }
 
-      override def body: Option[Chunk] = Some(WorkflowElementBody(conditional.body))
+      override val body: Option[Chunk] = Some(WorkflowElementBody(conditional.body))
     }
 
     case class WorkflowSections(workflow: Workflow) extends Sections {
@@ -1109,10 +1098,10 @@ case class WdlV1Formatter(opts: Options,
     case class WorkflowBlock(workflow: Workflow)
         extends BlockStatement(Symbols.Workflow, workflow.text) {
 
-      override def clause: Option[Atom] =
+      override val clause: Option[Atom] =
         Some(Token.fromPrev(workflow.name, keywordToken.textSource, spacing = 1))
 
-      override def body: Option[Chunk] = Some(WorkflowSections(workflow))
+      override val body: Option[Chunk] = Some(WorkflowSections(workflow))
     }
 
     case class CommandBlock(command: CommandSection) extends Statement {
@@ -1205,14 +1194,14 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class RuntimeMetadataSection(runtimeKV: Vector[RuntimeKV]) extends StatementGroup {
-      override def statements: Vector[Statement] = {
+      override val statements: Vector[Statement] = {
         runtimeKV.map(kv => KVStatement(kv.id, kv.expr, kv.text))
       }
     }
 
     case class RuntimeBlock(runtime: RuntimeSection)
         extends BlockStatement(Symbols.Runtime, runtime.text) {
-      override def body: Option[Chunk] = Some(RuntimeMetadataSection(runtime.kvs))
+      override val body: Option[Chunk] = Some(RuntimeMetadataSection(runtime.kvs))
     }
 
     case class TaskSections(task: Task) extends Sections() {
@@ -1244,10 +1233,10 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class TaskBlock(task: Task) extends BlockStatement(Symbols.Task, task.text) {
-      override def clause: Option[Atom] =
+      override val clause: Option[Atom] =
         Some(Token.fromPrev(task.name, keywordToken.textSource, spacing = 1))
 
-      override def body: Option[Chunk] = Some(TaskSections(task))
+      override val body: Option[Chunk] = Some(TaskSections(task))
     }
 
     case class DocumentSections() extends Sections {
