@@ -2,8 +2,8 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
+import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
 
@@ -25,24 +25,47 @@ object WdlVersion {
 // source location in a WDL program. We add it to each syntax element
 // so we could do accurate error reporting.
 //
+// Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
+// the only example of this is Version, which in draft-2 documents has
+// an implicit value of WdlVersion.Draft_2, but there is no actual version
+// statement.
+//
 // line: line number
 // col : column number
 // URL:  original file or web URL
 //
-case class TextSource(line: Int, col: Int, url: Option[URL] = None) {
+case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
+
+  override def compare(that: TextSource): Int = {
+    line - that.line
+  }
+
   override def toString: String = {
-    if (url.isDefined) {
-      s"line ${line} col ${col} of ${url}"
-    } else {
-      s"line ${line} col ${col}"
-    }
+    s"${line}:${col}-${endLine}:${endCol}"
+  }
+
+  lazy val lineRange: Range = line until endLine
+
+  lazy val maxCol: Int = Vector(col, endCol).max
+}
+
+object TextSource {
+  lazy val empty: TextSource = TextSource(0, 0, 0, 0)
+
+  def fromSpan(start: TextSource, stop: TextSource): TextSource = {
+    TextSource(
+        start.line,
+        start.col,
+        stop.endLine,
+        stop.endCol
+    )
   }
 }
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource) =
-    this(s"${msg} in file ${text.url} line ${text.line} col ${text.col}")
+    this(s"${msg} at ${text}")
 }
 
 /**
@@ -72,14 +95,19 @@ abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
     apply(loader.apply(url))
   }
 
+  def getDocSourceURL(addr: String): URL = {
+    Util.getURL(addr, opts.localDirectories)
+  }
+
   case class Walker[T](rootURL: URL,
                        sourceCode: Option[SourceCode] = None,
                        results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, url, doc, _, _) if doc.isDefined => Some(url -> doc.get)
-        case _                                                => None
+        case ImportDoc(_, _, addr, doc, _, _) if doc.isDefined =>
+          Some(Util.getURL(addr.value, opts.localDirectories) -> doc.get)
+        case _ => None
       }.toMap
     }
 

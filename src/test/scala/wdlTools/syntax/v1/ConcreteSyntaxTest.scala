@@ -16,7 +16,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       verbosity = Quiet,
-      localDirectories = Some(Vector(tasksDir, workflowsDir, structsDir))
+      localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
   private val loader = SourceCode.Loader(opts)
   private val grammarFactory = WdlV1GrammarFactory(opts)

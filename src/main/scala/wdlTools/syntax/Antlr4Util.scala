@@ -1,6 +1,5 @@
 package wdlTools.syntax
 
-import java.net.URL
 import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -14,7 +13,8 @@ import org.antlr.v4.runtime.{
   CommonTokenStream,
   Lexer,
   Parser,
-  ParserRuleContext
+  ParserRuleContext,
+  Token
 }
 import wdlTools.syntax
 import wdlTools.util.{Options, Verbosity}
@@ -22,6 +22,24 @@ import wdlTools.util.{Options, Verbosity}
 import scala.collection.mutable
 
 object Antlr4Util {
+  def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
+    val stopToken = maybeStopToken.getOrElse(startToken)
+    syntax.TextSource(
+        line = startToken.getLine,
+        col = startToken.getCharPositionInLine,
+        endLine = stopToken.getLine,
+        endCol = stopToken.getCharPositionInLine + stopToken.getText.length
+    )
+  }
+
+  def getTextSource(ctx: ParserRuleContext): TextSource = {
+    getTextSource(ctx.getStart, Some(ctx.getStop))
+  }
+
+  def getTextSource(symbol: TerminalNode): TextSource = {
+    getTextSource(symbol.getSymbol, None)
+  }
+
   case class Grammar[L <: Lexer, P <: Parser](lexer: L,
                                               parser: P,
                                               errListener: ErrorListener,
@@ -41,16 +59,6 @@ object Antlr4Util {
         }
         throw new Exception(s"${errors.size} syntax errors were found, stopping")
       }
-    }
-
-    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
-      val token = ctx.start
-      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
-    }
-
-    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
-      val token = symbol.getSymbol
-      syntax.TextSource(line = token.getLine, col = token.getCharPositionInLine, url = docSourceURL)
     }
 
     def getComment(ctx: ParserRuleContext, before: Boolean = true): Option[Comment] = {

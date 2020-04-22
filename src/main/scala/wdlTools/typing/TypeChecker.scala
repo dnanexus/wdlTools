@@ -1,13 +1,15 @@
 package wdlTools.typing
 
 import java.nio.file.Paths
+
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
+import wdlTools.util.Util
 
 case class TypeChecker(stdlib: Stdlib) {
-  val tUtil = TUtil(stdlib.conf)
+  private val tUtil = TUtil(stdlib.conf)
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -255,16 +257,19 @@ case class TypeChecker(stdlib: Stdlib) {
       case Some(WT_Struct(_, fields)) => fields
     }
     val rhsFields: Map[String, Expr] = expr match {
-      case ExprMap(m: Map[Expr, Expr], _) =>
+      case ExprMap(m: Vector[ExprMapItem], _) =>
         m.map {
-          case (ValueString(fName, _), e) => fName -> e
-          case (_, _) =>
+          case ExprMapItem(ValueString(fName, _), e, _) => fName -> e
+          case _ =>
             throw new TypeException(
                 s"map ${exprToString(expr)} isn't made up of string field names",
                 text
             )
-        }
-      case ExprObject(m, _) => m
+        }.toMap
+      case ExprObject(m, _) =>
+        m.map {
+          case ExprObjectMember(fName, e, _) => fName -> e
+        }.toMap
       case _ =>
         throw new TypeException(
             s"Expression ${exprToString(expr)} cannot be coereced into a struct",
@@ -369,9 +374,9 @@ case class TypeChecker(stdlib: Stdlib) {
 
       case ExprMap(m, _) =>
         // figure out the types from the first element
-        val mTypes: Map[WT, WT] = m.map {
-          case (k, v) => typeEval(k, ctx) -> typeEval(v, ctx)
-        }
+        val mTypes: Map[WT, WT] = m.map { item: ExprMapItem =>
+          typeEval(item.key, ctx) -> typeEval(item.value, ctx)
+        }.toMap
         val (tk, _) =
           try {
             tUtil.unifyCollection(mTypes.keys, Map.empty)
@@ -558,12 +563,12 @@ case class TypeChecker(stdlib: Stdlib) {
             }
 
           // accessing a pair element
-          case WT_Pair(l, r) if id.toLowerCase() == "left"  => l
-          case WT_Pair(l, r) if id.toLowerCase() == "right" => r
+          case WT_Pair(l, _) if id.toLowerCase() == "left"  => l
+          case WT_Pair(_, r) if id.toLowerCase() == "right" => r
           case WT_Pair(_, _) =>
             throw new TypeException(s"accessing a pair with (${id}) is illegal", expr.text)
 
-          case other =>
+          case _ =>
             throw new TypeException(s"member access (${id}) in expression is illegal", expr.text)
         }
     }
@@ -973,12 +978,13 @@ case class TypeChecker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val nsName = Paths.get(iStat.url.getFile).getFileName.toString
+            val url = Util.getURL(iStat.addr.value, stdlib.conf.localDirectories)
+            val nsName = Paths.get(url.getFile).getFileName.toString
             if (nsName.endsWith(".wdl"))
               nsName.dropRight(".wdl".length)
             else
               nsName
-          case Some(x) => x
+          case Some(x) => x.value
         }
 
         // add the externally visible definitions to the context

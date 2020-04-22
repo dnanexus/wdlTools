@@ -14,6 +14,7 @@ object Verbosity extends Enumeration {
 }
 
 object TypeCheckingRegime extends Enumeration {
+  type TypeCheckingRegime = Value
   val Strict, Moderate, Lenient = Value
 
   def fromName(name: String): TypeCheckingRegime.Value = {
@@ -30,7 +31,7 @@ import Verbosity._
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Option[Vector[Path]] = None,
+case class Options(localDirectories: Vector[Path] = Vector.empty,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false,

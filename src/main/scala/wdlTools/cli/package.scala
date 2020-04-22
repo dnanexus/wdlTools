@@ -12,9 +12,9 @@ import org.rogach.scallop.{
   singleArgConverter
 }
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.TypeCheckingRegime
+import wdlTools.util.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.Verbosity._
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{Options, TypeCheckingRegime, Util}
 
 /**
   * Base class for wdlTools CLI commands.
@@ -28,8 +28,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.fromName)
-  implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime.Value] =
-    singleArgConverter[TypeCheckingRegime.Value](TypeCheckingRegime.fromName)
+  implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
+    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.fromName)
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly
@@ -68,7 +68,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         .asInstanceOf[WdlToolsConf]
         .getOptions
         .copy(
-            localDirectories = Some(this.localDirectories(Set(wdlDir))),
+            localDirectories = this.localDirectories(Set(wdlDir)),
             followImports = true
         )
     }
@@ -107,10 +107,20 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       name = "check",
       description = "Type check WDL file."
   ) {
-    val typeCheckRegime: ScallopOption[TypeCheckingRegime.Value] = opt[TypeCheckingRegime.Value](
-        descr = "",
+    val regime: ScallopOption[TypeCheckingRegime] = opt[TypeCheckingRegime](
+        descr = "Strictness of type checking",
         default = Some(TypeCheckingRegime.Moderate)
     )
+
+    override def getOptions: Options = {
+      val opts = super.getOptions
+      val typeChecking = regime()
+      if (opts.typeChecking != typeChecking) {
+        opts.copy(typeChecking = typeChecking)
+      } else {
+        opts
+      }
+    }
   }
   addSubcommand(check)
 
