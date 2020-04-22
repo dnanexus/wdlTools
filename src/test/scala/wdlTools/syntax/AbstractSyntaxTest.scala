@@ -61,4 +61,33 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     doc.version.value shouldBe WdlVersion.V1
   }
 
+  it should "handle the meta section" taggedAs Edge in {
+    val doc = parser.apply(getTaskSource("meta_null_value.wdl"))
+    doc.version.value shouldBe WdlVersion.V1
+    doc.elements.size shouldBe 1
+    val task = doc.elements.head.asInstanceOf[Task]
+
+    task.parameterMeta.get shouldBe a[ParameterMetaSection]
+    task.parameterMeta.get.kvs.size shouldBe 1
+    val mpkv = task.parameterMeta.get.kvs.head
+    mpkv should matchPattern {
+      case MetaKV("i", ExprIdentifier("null", _), _, _) =>
+    }
+  }
+
+  it should "complex meta values" taggedAs Edge in {
+    val doc = parser.apply(getTaskSource("meta_section_compound.wdl"))
+    doc.version.value shouldBe WdlVersion.V1
+    doc.elements.size shouldBe 1
+    val task = doc.elements.head.asInstanceOf[Task]
+
+    task.parameterMeta.get shouldBe a[ParameterMetaSection]
+    task.parameterMeta.get.kvs.size shouldBe 3
+  }
+
+  it should "report errors in meta section" taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      parser.apply(getTaskSource("meta_section_error.wdl"))
+    }
+  }
 }

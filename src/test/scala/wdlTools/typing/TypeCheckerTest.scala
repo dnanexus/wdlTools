@@ -13,7 +13,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       localDirectories = Vector(
           Paths.get(getClass.getResource("/typing/v1").getPath)
       ),
-      verbosity = Verbosity.Normal,
+      verbosity = Verbosity.Quiet,
       followImports = true
   )
   private val loader = SourceCode.Loader(opts)
@@ -50,7 +50,6 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "command_string.wdl" -> TResult(correct = true),
       "comparisons.wdl" -> TResult(correct = true),
       "library.wdl" -> TResult(correct = true),
-      "null.wdl" -> TResult(correct = true),
       "simple.wdl" -> TResult(correct = true),
       "stdlib.wdl" -> TResult(correct = true),
       // incorrect tasks
@@ -60,12 +59,16 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "declaration_shadowing.wdl" -> TResult(correct = false),
       "simple.wdl" -> TResult(correct = false),
       // expressions
-      "expressions.wdl" -> TResult(correct = true),
-      "expressions_bad.wdl" -> TResult(correct = false)
+      "expressions.wdl" -> TResult(true),
+      "expressions_bad.wdl" -> TResult(false),
+      // metadata
+      "metadata_null_value.wdl" -> TResult(correct = true),
+      "metadata_complex.wdl" -> TResult(correct = true)
   )
 
   // test to include/exclude
-  private val includeList: Option[Set[String]] = Some(Set("coercions_questionable.wdl"))
+  private val includeList
+      : Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
@@ -120,7 +123,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check test wdl files" in {
+  it should "type check test wdl files" taggedAs (Edge) in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/typing/v1").getPath)
     )
@@ -147,7 +150,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" taggedAs Edge in {
+  it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
