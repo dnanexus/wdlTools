@@ -2,23 +2,24 @@ package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.Comment
+import wdlTools.syntax.{Comment, TextSource}
 
 import scala.collection.mutable
 
-case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
-                                initialIndent: String = "",
-                                indentation: String = " ",
-                                indentStep: Int = 2,
-                                defaultSpacing: String = " ",
-                                maxLineWidth: Int = 100,
-                                lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty)
-    extends LineFormatter(defaultIndenting, defaultSpacing) {
+case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
+                         defaultIndenting: Indenting = Indenting.IfNotIndented,
+                         initialIndent: String = "",
+                         indentation: String = " ",
+                         indentStep: Int = 2,
+                         defaultSpacing: String = " ",
+                         maxLineWidth: Int = 100,
+                         lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty) {
   private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
   private val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
 
   def indented(indenting: Indenting = defaultIndenting): LineFormatter = {
-    DefaultLineFormatter(
+    LineFormatter(
+        inlineComments,
         defaultIndenting = indenting,
         initialIndent = initialIndent + (indentation * indentStep),
         indentation = indentation,
@@ -29,7 +30,8 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
   }
 
   def preformatted(): LineFormatter = {
-    DefaultLineFormatter(
+    LineFormatter(
+        inlineComments,
         defaultSpacing = "",
         maxLineWidth = maxLineWidth,
         lines = lines
@@ -118,7 +120,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     }
   }
 
-  override def appendLineComments(comments: Vector[Comment]): Unit = {
+  def appendLineComments(comments: Vector[Comment]): Unit = {
     require(atLineStart)
 
     var prevLine = 0
@@ -164,7 +166,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     }
   }
 
-  override def appendInlineComment(comment: String): Unit = {
+  def appendInlineComment(comment: String): Unit = {
     if (!atLineStart) {
       appendString("  ")
     }
@@ -173,7 +175,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     appendString(comment)
   }
 
-  override def appendInlineComment(comments: Vector[Comment]): Unit = {
+  def appendInlineComment(comments: Vector[Comment]): Unit = {
     val trimmedComments = trimComments(comments)
     val text = if (trimmedComments.size > 1) {
       trimmedComments.map(_._1).mkString(" ")

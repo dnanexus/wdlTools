@@ -46,6 +46,13 @@ case class WdlV1Formatter(opts: Options,
     }
 
     abstract class Atom extends Chunk {
+      // add this Atom to the index - this is used by the formatter to add in-line comments
+      textSource.lineRange.foreach { line =>
+        if (!commentLines.contains(line) || commentLines(line).maxCol < textSource.maxCol) {
+          commentLines(line) = textSource
+        }
+      }
+
       def length: Int
 
       def format(lineFormatter: LineFormatter): Unit = {
@@ -100,20 +107,15 @@ case class WdlV1Formatter(opts: Options,
           } else {
             beforeCol
           }
-          TextSource(line, col, line, col + value.length, before.url)
+          TextSource(line, col, line, col + value.length)
         } else if (preferBefore) {
           // assume the value is separated by the previous token by one space
           TextSource(before.endLine,
                      before.endCol + spacing,
                      before.endLine,
-                     before.endCol + value.length + spacing,
-                     before.url)
+                     before.endCol + value.length + spacing)
         } else {
-          TextSource(after.line,
-                     after.col - spacing,
-                     after.col,
-                     after.col - value.length - spacing,
-                     after.url)
+          TextSource(after.line, after.col - spacing, after.col, after.col - value.length - spacing)
         }
         Token(value, textSource)
       }
@@ -123,8 +125,7 @@ case class WdlV1Formatter(opts: Options,
             prev.endLine,
             prev.endCol + spacing,
             prev.endLine,
-            prev.endCol + value.length + spacing,
-            prev.url
+            prev.endCol + value.length + spacing
         )
         Token(value, textSource)
       }
@@ -134,8 +135,7 @@ case class WdlV1Formatter(opts: Options,
             next.line,
             next.col - value.length,
             next.line,
-            next.col,
-            next.url
+            next.col
         )
         Token(value, textSource)
       }
@@ -166,8 +166,7 @@ case class WdlV1Formatter(opts: Options,
             prev.endLine,
             prev.endCol + spacing,
             prev.endLine,
-            prev.endCol + value.length + spacing,
-            prev.url
+            prev.endCol + value.length + spacing
         )
         StringLiteral(value, textSource)
       }
@@ -239,8 +238,14 @@ case class WdlV1Formatter(opts: Options,
 
       def separator: String
 
-      lazy val itemStr: String = items.mkString(separator)
-      lazy val itemLength: Int = itemStr.length
+      private lazy val itemStr: String = items.mkString(separator)
+      private val itemLength: Int = itemStr.length
+      private val itemTokens: Vector[Atom] = items.zipWithIndex.map {
+        case (item, i) if i < item.length - 1 =>
+          val delimiterToken = Token.fromPrev(separator, item.textSource)
+          Adjacent(Vector(item, delimiterToken))
+        case (item, _) => item
+      }
 
       override def toString: String = {
         val open = prefix.map(_.toString).getOrElse("")
@@ -256,23 +261,10 @@ case class WdlV1Formatter(opts: Options,
         if (items.nonEmpty) {
           if (wrapAll || (items.length > 1 && itemLength > lineFormatter.lengthRemaining)) {
             lineFormatter.beginLine()
-            var prevItem = items.head
-            lineFormatter.appendAll(Vector(prevItem))
-            items.tail.foreach { item =>
-              val delimiterToken = Token.fromPrev(separator, prevItem.textSource)
-              lineFormatter.appendChunk(delimiterToken, spacing = "")
-              if (wrapAll || item.length > lineFormatter.lengthRemaining) {
-                lineFormatter.endLine(wrap = true, indenting = Indenting.Never)
-                lineFormatter.beginLine()
-              }
-              lineFormatter.appendAll(Vector(item))
-              prevItem = item
-            }
+            lineFormatter.appendAll(itemTokens, wrapping = Wrapping.Always)
             lineFormatter.endLine()
-          } else if (wrapping == Wrapping.Never) {
-            lineFormatter.appendString(itemStr)
           } else {
-            lineFormatter.appendAll(items, wrapping = wrapping)
+            lineFormatter.appendAll(itemTokens, wrapping = wrapping)
           }
         }
       }
@@ -301,7 +293,7 @@ case class WdlV1Formatter(opts: Options,
                         delimiter: String = Symbols.KeyValueDelimiter,
                         override val textSource: TextSource)
         extends Atom {
-      lazy val delimiterToken: Token = Token.fromPrev(delimiter, key.textSource)
+      val delimiterToken: Token = Token.fromPrev(delimiter, key.textSource)
 
       override def toString: String = {
         s"${key}${delimiter} ${value}"
@@ -412,6 +404,8 @@ case class WdlV1Formatter(opts: Options,
           None
         }, wrapAll = false) {
 
+      private val operToken = Token.fromBetween(oper, lhs.textSource, rhs.textSource)
+
       override def toString: String = {
         val str = s"${lhs} ${oper} ${rhs}"
         if (grouped) {
@@ -431,7 +425,6 @@ case class WdlV1Formatter(opts: Options,
       }
 
       def wrapBody(lineFormatter: LineFormatter): Unit = {
-        val operToken = Token.fromBetween(oper, lhs.textSource, rhs.textSource)
         lineFormatter.appendAll(Vector(lhs, operToken, rhs), Wrapping.AsNeeded)
       }
     }
@@ -475,17 +468,6 @@ case class WdlV1Formatter(opts: Options,
         inPlaceholder: Boolean = false,
         inOperation: Boolean = false
     ): Atom = {
-      addLineComments(expr.text)
-
-      // Add to mapping of lines to the right-most TextSource
-      val maxCol = expr.text.maxCol
-      expr.text.lineRange.foreach { line =>
-        if (document.comments.contains(line)) {
-          if (!commentLines.contains(line) || maxCol > commentLines(line).maxCol) {
-            commentLines(line) = expr.text
-          }
-        }
-      }
 
       /**
         * Creates a Token or a StringLiteral, depending on whether we're already inside a string literal
@@ -518,11 +500,10 @@ case class WdlV1Formatter(opts: Options,
                  inPlaceholder: Boolean = inPlaceholder,
                  inOperation: Boolean = inOperation): Atom = {
         buildExpression(nestedExpression,
-                             placeholderOpen = placeholderOpen,
-                             inString = inString,
-                             commentLines = commentLines,
-                             inPlaceholder = inPlaceholder,
-                             inOperation = inOperation)
+                        placeholderOpen = placeholderOpen,
+                        inString = inString,
+                        inPlaceholder = inPlaceholder,
+                        inOperation = inOperation)
       }
 
       def unirary(oper: String, value: Expr, textSource: TextSource): Atom = {
@@ -825,69 +806,37 @@ case class WdlV1Formatter(opts: Options,
     case class VersionStatement(version: Version) extends Statement {
       override def textSource: TextSource = version.text
 
+      private val keywordToken = Token.fromStart(Symbols.Version, version.text)
+      private val versionToken = Token.fromStop(version.value.name, version.text)
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        lineFormatter.appendAll(
-            Vector(Token.fromStart(Symbols.Version, version.text),
-                   Token.fromStop(version.value.name, version.text)),
-            Wrapping.Never
-        )
-        val comments = getCommentsWithin(textSource)
-        if (comments.nonEmpty) {
-          lineFormatter.appendInlineComment(comments)
-        }
+        lineFormatter.appendAll(Vector(keywordToken, versionToken), Wrapping.Never)
       }
     }
 
     case class ImportStatement(importDoc: ImportDoc) extends Statement {
       override def textSource: TextSource = importDoc.text
 
+      private val keywordToken = Token.fromStart(Symbols.Import, importDoc.text)
+      // assuming URL comes directly after keyword
+      private val urlLiteral = StringLiteral.fromPrev(importDoc.addr.value, keywordToken.textSource)
+      // assuming namespace comes directly after url
+      private val nameTokens = importDoc.name.map { name =>
+        Token.chain(Vector(Symbols.As, name.value), urlLiteral.textSource, spacing = 1)
+      }
+      private val aliasTokens = importDoc.aliases.map { alias =>
+        Token.chain(Vector(Symbols.Alias, alias.id1, Symbols.As, alias.id2),
+                    alias.text,
+                    spacing = 1)
+      }
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        val keywordToken = Token.fromStart(Symbols.Import, importDoc.text)
-        // assuming URL comes directly after keyword
-        val urlLiteral = StringLiteral.fromPrev(importDoc.url.toString, keywordToken.textSource)
-
         lineFormatter.appendAll(Vector(keywordToken, urlLiteral), Wrapping.Never)
-        if (importDoc.name.isDefined) {
-          // assuming namespace comes directly after url
-          lineFormatter.appendAll(Token.chain(Vector(Symbols.As, importDoc.name.get.value),
-                                              urlLiteral.textSource,
-                                              spacing = 1),
-                                  Wrapping.AsNeeded)
+        if (nameTokens.isDefined) {
+          lineFormatter.appendAll(nameTokens.get, Wrapping.AsNeeded)
         }
-
-        def appendAlias(alias: ImportAlias, lastInLine: Boolean): Unit = {
-          lineFormatter.appendAll(
-              Token.chain(Vector(Symbols.Alias, alias.id1, Symbols.As, alias.id2),
-                          alias.text,
-                          spacing = 1),
-              Wrapping.Always
-          )
-          if (lastInLine) {
-            val comments = getCommentsWithin(alias.text)
-            if (comments.nonEmpty) {
-              lineFormatter.appendInlineComment(comments)
-            }
-          }
-        }
-
-        if (importDoc.aliases.nonEmpty) {
-          var alias = importDoc.aliases.head
-          if (alias.text.line > textSource.line) {
-            lineFormatter.appendInlineComment(
-                getCommentsBetween(textSource.line, alias.text.line)
-            )
-          }
-          importDoc.aliases.tail.foreach { nextAlias =>
-            val comments = nextAlias.text.line >= alias.text.endLine
-            appendAlias(alias, comments)
-            alias = nextAlias
-          }
-          appendAlias(alias, lastInLine = true)
-        } else {
-          val comments = getCommentsWithin(textSource)
-          if (comments.nonEmpty) {
-            lineFormatter.appendInlineComment(comments)
-          }
+        aliasTokens.foreach { alias =>
+          lineFormatter.appendAll(alias, Wrapping.Always)
         }
       }
     }
@@ -898,21 +847,26 @@ case class WdlV1Formatter(opts: Options,
       }
     }
 
-    // TODO: handle inline comments
     abstract class DeclarationBase(name: String,
                                    wdlType: Type,
                                    expr: Option[Expr] = None,
                                    override val textSource: TextSource)
         extends Statement {
 
+      private val typeAtom = DataType.fromWdlType(wdlType)
+      // assuming name follows direclty after type
+      private val nameToken = Token.fromPrev(name, typeAtom.textSource, spacing = 1)
+      private val lhs = Vector(typeAtom, nameToken)
+      private val rhs = expr.map { e =>
+        val eqToken = Token.fromPrev(Symbols.Assignment, nameToken.textSource, spacing = 1)
+        val exprAtom = buildExpression(e)
+        Vector(eqToken, exprAtom)
+      }
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        val typeAtom = DataType.fromWdlType(wdlType)
-        val nameToken = Token.fromPrev(name, typeAtom.textSource, spacing = 1)
-        lineFormatter.appendAll(Vector(typeAtom, nameToken))
-        if (expr.isDefined) {
-          val eqToken = Token.fromPrev(Symbols.Assignment, nameToken.textSource, spacing = 1)
-          val (exprAtom, inlineComments) = buildExpression(expr.get)
-          lineFormatter.appendAll(Vector(eqToken, ))
+        lineFormatter.appendAll(lhs)
+        if (rhs.isDefined) {
+          lineFormatter.appendAll(rhs.get)
         }
       }
     }
@@ -938,13 +892,14 @@ case class WdlV1Formatter(opts: Options,
     // TODO: handle inline comments
     case class KVStatement(id: String, expr: Expr, override val textSource: TextSource)
         extends Statement {
+      private val idToken = Token.fromStart(id, textSource)
+      private val delimToken = Token.fromPrev(Symbols.KeyValueDelimiter, idToken.textSource)
+      private val lhs = Vector(idToken, delimToken)
+      addCommentLines(lhs)
+      private val rhs = buildExpression(expr)
+
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
-        val idToken = Token.fromStart(id, textSource)
-        val delimToken = Token.fromPrev(Symbols.KeyValueDelimiter, idToken.textSource)
-        val (exprAtom, inlineComments) = buildExpression(expr)
-        lineFormatter.appendAll(
-            Vector(Adjacent(Vector(idToken, delimToken)), )
-        )
+        lineFormatter.appendAll(Vector(Adjacent(lhs), rhs))
       }
     }
 
@@ -1050,11 +1005,10 @@ case class WdlV1Formatter(opts: Options,
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
         val args = inputs.value.map { inp =>
           val nameToken = Token.fromStart(inp.name, inp.text)
-          val (exprAtom, inlineComments) = buildExpression(inp.expr)
           SpacedContainer(
               Vector(nameToken,
                      Token.fromBetween(Symbols.Assignment, nameToken.textSource, inp.expr.text),
-                     ),
+                     buildExpression(inp.expr)),
               textSource = inp.text
           )
         }
@@ -1098,7 +1052,7 @@ case class WdlV1Formatter(opts: Options,
         val openToken = Token.fromPrev(Symbols.GroupOpen, keywordToken.textSource, spacing = 1)
         val idToken = Token.fromPrev(scatter.identifier, openToken.textSource)
         val inToken = Token.fromPrev(Symbols.In, idToken.textSource, spacing = 1)
-        val (exprAtom, inlineComments) = buildExpression(scatter.expr)
+        val exprAtom = buildExpression(scatter.expr)
         val closeToken = Token.fromPrev(Symbols.GroupClose, exprAtom.textSource)
         Some(
             SpacedContainer(
@@ -1116,7 +1070,7 @@ case class WdlV1Formatter(opts: Options,
     case class ConditionalBlock(conditional: Conditional)
         extends BlockStatement(Symbols.If, conditional.text) {
       override val clause: Option[Atom] = {
-        val (exprAtom, inlineComments) = buildExpression(conditional.expr)
+        val exprAtom = buildExpression(conditional.expr)
         val openToken = Token.fromNext(Symbols.GroupOpen, exprAtom.textSource)
         val closeToken = Token.fromPrev(Symbols.GroupClose, exprAtom.textSource)
         Some(
@@ -1193,7 +1147,7 @@ case class WdlV1Formatter(opts: Options,
                     expr,
                     placeholderOpen = Symbols.PlaceholderOpenTilde,
                     inString = true
-                )._1
+                )
             )
             bodyFormatter.endLine()
           } else {
@@ -1217,14 +1171,14 @@ case class WdlV1Formatter(opts: Options,
                     expr,
                     placeholderOpen = Symbols.PlaceholderOpenTilde,
                     inString = true
-                )._1
+                )
             )
             if (numParts > 2) {
               command.parts.slice(1, command.parts.size - 1).foreach { chunk =>
                 bodyFormatter.appendChunk(
                     buildExpression(chunk,
                                     placeholderOpen = Symbols.PlaceholderOpenTilde,
-                                    inString = true)._1
+                                    inString = true)
                 )
               }
             }
@@ -1237,7 +1191,7 @@ case class WdlV1Formatter(opts: Options,
                     },
                     placeholderOpen = Symbols.PlaceholderOpenTilde,
                     inString = true
-                )._1
+                )
             )
             bodyFormatter.endLine()
           }
@@ -1335,7 +1289,7 @@ case class WdlV1Formatter(opts: Options,
           case (k, v) => (k, v.values.toVector.flatten)
         }
 
-      val lineFormatter = DefaultLineFormatter(inlineComments)
+      val lineFormatter = LineFormatter(inlineComments)
 
       documentSections.format(lineFormatter)
 

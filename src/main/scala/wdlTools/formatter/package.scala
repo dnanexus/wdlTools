@@ -1,8 +1,6 @@
 package wdlTools.formatter
 
-import wdlTools.formatter.Indenting.Indenting
-import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.{Comment, TextSource}
+import wdlTools.syntax.TextSource
 
 object Indenting extends Enumeration {
   type Indenting = Value
@@ -20,39 +18,6 @@ trait Chunk {
   def format(lineFormatter: LineFormatter): Unit
 
   def textSource: TextSource
-}
-
-abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndented,
-                             defaultSpacing: String = " ") {
-  def preformatted(): LineFormatter
-
-  def indented(indenting: Indenting = defaultIndenting): LineFormatter
-
-  def atLineStart: Boolean
-
-  def lengthRemaining: Int
-
-  def emptyLine(): Unit
-
-  def beginLine(): Unit
-
-  def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
-
-  def appendLineComments(comments: Vector[Comment]): Unit
-
-  def appendInlineComment(comment: String): Unit
-
-  def appendInlineComment(comments: Vector[Comment]): Unit
-
-  def appendString(value: String): Unit
-
-  def appendChunk(chunk: Chunk, spacing: String = defaultSpacing): Unit
-
-  def appendAll(chunks: Vector[Chunk],
-                wrapping: Wrapping = Wrapping.AsNeeded,
-                spacing: String = defaultSpacing): Unit
-
-  def toVector: Vector[String]
 }
 
 /**
