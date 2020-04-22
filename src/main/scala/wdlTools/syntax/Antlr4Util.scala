@@ -23,17 +23,22 @@ import wdlTools.util.{Options, SourceCode, Verbosity}
 import scala.collection.mutable
 
 object Antlr4Util {
-  def getSourceText(startToken: Token,
-                    maybeStopToken: Option[Token] = None,
-                    docSourceURL: Option[URL] = None): TextSource = {
+  def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
     val stopToken = maybeStopToken.getOrElse(startToken)
     syntax.TextSource(
         line = startToken.getLine,
         col = startToken.getCharPositionInLine,
         endLine = stopToken.getLine,
-        endCol = stopToken.getCharPositionInLine + stopToken.getText.length,
-        url = docSourceURL
+        endCol = stopToken.getCharPositionInLine + stopToken.getText.length
     )
+  }
+
+  def getTextSource(ctx: ParserRuleContext): TextSource = {
+    getTextSource(ctx.getStart, Some(ctx.getStop))
+  }
+
+  def getTextSource(symbol: TerminalNode): TextSource = {
+    getTextSource(symbol.getSymbol, None)
   }
 
   case class CommentListener(tokenStream: BufferedTokenStream,
@@ -43,7 +48,7 @@ object Antlr4Util {
       extends AllParseTreeListener {
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
-        val source = Antlr4Util.getSourceText(tok, None, docSourceUrl)
+        val source = Antlr4Util.getTextSource(tok, None)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
@@ -88,14 +93,6 @@ object Antlr4Util {
         }
         throw new Exception(s"${errors.size} syntax errors were found, stopping")
       }
-    }
-
-    def getSourceText(ctx: ParserRuleContext, docSourceURL: Option[URL]): TextSource = {
-      Antlr4Util.getSourceText(ctx.getStart, Some(ctx.getStop), docSourceURL)
-    }
-
-    def getSourceText(symbol: TerminalNode, docSourceURL: Option[URL]): TextSource = {
-      Antlr4Util.getSourceText(symbol.getSymbol, None, docSourceURL)
     }
   }
 

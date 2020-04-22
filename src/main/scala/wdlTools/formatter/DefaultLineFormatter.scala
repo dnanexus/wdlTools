@@ -3,7 +3,6 @@ package wdlTools.formatter
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.Comment
-//import wdlTools.syntax.Comment
 
 import scala.collection.mutable
 
@@ -103,49 +102,85 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     builder
   }
 
+  private lazy val commentStart = "^#+".r
   private lazy val whitespace = "[ \t\n\r]+".r
 
-  override def appendComments(comments: Vector[Comment]): Unit = {
+  private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
+    comments.map { comment =>
+      val text = comment.value.trim
+      val hashes = commentStart.findFirstIn(text)
+      if (hashes.isEmpty) {
+        throw new Exception("Expected comment to start with '#'")
+      }
+      (text.substring(hashes.get.length),
+       comment.text.line,
+       hashes.get.startsWith(Symbols.PreformattedComment))
+    }
+  }
+
+  override def appendLineComments(comments: Vector[Comment]): Unit = {
     require(atLineStart)
 
     var prevLine = 0
+    var preformatted = false
 
-    comments.sortWith(_ < _).foreach { comment =>
-      if (prevLine > 0 && comment.text.line > prevLine + 1) {
-        endLine()
-        emptyLine()
-      }
-      val text = comment.value
-    }
-
-    comment match {
-      case CommentEmpty() =>
-        beginLine()
-        appendChunk(Token.Comment)
-        endLine()
-      case CommentLine(text) =>
-        beginLine()
-        appendChunk(Token.Comment)
-        whitespace.split(text).foreach { token =>
-          // we let the line run over for a single token that is longer than the max line length
-          // (i.e. we don't try to hyphenate)
-          if (!atLineStart && lengthRemaining < token.length + 1) {
-            endLine()
-            beginLine()
-            appendChunk(Token.Comment)
-          }
-          currentLine.append(" ")
-          currentLine.append(token)
-        }
-        endLine()
-      case CommentPreformatted(preLines) =>
-        preLines.foreach { line =>
-          beginLine()
-          appendAll(Vector[Chunk](Token.PreformattedComment, StringLiteral(line)), Wrapping.Never)
+    trimComments(comments).foreach {
+      case (trimmed, curLine, curPreformatted) =>
+        if (prevLine > 0 && curLine > prevLine + 1) {
+          endLine()
+          emptyLine()
+        } else if (!preformatted && curPreformatted) {
           endLine()
         }
-      case CommentCompound(comments) => comments.foreach(appendComment)
+        if (curPreformatted) {
+          beginLine()
+          appendString(Symbols.PreformattedComment)
+          appendString(" ")
+          appendString(trimmed)
+          endLine()
+        } else {
+          if (atLineStart) {
+            appendString(Symbols.Comment)
+          }
+          if (lengthRemaining >= trimmed.length + 1) {
+            appendString(" ")
+            appendString(trimmed)
+          } else {
+            whitespace.split(trimmed).foreach { token =>
+              // we let the line run over for a single token that is longer than the max line length
+              // (i.e. we don't try to hyphenate)
+              if (!atLineStart && lengthRemaining < token.length + 1) {
+                endLine()
+                beginLine()
+                appendString(Symbols.Comment)
+              }
+              appendString(" ")
+              appendString(token)
+            }
+          }
+        }
+        prevLine = curLine
+        preformatted = curPreformatted
     }
+  }
+
+  override def appendInlineComment(comment: String): Unit = {
+    if (!atLineStart) {
+      appendString("  ")
+    }
+    appendString(Symbols.Comment)
+    appendString(" ")
+    appendString(comment)
+  }
+
+  override def appendInlineComment(comments: Vector[Comment]): Unit = {
+    val trimmedComments = trimComments(comments)
+    val text = if (trimmedComments.size > 1) {
+      trimmedComments.map(_._1).mkString(" ")
+    } else {
+      trimmedComments.head._1
+    }
+    appendInlineComment(text)
   }
 
   def appendString(value: String): Unit = {
@@ -156,7 +191,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     buildSubstring(Vector(chunk), currentLine, spacing)
   }
 
-  def appendAll(chunks: Seq[Chunk],
+  def appendAll(chunks: Vector[Chunk],
                 wrapping: Wrapping = Wrapping.AsNeeded,
                 spacing: String = defaultSpacing): Unit = {
     if (wrapping == Wrapping.Never) {
@@ -189,7 +224,7 @@ case class DefaultLineFormatter(defaultIndenting: Indenting = Indenting.IfNotInd
     }
   }
 
-  def toSeq: Seq[String] = {
+  def toVector: Vector[String] = {
     lines.toVector
   }
 }

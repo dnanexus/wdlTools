@@ -28,7 +28,7 @@ import TypeCheckingRegime._
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
   * @param typeChecking strictness of type-checking
   */
-case class Options(localDirectories: Option[Vector[Path]] = None,
+case class Options(localDirectories: Vector[Path] = Vector.empty,
                    followImports: Boolean = false,
                    verbosity: Verbosity = Normal,
                    antlr4Trace: Boolean = false,

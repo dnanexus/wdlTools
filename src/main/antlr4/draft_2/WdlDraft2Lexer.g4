@@ -5,6 +5,9 @@ channels { COMMENTS }
 // Comments
 LINE_COMMENT: '#' ~[\r\n]* -> channel(COMMENTS);
 
+// Hidden
+WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
+
 // Keywords
 IMPORT: 'import';
 WORKFLOW: 'workflow';
@@ -22,8 +25,8 @@ OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta';
 META: 'meta';
 
-HEREDOC_COMMAND: 'command' ' '* '<<<' -> pushMode(HereDocCommand);
-COMMAND: 'command' ' '* '{' -> pushMode(Command);
+HEREDOC_COMMAND: 'command' [ \t\r\n]* '<<<' -> pushMode(HereDocCommand);
+COMMAND: 'command' [ \t\r\n]* '{' -> pushMode(Command);
 
 RUNTIME: 'runtime';
 BOOLEAN: 'Boolean';
@@ -85,10 +88,6 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
-
-WHITESPACE
-	: [ \t\r\n]+ -> channel(HIDDEN)
-	;
 
 Identifier: CompleteIdentifier;
 

@@ -3,7 +3,7 @@ package wdlTools.typing
 import wdlTools.syntax.AbstractSyntax._
 import WdlTypes._
 import wdlTools.syntax.TextSource
-import wdlTools.util.TypeCheckingRegime
+import wdlTools.util.{TypeCheckingRegime, Util}
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
@@ -937,7 +937,8 @@ case class TypeChecker(stdlib: Stdlib) {
             // will be named:
             //    stdlib
             //    C
-            val nsName = iStat.url.getFile.replaceAll("/", "")
+            val url = Util.getURL(iStat.addr.value, stdlib.conf.localDirectories)
+            val nsName = url.getFile.replaceAll("/", "")
             if (nsName.endsWith(".wdl"))
               nsName.dropRight(".wdl".length)
             else

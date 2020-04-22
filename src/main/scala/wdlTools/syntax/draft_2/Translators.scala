@@ -214,6 +214,7 @@ object Translators {
 
   def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
                          importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
+    val addrAbst = AbstractSyntax.ImportAddr(importDoc.addr.value, importDoc.addr.text)
     val nameAbst = importDoc.name.map {
       case ConcreteSyntax.ImportName(value, text) => AbstractSyntax.ImportName(value, text)
     }
@@ -222,7 +223,7 @@ object Translators {
     }
 
     // Replace the original statement with a new one
-    AbstractSyntax.ImportDoc(nameAbst, aliasesAbst, importDoc.url, importedDoc, importDoc.text)
+    AbstractSyntax.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text)
   }
 
   def translateTask(task: ConcreteSyntax.Task): AbstractSyntax.Task = {

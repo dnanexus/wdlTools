@@ -5,6 +5,9 @@ channels { COMMENTS }
 // Comments
 LINE_COMMENT: '#' ~[\r\n]* -> channel(COMMENTS);
 
+// Hidden
+WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
+
 // Keywords
 VERSION: 'version' -> pushMode(Version);
 IMPORT: 'import';
@@ -24,8 +27,8 @@ OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta';
 META: 'meta';
 
-HEREDOC_COMMAND: 'command' ' '* '<<<' -> pushMode(HereDocCommand);
-COMMAND: 'command' ' '* '{' -> pushMode(Command);
+HEREDOC_COMMAND: 'command' [ \t\r\n]* '<<<' -> pushMode(HereDocCommand);
+COMMAND: 'command' [ \t\r\n]* '{' -> pushMode(Command);
 
 RUNTIME: 'runtime';
 BOOLEAN: 'Boolean';
@@ -41,7 +44,6 @@ OBJECT_LITERAL: 'object';
 
 SEP: 'sep';
 DEFAULT: 'default';
-
 
 // Primitive Literals
 IntLiteral
@@ -89,10 +91,6 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
-
-WHITESPACE
-	: [ \t\r\n]+ -> channel(HIDDEN)
-	;
 
 Identifier: CompleteIdentifier;
 
@@ -147,7 +145,6 @@ VERSION_WHITESPACE
 	: [ \t]+ -> channel(HIDDEN)
 	;
 RELEASE_VERSION: [a-zA-Z0-9.-]+ -> popMode;
-
 
 // Fragments
 

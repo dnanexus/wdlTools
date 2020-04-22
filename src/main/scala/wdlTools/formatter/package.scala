@@ -38,7 +38,11 @@ abstract class LineFormatter(defaultIndenting: Indenting = Indenting.IfNotIndent
 
   def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit
 
-  def appendComments(comment: Vector[Comment]): Unit
+  def appendLineComments(comments: Vector[Comment]): Unit
+
+  def appendInlineComment(comment: String): Unit
+
+  def appendInlineComment(comments: Vector[Comment]): Unit
 
   def appendString(value: String): Unit
 

@@ -130,11 +130,16 @@ object AbstractSyntax {
   case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
 
   // import statement with the AST for the referenced document
+  case class ImportAddr(value: String, text: TextSource) extends Element {
+    def isLocal: Boolean = {
+      !(value.contains("://") && value.startsWith("file"))
+    }
+  }
   case class ImportName(value: String, text: TextSource) extends Element
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
   case class ImportDoc(name: Option[ImportName],
                        aliases: Vector[ImportAlias],
-                       url: URL,
+                       addr: ImportAddr,
                        doc: Option[Document],
                        text: TextSource)
       extends DocumentElement
@@ -180,7 +185,8 @@ object AbstractSyntax {
                       text: TextSource)
       extends Element
 
-  case class Document(version: Version,
+  case class Document(docSourceURL: URL,
+                      version: Version,
                       versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

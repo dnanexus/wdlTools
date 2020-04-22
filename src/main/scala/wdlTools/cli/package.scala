@@ -68,7 +68,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         .asInstanceOf[WdlToolsConf]
         .getOptions
         .copy(
-            localDirectories = Some(this.localDirectories(Set(wdlDir))),
+            localDirectories = this.localDirectories(Set(wdlDir)),
             followImports = true
         )
     }

@@ -70,8 +70,8 @@ case class ProjectGenerator(opts: Options,
       case ExprPair(l, r, _)                                                             => requiresEvaluation(l) || requiresEvaluation(r)
       case ExprArray(value, _)                                                           => value.exists(requiresEvaluation)
       case ExprMap(value, _) =>
-        value.exists(elt => requiresEvaluation(elt._1) || requiresEvaluation(elt._2))
-      case ExprObject(value, _) => value.values.exists(requiresEvaluation)
+        value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
+      case ExprObject(value, _) => value.exists(member => requiresEvaluation(member.value))
       case _                    => true
     }
   }
@@ -270,7 +270,7 @@ object ProjectGenerator {
     }
 
     def toMeta: Option[MetaKV] = {
-      val metaMap: Map[String, Expr] = Map(
+      val metaMap: Vector[ExprObjectMember] = Map(
           "label" -> label.map(ValueString(_, null)),
           "help" -> help.map(ValueString(_, null)),
           "patterns" -> (if (patterns.isEmpty) {
@@ -285,8 +285,10 @@ object ProjectGenerator {
                           Some(ExprArray(choices.toVector, null))
                         })
       ).collect {
-        case (key, Some(value)) => key -> value
-      }
+          case (key, Some(value)) => key -> value
+        }
+        .map(item => ExprObjectMember(item._1, item._2, null))
+        .toVector
       if (metaMap.isEmpty) {
         None
       } else {
