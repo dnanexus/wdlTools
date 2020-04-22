@@ -1,5 +1,7 @@
 package wdlTools.typing
 
+import java.net.URL
+
 import wdlTools.syntax.TextSource
 import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
@@ -206,12 +208,17 @@ case class TUtil(conf: Options) {
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: WT, typeBindings: Map[WT_Var, WT], srcText: TextSource): WT = {
+  def substitute(t: WT,
+                 typeBindings: Map[WT_Var, WT],
+                 srcText: TextSource,
+                 docSourceURL: Option[URL] = None): WT = {
     def sub(t: WT): WT = {
       t match {
         case WT_String | WT_File | WT_Boolean | WT_Int | WT_Float => t
         case a: WT_Var if !(typeBindings contains a) =>
-          throw new TypeException(s"type variable ${toString(a)} does not have a binding", srcText)
+          throw new TypeException(s"type variable ${toString(a)} does not have a binding",
+                                  srcText,
+                                  docSourceURL)
         case a: WT_Var         => typeBindings(a)
         case id: WT_Identifier => id
         case WT_Pair(l, r)     => WT_Pair(sub(l), sub(r))
@@ -221,7 +228,8 @@ case class TUtil(conf: Options) {
         case WT_Optional(t1)   => WT_Optional(sub(t1))
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
-                                  srcText)
+                                  srcText,
+                                  docSourceURL)
       }
     }
     sub(t)

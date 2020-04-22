@@ -1,5 +1,7 @@
 package wdlTools.typing
 
+import java.net.URL
+
 import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
@@ -87,13 +89,14 @@ case class Stdlib(conf: Options) {
   // some functions are polymorphic in their inputs.
   private def evalOnePrototype(funcDesc: WT_StdlibFunc,
                                inputTypes: Vector[WT],
-                               text: TextSource): Option[WT] = {
+                               text: TextSource,
+                               docSourceURL: Option[URL]): Option[WT] = {
     val args = funcDesc match {
       case WT_Function0(_, _) if inputTypes.isEmpty => Vector.empty
       case WT_Function1(_, arg1, _)                 => Vector(arg1)
       case WT_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
       case WT_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text)
+      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceURL)
     }
     try {
       val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
@@ -105,10 +108,15 @@ case class Stdlib(conf: Options) {
     }
   }
 
-  def apply(funcName: String, inputTypes: Vector[WT], expr: AbstractSyntax.Expr): WT = {
+  def apply(funcName: String,
+            inputTypes: Vector[WT],
+            expr: AbstractSyntax.Expr,
+            docSourceURL: Option[URL] = None): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
-        throw new TypeException(s"No function named ${funcName} in the standard library", expr.text)
+        throw new TypeException(s"No function named ${funcName} in the standard library",
+                                expr.text,
+                                docSourceURL)
       case Some(protoVec) =>
         protoVec
     }
@@ -116,7 +124,7 @@ case class Stdlib(conf: Options) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[WT]] = candidates.map {
-      evalOnePrototype(_, inputTypes, expr.text)
+      evalOnePrototype(_, inputTypes, expr.text, docSourceURL)
     }
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
@@ -126,7 +134,7 @@ case class Stdlib(conf: Options) {
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
-                                    |""".stripMargin, expr.text)
+                                    |""".stripMargin, expr.text, docSourceURL)
       //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
@@ -138,7 +146,8 @@ case class Stdlib(conf: Options) {
           throw new TypeException(s"""|Call to ${funcName} matches ${n} prototypes with different
                                       |output types (${possibleOutputTypes})""".stripMargin
                                     .replaceAll("\n", " "),
-                                  expr.text)
+                                  expr.text,
+                                  docSourceURL)
         possibleOutputTypes.toVector.head
     }
   }
