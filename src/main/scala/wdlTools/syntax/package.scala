@@ -64,8 +64,14 @@ object TextSource {
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) =
-    this(s"${msg} at ${text}${docSourceURL.map(url => s" in ${url.toString}").getOrElse("")}")
+  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
+    this(formatMessage(msg, text, docSourceURL))
+  }
+
+  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
+    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+    s"${msg} at ${text}${urlPart}"
+  }
 }
 
 /**
