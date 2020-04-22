@@ -1,5 +1,6 @@
 package wdlTools.syntax
 
+import java.net.URL
 import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -17,7 +18,7 @@ import org.antlr.v4.runtime.{
   Token
 }
 import wdlTools.syntax
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.util.{Options, SourceCode, Verbosity}
 
 import scala.collection.mutable
 
@@ -44,6 +45,7 @@ object Antlr4Util {
                                               parser: P,
                                               errListener: ErrorListener,
                                               commentChannelName: String,
+                                              docSourceURL: Option[URL] = None,
                                               opts: Options) {
     val commentChannel: Int = lexer.getChannelNames.indexOf(commentChannelName)
     require(commentChannel > 0)
@@ -129,7 +131,11 @@ object Antlr4Util {
 
   abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options,
                                                          commentChannelName: String = "COMMENTS") {
-    def createGrammar(inp: String): Grammar[L, P] = {
+    def createGrammar(sourceCode: SourceCode): Grammar[L, P] = {
+      createGrammar(sourceCode.toString, Some(sourceCode.url))
+    }
+
+    def createGrammar(inp: String, docSourceUrl: Option[URL] = None): Grammar[L, P] = {
       val codePointBuffer: CodePointBuffer =
         CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
       val lexer: L = createLexer(CodePointCharStream.fromBuffer(codePointBuffer))
@@ -146,7 +152,7 @@ object Antlr4Util {
         parser.setTrace(true)
       }
 
-      Grammar(lexer, parser, errListener, commentChannelName, opts)
+      Grammar(lexer, parser, errListener, commentChannelName, docSourceUrl, opts)
     }
 
     def createLexer(charStream: CharStream): L

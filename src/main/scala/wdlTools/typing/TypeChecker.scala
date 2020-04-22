@@ -1,5 +1,6 @@
 package wdlTools.typing
 
+import java.net.URL
 import java.nio.file.Paths
 
 import wdlTools.syntax.AbstractSyntax._
@@ -10,6 +11,7 @@ import wdlTools.util.Util
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
+  private val regime = stdlib.conf.typeChecking
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -19,16 +21,19 @@ case class TypeChecker(stdlib: Stdlib) {
   //
   // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
   // An additional variable holds a list of all imported namespaces.
-  case class Context(declarations: Map[String, WT],
-                     structs: Map[String, WT_Struct],
-                     callables: Map[String, WT_Callable],
-                     namespaces: Set[String]) {
+  case class Context(docSourceURL: Option[URL] = None,
+                     declarations: Map[String, WT] = Map.empty,
+                     structs: Map[String, WT_Struct] = Map.empty,
+                     callables: Map[String, WT_Callable] = Map.empty,
+                     namespaces: Set[String] = Set.empty) {
     def bindVar(varName: String, wdlType: WT, srcText: TextSource): Context = {
       declarations.get(varName) match {
         case None =>
           this.copy(declarations = declarations + (varName -> wdlType))
         case Some(_) =>
-          throw new TypeException(s"variable ${varName} shadows an existing variable", srcText)
+          throw new TypeException(s"variable ${varName} shadows an existing variable",
+                                  srcText,
+                                  docSourceURL)
       }
     }
 
@@ -37,7 +42,7 @@ case class TypeChecker(stdlib: Stdlib) {
         case None =>
           this.copy(structs = structs + (s.name -> s))
         case Some(_) =>
-          throw new TypeException(s"struct ${s.name} is already declared", srcText)
+          throw new TypeException(s"struct ${s.name} is already declared", srcText, docSourceURL)
       }
     }
 
@@ -47,7 +52,9 @@ case class TypeChecker(stdlib: Stdlib) {
         case None =>
           this.copy(callables = callables + (callable.name -> callable))
         case Some(_) =>
-          throw new TypeException(s"a callable named ${callable.name} is already declared", srcText)
+          throw new TypeException(s"a callable named ${callable.name} is already declared",
+                                  srcText,
+                                  docSourceURL)
       }
     }
 
@@ -57,7 +64,7 @@ case class TypeChecker(stdlib: Stdlib) {
       val newVarNames = bindings.keys.toSet
       val both = existingVarNames intersect newVarNames
       if (both.nonEmpty)
-        throw new TypeException(s"Variables ${both} are being redeclared", srcText)
+        throw new TypeException(s"Variables ${both} are being redeclared", srcText, docSourceURL)
       this.copy(declarations = declarations ++ bindings)
     }
 
@@ -78,7 +85,9 @@ case class TypeChecker(stdlib: Stdlib) {
                         aliases: Vector[ImportAlias],
                         srcText: TextSource): Context = {
       if (this.namespaces contains namespace)
-        throw new TypeException(s"namespace ${namespace} already exists", srcText)
+        throw new TypeException(s"namespace ${namespace} already exists",
+                                srcText,
+                                iCtx.docSourceURL)
 
       // There cannot be any collisions because this is a new namespace
       val iCallables = iCtx.callables.map {
@@ -114,7 +123,9 @@ case class TypeChecker(stdlib: Stdlib) {
       val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet
       for (sname <- doublyDefinedStructs) {
         if (this.structs(sname) != iStructs(sname))
-          throw new TypeException(s"Struct ${sname} is already defined in a different way", srcText)
+          throw new TypeException(s"Struct ${sname} is already defined in a different way",
+                                  srcText,
+                                  iCtx.docSourceURL)
       }
 
       this.copy(structs = structs ++ iStructs,
@@ -123,15 +134,15 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private val contextEmpty = Context(Map.empty, Map.empty, Map.empty, Set.empty)
-
   private def typeEvalMathOp(expr: Expr, ctx: Context): WT = {
     val t = typeEval(expr, ctx)
     t match {
       case _: TypeInt   => WT_Int
       case _: TypeFloat => WT_Float
       case _ =>
-        throw new TypeException(s"${exprToString(expr)} must be an integer or a float", expr.text)
+        throw new TypeException(s"${exprToString(expr)} must be an integer or a float",
+                                expr.text,
+                                ctx.docSourceURL)
     }
   }
 
@@ -166,9 +177,9 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // NON STANDARD
       // there are WDL programs where we add optional strings
-      case (WT_String, x) if isPseudoString(x)                                       => WT_String
-      case (WT_String, WT_Optional(WT_Int)) if stdlib.conf.typeChecking == Lenient   => WT_String
-      case (WT_String, WT_Optional(WT_Float)) if stdlib.conf.typeChecking == Lenient => WT_String
+      case (WT_String, x) if isPseudoString(x)                     => WT_String
+      case (WT_String, WT_Optional(WT_Int)) if regime == Lenient   => WT_String
+      case (WT_String, WT_Optional(WT_Float)) if regime == Lenient => WT_String
 
       // adding files is equivalent to concatenating paths
       case (WT_File, WT_String | WT_File) => WT_File
@@ -176,7 +187,8 @@ case class TypeChecker(stdlib: Stdlib) {
       case (_, _) =>
         throw new TypeException(
             s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
-            a.text
+            a.text,
+            ctx.docSourceURL
         )
     }
   }
@@ -192,7 +204,8 @@ case class TypeChecker(stdlib: Stdlib) {
       case (_, _) =>
         throw new TypeException(
             s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
-            a.text
+            a.text,
+            ctx.docSourceURL
         )
     }
   }
@@ -204,7 +217,8 @@ case class TypeChecker(stdlib: Stdlib) {
       case other =>
         throw new TypeException(
             s"${exprToString(expr)} must be a boolean, it is ${tUtil.toString(other)}",
-            expr.text
+            expr.text,
+            ctx.docSourceURL
         )
     }
   }
@@ -216,7 +230,8 @@ case class TypeChecker(stdlib: Stdlib) {
       case (WT_Boolean, WT_Boolean) => WT_Boolean
       case (_, _) =>
         throw new TypeException(s"${exprToString(a)} and ${exprToString(b)} must have boolean type",
-                                a.text)
+                                a.text,
+                                ctx.docSourceURL)
     }
   }
 
@@ -236,7 +251,8 @@ case class TypeChecker(stdlib: Stdlib) {
       case (_, _) =>
         throw new TypeException(
             s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
-            a.text
+            a.text,
+            ctx.docSourceURL
         )
     }
   }
@@ -253,7 +269,7 @@ case class TypeChecker(stdlib: Stdlib) {
                                              ctx: Context): Unit = {
     val defFields = ctx.structs.get(structName) match {
       case None =>
-        throw new TypeException(s"Struct ${structName} is not defined", text)
+        throw new TypeException(s"Struct ${structName} is not defined", text, ctx.docSourceURL)
       case Some(WT_Struct(_, fields)) => fields
     }
     val rhsFields: Map[String, Expr] = expr match {
@@ -263,7 +279,8 @@ case class TypeChecker(stdlib: Stdlib) {
           case _ =>
             throw new TypeException(
                 s"map ${exprToString(expr)} isn't made up of string field names",
-                text
+                text,
+                ctx.docSourceURL
             )
         }.toMap
       case ExprObject(m, _) =>
@@ -273,13 +290,16 @@ case class TypeChecker(stdlib: Stdlib) {
       case _ =>
         throw new TypeException(
             s"Expression ${exprToString(expr)} cannot be coereced into a struct",
-            text
+            text,
+            ctx.docSourceURL
         )
     }
 
     // Check that the all the struct fields are defined
     if (defFields.keys.toSet != rhsFields.keys.toSet)
-      throw new TypeException(s"the fields should be ${defFields.keys.toSet}", text)
+      throw new TypeException(s"the fields should be ${defFields.keys.toSet}",
+                              text,
+                              ctx.docSourceURL)
 
     // Check that each field is of the correct type
     defFields.foreach {
@@ -287,7 +307,7 @@ case class TypeChecker(stdlib: Stdlib) {
         val e = rhsFields(fieldName)
         val t = typeEval(e, ctx)
         if (!tUtil.isCoercibleTo(fieldType, t))
-          throw new TypeException(s"field ${fieldName} is badly typed", text)
+          throw new TypeException(s"field ${fieldName} is badly typed", text, ctx.docSourceURL)
     }
   }
 
@@ -304,7 +324,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case _: TypeFloat       => WT_Float
       case TypeIdentifier(id, _) =>
         if (!(ctx.structs contains id))
-          throw new TypeException(s"struct ${id} has not been defined", text)
+          throw new TypeException(s"struct ${id} has not been defined", text, ctx.docSourceURL)
         WT_Identifier(id)
       case _: TypeObject => WT_Object
       case TypeStruct(name, members, _, _) =>
@@ -328,7 +348,8 @@ case class TypeChecker(stdlib: Stdlib) {
       // an identifier has to be bound to a known type
       case ExprIdentifier(id, _) =>
         ctx.declarations.get(id) match {
-          case None    => throw new TypeException(s"Identifier ${id} is not defined", expr.text)
+          case None =>
+            throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceURL)
           case Some(t) => t
         }
 
@@ -339,7 +360,8 @@ case class TypeChecker(stdlib: Stdlib) {
           if (!tUtil.isCoercibleTo(WT_String, t))
             throw new TypeException(
                 s"expression ${exprToString(expr)} of type ${t} is not coercible to string",
-                expr.text
+                expr.text,
+                ctx.docSourceURL
             )
         }
         WT_String
@@ -359,7 +381,8 @@ case class TypeChecker(stdlib: Stdlib) {
             case _: TypeUnificationException =>
               throw new TypeException(
                   "array elements must have the same type, or be coercible to one",
-                  expr.text
+                  expr.text,
+                  ctx.docSourceURL
               )
           }
         WT_Array(t)
@@ -383,7 +406,8 @@ case class TypeChecker(stdlib: Stdlib) {
           } catch {
             case _: TypeUnificationException =>
               throw new TypeException("map keys must have the same type, or be coercible to one",
-                                      expr.text)
+                                      expr.text,
+                                      ctx.docSourceURL)
           }
         val (tv, _) =
           try {
@@ -391,7 +415,8 @@ case class TypeChecker(stdlib: Stdlib) {
           } catch {
             case _: TypeUnificationException =>
               throw new TypeException("map values must have the same type, or be coercible to one",
-                                      expr.text)
+                                      expr.text,
+                                      ctx.docSourceURL)
           }
         WT_Map(tk, tv)
 
@@ -404,12 +429,14 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"""|subexpressions ${exprToString(t)} and ${exprToString(f)}
                                       |in ${exprToString(expr)} must have the same type""".stripMargin
                                     .replaceAll("\n", " "),
-                                  expr.text)
+                                  expr.text,
+                                  ctx.docSourceURL)
         val tv = typeEval(value, ctx)
         if (tv != WT_Boolean)
           throw new TypeException(
               s"${value} in ${exprToString(expr)} should have boolean type, it has type ${tUtil.toString(tv)} instead",
-              expr.text
+              expr.text,
+              ctx.docSourceURL
           )
         tType
 
@@ -428,7 +455,8 @@ case class TypeChecker(stdlib: Stdlib) {
                 s"""|Expression (${exprToString(value)}) must have type coercible to
                     |(${tUtil.toString(dt)}), it has type (${vt}) instead
                     |""".stripMargin.replaceAll("\n", " "),
-                expr.text
+                expr.text,
+                ctx.docSourceURL
             )
         }
 
@@ -437,7 +465,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprPlaceholderSep(sep: Expr, value: Expr, _) =>
         val sepType = typeEval(sep, ctx)
         if (sepType != WT_String)
-          throw new TypeException(s"separator ${sep} in ${expr} must have string type", expr.text)
+          throw new TypeException(s"separator ${sep} in ${expr} must have string type",
+                                  expr.text,
+                                  ctx.docSourceURL)
         val vt = typeEval(value, ctx)
         vt match {
           case WT_Array(x) if tUtil.isCoercibleTo(WT_String, x) =>
@@ -445,7 +475,8 @@ case class TypeChecker(stdlib: Stdlib) {
           case other =>
             throw new TypeException(
                 s"expression ${value} should be coercible to Array[String], but it is ${other}",
-                expr.text
+                expr.text,
+                ctx.docSourceURL
             )
         }
 
@@ -479,13 +510,14 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprAt(array: Expr, index: Expr, _) =>
         val idxt = typeEval(index, ctx)
         if (idxt != WT_Int)
-          throw new TypeException(s"${index} must be an integer", expr.text)
+          throw new TypeException(s"${index} must be an integer", expr.text, ctx.docSourceURL)
         val arrayt = typeEval(array, ctx)
         arrayt match {
           case WT_Array(elemType) => elemType
           case _ =>
             throw new TypeException(s"subexpression ${array} in (${expr}) must be an array",
-                                    expr.text)
+                                    expr.text,
+                                    ctx.docSourceURL)
         }
 
       // conditional:
@@ -493,7 +525,9 @@ case class TypeChecker(stdlib: Stdlib) {
       case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
         val condType = typeEval(cond, ctx)
         if (condType != WT_Boolean)
-          throw new TypeException(s"condition ${exprToString(cond)} must be a boolean", expr.text)
+          throw new TypeException(s"condition ${exprToString(cond)} must be a boolean",
+                                  expr.text,
+                                  ctx.docSourceURL)
         val tBranchT = typeEval(tBranch, ctx)
         val fBranchT = typeEval(fBranch, ctx)
         try {
@@ -507,7 +541,8 @@ case class TypeChecker(stdlib: Stdlib) {
                     |  true branch: ${tUtil.toString(tBranchT)}
                     |  flase branch: ${tUtil.toString(fBranchT)}
                     |""".stripMargin,
-                expr.text
+                expr.text,
+                ctx.docSourceURL
             )
         }
 
@@ -527,7 +562,8 @@ case class TypeChecker(stdlib: Stdlib) {
               case None =>
                 throw new TypeException(
                     s"Struct ${name} does not have member ${id} in expression",
-                    expr.text
+                    expr.text,
+                    ctx.docSourceURL
                 )
               case Some(t) =>
                 t
@@ -538,7 +574,8 @@ case class TypeChecker(stdlib: Stdlib) {
               case None =>
                 throw new TypeException(
                     s"Call object ${name} does not have member ${id} in expression",
-                    expr.text
+                    expr.text,
+                    ctx.docSourceURL
                 )
               case Some(t) =>
                 t
@@ -551,14 +588,19 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Identifier(structName) =>
             // produce the struct definition
             val members = ctx.structs.get(structName) match {
-              case None                        => throw new TypeException(s"unknown struct ${structName}", expr.text)
+              case None =>
+                throw new TypeException(s"unknown struct ${structName}",
+                                        expr.text,
+                                        ctx.docSourceURL)
               case Some(WT_Struct(_, members)) => members
-              case other                       => throw new TypeException(s"not a struct ${other}", expr.text)
+              case other =>
+                throw new TypeException(s"not a struct ${other}", expr.text, ctx.docSourceURL)
             }
             members.get(id) match {
               case None =>
                 throw new TypeException(s"Struct ${structName} does not have member ${id}",
-                                        expr.text)
+                                        expr.text,
+                                        ctx.docSourceURL)
               case Some(t) => t
             }
 
@@ -566,10 +608,14 @@ case class TypeChecker(stdlib: Stdlib) {
           case WT_Pair(l, _) if id.toLowerCase() == "left"  => l
           case WT_Pair(_, r) if id.toLowerCase() == "right" => r
           case WT_Pair(_, _) =>
-            throw new TypeException(s"accessing a pair with (${id}) is illegal", expr.text)
+            throw new TypeException(s"accessing a pair with (${id}) is illegal",
+                                    expr.text,
+                                    ctx.docSourceURL)
 
           case _ =>
-            throw new TypeException(s"member access (${id}) in expression is illegal", expr.text)
+            throw new TypeException(s"member access (${id}) in expression is illegal",
+                                    expr.text,
+                                    ctx.docSourceURL)
         }
     }
   }
@@ -609,7 +655,9 @@ case class TypeChecker(stdlib: Stdlib) {
         if (!tUtil.isCoercibleTo(lhsType, rhsType)) {
           throw new TypeException(s"""|${decl.name} is of type ${tUtil.toString(lhsType)}
                                       |but is assigned ${tUtil.toString(rhsType)}
-                                      |""".stripMargin.replaceAll("\n", " "), decl.text)
+                                      |""".stripMargin.replaceAll("\n", " "),
+                                  decl.text,
+                                  ctx.docSourceURL)
         }
     }
     (decl.name, lhsType)
@@ -703,7 +751,8 @@ case class TypeChecker(stdlib: Stdlib) {
       if (!valid)
         throw new TypeException(
             s"Expression ${exprToString(expr)} in the command section is not coercible to a string",
-            expr.text
+            expr.text,
+            ctx.docSourceURL
         )
     }
 
@@ -731,13 +780,17 @@ case class TypeChecker(stdlib: Stdlib) {
 
     val (calleeInputs, calleeOutputs) = ctx.callables.get(call.name) match {
       case None =>
-        throw new TypeException(s"called task/workflow ${call.name} is not defined", call.text)
+        throw new TypeException(s"called task/workflow ${call.name} is not defined",
+                                call.text,
+                                ctx.docSourceURL)
       case Some(WT_Task(_, input, output)) =>
         (input, output)
       case Some(WT_Workflow(_, input, output)) =>
         (input, output)
       case _ =>
-        throw new TypeException(s"callee ${call.name} is not a task or workflow", call.text)
+        throw new TypeException(s"callee ${call.name} is not a task or workflow",
+                                call.text,
+                                ctx.docSourceURL)
     }
 
     // type-check input arguments
@@ -747,19 +800,22 @@ case class TypeChecker(stdlib: Stdlib) {
           case None =>
             throw new TypeException(
                 s"call ${call} has argument ${argName} that does not exist in the callee",
-                call.text
+                call.text,
+                ctx.docSourceURL
             )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking == Strict =>
+          case Some((calleeType, _)) if regime == Strict =>
             if (calleeType != wdlType)
               throw new TypeException(
                   s"argument ${argName} has wrong type ${wdlType}, expecting ${calleeType}",
-                  call.text
+                  call.text,
+                  ctx.docSourceURL
               )
-          case Some((calleeType, _)) if stdlib.conf.typeChecking >= Moderate =>
+          case Some((calleeType, _)) if regime >= Moderate =>
             if (!tUtil.isCoercibleTo(calleeType, wdlType))
               throw new TypeException(
                   s"argument ${argName} has type ${wdlType}, it is not coercible to ${calleeType}",
-                  call.text
+                  call.text,
+                  ctx.docSourceURL
               )
           case _ => ()
         }
@@ -772,7 +828,8 @@ case class TypeChecker(stdlib: Stdlib) {
           case None =>
             throw new TypeException(
                 s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
-                call.text
+                call.text,
+                ctx.docSourceURL
             )
           case Some(_) => ()
         }
@@ -796,7 +853,9 @@ case class TypeChecker(stdlib: Stdlib) {
     }
 
     if (ctx.declarations contains callName)
-      throw new TypeException(s"call ${callName} shadows an existing definition", call.text)
+      throw new TypeException(s"call ${callName} shadows an existing definition",
+                              call.text,
+                              ctx.docSourceURL)
 
     // build a type for the resulting object
     callName -> WT_Call(callName, calleeOutputs)
@@ -959,46 +1018,47 @@ case class TypeChecker(stdlib: Stdlib) {
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc: Document, ctxOuter: Context = contextEmpty): Context = {
-    val context: Context = doc.elements.foldLeft(ctxOuter) {
-      case (accu: Context, task: Task) =>
-        val tt = applyTask(task, accu)
-        accu.bindCallable(tt, task.text)
+  def apply(doc: Document, ctxOuter: Option[Context] = None): Context = {
+    val context: Context =
+      doc.elements.foldLeft(ctxOuter.getOrElse(Context(Some(doc.docSourceURL)))) {
+        case (accu: Context, task: Task) =>
+          val tt = applyTask(task, accu)
+          accu.bindCallable(tt, task.text)
 
-      case (accu: Context, iStat: ImportDoc) =>
-        val iCtx = apply(iStat.doc.get, contextEmpty)
+        case (accu: Context, iStat: ImportDoc) =>
+          val iCtx = apply(iStat.doc.get)
 
-        // Figure out what to name the sub-document
-        val namespace = iStat.name match {
-          case None =>
-            // Something like
-            //    import "http://example.com/lib/stdlib"
-            //    import "A/B/C"
-            // Where the user does not specify an alias. The namespace
-            // will be named:
-            //    stdlib
-            //    C
-            val url = Util.getURL(iStat.addr.value, stdlib.conf.localDirectories)
-            val nsName = Paths.get(url.getFile).getFileName.toString
-            if (nsName.endsWith(".wdl"))
-              nsName.dropRight(".wdl".length)
-            else
-              nsName
-          case Some(x) => x.value
-        }
+          // Figure out what to name the sub-document
+          val namespace = iStat.name match {
+            case None =>
+              // Something like
+              //    import "http://example.com/lib/stdlib"
+              //    import "A/B/C"
+              // Where the user does not specify an alias. The namespace
+              // will be named:
+              //    stdlib
+              //    C
+              val url = Util.getURL(iStat.addr.value, stdlib.conf.localDirectories)
+              val nsName = Paths.get(url.getFile).getFileName.toString
+              if (nsName.endsWith(".wdl"))
+                nsName.dropRight(".wdl".length)
+              else
+                nsName
+            case Some(x) => x.value
+          }
 
-        // add the externally visible definitions to the context
-        accu.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text)
+          // add the externally visible definitions to the context
+          accu.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text)
 
-      case (accu: Context, struct: TypeStruct) =>
-        // Add the struct to the context
-        val t = typeTranslate(struct, struct.text, accu)
-        val t2 = t.asInstanceOf[WT_Struct]
-        accu.bind(t2, struct.text)
+        case (accu: Context, struct: TypeStruct) =>
+          // Add the struct to the context
+          val t = typeTranslate(struct, struct.text, accu)
+          val t2 = t.asInstanceOf[WT_Struct]
+          accu.bind(t2, struct.text)
 
-      case (_, other) =>
-        throw new Exception(s"sanity: wrong element type in workflow $other")
-    }
+        case (_, other) =>
+          throw new Exception(s"sanity: wrong element type in workflow $other")
+      }
 
     // now that we have types for everything else, we can check the workflow
     doc.workflow match {
