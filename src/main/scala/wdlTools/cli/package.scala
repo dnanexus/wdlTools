@@ -106,7 +106,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val check = new ParserSubcommand("check", "Type check WDL file.") {
     val regime: ScallopOption[TypeCheckingRegime] = opt[TypeCheckingRegime](
         descr = "Strictness of type checking",
-        default = Some(TypeCheckingRegime.Strict)
+        default = Some(TypeCheckingRegime.Moderate)
     )
 
     override def getOptions: Options = {

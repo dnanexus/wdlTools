@@ -1,14 +1,21 @@
 package wdlTools.typing
 
+import java.net.URL
+
 import wdlTools.syntax.TextSource
 
 // Type error exception
-class TypeException private (ex: Exception) extends Exception(ex) {
-  def this(msg: String, text: TextSource) =
-    this(new Exception(s"${msg} at ${text}"))
+final class TypeException(message: String) extends Exception(message) {
+  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
+    this(TypeException.formatMessage(msg, text, docSourceURL))
+  }
 }
 
-class TypeUnificationException private (ex: Exception) extends Exception(ex) {
-  def this(msg: String) =
-    this(new Exception(msg))
+object TypeException {
+  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
+    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+    s"${msg} at ${text}${urlPart}"
+  }
 }
+
+final class TypeUnificationException(message: String) extends Exception(message)

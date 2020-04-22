@@ -8,11 +8,11 @@ import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
 class AbstractSyntaxTest extends FlatSpec with Matchers {
-  private val tasksDir = Paths.get(getClass.getResource("/syntax/v1_0/tasks").getPath)
-  private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1_0/workflows").getPath)
+  private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)
+  private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1/workflows").getPath)
   private val opts =
     Options(antlr4Trace = false,
-            localDirectories = Some(Vector(tasksDir, workflowsDir)),
+            localDirectories = Vector(tasksDir, workflowsDir),
             verbosity = Verbosity.Quiet)
   private val loader = SourceCode.Loader(opts)
   private val parser = ParseAll(opts, loader)
@@ -43,7 +43,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     doc.version.value shouldBe WdlVersion.V1
   }
 
-  it should "type check GATK tasks" in {
+  it should "parse GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
@@ -52,7 +52,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     doc.version.value shouldBe WdlVersion.V1
   }
 
-  it should "type check GATK joint genotyping workflow" taggedAs Edge in {
+  it should "parse GATK joint genotyping workflow" taggedAs Edge in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))

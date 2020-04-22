@@ -218,12 +218,9 @@ object Translators {
     val nameAbst = importDoc.name.map {
       case ConcreteSyntax.ImportName(value, text) => AbstractSyntax.ImportName(value, text)
     }
-    val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
-      case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
-    }
 
     // Replace the original statement with a new one
-    AbstractSyntax.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text)
+    AbstractSyntax.ImportDoc(nameAbst, Vector.empty, addrAbst, importedDoc, importDoc.text)
   }
 
   def translateTask(task: ConcreteSyntax.Task): AbstractSyntax.Task = {

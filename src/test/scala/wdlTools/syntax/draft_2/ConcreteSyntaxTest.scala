@@ -15,7 +15,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       verbosity = Quiet,
-      localDirectories = Some(Vector(tasksDir, workflowsDir))
+      localDirectories = Vector(tasksDir, workflowsDir)
   )
   private val loader = SourceCode.Loader(opts)
   private val grammarFactory = WdlDraft2GrammarFactory(opts)
@@ -267,25 +267,25 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
     doc.comments(1) should matchPattern {
-      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, _)) =>
+      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, 1, 46)) =>
     }
     doc.comments(4) should matchPattern {
-      case Comment("# Just a random declaration", TextSource(4, 2, _)) =>
+      case Comment("# Just a random declaration", TextSource(4, 2, 4, 29)) =>
     }
     doc.comments(7) should matchPattern {
-      case Comment("# comment after bracket", TextSource(7, 12, _)) =>
+      case Comment("# comment after bracket", TextSource(7, 12, 7, 35)) =>
     }
     doc.comments(8) should matchPattern {
-      case Comment("# Int num_lines = read_int(stdout())", TextSource(8, 4, _)) =>
+      case Comment("# Int num_lines = read_int(stdout())", TextSource(8, 4, 8, 40)) =>
     }
     doc.comments(9) should matchPattern {
-      case Comment("# end of line comment", TextSource(9, 23, _)) =>
+      case Comment("# end of line comment", TextSource(9, 23, 9, 44)) =>
     }
     doc.comments(18) should matchPattern {
-      case Comment("# The comment below is empty", TextSource(18, 4, _)) =>
+      case Comment("# The comment below is empty", TextSource(18, 4, 18, 32)) =>
     }
     doc.comments(19) should matchPattern {
-      case Comment("#", TextSource(19, 4, _)) =>
+      case Comment("#", TextSource(19, 4, 19, 5)) =>
     }
 
     doc.elements.size shouldBe 1

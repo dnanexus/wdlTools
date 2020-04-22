@@ -1,5 +1,7 @@
 package wdlTools.typing
 
+import java.net.URL
+
 import wdlTools.syntax.TextSource
 import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
@@ -31,14 +33,19 @@ case class TUtil(conf: Options) {
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
     //System.out.println(s"isCoercibleTo ${left} ${right} ")
     (left, right) match {
-      case (WT_String, WT_String | WT_File)            => true
-      case (WT_String, WT_Int | WT_Float | WT_Boolean) =>
-        // Undocumented in the spec
-        true
+      case (WT_String, WT_String | WT_File) => true
+
+      // Undocumented in spec 1.0
+      case (WT_String, WT_Int | WT_Float | WT_Boolean) => true
+
       case (WT_File, WT_String | WT_File) => true
       case (WT_Boolean, WT_Boolean)       => true
       case (WT_Int, WT_Int)               => true
       case (WT_Float, WT_Int | WT_Float)  => true
+
+      // Undocumented in spec 1.0.
+      // The user should specify ciel/round/... instead of this coercion
+      case (WT_Int, WT_Float) => true
 
       // This is going to require a runtime check. For example:
       // Int a = "1"
@@ -46,7 +53,7 @@ case class TUtil(conf: Options) {
       case (WT_Optional(l), WT_Optional(r))         => isCoercibleTo2(l, r)
 
       // T is coercible to T?
-      case (WT_Optional(l), r) if regime == Lenient => isCoercibleTo2(l, r)
+      case (WT_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)
 
       case (WT_Array(l), WT_Array(r))         => isCoercibleTo2(l, r)
       case (WT_Map(kl, vl), WT_Map(kr, vr))   => isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)
@@ -201,12 +208,17 @@ case class TUtil(conf: Options) {
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: WT, typeBindings: Map[WT_Var, WT], srcText: TextSource): WT = {
+  def substitute(t: WT,
+                 typeBindings: Map[WT_Var, WT],
+                 srcText: TextSource,
+                 docSourceURL: Option[URL] = None): WT = {
     def sub(t: WT): WT = {
       t match {
         case WT_String | WT_File | WT_Boolean | WT_Int | WT_Float => t
         case a: WT_Var if !(typeBindings contains a) =>
-          throw new TypeException(s"type variable ${toString(a)} does not have a binding", srcText)
+          throw new TypeException(s"type variable ${toString(a)} does not have a binding",
+                                  srcText,
+                                  docSourceURL)
         case a: WT_Var         => typeBindings(a)
         case id: WT_Identifier => id
         case WT_Pair(l, r)     => WT_Pair(sub(l), sub(r))
@@ -216,7 +228,8 @@ case class TUtil(conf: Options) {
         case WT_Optional(t1)   => WT_Optional(sub(t1))
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
-                                  srcText)
+                                  srcText,
+                                  docSourceURL)
       }
     }
     sub(t)

@@ -6,7 +6,7 @@ import java.nio.file.Path
 import wdlTools.formatter.WdlV1Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Parsers, WdlFragmentParser, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, WdlFragmentParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
 import scala.collection.mutable
@@ -223,12 +223,12 @@ case class ProjectGenerator(opts: Options,
       taskModels.map(_.toTask)
     }
 
-    val doc = Document(Version(wdlVersion, null),
-                       null,
+    val doc = Document(null,
+                       Version(wdlVersion, null),
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
                        null,
-                       Map.empty)
+                       CommentMap.empty)
     val wdlName = s"${name}.wdl"
     val docUrl = Util.getURL(outputDir.resolve(wdlName))
     generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())

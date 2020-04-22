@@ -230,10 +230,10 @@ object Translators {
 
   def translateImportDoc(importDoc: ConcreteSyntax.ImportDoc,
                          importedDoc: Option[AbstractSyntax.Document]): AbstractSyntax.ImportDoc = {
+    val addrAbst = AbstractSyntax.ImportAddr(importDoc.addr.value, importDoc.text)
     val nameAbst = importDoc.name.map {
       case ConcreteSyntax.ImportName(value, text) => AbstractSyntax.ImportName(value, text)
     }
-    val addrAbst = AbstractSyntax.ImportAddr(importDoc.addr.value, importDoc.text)
     val aliasesAbst: Vector[AbstractSyntax.ImportAlias] = importDoc.aliases.map {
       case ConcreteSyntax.ImportAlias(x, y, alText) => AbstractSyntax.ImportAlias(x, y, alText)
     }

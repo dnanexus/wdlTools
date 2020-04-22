@@ -2,7 +2,7 @@ package wdlTools.syntax.draft_2
 
 import java.net.URL
 
-import wdlTools.syntax.{Comment, TextSource}
+import wdlTools.syntax.{CommentMap, TextSource}
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
@@ -134,13 +134,9 @@ object ConcreteSyntax {
   // imports
   case class ImportAddr(value: String, text: TextSource) extends Element
   case class ImportName(value: String, text: TextSource) extends Element
-  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
 
   // import statement as read from the document
-  case class ImportDoc(name: Option[ImportName],
-                       aliases: Vector[ImportAlias],
-                       addr: ImportAddr,
-                       text: TextSource)
+  case class ImportDoc(name: Option[ImportName], addr: ImportAddr, text: TextSource)
       extends DocumentElement
 
   // top level definitions
@@ -184,6 +180,6 @@ object ConcreteSyntax {
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,
-                      comments: Map[Int, Comment])
+                      comments: CommentMap)
       extends Element
 }

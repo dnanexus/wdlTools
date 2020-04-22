@@ -4,23 +4,20 @@ import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{Options, SourceCode, Util, Verbosity}
-import wdlTools.util.TypeCheckingRegime._
+import wdlTools.syntax.Parsers
+import wdlTools.util.{Options, SourceCode, TypeCheckingRegime, Util, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
-      localDirectories = Some(
-          Vector(
-              Paths.get(getClass.getResource("/typing/v1_0").getPath)
-          )
+      localDirectories = Vector(
+          Paths.get(getClass.getResource("/typing/v1").getPath)
       ),
-      verbosity = Verbosity.Quiet,
+      verbosity = Verbosity.Normal,
       followImports = true
   )
   private val loader = SourceCode.Loader(opts)
-  private val parser = ParseAll(opts, loader)
+  private val parser = Parsers(opts, Some(loader))
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(folder: Path): Vector[Path] = {
@@ -32,7 +29,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   // Expected results for a test, and any additional flags required
   // to run it.
-  case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime] = None)
+  case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
 
   val controlTable: Map[String, TResult] = Map(
       // workflows
@@ -42,7 +39,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "linear.wdl" -> TResult(correct = true),
       "nested.wdl" -> TResult(correct = true),
       "types.wdl" -> TResult(correct = true),
-      "coercions_questionable.wdl" -> TResult(correct = true, Some(Lenient)),
+      "coercions_questionable.wdl" -> TResult(correct = true, Some(TypeCheckingRegime.Lenient)),
       "coercions_strict.wdl" -> TResult(correct = true),
       "bad_stdlib_calls.wdl" -> TResult(correct = false),
       "scatter_II.wdl" -> TResult(correct = false),
@@ -61,14 +58,17 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "comparison2.wdl" -> TResult(correct = false),
       "comparison4.wdl" -> TResult(correct = false),
       "declaration_shadowing.wdl" -> TResult(correct = false),
-      "simple.wdl" -> TResult(correct = false)
+      "simple.wdl" -> TResult(correct = false),
+      // expressions
+      "expressions.wdl" -> TResult(correct = true),
+      "expressions_bad.wdl" -> TResult(correct = false)
   )
 
   // test to include/exclude
-  private val includeList: Option[Set[String]] = None //Some(Set("coercions_questionable.wdl"))
+  private val includeList: Option[Set[String]] = Some(Set("coercions_questionable.wdl"))
   private val excludeList: Option[Set[String]] = None
 
-  private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
+  private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
@@ -80,12 +80,12 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       checker.apply(doc)
     } catch {
       case e: Throwable =>
-        System.out.println(e.getMessage)
-        throw new RuntimeException(s"Type error in file ${file.toString}")
+        Util.error(s"Type error in file ${file.toString}")
+        throw e
     }
   }
 
-  private def checkIncorrect(file: Path, flag: Option[TypeCheckingRegime]): Unit = {
+  private def checkIncorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
@@ -122,7 +122,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/typing/v1_0").getPath)
+        Paths.get(getClass.getResource("/typing/v1").getPath)
     )
 
     // filter out files that do not appear in the control table
@@ -147,22 +147,30 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  ignore should "coerce types" in {
-    val tUtil = TUtil(opts)
-    import WdlTypes._
-
-    tUtil
-      .isCoercibleTo(WT_Array(WT_Optional(WT_String)), WT_Array(WT_Optional(WT_String))) shouldBe true
-  }
-
   it should "be able to handle GATK" taggedAs Edge in {
-    val opts2 = opts.copy(typeChecking = Lenient)
+    val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
 
     val sources = Vector(
-        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-        //      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl",
+        "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
+        // Uses the keyword "version "
+        //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
+        "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl"
+        // Non standard usage of place holders
+        //"https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
+        //
+        // https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1208
+        //  Array[String]? ignore
+        //  String s2 = {default="null" sep=" IGNORE=" ignore}
+        //
+        //  # syntax error in place-holder
+        //  # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1210
+        //  Boolean? is_outlier_data
+        //  String s3 = ${default='SKIP_MATE_VALIDATION=false' true='SKIP_MATE_VALIDATION=true' false='SKIP_MATE_VALIDATION=false' is_outlier_data}
+        //
     )
 
     for (src <- sources) {

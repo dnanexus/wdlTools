@@ -9,14 +9,14 @@ import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
-  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1_0").getPath)
+  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
   private val opts = Options(
       antlr4Trace = false,
       verbosity = Quiet,
-      localDirectories = Some(Vector(tasksDir, workflowsDir, structsDir))
+      localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
   private val loader = SourceCode.Loader(opts)
   private val grammarFactory = WdlV1GrammarFactory(opts)
@@ -277,28 +277,25 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
     doc.comments(1) should matchPattern {
-      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, _)) =>
+      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, 1, 46)) =>
     }
     doc.comments(8) should matchPattern {
-      case Comment("# Just a random declaration", TextSource(8, 2, _)) =>
+      case Comment("# Just a random declaration", TextSource(8, 2, 8, 29)) =>
     }
     doc.comments(11) should matchPattern {
-      case Comment("# comment after bracket", TextSource(11, 12, _)) =>
+      case Comment("# comment after bracket", TextSource(11, 12, 11, 35)) =>
     }
     doc.comments(12) should matchPattern {
-      case Comment("# Int num_lines = read_int(stdout())", TextSource(12, 4, _)) =>
-    }
-    if (!doc.comments.contains(13)) {
-      throw new Exception(s"${doc.comments}")
+      case Comment("# Int num_lines = read_int(stdout())", TextSource(12, 4, 12, 40)) =>
     }
     doc.comments(13) should matchPattern {
-      case Comment("# end-of-line comment", TextSource(13, 23, _)) =>
+      case Comment("# end-of-line comment", TextSource(13, 23, 13, 44)) =>
     }
     doc.comments(20) should matchPattern {
-      case Comment("# The comment below is empty", TextSource(20, 4, _)) =>
+      case Comment("# The comment below is empty", TextSource(20, 4, 20, 32)) =>
     }
     doc.comments(21) should matchPattern {
-      case Comment("#", TextSource(21, 4, _)) =>
+      case Comment("#", TextSource(21, 4, 21, 5)) =>
     }
 
     doc.version.value shouldBe WdlVersion.V1
@@ -528,7 +525,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     doc.elements.size shouldBe 19
   }
 
-  it should "be able to handle GATK workflow" taggedAs Edge in {
+  it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
     val sourceCode = loader.apply(Util.getURL(url))
@@ -558,5 +555,44 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                      _) =>
         ()
     }
+  }
+
+  it should "handle call with extra comma" in {
+    val doc = getDocument(getWorkflowSource("call_bug.wdl"))
+    doc.elements.size shouldBe 1
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+  }
+
+  it should "version is a reserved keyword" in {
+    assertThrows[Exception] {
+      val _ = getDocument(getWorkflowSource("call_bug2.wdl"))
+    }
+  }
+
+  it should "relative imports" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("relative_imports.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "library.wc"
+  }
+
+  it should "relative imports II" taggedAs Edge in {
+    val doc = getDocument(getWorkflowSource("relative_imports_II.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "cd.count_dogs"
   }
 }

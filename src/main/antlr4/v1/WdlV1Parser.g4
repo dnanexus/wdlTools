@@ -228,7 +228,7 @@ call_input
 	;
 
 call_inputs
-	: INPUT COLON (call_input (COMMA call_input)*)
+	: INPUT COLON (call_input (COMMA call_input)*) COMMA?
 	;
 
 call_body

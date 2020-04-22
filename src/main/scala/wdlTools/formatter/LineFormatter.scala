@@ -81,7 +81,7 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
     }
   }
 
-  private def dent(indenting: Indenting = defaultIndenting): Unit = {
+  private def dent(indenting: Indenting): Unit = {
     indenting match {
       case Indenting.Always => indent.append(indentation * indentStep)
       case Indenting.IfNotIndented if indent.length == initialIndent.length =>

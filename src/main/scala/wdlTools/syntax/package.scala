@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, ImportDoc, Type, Expr}
+import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
@@ -50,7 +50,7 @@ case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Or
 }
 
 object TextSource {
-  lazy val empty: TextSource = TextSource(0, 0, 0, 0)
+  val empty: TextSource = TextSource(0, 0, 0, 0)
 
   def fromSpan(start: TextSource, stop: TextSource): TextSource = {
     TextSource(
@@ -63,9 +63,17 @@ object TextSource {
 }
 
 // Syntax error exception
-class SyntaxException private (ex: Exception) extends Exception(ex) {
-  def this(msg: String, text: TextSource) =
-    this(new Exception(s"${msg} at ${text}"))
+final class SyntaxException(message: String) extends Exception(message) {
+  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
+    this(SyntaxException.formatMessage(msg, text, docSourceURL))
+  }
+}
+
+object SyntaxException {
+  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
+    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+    s"${msg} at ${text}${urlPart}"
+  }
 }
 
 /**
@@ -75,6 +83,49 @@ class SyntaxException private (ex: Exception) extends Exception(ex) {
   */
 case class Comment(value: String, text: TextSource) extends Ordered[Comment] {
   override def compare(that: Comment): Int = text.line - that.text.line
+}
+
+case class CommentMap(comments: Map[Int, Comment]) {
+  def nonEmpty: Boolean = {
+    comments.nonEmpty
+  }
+
+  def filterBetween(start: Int, stop: Int): CommentMap = {
+    CommentMap(comments.filterKeys(i => i >= start && i <= stop))
+  }
+
+  def filterBetween(before: TextSource,
+                    after: TextSource,
+                    startInclusive: Boolean = false,
+                    stopInclusive: Boolean = false): CommentMap = {
+    val start = before.endLine - (if (startInclusive) 0 else 1)
+    val stop = after.line + (if (stopInclusive) 0 else 1)
+    filterBetween(start, stop)
+  }
+
+  def filterWithin(textSource: TextSource,
+                   startInclusive: Boolean = true,
+                   stopInclusive: Boolean = false): CommentMap = {
+    val start = textSource.line + (if (startInclusive) 0 else 1)
+    val stop = textSource.endLine - (if (stopInclusive) 0 else 1)
+    filterBetween(start, stop)
+  }
+
+  def toSortedVector: Vector[Comment] = {
+    comments.values.toVector.sortWith(_ < _)
+  }
+
+  def get(line: Int): Option[Comment] = {
+    comments.get(line)
+  }
+
+  def apply(line: Int): Comment = {
+    comments(line)
+  }
+}
+
+object CommentMap {
+  val empty: CommentMap = CommentMap(Map.empty)
 }
 
 trait DocumentWalker[T] {

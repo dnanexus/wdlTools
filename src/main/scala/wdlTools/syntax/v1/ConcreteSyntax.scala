@@ -2,7 +2,7 @@ package wdlTools.syntax.v1
 
 import java.net.URL
 
-import wdlTools.syntax.{Comment, TextSource, WdlVersion}
+import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
@@ -183,6 +183,6 @@ object ConcreteSyntax {
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,
-                      comments: Map[Int, Comment])
+                      comments: CommentMap)
       extends Element
 }

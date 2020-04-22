@@ -187,11 +187,10 @@ object AbstractSyntax {
 
   case class Document(docSourceURL: URL,
                       version: Version,
-                      versionTextSource: Option[TextSource] = None,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,
-                      comments: Map[Int, Comment])
+                      comments: CommentMap)
       extends Element
 
   // Utility function for writing an expression in a human readable form
@@ -213,19 +212,18 @@ object AbstractSyntax {
         "[" + value.map(exprToString).mkString(", ") + "]"
       case ExprMap(value: Vector[ExprMapItem], _) =>
         val m = value
-          .map { item =>
-            s"${exprToString(item.key)} : ${exprToString(item.value)}"
-          }
+          .map(exprToString)
           .mkString(", ")
         "{ " + m + " }"
+      case ExprMapItem(key, value, _) =>
+        s"${exprToString(key)} : ${exprToString(value)}"
       case ExprObject(value: Vector[ExprObjectMember], _) =>
         val m = value
-          .map { member =>
-            s"${member.key} : ${exprToString(member.value)}"
-          }
+          .map(exprToString)
           .mkString(", ")
         s"object($m)"
-
+      case ExprObjectMember(key, value, _) =>
+        s"${key} : ${exprToString(value)}"
       // ~{true="--yes" false="--no" boolean_value}
       case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
         s"{true=${exprToString(t)} false=${exprToString(f)} ${exprToString(value)}"

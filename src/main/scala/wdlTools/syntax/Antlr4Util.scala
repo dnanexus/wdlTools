@@ -81,6 +81,7 @@ object Antlr4Util {
                                               parser: P,
                                               errListener: ErrorListener,
                                               comments: mutable.Map[Int, Comment],
+                                              docSourceURL: Option[URL] = None,
                                               opts: Options) {
     def verify(): Unit = {
       // check if any errors were found
@@ -96,9 +97,8 @@ object Antlr4Util {
     }
   }
 
-  abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options) {
-    def commentChannelName: String = "COMMENTS"
-
+  abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options,
+                                                         commentChannelName: String = "COMMENTS") {
     def createGrammar(sourceCode: SourceCode): Grammar[L, P] = {
       createGrammar(sourceCode.toString, Some(sourceCode.url))
     }
@@ -131,7 +131,7 @@ object Antlr4Util {
           )
       )
 
-      Grammar(lexer, parser, errListener, comments, opts)
+      Grammar(lexer, parser, errListener, comments, docSourceUrl, opts)
     }
 
     def createLexer(charStream: CharStream): L

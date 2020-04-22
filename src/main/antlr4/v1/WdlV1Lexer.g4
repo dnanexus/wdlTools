@@ -5,9 +5,6 @@ channels { COMMENTS }
 // Comments
 LINE_COMMENT: '#' ~[\r\n]* -> channel(COMMENTS);
 
-// Hidden
-WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
-
 // Keywords
 VERSION: 'version' -> pushMode(Version);
 IMPORT: 'import';
@@ -91,6 +88,8 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
+
+WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
 Identifier: CompleteIdentifier;
 
