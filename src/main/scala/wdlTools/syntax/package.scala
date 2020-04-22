@@ -50,7 +50,7 @@ case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Or
 }
 
 object TextSource {
-  lazy val empty: TextSource = TextSource(0, 0, 0, 0)
+  val empty: TextSource = TextSource(0, 0, 0, 0)
 
   def fromSpan(start: TextSource, stop: TextSource): TextSource = {
     TextSource(
