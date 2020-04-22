@@ -65,8 +65,7 @@ case class WdlV1Formatter(opts: Options,
           lineFormatter.endLine(wrap = true)
           lineFormatter.appendChunk(this)
         } else {
-          lineFormatter.appendString(space)
-          lineFormatter.appendChunk(this)
+          lineFormatter.appendChunk(this, " ")
         }
       }
     }
@@ -1114,6 +1113,9 @@ case class WdlV1Formatter(opts: Options,
             Token.chain(Vector(Symbols.Command, Symbols.CommandOpen), command.text, spacing = 1)
         )
         if (command.parts.nonEmpty) {
+          // The parser swallows anyting after the opening token ('{' or '<<<')
+          // as part of the comment block, so we need to parse out any in-line
+          // comment and append it separately
           val numParts = command.parts.size
           if (numParts == 1) {
             val (expr, comment) = command.parts.head match {

@@ -16,6 +16,26 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
                          lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty) {
   private val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
   private val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
+  private val currentLineComments: mutable.Buffer[String] = mutable.ArrayBuffer.empty
+  private val commentStart = "^#+".r
+  private val whitespace = "[ \t\n\r]+".r
+
+  private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
+    comments.map { comment =>
+      val text = comment.value.trim
+      val hashes = commentStart.findFirstIn(text)
+      if (hashes.isEmpty) {
+        throw new Exception("Expected comment to start with '#'")
+      }
+      (text.substring(hashes.get.length),
+       comment.text.line,
+       hashes.get.startsWith(Symbols.PreformattedComment))
+    }
+  }
+
+  def appendInlineComment(text: String): Unit = {
+    currentLineComments.append(text)
+  }
 
   def indented(indenting: Indenting = defaultIndenting): LineFormatter = {
     LineFormatter(
@@ -50,7 +70,18 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
     }
   }
 
-  def dent(indenting: Indenting = defaultIndenting): Unit = {
+  def emptyLine(): Unit = {
+    lines.append("")
+  }
+
+  def beginLine(): Unit = {
+    require(atLineStart)
+    if (currentLine.isEmpty) {
+      currentLine.append(indent)
+    }
+  }
+
+  private def dent(indenting: Indenting = defaultIndenting): Unit = {
     indenting match {
       case Indenting.Always => indent.append(indentation * indentStep)
       case Indenting.IfNotIndented if indent.length == initialIndent.length =>
@@ -67,18 +98,16 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
     }
   }
 
-  def emptyLine(): Unit = {
-    lines.append("")
-  }
-
-  def beginLine(): Unit = {
-    require(atLineStart)
-    if (currentLine.isEmpty) {
-      currentLine.append(indent)
-    }
-  }
-
   def endLine(wrap: Boolean = false, indenting: Indenting = defaultIndenting): Unit = {
+    if (currentLineComments.nonEmpty) {
+      if (!atLineStart) {
+        currentLine.append("  ")
+      }
+      currentLine.append(Symbols.Comment)
+      currentLine.append(" ")
+      currentLine.append(currentLineComments.mkString(" "))
+      currentLineComments.clear()
+    }
     if (!atLineStart) {
       lines.append(currentLine.toString)
       if (wrap) {
@@ -88,36 +117,6 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
       }
     }
     currentLine.clear()
-  }
-
-  def buildSubstring(
-      chunks: Seq[Chunk],
-      builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth),
-      spacing: String = defaultSpacing
-  ): StringBuilder = {
-    chunks.foreach { chunk =>
-      if (builder.nonEmpty && !(builder.last.isWhitespace || builder.last == indentation.last)) {
-        builder.append(spacing)
-      }
-      builder.append(chunk.toString)
-    }
-    builder
-  }
-
-  private lazy val commentStart = "^#+".r
-  private lazy val whitespace = "[ \t\n\r]+".r
-
-  private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
-    comments.map { comment =>
-      val text = comment.value.trim
-      val hashes = commentStart.findFirstIn(text)
-      if (hashes.isEmpty) {
-        throw new Exception("Expected comment to start with '#'")
-      }
-      (text.substring(hashes.get.length),
-       comment.text.line,
-       hashes.get.startsWith(Symbols.PreformattedComment))
-    }
   }
 
   def appendLineComments(comments: Vector[Comment]): Unit = {
@@ -136,17 +135,17 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
         }
         if (curPreformatted) {
           beginLine()
-          appendString(Symbols.PreformattedComment)
-          appendString(" ")
-          appendString(trimmed)
+          currentLine.append(Symbols.PreformattedComment)
+          currentLine.append(" ")
+          currentLine.append(trimmed)
           endLine()
         } else {
           if (atLineStart) {
-            appendString(Symbols.Comment)
+            currentLine.append(Symbols.Comment)
           }
           if (lengthRemaining >= trimmed.length + 1) {
-            appendString(" ")
-            appendString(trimmed)
+            currentLine.append(" ")
+            currentLine.append(trimmed)
           } else {
             whitespace.split(trimmed).foreach { token =>
               // we let the line run over for a single token that is longer than the max line length
@@ -154,39 +153,36 @@ case class LineFormatter(inlineComments: Map[TextSource, Vector[Comment]],
               if (!atLineStart && lengthRemaining < token.length + 1) {
                 endLine()
                 beginLine()
-                appendString(Symbols.Comment)
+                currentLine.append(Symbols.Comment)
               }
-              appendString(" ")
-              appendString(token)
+              currentLine.append(" ")
+              currentLine.append(token)
             }
           }
         }
         prevLine = curLine
         preformatted = curPreformatted
     }
+
+    endLine()
   }
 
-  def appendInlineComment(comment: String): Unit = {
-    if (!atLineStart) {
-      appendString("  ")
+  private def buildSubstring(
+      chunks: Seq[Chunk],
+      builder: mutable.StringBuilder = new mutable.StringBuilder(maxLineWidth),
+      spacing: String = defaultSpacing
+  ): StringBuilder = {
+    chunks.foreach { chunk =>
+      if (builder.nonEmpty && !(builder.last.isWhitespace || builder.last == indentation.last)) {
+        builder.append(spacing)
+      }
+      builder.append(chunk.toString)
+      if (inlineComments.contains(chunk.textSource)) {
+        val trimmedComments = trimComments(inlineComments(chunk.textSource))
+        currentLineComments.appendAll(trimmedComments.map(_._1))
+      }
     }
-    appendString(Symbols.Comment)
-    appendString(" ")
-    appendString(comment)
-  }
-
-  def appendInlineComment(comments: Vector[Comment]): Unit = {
-    val trimmedComments = trimComments(comments)
-    val text = if (trimmedComments.size > 1) {
-      trimmedComments.map(_._1).mkString(" ")
-    } else {
-      trimmedComments.head._1
-    }
-    appendInlineComment(text)
-  }
-
-  def appendString(value: String): Unit = {
-    currentLine.append(value)
+    builder
   }
 
   def appendChunk(chunk: Chunk, spacing: String = defaultSpacing): Unit = {
