@@ -52,7 +52,6 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "library.wdl" -> TResult(correct = true),
       "simple.wdl" -> TResult(correct = true),
       "stdlib.wdl" -> TResult(correct = true),
-
       // incorrect tasks
       "comparison1.wdl" -> TResult(correct = false),
       "comparison2.wdl" -> TResult(correct = false),
@@ -62,14 +61,14 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       // expressions
       "expressions.wdl" -> TResult(true),
       "expressions_bad.wdl" -> TResult(false),
-
-    // metadata
-    "metadata_null_value.wdl" -> TResult(correct = true),
-    "metadata_complex.wdl" -> TResult(correct = true)
+      // metadata
+      "metadata_null_value.wdl" -> TResult(correct = true),
+      "metadata_complex.wdl" -> TResult(correct = true)
   )
 
   // test to include/exclude
-  private val includeList: Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
+  private val includeList
+      : Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {

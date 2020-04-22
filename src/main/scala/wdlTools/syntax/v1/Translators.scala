@@ -57,10 +57,7 @@ object Translators {
 
       // string place holders
       case CST.ExprPlaceholderEqual(t, f, value, srcText) =>
-        AST.ExprPlaceholderEqual(translateExpr(t),
-                                            translateExpr(f),
-                                            translateExpr(value),
-                                            srcText)
+        AST.ExprPlaceholderEqual(translateExpr(t), translateExpr(f), translateExpr(value), srcText)
       case CST.ExprPlaceholderDefault(default, value, srcText) =>
         AST.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
       case CST.ExprPlaceholderSep(sep, value, srcText) =>
@@ -108,9 +105,9 @@ object Translators {
 
       case CST.ExprIfThenElse(cond, tBranch, fBranch, srcText) =>
         AST.ExprIfThenElse(translateExpr(cond),
-                                      translateExpr(tBranch),
-                                      translateExpr(fBranch),
-                                      srcText)
+                           translateExpr(tBranch),
+                           translateExpr(fBranch),
+                           srcText)
       case CST.ExprApply(funcName, elements, srcText) =>
         AST.ExprApply(funcName, elements.map(translateExpr), srcText)
       case CST.ExprGetName(e, id, srcText) =>
@@ -127,7 +124,7 @@ object Translators {
   // $meta_object = '{}' | '{' $parameter_meta_kv (, $parameter_meta_kv)* '}'
   // $meta_array = '[]' |  '[' $meta_value (, $meta_value)* ']'
   //
-  private def metaValueToExpr(value : CST.Expr) : AST.Expr = {
+  private def metaValueToExpr(value: CST.Expr): AST.Expr = {
     value match {
       // values
       case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
@@ -136,8 +133,8 @@ object Translators {
       case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
       case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
 
-        // special handling for null. It appears as an identifier here, even though
-        // it has not been defined, and it is no identifier.
+      // special handling for null. It appears as an identifier here, even though
+      // it has not been defined, and it is no identifier.
       case CST.ExprIdentifier(id, srcText) if id == "null" =>
         AST.ExprIdentifier(id, srcText)
       case CST.ExprIdentifier(id, srcText) =>
@@ -149,16 +146,19 @@ object Translators {
       case CST.ExprArrayLiteral(vec, srcText) =>
         AST.ExprArray(vec.map(metaValueToExpr), srcText)
       case CST.ExprMapLiteral(m, srcText) =>
-        AST.ExprMap(m.map{
-                      case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
-                        AST.ExprMapItem(AST.ExprIdentifier(k, text2), metaValueToExpr(value), text)
-                      case _ => throw new SyntaxException(s"Illegal meta field value", srcText)
-                    }, srcText)
+        AST.ExprMap(
+            m.map {
+              case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
+                AST.ExprMapItem(AST.ExprIdentifier(k, text2), metaValueToExpr(value), text)
+              case _ => throw new SyntaxException(s"Illegal meta field value", srcText)
+            },
+            srcText
+        )
       case CST.ExprObjectLiteral(m, srcText) =>
         AST.ExprObject(m.map {
-                         case CST.ExprObjectMember(fieldName, v, text) =>
-                           AST.ExprObjectMember(fieldName, metaValueToExpr(v), text)
-                       }, srcText)
+          case CST.ExprObjectMember(fieldName, v, text) =>
+            AST.ExprObjectMember(fieldName, metaValueToExpr(v), text)
+        }, srcText)
 
       case other =>
         throw new SyntaxException("illegal expression in meta section", other.text)
@@ -178,9 +178,7 @@ object Translators {
   def translateOutputSection(
       output: CST.OutputSection
   ): AST.OutputSection = {
-    AST.OutputSection(output.declarations.map(translateDeclaration),
-                                 output.text,
-                                 output.comment)
+    AST.OutputSection(output.declarations.map(translateDeclaration), output.text, output.comment)
   }
 
   def translateCommandSection(
@@ -191,10 +189,10 @@ object Translators {
 
   def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
     AST.Declaration(decl.name,
-                               translateType(decl.wdlType),
-                               decl.expr.map(translateExpr),
-                               decl.text,
-                               decl.comment)
+                    translateType(decl.wdlType),
+                    decl.expr.map(translateExpr),
+                    decl.text,
+                    decl.comment)
   }
 
   def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
@@ -204,9 +202,7 @@ object Translators {
   def translateParameterMetaSection(
       paramMeta: CST.ParameterMetaSection
   ): AST.ParameterMetaSection = {
-    AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
-                                        paramMeta.text,
-                                        paramMeta.comment)
+    AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text, paramMeta.comment)
   }
 
   def translateRuntimeSection(
@@ -227,11 +223,7 @@ object Translators {
   ): AST.WorkflowElement = {
     elem match {
       case CST.Declaration(name, wdlType, expr, text, comment) =>
-        AST.Declaration(name,
-                                   translateType(wdlType),
-                                   expr.map(translateExpr),
-                                   text,
-                                   comment)
+        AST.Declaration(name, translateType(wdlType), expr.map(translateExpr), text, comment)
 
       case CST.Call(name, alias, inputs, text, comment) =>
         AST.Call(
@@ -252,16 +244,13 @@ object Translators {
 
       case CST.Scatter(identifier, expr, body, text, comment) =>
         AST.Scatter(identifier,
-                               translateExpr(expr),
-                               body.map(translateWorkflowElement),
-                               text,
-                               comment)
+                    translateExpr(expr),
+                    body.map(translateWorkflowElement),
+                    text,
+                    comment)
 
       case CST.Conditional(expr, body, text, comment) =>
-        AST.Conditional(translateExpr(expr),
-                                   body.map(translateWorkflowElement),
-                                   text,
-                                   comment)
+        AST.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text, comment)
     }
   }
 
@@ -301,12 +290,7 @@ object Translators {
     }
 
     // Replace the original statement with a new one
-    AST.ImportDoc(nameAbst,
-                             aliasesAbst,
-                             addrAbst,
-                             importedDoc,
-                             importDoc.text,
-                             importDoc.comment)
+    AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text, importDoc.comment)
   }
 
   def translateTask(task: CST.Task): AST.Task = {

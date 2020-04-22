@@ -86,7 +86,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "report errors in meta section" taggedAs Edge in {
-    assertThrows[SyntaxException]{
+    assertThrows[SyntaxException] {
       parser.apply(getTaskSource("meta_section_error.wdl"))
     }
   }
