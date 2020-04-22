@@ -1,6 +1,6 @@
 package wdlTools.syntax.v1
 
-import wdlTools.syntax.AbstractSyntax
+import wdlTools.syntax.{AbstractSyntax, SyntaxException}
 
 object Translators {
   def translateType(t: ConcreteSyntax.Type): AbstractSyntax.Type = {
@@ -120,8 +120,51 @@ object Translators {
     }
   }
 
+  // The meta values are a subset of the expression syntax.
+  //
+  // $meta_value = $string | $number | $boolean | 'null' | $meta_object | $meta_array
+  // $meta_object = '{}' | '{' $parameter_meta_kv (, $parameter_meta_kv)* '}'
+  // $meta_array = '[]' |  '[' $meta_value (, $meta_value)* ']'
+  //
+  private def metaValueToExpr(value : ConcreteSyntax.Expr) : AbstractSyntax.Expr = {
+    value match {
+      // values
+      case ConcreteSyntax.ExprString(value, srcText)  => AbstractSyntax.ValueString(value, srcText)
+      case ConcreteSyntax.ExprFile(value, srcText)    => AbstractSyntax.ValueFile(value, srcText)
+      case ConcreteSyntax.ExprBoolean(value, srcText) => AbstractSyntax.ValueBoolean(value, srcText)
+      case ConcreteSyntax.ExprInt(value, srcText)     => AbstractSyntax.ValueInt(value, srcText)
+      case ConcreteSyntax.ExprFloat(value, srcText)   => AbstractSyntax.ValueFloat(value, srcText)
+
+        // special handling for null. It appears as an identifier here, even though
+        // it has not been defined, and it is no identifier.
+      case ConcreteSyntax.ExprIdentifier(id, srcText) if id == "null" =>
+        AbstractSyntax.ExprIdentifier(id, srcText)
+      case ConcreteSyntax.ExprIdentifier(id, srcText) =>
+        throw new SyntaxException(s"cannot access identifier (${id}) in a meta section", srcText)
+
+      // compound values
+      case ConcreteSyntax.ExprPair(l, r, srcText) =>
+        AbstractSyntax.ExprPair(metaValueToExpr(l), metaValueToExpr(r), srcText)
+      case ConcreteSyntax.ExprArrayLiteral(vec, srcText) =>
+        AbstractSyntax.ExprArray(vec.map(metaValueToExpr), srcText)
+      case ConcreteSyntax.ExprMapLiteral(m, srcText) =>
+        AbstractSyntax.ExprMap(
+          m.map {
+            case (ConcreteSyntax.ExprIdentifier(k, text), v) => AbstractSyntax.ExprIdentifier(k, text) -> metaValueToExpr(v)
+            case (other, _ ) => throw new SyntaxException(s"Illegal meta field value", other.text)
+        }, srcText)
+      case ConcreteSyntax.ExprObjectLiteral(m, srcText) =>
+        AbstractSyntax.ExprObject(m.map {
+          case (fieldName, v) => fieldName -> metaValueToExpr(v)
+                                  }, srcText)
+
+      case other =>
+        throw new SyntaxException("illegal expression in meta section", other.text)
+    }
+  }
+
   def translateMetaKV(kv: ConcreteSyntax.MetaKV): AbstractSyntax.MetaKV = {
-    AbstractSyntax.MetaKV(kv.id, translateExpr(kv.expr), kv.text, kv.comment)
+    AbstractSyntax.MetaKV(kv.id, metaValueToExpr(kv.expr), kv.text, kv.comment)
   }
 
   def translateInputSection(

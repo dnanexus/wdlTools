@@ -15,7 +15,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
               Paths.get(getClass.getResource("/typing/v1").getPath)
           )
       ),
-      verbosity = Verbosity.Normal,
+      verbosity = Verbosity.Quiet,
       followImports = true
   )
   private val loader = SourceCode.Loader(opts)
@@ -52,7 +52,6 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "command_string.wdl" -> TResult(true),
       "comparisons.wdl" -> TResult(true),
       "library.wdl" -> TResult(true),
-      "null.wdl" -> TResult(true),
       "simple.wdl" -> TResult(true),
       "stdlib.wdl" -> TResult(true),
       // incorrect tasks
@@ -63,11 +62,15 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "simple.wdl" -> TResult(false),
       // expressions
       "expressions.wdl" -> TResult(true),
-      "expressions_bad.wdl" -> TResult(false)
+      "expressions_bad.wdl" -> TResult(false),
+
+    // metadata
+    "metadata_null_value.wdl" -> TResult(true),
+    "metadata_complex.wdl" -> TResult(true)
   )
 
   // test to include/exclude
-  private val includeList: Option[Set[String]] = Some(Set("coercions_questionable.wdl"))
+  private val includeList: Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
@@ -122,7 +125,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check test wdl files" in {
+  it should "type check test wdl files" taggedAs (Edge) in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/typing/v1").getPath)
     )
@@ -150,7 +153,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "be able to handle GATK" taggedAs (Edge) in {
+  it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
