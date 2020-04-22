@@ -54,8 +54,10 @@ object ConcreteSyntax {
   // For example:
   //  "some string part ~{ident + ident} some string part after"
   case class ExprCompoundString(value: Vector[Expr], text: TextSource) extends Expr
-  case class ExprMapLiteral(value: Map[Expr, Expr], text: TextSource) extends Expr
-  case class ExprObjectLiteral(value: Map[String, Expr], text: TextSource) extends Expr
+  case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
+  case class ExprMapLiteral(value: Vector[ExprMapItem], text: TextSource) extends Expr
+  case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
+  case class ExprObjectLiteral(value: Vector[ExprObjectMember], text: TextSource) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr], text: TextSource) extends Expr
 
   case class ExprIdentifier(id: String, text: TextSource) extends Expr
@@ -153,12 +155,14 @@ object ConcreteSyntax {
       extends StatementElement
 
   // imports
+  case class ImportAddr(value: String, text: TextSource) extends Element
+  case class ImportName(value: String, text: TextSource) extends Element
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
 
   // import statement as read from the document
-  case class ImportDoc(name: Option[String],
+  case class ImportDoc(name: Option[ImportName],
                        aliases: Vector[ImportAlias],
-                       url: URL,
+                       addr: ImportAddr,
                        text: TextSource,
                        comment: Option[Comment])
       extends DocumentElement
@@ -208,7 +212,8 @@ object ConcreteSyntax {
       extends StatementElement
 
   case class Version(value: WdlVersion = WdlVersion.V1, text: TextSource) extends Element
-  case class Document(version: Version,
+  case class Document(docSourceURL: URL,
+                      version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,

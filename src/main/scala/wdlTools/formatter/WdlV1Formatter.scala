@@ -307,8 +307,8 @@ case class WdlV1Formatter(opts: Options,
       case ExprMap(value, _) =>
         Container(
             value.map {
-              case (k, v) => KeyValue(nested(k), nested(v))
-            }.toVector,
+              case ExprMapItem(k, v, _) => KeyValue(nested(k), nested(v))
+            },
             prefix = Some(Token.MapOpen),
             suffix = Some(Token.MapClose),
             wrapAll = true
@@ -316,8 +316,8 @@ case class WdlV1Formatter(opts: Options,
       case ExprObject(value, _) =>
         Container(
             value.map {
-              case (k, v) => KeyValue(Token(k), nested(v))
-            }.toVector,
+              case ExprObjectMember(k, v, _) => KeyValue(Token(k), nested(v))
+            },
             prefix = Some(Token.MapOpen),
             suffix = Some(Token.MapClose),
             wrapAll = true
@@ -426,10 +426,11 @@ case class WdlV1Formatter(opts: Options,
         lineFormatter.appendComment(importDoc.comment.get)
       }
       lineFormatter.beginLine()
-      lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.url.toString)),
+      lineFormatter.appendAll(Vector(Token.Import, StringLiteral(importDoc.addr.toString)),
                               Wrapping.Never)
       if (importDoc.name.isDefined) {
-        lineFormatter.appendAll(Vector(Token.As, Token(importDoc.name.get)), Wrapping.AsNeeded)
+        lineFormatter.appendAll(Vector(Token.As, Token(importDoc.name.get.value)),
+                                Wrapping.AsNeeded)
       }
       importDoc.aliases.foreach { alias =>
         lineFormatter.appendAll(Vector(Token.Alias, Token(alias.id1), Token.As, Token(alias.id2)),

@@ -47,7 +47,7 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     val elems: Vector[AbstractSyntax.DocumentElement] = doc.elements.map {
       case importDoc: ConcreteSyntax.ImportDoc =>
         val importedDoc = if (opts.followImports) {
-          Some(followImport(importDoc.url))
+          Some(followImport(getDocSourceURL(importDoc.addr.value)))
         } else {
           None
         }
@@ -57,8 +57,8 @@ case class ParseAll(opts: Options, loader: SourceCode.Loader) extends WdlParser(
     }
 
     val aWf = doc.workflow.map(translateWorkflow)
-    val version = AbstractSyntax.Version(WdlVersion.Draft_2, TextSource(-1, -1), None)
-    AbstractSyntax.Document(version, None, elems, aWf, doc.text, doc.comment)
+    val version = AbstractSyntax.Version(WdlVersion.Draft_2, TextSource.empty, None)
+    AbstractSyntax.Document(doc.docSourceURL, version, None, elems, aWf, doc.text, doc.comment)
   }
 
   def apply(sourceCode: SourceCode): AbstractSyntax.Document = {

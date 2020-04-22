@@ -22,16 +22,16 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Option[Vector[Path]] = None): URL = {
+  def getURL(pathOrUrl: String, searchPath: Vector[Path] = Vector.empty): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
       val path: Path = Paths.get(pathOrUrl)
       val resolved: Option[Path] = if (Files.exists(path)) {
         Some(path)
-      } else if (searchPath.isDefined) {
+      } else if (searchPath.nonEmpty) {
         // search in all directories where imports may be found
-        searchPath.get.map(d => d.resolve(pathOrUrl)).collectFirst {
+        searchPath.map(d => d.resolve(pathOrUrl)).collectFirst {
           case fp if Files.exists(fp) => fp
         }
       } else None

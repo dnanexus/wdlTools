@@ -7,7 +7,7 @@ import wdlTools.syntax.{AbstractSyntax, TextSource}
 //import wdlTools.util.Util
 
 case class Stdlib(conf: Options) {
-  val tUtil = TUtil(conf)
+  private val tUtil = TUtil(conf)
 
   private val stdlibV1_0: Vector[WT_StdlibFunc] = Vector(
       WT_Function0("stdout", WT_File),
@@ -121,7 +121,7 @@ case class Stdlib(conf: Options) {
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(tUtil.toString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(tUtil.toString).mkString("\n")
         val candidatesStr = candidates.map(tUtil.toString(_)).mkString("\n")
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
