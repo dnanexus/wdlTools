@@ -16,13 +16,7 @@ object Verbosity extends Enumeration {
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
   val Strict, Moderate, Lenient = Value
-
-  def fromName(name: String): TypeCheckingRegime.Value = {
-    val x = this.values.find(x => x.toString.toLowerCase() == name.toLowerCase())
-    x.get
-  }
 }
-import Verbosity._
 
 /**
   * Common configuration options.
@@ -30,10 +24,11 @@ import Verbosity._
   * @param followImports whether to follow imports when parsing.
   * @param verbosity verbosity level.
   * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
+  * @param typeChecking strictness of type-checking
   */
 case class Options(localDirectories: Vector[Path] = Vector.empty,
                    followImports: Boolean = false,
-                   verbosity: Verbosity = Normal,
+                   verbosity: Verbosity.Verbosity = Verbosity.Normal,
                    antlr4Trace: Boolean = false,
                    typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
 

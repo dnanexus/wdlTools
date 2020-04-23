@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Options, SourceCode, TypeCheckingRegime, Util, Verbosity}
+import wdlTools.util.{Options, TypeCheckingRegime, Util, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
   private val opts = Options(
@@ -16,8 +16,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       verbosity = Verbosity.Quiet,
       followImports = true
   )
-  private val loader = SourceCode.Loader(opts)
-  private val parser = Parsers(opts, Some(loader))
+  private val parser = Parsers(opts)
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(folder: Path): Vector[Path] = {
@@ -59,8 +58,8 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "declaration_shadowing.wdl" -> TResult(correct = false),
       "simple.wdl" -> TResult(correct = false),
       // expressions
-      "expressions.wdl" -> TResult(true),
-      "expressions_bad.wdl" -> TResult(false),
+      "expressions.wdl" -> TResult(correct = true),
+      "expressions_bad.wdl" -> TResult(correct = false),
       // metadata
       "metadata_null_value.wdl" -> TResult(correct = true),
       "metadata_complex.wdl" -> TResult(correct = true),
@@ -82,7 +81,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
     try {
-      val doc = parser.parse(Util.getURL(file))
+      val doc = parser.parseDocument(Util.pathToURL(file))
       checker.apply(doc)
     } catch {
       case e: Throwable =>
@@ -100,7 +99,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val checker = TypeChecker(stdlib)
     val checkVal =
       try {
-        val doc = parser.parse(Util.getURL(file))
+        val doc = parser.parseDocument(Util.pathToURL(file))
         checker.apply(doc)
         true
       } catch {
@@ -126,7 +125,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "type check test wdl files" taggedAs (Edge) in {
+  it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/typing/v1").getPath)
     )
@@ -181,7 +180,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
     for (src <- sources) {
       val url = Util.getURL(src)
-      val doc = parser.parse(url)
+      val doc = parser.parseDocument(url)
       checker.apply(doc)
     }
   }

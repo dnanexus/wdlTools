@@ -8,19 +8,14 @@ import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
 
-case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.Loader] = None) {
-  private val loader: SourceCode.Loader = defaultLoader.getOrElse(SourceCode.Loader(opts))
+case class Parsers(opts: Options = Options()) {
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, loader),
-      WdlVersion.V1 -> v1.ParseAll(opts, loader)
-  )
-  private lazy val fragmentParsers: Map[WdlVersion, WdlFragmentParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseFragment(opts),
-      WdlVersion.V1 -> v1.ParseFragment(opts)
+      WdlVersion.Draft_2 -> draft_2.ParseAll(opts),
+      WdlVersion.V1 -> v1.ParseAll(opts)
   )
 
   def getParser(url: URL): WdlParser = {
-    getParser(loader.apply(url))
+    getParser(SourceCode.loadFrom(url))
   }
 
   def getParser(sourceCode: SourceCode): WdlParser = {
@@ -37,26 +32,22 @@ case class Parsers(opts: Options = Options(), defaultLoader: Option[SourceCode.L
     parsers(wdlVersion)
   }
 
-  def parse(path: Path): Document = {
-    parse(Util.getURL(path))
+  def parseDocument(path: Path): Document = {
+    parseDocument(Util.pathToURL(path))
   }
 
-  def parse(url: URL): Document = {
-    val sourceCode = loader.apply(url)
+  def parseDocument(url: URL): Document = {
+    val sourceCode = SourceCode.loadFrom(url)
     val parser = getParser(sourceCode)
-    parser.apply(sourceCode)
+    parser.parseDocument(sourceCode)
   }
 
   def getDocumentWalker[T](
       url: URL,
       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
   ): DocumentWalker[T] = {
-    val sourceCode = loader.apply(url)
+    val sourceCode = SourceCode.loadFrom(url)
     val parser = getParser(sourceCode)
-    parser.Walker(url, Some(sourceCode), results)
-  }
-
-  def getFragmentParser(wdlVersion: WdlVersion): WdlFragmentParser = {
-    fragmentParsers(wdlVersion)
+    parser.Walker(sourceCode, results)
   }
 }
