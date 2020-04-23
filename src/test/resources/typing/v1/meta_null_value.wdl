@@ -2,14 +2,14 @@ version 1.0
 
 task Foo {
   input {
-		Int i
+    Int i
   }
 
   command <<<
-  echo ~{i}
+    echo ~{i}
   >>>
 
   parameter_meta {
-  	i: null
+    i: null
   }
 }

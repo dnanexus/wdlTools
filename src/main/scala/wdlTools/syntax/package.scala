@@ -2,11 +2,6 @@ package wdlTools.syntax
 
 import java.net.URL
 
-import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{Options, SourceCode, Util}
-
-import scala.collection.mutable
-
 sealed abstract class WdlVersion(val name: String, val order: Int) extends Ordered[WdlVersion] {
   def compare(that: WdlVersion): Int = this.order - that.order
 }
@@ -126,57 +121,4 @@ case class CommentMap(comments: Map[Int, Comment]) {
 
 object CommentMap {
   val empty: CommentMap = CommentMap(Map.empty)
-}
-
-trait DocumentWalker[T] {
-  def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
-}
-
-abstract class WdlParser(opts: Options, loader: SourceCode.Loader) {
-  def canParse(sourceCode: SourceCode): Boolean
-
-  def apply(sourceCode: SourceCode): Document
-
-  def parse(url: URL): Document = {
-    apply(loader.apply(url))
-  }
-
-  def getDocSourceURL(addr: String): URL = {
-    Util.getURL(addr, opts.localDirectories)
-  }
-
-  case class Walker[T](rootURL: URL,
-                       sourceCode: Option[SourceCode] = None,
-                       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
-      extends DocumentWalker[T] {
-    def extractDependencies(document: Document): Map[URL, Document] = {
-      document.elements.flatMap {
-        case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
-          Some(Util.getURL(addr.value, opts.localDirectories) -> doc.get)
-        case _ => None
-      }.toMap
-    }
-
-    def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
-      def addDocument(url: URL, doc: Document): Unit = {
-        if (!results.contains(url)) {
-          visitor(url, doc, results)
-          if (opts.followImports) {
-            extractDependencies(doc).foreach {
-              case (uri, doc) => addDocument(uri, doc)
-            }
-          }
-        }
-      }
-
-      val document = apply(sourceCode.getOrElse(loader.apply(rootURL)))
-      addDocument(rootURL, document)
-      results.toMap
-    }
-  }
-}
-
-trait WdlFragmentParser {
-  def parseExpr(text: String): Expr
-  def parseType(text: String): Type
 }

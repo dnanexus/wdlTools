@@ -34,5 +34,5 @@ workflow foo {
 
 
   File f = "foo"
-  File f2 = f + "/all"
+  File f5 = f + "/all"
 }

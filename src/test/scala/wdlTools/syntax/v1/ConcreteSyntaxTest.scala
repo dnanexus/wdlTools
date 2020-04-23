@@ -3,9 +3,10 @@ package wdlTools.syntax.v1
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Comment, Edge, TextSource, WdlVersion}
+import wdlTools.syntax.{Comment, TextSource, WdlVersion}
+
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.util.Verbosity.Quiet
+import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
 
 class ConcreteSyntaxTest extends FlatSpec with Matchers {
@@ -572,7 +573,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "relative imports" taggedAs Edge in {
+  it should "relative imports" in {
     val doc = getDocument(getWorkflowSource("relative_imports.wdl"))
 
     doc.version.value shouldBe WdlVersion.V1
@@ -584,7 +585,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     call.name shouldBe "library.wc"
   }
 
-  it should "relative imports II" taggedAs Edge in {
+  it should "relative imports II" in {
     val doc = getDocument(getWorkflowSource("relative_imports_II.wdl"))
 
     doc.version.value shouldBe WdlVersion.V1
