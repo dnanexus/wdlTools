@@ -16,11 +16,6 @@ object Verbosity extends Enumeration {
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
   val Strict, Moderate, Lenient = Value
-
-  def fromName(name: String): TypeCheckingRegime.Value = {
-    val x = this.values.find(x => x.toString.toLowerCase() == name.toLowerCase())
-    x.get
-  }
 }
 
 /**

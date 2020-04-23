@@ -28,7 +28,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.fromName)
-  implicit val regimeConverter: ValueConverter[TypeCheckingRegime] =
+  implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
     singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName)
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
@@ -103,7 +103,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val antlr4Trace: ScallopOption[Boolean] =
     toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
-  val check = new ParserSubcommand("check", "Type check WDL file.") {
+  val check = new ParserSubcommand(
+      "check",
+      "Type check WDL file."
+  ) {
     val regime: ScallopOption[TypeCheckingRegime] = opt[TypeCheckingRegime](
         descr = "Strictness of type checking",
         default = Some(TypeCheckingRegime.Moderate)
