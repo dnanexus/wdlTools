@@ -208,6 +208,14 @@ object Translators {
   def translateRuntimeSection(
       runtime: CST.RuntimeSection
   ): AST.RuntimeSection = {
+    // check for duplicate ids
+    var allIds = Set.empty[String]
+    for (kv <- runtime.kvs) {
+      if (allIds contains kv.id)
+        throw new SyntaxException(s"key ${kv.id} defined twice in runtime section", kv.text)
+      allIds = allIds + kv.id
+    }
+
     AST.RuntimeSection(
         runtime.kvs.map {
           case CST.RuntimeKV(id, expr, text, comment) =>

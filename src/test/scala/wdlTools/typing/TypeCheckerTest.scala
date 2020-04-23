@@ -63,7 +63,11 @@ class TypeCheckerTest extends FlatSpec with Matchers {
       "expressions_bad.wdl" -> TResult(false),
       // metadata
       "metadata_null_value.wdl" -> TResult(correct = true),
-      "metadata_complex.wdl" -> TResult(correct = true)
+      "metadata_complex.wdl" -> TResult(correct = true),
+
+      // runtime section
+      "runtime_section_I.wdl" -> TResult(correct = true),
+      "runtime_section_bad.wdl" -> TResult(correct = false)
   )
 
   // test to include/exclude

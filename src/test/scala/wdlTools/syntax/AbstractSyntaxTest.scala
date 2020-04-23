@@ -90,4 +90,10 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
       parser.apply(getTaskSource("meta_section_error.wdl"))
     }
   }
+
+  it should "report duplicate key in runtime section " taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      parser.apply(getTaskSource("runtime_section_duplicate_key.wdl"))
+    }
+  }
 }
