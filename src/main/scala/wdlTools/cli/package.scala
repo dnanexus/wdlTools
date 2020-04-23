@@ -29,7 +29,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.fromName)
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
-    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.fromName)
+    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName)
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly

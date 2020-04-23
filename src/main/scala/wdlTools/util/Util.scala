@@ -22,7 +22,9 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Vector[Path] = Vector.empty): URL = {
+  def getURL(pathOrUrl: String,
+             searchPath: Vector[Path] = Vector.empty,
+             mustExist: Boolean = true): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
@@ -35,16 +37,20 @@ object Util {
           case fp if Files.exists(fp) => fp
         }
       } else None
-      if (resolved.isEmpty) {
-        throw new Exception(
-            s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
-        )
+      val result = resolved.getOrElse {
+        if (mustExist) {
+          throw new Exception(
+              s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+          )
+        } else {
+          path
+        }
       }
-      new URL(s"file://${resolved.get.toAbsolutePath}")
+      new URL(s"file://${result.toAbsolutePath}")
     }
   }
 
-  def getURL(path: Path): URL = {
+  def pathToURL(path: Path): URL = {
     path.toUri.toURL
   }
 
@@ -157,10 +163,10 @@ object Util {
     * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
-    * @param a - The value to pretty print.
-    * @param indentSize - Number of spaces for each indent.
-    * @param maxElementWidth - Largest element size before wrapping.
-    * @param depth - Initial depth to pretty print indents.
+    * @param a The value to pretty print.
+    * @param indentSize Number of spaces for each indent.
+    * @param maxElementWidth Largest element size before wrapping.
+    * @param depth Initial depth to pretty print indents.
     * @return
     */
   def prettyFormat(a: Any,
@@ -218,6 +224,13 @@ object Util {
     }
   }
 
+  /**
+    * Simple bi-directional Map class.
+    * @param keys map keys
+    * @param values map values - must be unique, i.e. you must be able to map values -> keys without collisions
+    * @tparam X keys Type
+    * @tparam Y values Type
+    */
   case class BiMap[X, Y](keys: Seq[X], values: Seq[Y]) {
     require(keys.size == values.size, "no 1 to 1 relation")
     private lazy val kvMap: Map[X, Y] = keys.zip(values).toMap

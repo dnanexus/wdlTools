@@ -746,7 +746,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
 
     // check the runtime section
-    task.runtime.map(rtSection => applyRuntime(rtSection, ctxDecl))
+    task.runtime.foreach(rtSection => applyRuntime(rtSection, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section

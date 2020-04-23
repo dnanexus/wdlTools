@@ -17,15 +17,14 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir)
   )
-  private val loader = SourceCode.Loader(opts)
   private val grammarFactory = WdlDraft2GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(workflowsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(workflowsDir.resolve(fname)))
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {

@@ -14,19 +14,18 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
     Options(antlr4Trace = false,
             localDirectories = Vector(tasksDir, workflowsDir),
             verbosity = Verbosity.Quiet)
-  private val loader = SourceCode.Loader(opts)
-  private val parser = ParseAll(opts, loader)
+  private val parser = ParseAll(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(workflowsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(workflowsDir.resolve(fname)))
   }
 
   it should "handle import statements" in {
-    val doc = parser.apply(getWorkflowSource("imports.wdl"))
+    val doc = parser.parseDocument(getWorkflowSource("imports.wdl"))
 
     doc.version.value shouldBe WdlVersion.V1
 
@@ -39,15 +38,15 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "handle optionals" in {
-    val doc = parser.apply(getTaskSource("missing_type_bug.wdl"))
+    val doc = parser.parseDocument(getTaskSource("missing_type_bug.wdl"))
     doc.version.value shouldBe WdlVersion.V1
   }
 
   it should "parse GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
-    val sourceCode = loader.apply(Util.getURL(url))
-    val doc = parser.apply(sourceCode)
+    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val doc = parser.parseDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
   }
@@ -55,14 +54,14 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   it should "parse GATK joint genotyping workflow" taggedAs Edge in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-    val sourceCode = loader.apply(Util.getURL(url))
-    val doc = parser.apply(sourceCode)
+    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val doc = parser.parseDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
   }
 
   it should "handle the meta section" taggedAs Edge in {
-    val doc = parser.apply(getTaskSource("meta_null_value.wdl"))
+    val doc = parser.parseDocument(getTaskSource("meta_null_value.wdl"))
     doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val task = doc.elements.head.asInstanceOf[Task]
@@ -76,7 +75,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "complex meta values" taggedAs Edge in {
-    val doc = parser.apply(getTaskSource("meta_section_compound.wdl"))
+    val doc = parser.parseDocument(getTaskSource("meta_section_compound.wdl"))
     doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val task = doc.elements.head.asInstanceOf[Task]
@@ -87,13 +86,13 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
 
   it should "report errors in meta section" taggedAs Edge in {
     assertThrows[SyntaxException] {
-      parser.apply(getTaskSource("meta_section_error.wdl"))
+      parser.parseDocument(getTaskSource("meta_section_error.wdl"))
     }
   }
 
   it should "report duplicate key in runtime section " taggedAs Edge in {
     assertThrows[SyntaxException] {
-      parser.apply(getTaskSource("runtime_section_duplicate_key.wdl"))
+      parser.parseDocument(getTaskSource("runtime_section_duplicate_key.wdl"))
     }
   }
 }
