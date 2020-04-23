@@ -104,8 +104,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
   val check = new ParserSubcommand(
-      "check",
-      "Type check WDL file."
+      name = "check",
+      description = "Type check WDL file."
   ) {
     val regime: ScallopOption[TypeCheckingRegime] = opt[TypeCheckingRegime](
         descr = "Strictness of type checking",
