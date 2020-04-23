@@ -715,6 +715,14 @@ case class TypeChecker(stdlib: Stdlib) {
     (inputType, outputType)
   }
 
+  // The runtime section can make use of values defined in declarations
+  private def applyRuntime(rtSection: RuntimeSection, ctx: Context): Unit = {
+    rtSection.kvs.foreach {
+      case RuntimeKV(id, expr, _, _) =>
+        val _ = typeEval(expr, ctx)
+    }
+  }
+
   // TASK
   //
   // - An inputs type has to match the type of its default value (if any)
@@ -730,14 +738,15 @@ case class TypeChecker(stdlib: Stdlib) {
         ctxOuter.bindVarList(bindings, task.text)
     }
 
-    // TODO: type-check the runtime section
-
     // check the declarations, and accumulate context
     val ctxDecl = task.declarations.foldLeft(ctx) {
       case (accu: Context, decl) =>
         val (varName, typ) = applyDecl(decl, accu)
         accu.bindVar(varName, typ, decl.text)
     }
+
+    // check the runtime section
+    task.runtime.map(rtSection => applyRuntime(rtSection, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section
