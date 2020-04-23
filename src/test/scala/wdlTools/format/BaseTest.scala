@@ -6,23 +6,22 @@ import java.nio.file.{Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.formatter.WdlV1Formatter
 import wdlTools.syntax.{WdlVersion, v1}
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{Options, Util}
 
 class BaseTest extends FlatSpec with Matchers {
   private lazy val opts = Options()
-  private lazy val loader = SourceCode.Loader(opts)
-  private lazy val parser = v1.ParseAll(opts, loader)
+  private lazy val parser = v1.ParseAll(opts)
 
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
   private def getWdlURL(fname: String, subdir: String): URL = {
-    Util.getURL(getWdlPath(fname, subdir))
+    Util.pathToURL(getWdlPath(fname, subdir))
   }
 
   it should "handle the runtime section correctly" in {
-    val doc = parser.parse(getWdlURL(fname = "simple.wdl", subdir = "after"))
+    val doc = parser.apply(getWdlURL(fname = "simple.wdl", subdir = "after"))
     doc.version.value shouldBe WdlVersion.V1
   }
 

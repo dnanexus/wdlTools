@@ -18,11 +18,11 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   private val parser = ParseAll(opts, loader)
 
   private def getTaskSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+    loader.apply(Util.pathToURL(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(workflowsDir.resolve(fname)))
+    loader.apply(Util.pathToURL(workflowsDir.resolve(fname)))
   }
 
   it should "handle import statements" in {

@@ -22,8 +22,7 @@ case class Upgrader(opts: Options) {
     val formatter = WdlV1Formatter(opts.copy(followImports = false))
 
     // parse and format the document (and any imports)
-    val walker = parser.Walker[Seq[String]](url)
-    walker.walk { (docUrl, doc, results) =>
+    parser.getDocumentWalker[Seq[String]](url).walk { (docUrl, doc, results) =>
       if (doc.version.value >= destVersion) {
         throw new Exception(s"Cannot convert WDL version ${doc.version} to ${destVersion}")
       }

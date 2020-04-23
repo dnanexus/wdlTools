@@ -22,7 +22,9 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String, searchPath: Vector[Path] = Vector.empty): URL = {
+  def getURL(pathOrUrl: String,
+             searchPath: Vector[Path] = Vector.empty,
+             mustExist: Boolean = true): URL = {
     if (pathOrUrl.contains("://")) {
       new URL(pathOrUrl)
     } else {
@@ -35,16 +37,20 @@ object Util {
           case fp if Files.exists(fp) => fp
         }
       } else None
-      if (resolved.isEmpty) {
-        throw new Exception(
-            s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
-        )
+      val result = resolved.getOrElse {
+        if (mustExist) {
+          throw new Exception(
+              s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+          )
+        } else {
+          path
+        }
       }
-      new URL(s"file://${resolved.get.toAbsolutePath}")
+      new URL(s"file://${result.toAbsolutePath}")
     }
   }
 
-  def getURL(path: Path): URL = {
+  def pathToURL(path: Path): URL = {
     path.toUri.toURL
   }
 

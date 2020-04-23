@@ -8,7 +8,7 @@ case class PrintAST(conf: WdlToolsConf) extends Command {
     val url = conf.check.url()
     val opts = conf.check.getOptions
     val parsers = Parsers(opts)
-    val document = parsers.parse(url)
+    val document = parsers.parseDocument(url)
     println(Util.prettyFormat(document))
   }
 }

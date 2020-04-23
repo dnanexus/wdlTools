@@ -22,7 +22,6 @@ object TypeCheckingRegime extends Enumeration {
     x.get
   }
 }
-import Verbosity._
 
 /**
   * Common configuration options.
@@ -34,7 +33,7 @@ import Verbosity._
   */
 case class Options(localDirectories: Vector[Path] = Vector.empty,
                    followImports: Boolean = false,
-                   verbosity: Verbosity = Normal,
+                   verbosity: Verbosity.Verbosity = Verbosity.Normal,
                    antlr4Trace: Boolean = false,
                    typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
 

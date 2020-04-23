@@ -11,14 +11,14 @@ trait DocumentWalker[T] {
   def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
 
-abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
+abstract class WdlParser(opts: Options) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
 
   protected def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val aDoc = apply(loader.apply(url))
+        val aDoc = apply(SourceCode.loadFrom(url))
         docCache(url) = aDoc
         aDoc
       case Some(aDoc) => aDoc
@@ -28,22 +28,27 @@ abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
   def canParse(sourceCode: SourceCode): Boolean
 
   def apply(url: URL): AbstractSyntax.Document = {
-    apply(loader.apply(url))
+    apply(SourceCode.loadFrom(url))
   }
 
   def apply(sourceCode: SourceCode): Document
+
+  def parseExpr(text: String): Expr
+
+  def parseType(text: String): Type
 
   def getDocSourceURL(addr: String): URL = {
     Util.getURL(addr, opts.localDirectories)
   }
 
-  def getWalker[T](url: URL,
-                   results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]): Walker[T] = {
-    Walker[T](url, loader.apply(url), results)
+  def getDocumentWalker[T](
+      url: URL,
+      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
+  ): Walker[T] = {
+    Walker[T](SourceCode.loadFrom(url), results)
   }
 
-  case class Walker[T](rootURL: URL,
-                       sourceCode: SourceCode,
+  case class Walker[T](sourceCode: SourceCode,
                        results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
@@ -71,9 +76,4 @@ abstract class ParseAllBase(opts: Options, loader: SourceCode.Loader) {
       results.toMap
     }
   }
-}
-
-trait WdlFragmentParser {
-  def parseExpr(text: String): Expr
-  def parseType(text: String): Type
 }

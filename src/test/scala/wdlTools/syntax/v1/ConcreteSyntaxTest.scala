@@ -23,15 +23,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(tasksDir.resolve(fname)))
+    loader.apply(Util.pathToURL(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(workflowsDir.resolve(fname)))
+    loader.apply(Util.pathToURL(workflowsDir.resolve(fname)))
   }
 
   private def getStructSource(fname: String): SourceCode = {
-    loader.apply(Util.getURL(structsDir.resolve(fname)))
+    loader.apply(Util.pathToURL(structsDir.resolve(fname)))
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {

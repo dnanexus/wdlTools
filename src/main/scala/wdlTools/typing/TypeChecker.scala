@@ -718,7 +718,7 @@ case class TypeChecker(stdlib: Stdlib) {
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: RuntimeSection, ctx: Context): Unit = {
     rtSection.kvs.foreach {
-      case RuntimeKV(id, expr, _, _) =>
+      case RuntimeKV(_, expr, _) =>
         val _ = typeEval(expr, ctx)
     }
   }
@@ -746,7 +746,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
 
     // check the runtime section
-    task.runtime.map(rtSection => applyRuntime(rtSection, ctxDecl))
+    task.runtime.foreach(rtSection => applyRuntime(rtSection, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section

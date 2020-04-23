@@ -44,7 +44,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles(Util.getURL(path)) = contents
+      generatedFiles(Util.pathToURL(path)) = contents
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -55,7 +55,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles(Util.getURL(path)) = contents
+      generatedFiles(Util.pathToURL(path)) = contents
       readmeName
     }
   }

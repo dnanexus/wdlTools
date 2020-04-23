@@ -30,7 +30,6 @@ object WdlVersion {
 // URL:  original file or web URL
 //
 case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
-
   override def compare(that: TextSource): Int = {
     line - that.line
   }
