@@ -23,6 +23,8 @@ object SourceCode {
   //   foo.txt
   //
   // Follow the URL and retrieve the content as a string.
+  //
+  // Note: we are assuming this is a textual file.
   private def fetchHttpAddress(url: URL): Seq[String] = {
     val src = Source.fromURL(url)
     try {
