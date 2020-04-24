@@ -1,7 +1,7 @@
 package wdlTools.syntax.v1
 
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
-import wdlTools.syntax.{AbstractSyntax, WdlParser, SyntaxException, AbstractSyntax => AST}
+import wdlTools.syntax.{WdlParser, SyntaxException, AbstractSyntax => AST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
@@ -177,7 +177,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   def translateInputSection(
       inp: CST.InputSection
   ): AST.InputSection = {
-    AST.InputSection(inp.declarations.map(translateDeclaration), inp.text)
+    AST.InputSection(inp.declarations.map(translateDeclaration), Vector(inp.text))
   }
 
   def translateOutputSection(
@@ -338,19 +338,19 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     false
   }
 
-  override def apply(sourceCode: SourceCode): AST.Document = {
+  override def parseDocument(sourceCode: SourceCode): AST.Document = {
     val grammar = grammarFactory.createGrammar(sourceCode.toString)
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
     dfs(top)
   }
 
-  override def parseExpr(text: String): AbstractSyntax.Expr = {
+  override def parseExpr(text: String): AST.Expr = {
     val parser = ParseTop(opts, grammarFactory.createGrammar(text))
     translateExpr(parser.parseExpr)
   }
 
-  override def parseType(text: String): AbstractSyntax.Type = {
+  override def parseType(text: String): AST.Type = {
     val parser = ParseTop(opts, grammarFactory.createGrammar(text))
     translateType(parser.parseWdlType)
   }

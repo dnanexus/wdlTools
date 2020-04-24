@@ -32,7 +32,7 @@ case class Options(localDirectories: Vector[Path] = Vector.empty,
                    antlr4Trace: Boolean = false,
                    typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
 
-  def getURL(pathOrUrl: String): URL = {
-    Util.getURL(pathOrUrl, localDirectories)
+  def getURL(pathOrUrl: String, mustExist: Boolean = true): URL = {
+    Util.getURL(pathOrUrl, localDirectories, mustExist)
   }
 }

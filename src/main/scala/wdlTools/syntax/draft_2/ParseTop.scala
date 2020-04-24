@@ -7,6 +7,13 @@ import java.net.URL
 import collection.JavaConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
+import org.openwdl.wdl.parser.draft_2.WdlDraft2Parser.{
+  Task_command_elementContext,
+  Task_meta_elementContext,
+  Task_output_elementContext,
+  Task_parameter_meta_elementContext,
+  Task_runtime_elementContext
+}
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.{Grammar, getTextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
@@ -707,20 +714,6 @@ any_decls
     RuntimeSection(kvs, getTextSource(ctx))
   }
 
-  /*
-task_input
-	: INPUT LBRACE (any_decls)* RBRACE
-	;
-   */
-  override def visitTask_input(ctx: WdlDraft2Parser.Task_inputContext): InputSection = {
-    val decls = ctx
-      .any_decls()
-      .asScala
-      .map(x => visitAny_decls(x))
-      .toVector
-    InputSection(decls, getTextSource(ctx))
-  }
-
   /* task_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	; */
@@ -887,44 +880,71 @@ task_input
     }
   }
 
+  /**
+    * Draft-2 doesn't have a formal input section. Informally, it is specified that inputs must be
+    * "at the top of any scope" - this is enforced by the Task grammar, but the workflow grammar allows
+    * declarations to appear anywhere in the workflow body.
+    *
+    * There are three types of declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring
+    * evaluation), and 3) bound with an expression requiring evaluation. Only the first two types of
+    * declarations may be inputs; however, all three types of declarations can be mixed together. This method
+    * creates a synthetic InputSection contianing only declarations of type 1 and 2. There is one TextSource
+    * for each sub-group of declarations that covers all of the lines starting from the previous group (or
+    * startLine for the first element) until the last line of the last declaration in the group.
+    *
+    * @param decls
+    * @param startLine
+    * @param otherElements
+    * @return
+    */
+  def createInputSection(decls: Vector[Declaration],
+                         startLine: Int,
+                         otherElements: Vector[Element]): InputSection = {
+    val sortedDecls = decls.sortWith((l, r) => l.text.line < r.text.line)
+    // collect the lines occupied by other elements
+    val elementLines: Vector[Int] = otherElements.flatMap(_.text.lineRange)
+    // this is the last possible line (non-inclusive) of the input section
+    val stopLine = sortedDecls.last.text.endLine
+
+    InputSection(decls, textSources)
+  }
+
   /* task
-	: TASK Identifier LBRACE (task_element)+ RBRACE
-	;  */
+    : TASK Identifier LBRACE (task_element)+ RBRACE
+    ;  */
   override def visitTask(ctx: WdlDraft2Parser.TaskContext): Task = {
     val name = getIdentifierText(ctx.Identifier(), ctx)
-    // split inputs into those that do not require evalutation (which can be task inputs)
-    // and those that do (which must be non-overideable decLarations)
-    val (input, topDecls) = if (ctx.task_input().any_decls().isEmpty) {
-      (None, Vector.empty)
-    } else {
-      val taskInput = visitTask_input(ctx.task_input())
-      val (evalDecls, noEvalDecls) = taskInput.declarations.partition(requiresEvaluation)
-      val newInput = if (noEvalDecls.isEmpty) {
-        None
-      } else {
-        Some(InputSection(noEvalDecls, taskInput.text))
-      }
-      (newInput, evalDecls)
-    }
-    val elems = ctx.task_element().asScala.map(visitTask_element).toVector
+    val elems = ctx.task_element().asScala.toVector
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
-      case x: OutputSection => x
+      case x: Task_output_elementContext => visitTask_output(x.task_output())
     }, "output", ctx)
     val command: CommandSection = exactlyOneSection(elems.collect {
-      case x: CommandSection => x
+      case x: Task_command_elementContext => visitTask_command(x.task_command())
     }, "command", ctx)
-    val decls: Vector[Declaration] = topDecls ++ elems.collect {
-      case x: Declaration => x
-    }
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
-      case x: MetaSection => x
+      case x: Task_meta_elementContext => visitMeta(x.meta())
     }, "meta", ctx)
     val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
-      case x: ParameterMetaSection => x
+      case x: Task_parameter_meta_elementContext => visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
     val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
-      case x: RuntimeSection => x
+      case x: Task_runtime_elementContext => visitTask_runtime(x.task_runtime())
     }, "runtime", ctx)
+
+    // We treat as an input any unbound declaration as well as any bound declaration
+    // that doesn't require evaluation.
+    val (decls, inputDecls) = ctx
+      .task_input()
+      .any_decls()
+      .asScala
+      .map(x => visitAny_decls(x))
+      .toVector
+      .partition(requiresEvaluation)
+    val input = if (inputDecls.nonEmpty) {
+      Some(createInputSection(inputDecls, getTextSource(ctx.task_input()).line, decls))
+    } else {
+      None
+    }
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
@@ -1061,18 +1081,6 @@ scatter
     Conditional(expr, body, getTextSource(ctx))
   }
 
-  /* workflow_input
-	: INPUT LBRACE (any_decls)* RBRACE
-	; */
-  override def visitWorkflow_input(ctx: WdlDraft2Parser.Workflow_inputContext): InputSection = {
-    val decls = ctx
-      .any_decls()
-      .asScala
-      .map(x => visitAny_decls(x))
-      .toVector
-    InputSection(decls, getTextSource(ctx))
-  }
-
   /* workflow_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	;
@@ -1107,56 +1115,68 @@ scatter
   }
 
   /*
-workflow_element
-	: workflow_input #input
-	| workflow_output #output
-	| inner_workflow_element #inner_element
-	| parameter_meta #parameter_meta_element
-	| meta #meta_element
-	;
+  workflow_element
+    : workflow_input #input
+    | workflow_output #output
+    | inner_workflow_element #inner_element
+    | parameter_meta #parameter_meta_element
+    | meta #meta_element
+    ;
 
-workflow
-	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
-	;
+  workflow
+    : WORKFLOW Identifier LBRACE workflow_element* RBRACE
+    ;
    */
   override def visitWorkflow(ctx: WdlDraft2Parser.WorkflowContext): Workflow = {
     val name = getIdentifierText(ctx.Identifier(), ctx)
-    // split inputs into those that do not require evalutation (which can be task inputs)
-    // and those that do (which must be non-overideable decLarations)
-    val (input, topDecls) = if (ctx.workflow_input().any_decls().isEmpty) {
-      (None, Vector.empty)
-    } else {
-      val workflowInput = visitWorkflow_input(ctx.workflow_input())
-      val (evalDecls, noEvalDecls) = workflowInput.declarations.partition(requiresEvaluation)
-      val newInput = if (noEvalDecls.isEmpty) {
-        None
-      } else {
-        Some(InputSection(noEvalDecls, workflowInput.text))
-      }
-      (newInput, evalDecls)
-    }
     val elems: Vector[WdlDraft2Parser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
+    val unboundDecls = elems.collect {
+      case x: WdlDraft2Parser.Wf_decl_elementContext =>
+        visitUnbound_decls(x.unbound_decls())
+    }
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.OutputContext =>
+      case x: WdlDraft2Parser.Wf_output_elementContext =>
         visitWorkflow_output(x.workflow_output())
     }, "output", ctx)
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.Meta_elementContext =>
+      case x: WdlDraft2Parser.Wf_meta_elementContext =>
         visitMeta(x.meta())
     }, "meta", ctx)
     val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.Parameter_meta_elementContext =>
+      case x: WdlDraft2Parser.Wf_parameter_meta_elementContext =>
         visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
-    val wfElems: Vector[WorkflowElement] = topDecls ++ elems.collect {
-      case x: WdlDraft2Parser.Inner_elementContext =>
-        visitInner_workflow_element(x.inner_workflow_element())
+
+    // We treat as an input any unbound declaration as well as any bound declaration
+    // that doesn't require evaluation.
+    val (noEvalDecls, wfElems) = elems
+      .collect {
+        case x: WdlDraft2Parser.Wf_inner_elementContext =>
+          visitInner_workflow_element(x.inner_workflow_element()) match {
+            case d: Declaration if !requiresEvaluation(d) => Left(d)
+            case other                                    => Right(other)
+          }
+      }
+      .partition(_.isLeft)
+
+    val wfBody = wfElems.map(_.right.get)
+    val wfTextSource = getTextSource(ctx)
+
+    val inputDecls = unboundDecls ++ noEvalDecls.map(_.left.get)
+    val input = if (inputDecls.nonEmpty) {
+      Some(
+          createInputSection(inputDecls,
+                             wfTextSource.endLine,
+                             Vector(output, meta, parameterMeta).flatten ++ wfBody)
+      )
+    } else {
+      None
     }
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Workflow(name, input, output, meta, parameterMeta, wfElems, getTextSource(ctx))
+    Workflow(name, input, output, meta, parameterMeta, wfBody, wfTextSource)
   }
 
   /*

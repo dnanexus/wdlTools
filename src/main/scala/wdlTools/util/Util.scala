@@ -1,6 +1,6 @@
 package wdlTools.util
 
-import java.io.IOException
+import java.io.{FileNotFoundException, IOException}
 
 import collection.JavaConverters._
 import java.net.URL
@@ -8,7 +8,6 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
-
 import Verbosity._
 
 object Util {
@@ -39,8 +38,8 @@ object Util {
       } else None
       val result = resolved.getOrElse {
         if (mustExist) {
-          throw new Exception(
-              s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+          throw new FileNotFoundException(
+              s"Could not resolve path or URL ${pathOrUrl} in search path [${searchPath.mkString(",")}]"
           )
         } else {
           path

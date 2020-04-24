@@ -1204,7 +1204,7 @@ document_element
     if (ctx.RELEASE_VERSION() == null)
       throw new Exception("version not specified")
     val value = ctx.RELEASE_VERSION().getText
-    Version(WdlVersion.fromName(value), getTextSource(ctx))
+    Version(WdlVersion.withName(value), getTextSource(ctx))
   }
 
   /*

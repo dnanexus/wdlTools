@@ -102,10 +102,21 @@ object ConcreteSyntax {
       extends WorkflowElement
 
   // sections
-  // In draft-2 there is no input {} block, but it is implied in the spec that inputs must appear
-  // at the top of the task/workflow. All declarations, whether bound or unbound, that appear before
-  // the first non-declaration are treated as inputs.
-  case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
+
+  /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
+    * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
+    * `InputSection` is not guaranteed to be one contiguous block, and so multiple `TextSource`es
+    * are required to describe the bounds.
+    */
+  case class InputSection(declarations: Vector[Declaration],
+                          subgroupTextSources: Vector[TextSource])
+      extends Element {
+    // Unlike other sections, the maximally covering TextSource of the draft-2 InputSection
+    // is not guaranteed to be non-overlapping with other elements.
+    override lazy val text: TextSource = {
+      TextSource.fromSpan(subgroupTextSources.head, subgroupTextSources.last)
+    }
+  }
   case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
 
   // A command can be simple, with just one continuous string:

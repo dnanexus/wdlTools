@@ -19,19 +19,18 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
-  private val loader = SourceCode.Loader(opts)
   private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    loader.apply(Util.pathToURL(tasksDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    loader.apply(Util.pathToURL(workflowsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(workflowsDir.resolve(fname)))
   }
 
   private def getStructSource(fname: String): SourceCode = {
-    loader.apply(Util.pathToURL(structsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToURL(structsDir.resolve(fname)))
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
@@ -519,7 +518,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "have real world GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
-    val sourceCode = loader.apply(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
     val doc = getDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
@@ -529,7 +528,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-    val sourceCode = loader.apply(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
     val doc = getDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1

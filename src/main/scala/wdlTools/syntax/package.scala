@@ -12,8 +12,13 @@ object WdlVersion {
 
   val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
 
-  def fromName(name: String): WdlVersion = {
-    All.collectFirst { case v if v.name == name => v }.get
+  def withName(name: String): WdlVersion = {
+    val version = All.collectFirst { case v if v.name == name => v }
+    if (version.isDefined) {
+      version.get
+    } else {
+      throw new NoSuchElementException(s"No value found for ${name}")
+    }
   }
 }
 
@@ -29,6 +34,7 @@ object WdlVersion {
 // col : column number
 // URL:  original file or web URL
 //
+// TODO: make endCol non-inclusive
 case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
   override def compare(that: TextSource): Int = {
     line - that.line
@@ -41,6 +47,21 @@ case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Or
   lazy val lineRange: Range = line until endLine
 
   lazy val maxCol: Int = Vector(col, endCol).max
+
+  def getBefore(startLine: Int = 0, startCol: Int = 0): TextSource = {
+    TextSource(startLine, startCol, line, col)
+  }
+
+  def getAfter(stopLine: Int, stopCol: Int = 0): TextSource = {
+    TextSource(endLine, endCol, stopLine, stopCol)
+  }
+
+  def shift(lineShift: Int = 0,
+            colShift: Int = 0,
+            endLineShift: Int = 0,
+            endColShift: Int = 0): TextSource = {
+    TextSource(line + lineShift, col + colShift, endLine + endLineShift, endCol + endColShift)
+  }
 }
 
 object TextSource {
@@ -83,6 +104,8 @@ case class CommentMap(comments: Map[Int, Comment]) {
   def nonEmpty: Boolean = {
     comments.nonEmpty
   }
+
+  def maxLine: Int = comments.keys.max
 
   def filterBetween(start: Int, stop: Int): CommentMap = {
     CommentMap(comments.filterKeys(i => i >= start && i <= stop))

@@ -4,17 +4,19 @@ import java.net.URL
 import java.nio.file.{Path, Paths}
 
 import org.rogach.scallop.{
+  ArgType,
   ScallopConf,
   ScallopOption,
   Subcommand,
   ValueConverter,
-  listArgConverter,
   singleArgConverter
 }
 import wdlTools.syntax.WdlVersion
 import wdlTools.util.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, TypeCheckingRegime, Util}
+
+import scala.util.Try
 
 /**
   * Base class for wdlTools CLI commands.
@@ -24,12 +26,38 @@ trait Command {
 }
 
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
-  implicit val fileListConverter: ValueConverter[List[Path]] = listArgConverter[Path](Paths.get(_))
-  implicit val urlConverter: ValueConverter[URL] = singleArgConverter[URL](Util.getURL(_))
+  def exceptionHandler[T]: PartialFunction[Throwable, Either[String, Option[T]]] = {
+    case t: Throwable => Left(s"${t.getMessage}")
+  }
+  def listArgConverter[A](
+      conv: String => A,
+      handler: PartialFunction[Throwable, Either[String, Option[List[A]]]] = PartialFunction.empty
+  ): ValueConverter[List[A]] = new ValueConverter[List[A]] {
+    def parse(s: List[(String, List[String])]): Either[String, Option[List[A]]] = {
+      Try({
+        val l = s.flatMap(_._2).map(i => conv(i))
+        if (l.isEmpty) {
+          Right(None)
+        } else {
+          Right(Some(l))
+        }
+      }).recover(handler)
+        .recover({
+          case _: Exception => Left("wrong arguments format")
+        })
+        .get
+    }
+    val argType = ArgType.LIST
+  }
+  implicit val fileListConverter: ValueConverter[List[Path]] =
+    listArgConverter[Path](Paths.get(_), exceptionHandler[List[Path]])
+  implicit val urlConverter: ValueConverter[URL] =
+    singleArgConverter[URL](Util.getURL(_), exceptionHandler[URL])
   implicit val versionConverter: ValueConverter[WdlVersion] =
-    singleArgConverter[WdlVersion](WdlVersion.fromName)
+    singleArgConverter[WdlVersion](WdlVersion.withName, exceptionHandler[WdlVersion])
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
-    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName)
+    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName,
+                                           exceptionHandler[TypeCheckingRegime])
 
   class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly

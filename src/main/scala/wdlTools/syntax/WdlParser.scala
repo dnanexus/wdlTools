@@ -18,7 +18,7 @@ abstract class WdlParser(opts: Options) {
   protected def followImport(url: URL): AbstractSyntax.Document = {
     docCache.get(url) match {
       case None =>
-        val aDoc = apply(SourceCode.loadFrom(url))
+        val aDoc = parseDocument(SourceCode.loadFrom(url))
         docCache(url) = aDoc
         aDoc
       case Some(aDoc) => aDoc
@@ -27,11 +27,11 @@ abstract class WdlParser(opts: Options) {
 
   def canParse(sourceCode: SourceCode): Boolean
 
-  def apply(url: URL): AbstractSyntax.Document = {
-    apply(SourceCode.loadFrom(url))
+  def parseDocument(url: URL): AbstractSyntax.Document = {
+    parseDocument(SourceCode.loadFrom(url))
   }
 
-  def apply(sourceCode: SourceCode): Document
+  def parseDocument(sourceCode: SourceCode): Document
 
   def parseExpr(text: String): Expr
 
@@ -71,7 +71,7 @@ abstract class WdlParser(opts: Options) {
         }
       }
 
-      val document = apply(sourceCode)
+      val document = parseDocument(sourceCode)
       addDocument(sourceCode.url, document)
       results.toMap
     }

@@ -4,7 +4,7 @@ import java.net.URL
 
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Comment, Parsers, TextSource}
+import wdlTools.syntax.{Comment, Parsers, TextSource, WdlVersion}
 import wdlTools.util.{Options, Util, Verbosity}
 
 import scala.collection.mutable
@@ -670,35 +670,45 @@ case class WdlV1Formatter(opts: Options,
       override lazy val textSource: TextSource = getTextSourceFromChunks(statements)
     }
 
-    abstract class SectionsStatement extends Statement {
+    abstract class Sections extends Statement {
       def sections: Vector[Statement]
 
       def topCommentsAllowed: Boolean = true
+
+      protected lazy val sortedSources: Vector[TextSource] =
+        sections.map(_.textSource).sortWith(_ < _)
 
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
         val comments = document.comments.filterWithin(textSource)
 
         if (comments.nonEmpty) {
           if (sections.nonEmpty) {
-            val sortedSources = sections.map(_.textSource).sortWith(_ < _)
-            val top = textSource.copy(endLine = sortedSources.head.line)
-            val bottom = textSource.copy(line = sortedSources.last.endLine)
-
+            val top: Option[TextSource] = if (sortedSources.head.line > 1) {
+              Some(sortedSources.head.getBefore())
+            } else {
+              None
+            }
+            val bottom: Option[TextSource] = if (sortedSources.last.endLine < comments.maxLine) {
+              Some(sortedSources.last.getAfter(comments.maxLine))
+            } else {
+              None
+            }
             // Mapping of section TextSource to (before?, emptyLineBetween?, comments)
             // A line comment sticks with the closest statement (before or after) and defaults
             // to the next statement if it is equidistant to both. To do this, we first need to
             // sort the sections by their original order.
             val sectionToComment: Map[TextSource, (Boolean, Boolean, Vector[Comment])] =
-              (Vector(top) ++ sortedSources ++ Vector(bottom))
+              (Vector(top).flatten ++ sortedSources ++ Vector(bottom).flatten)
                 .sliding(2)
                 .flatMap {
                   case Vector(l, r) =>
                     val betweenComments = comments.filterBetween(l, r)
+                    println(s"${l} ${r} ${betweenComments}")
                     if (betweenComments.nonEmpty) {
                       val sortedComments = betweenComments.toSortedVector
                       val beforeDist = sortedComments.head.text.line - l.endLine + 1
                       val afterDist = r.line - sortedComments.last.text.endLine
-                      if (!topCommentsAllowed && l == top) {
+                      if (!topCommentsAllowed && top.isDefined && l == top.get) {
                         Some(r -> (true, true, sortedComments))
                       } else if (afterDist <= beforeDist) {
                         Some(r -> (true, afterDist > 1, sortedComments))
@@ -733,8 +743,8 @@ case class WdlV1Formatter(opts: Options,
               }
             }
 
-            if (sectionToComment.contains(top)) {
-              lineFormatter.appendLineComments(sectionToComment(top)._3)
+            if (top.isDefined && sectionToComment.contains(top.get)) {
+              lineFormatter.appendLineComments(sectionToComment(top.get)._3)
               lineFormatter.emptyLine()
             }
 
@@ -744,9 +754,9 @@ case class WdlV1Formatter(opts: Options,
               addSection(section)
             }
 
-            if (sectionToComment.contains(bottom)) {
+            if (bottom.isDefined && sectionToComment.contains(bottom.get)) {
               lineFormatter.emptyLine()
-              lineFormatter.appendLineComments(sectionToComment(bottom)._3)
+              lineFormatter.appendLineComments(sectionToComment(bottom.get)._3)
             }
           } else {
             lineFormatter.appendLineComments(comments.toSortedVector)
@@ -759,28 +769,13 @@ case class WdlV1Formatter(opts: Options,
           }
         }
       }
-
-      override lazy val textSource: TextSource = {
-        if (sections.nonEmpty) {
-          val sortedSources = sections.map(_.textSource).sortWith(_ < _)
-          TextSource.fromSpan(sortedSources.head, sortedSources.last)
-        } else {
-          TextSource.empty
-        }
-      }
-    }
-
-    class Sections extends SectionsStatement {
-      val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
-
-      lazy override val sections: Vector[Statement] = statements.toVector
     }
 
     case class VersionStatement(version: Version) extends Statement {
       override def textSource: TextSource = version.text
 
       private val keywordToken = Token.fromStart(Symbols.Version, version.text)
-      private val versionToken = Token.fromStop(version.value.name, version.text)
+      private val versionToken = Token.fromStop(WdlVersion.V1.name, version.text)
 
       override def formatChunks(lineFormatter: LineFormatter): Unit = {
         lineFormatter.appendAll(Vector(keywordToken, versionToken), Wrapping.Never)
@@ -935,7 +930,7 @@ case class WdlV1Formatter(opts: Options,
       override def body: Option[Chunk] = Some(MetadataSection(parameterMeta.kvs))
     }
 
-    case class WorkflowElementBody(elements: Vector[WorkflowElement]) extends SectionsStatement {
+    case class WorkflowElementBody(elements: Vector[WorkflowElement]) extends Sections {
       override val sections: Vector[Statement] = {
         val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
         val declarations: mutable.Buffer[Declaration] = mutable.ArrayBuffer.empty
@@ -960,6 +955,14 @@ case class WdlV1Formatter(opts: Options,
         }
 
         statements.toVector
+      }
+
+      override lazy val textSource: TextSource = {
+        if (sections.nonEmpty) {
+          TextSource.fromSpan(sortedSources.head, sortedSources.last)
+        } else {
+          TextSource.empty
+        }
       }
     }
 
@@ -1051,23 +1054,16 @@ case class WdlV1Formatter(opts: Options,
     }
 
     case class WorkflowSections(workflow: Workflow) extends Sections {
-      if (workflow.input.isDefined) {
-        statements.append(InputsBlock(workflow.input.get))
-      }
-
-      statements.append(WorkflowElementBody(workflow.body))
-
-      if (workflow.output.isDefined) {
-        statements.append(OutputsBlock(workflow.output.get))
-      }
-
-      if (workflow.meta.isDefined) {
-        statements.append(MetaBlock(workflow.meta.get))
-      }
-
-      if (workflow.parameterMeta.isDefined) {
-        statements.append(ParameterMetaBlock(workflow.parameterMeta.get))
-      }
+      override val textSource: TextSource = workflow.text.shift(lineShift = 1, endLineShift = -1)
+      override val sections: Vector[Statement] = Vector(
+          workflow.input.map(InputsBlock),
+          Some(WorkflowElementBody(workflow.body)),
+          workflow.output.map(OutputsBlock),
+          workflow.meta.map(
+              MetaBlock
+          ),
+          workflow.parameterMeta.map(ParameterMetaBlock)
+      ).flatten
     }
 
     case class WorkflowBlock(workflow: Workflow)
@@ -1182,32 +1178,20 @@ case class WdlV1Formatter(opts: Options,
       override def body: Option[Chunk] = Some(RuntimeMetadataSection(runtime.kvs))
     }
 
-    case class TaskSections(task: Task) extends Sections() {
-      if (task.input.isDefined) {
-        statements.append(InputsBlock(task.input.get))
-      }
-
-      if (task.declarations.nonEmpty) {
-        statements.append(DeclarationsSection(task.declarations))
-      }
-
-      statements.append(CommandBlock(task.command))
-
-      if (task.output.isDefined) {
-        statements.append(OutputsBlock(task.output.get))
-      }
-
-      if (task.runtime.isDefined) {
-        statements.append(RuntimeBlock(task.runtime.get))
-      }
-
-      if (task.meta.isDefined) {
-        statements.append(MetaBlock(task.meta.get))
-      }
-
-      if (task.parameterMeta.isDefined) {
-        statements.append(ParameterMetaBlock(task.parameterMeta.get))
-      }
+    case class TaskSections(task: Task) extends Sections {
+      override val textSource: TextSource = task.text.shift(lineShift = 1, endLineShift = -1)
+      override val sections: Vector[Statement] = Vector(
+          task.input.map(InputsBlock),
+          task.declarations match {
+            case v: Vector[Declaration] if v.nonEmpty => Some(DeclarationsSection(v))
+            case _                                    => None
+          },
+          Some(CommandBlock(task.command)),
+          task.output.map(OutputsBlock),
+          task.runtime.map(RuntimeBlock),
+          task.meta.map(MetaBlock),
+          task.parameterMeta.map(ParameterMetaBlock)
+      ).flatten
     }
 
     case class TaskBlock(task: Task) extends BlockStatement(Symbols.Task, task.text) {
@@ -1217,33 +1201,28 @@ case class WdlV1Formatter(opts: Options,
       override def body: Option[Chunk] = Some(TaskSections(task))
     }
 
-    case class DocumentSections() extends Sections {
+    case class DocumentSections(document: Document) extends Sections {
+      override val textSource: TextSource = document.text
       override val topCommentsAllowed: Boolean = false
-
-      statements.append(VersionStatement(document.version))
-
-      private val imports = document.elements.collect { case imp: ImportDoc => imp }
-      if (imports.nonEmpty) {
-        statements.append(ImportsSection(imports))
-      }
-
-      document.elements.foreach {
-        case struct: TypeStruct => statements.append(StructBlock(struct))
-        case _                  => Unit
-      }
-
-      if (document.workflow.isDefined) {
-        statements.append(WorkflowBlock(document.workflow.get))
-      }
-
-      document.elements.foreach {
-        case task: Task => statements.append(TaskBlock(task))
-        case _          => Unit
+      override val sections: Vector[Statement] = {
+        val version = Vector(VersionStatement(document.version))
+        val imports = document.elements.collect { case imp: ImportDoc => imp } match {
+          case v: Vector[ImportDoc] if v.nonEmpty => Vector(ImportsSection(v))
+          case _                                  => Vector.empty
+        }
+        val structs = document.elements.collect {
+          case struct: TypeStruct => StructBlock(struct)
+        }
+        val workflow = document.workflow.map(WorkflowBlock).toVector
+        val tasks = document.elements.collect {
+          case task: Task => TaskBlock(task)
+        }
+        version ++ imports ++ structs ++ workflow ++ tasks
       }
     }
 
     def apply(): Vector[String] = {
-      val documentSections = DocumentSections()
+      val documentSections = DocumentSections(document)
 
       if (opts.verbosity == Verbosity.Verbose) {
         println(Util.prettyFormat(documentSections))
@@ -1266,8 +1245,8 @@ case class WdlV1Formatter(opts: Options,
     }
   }
 
-  def formatDocument(doc: Document): Vector[String] = {
-    FormatterDocument(doc).apply()
+  def formatDocument(document: Document): Vector[String] = {
+    FormatterDocument(document).apply()
   }
 
   def formatDocuments(url: URL): Unit = {
