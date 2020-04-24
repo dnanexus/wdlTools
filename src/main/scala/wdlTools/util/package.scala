@@ -36,3 +36,12 @@ case class Options(localDirectories: Vector[Path] = Vector.empty,
     Util.getURL(pathOrUrl, localDirectories)
   }
 }
+
+/** Configuration for expression evaluation. Some operations perform file IO.
+  *
+  * @param homeDir  the root directory for relative paths, and the root directory for search (glob).
+  * @param tmpDir   directory for placing temporary files.
+  * @param stdout   the file that has a copy of standard output. This is used in the command section.
+  * @param stderr   as above for standard error.
+  */
+case class ExprEvalConfig(homeDir: Path, tmpDir: Path, stdout: Path, stderr: Path)
