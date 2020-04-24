@@ -10,14 +10,14 @@ import wdlTools.eval.WdlValues._
 import wdlTools.util.{ExprEvalConfig, Options, Util}
 import wdlTools.util.Verbosity._
 
-case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
+case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
 
-  private def isURL(pathOrUrl : String) : Boolean = {
+  private def isURL(pathOrUrl: String): Boolean = {
     pathOrUrl.contains("://")
   }
 
   // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-  private def readLocalFile(p : Path) : WV_String = {
+  private def readLocalFile(p: Path): WV_String = {
     if (!Files.exists(p))
       throw new RuntimeException(s"File ${p} not found")
 
@@ -28,9 +28,9 @@ case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
     WV_String(content)
   }
 
-  private def readURLContent(url : URL) : WV_String = {
-    val is =  url.openStream()
-    val buffer : ByteArrayOutputStream  = new ByteArrayOutputStream()
+  private def readURLContent(url: URL): WV_String = {
+    val is = url.openStream()
+    val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
 
     try {
       // read all the bytes from the URL
@@ -47,7 +47,7 @@ case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
       val strVal = new String(buffer.toByteArray(), UTF_8)
       WV_String(strVal)
     } catch {
-      case e : Throwable =>
+      case e: Throwable =>
         Util.error(s"Error reading ${url.toString}")
         throw e
     } finally {
@@ -60,14 +60,14 @@ case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
   //
   // This may be a binary file that does not lend itself to splitting into lines.
   // Hence, we aren't using the Source module.
-  def readFile(pathOrUrl: String) :  WV_String = {
+  def readFile(pathOrUrl: String): WV_String = {
     if (isURL(pathOrUrl)) {
       // A URL
       val url = new URL(pathOrUrl)
       val content = url.getProtocol match {
-        case "http" | "https"  => readURLContent(new URL(pathOrUrl))
-        case "file"  => readLocalFile(Paths.get(pathOrUrl))
-        case _       => throw new RuntimeException(s"unknown protocol in URL ${url}")
+        case "http" | "https" => readURLContent(new URL(pathOrUrl))
+        case "file"           => readLocalFile(Paths.get(pathOrUrl))
+        case _                => throw new RuntimeException(s"unknown protocol in URL ${url}")
       }
       return content
     }
@@ -77,15 +77,14 @@ case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
     readLocalFile(p)
   }
 
-
   /**
     * Write "content" to the specified "path" location
     */
   def writeFile(pathOrUrl: String, content: String): WV_File = {
     if (isURL(pathOrUrl)) {
-        throw new RuntimeException(
-            s"writeFile: implemented only for local files (${pathOrUrl})"
-        )
+      throw new RuntimeException(
+          s"writeFile: implemented only for local files (${pathOrUrl})"
+      )
     }
 
     val path = Paths.get(pathOrUrl)
@@ -133,13 +132,13 @@ case class IoFunctions(opts : Options, evalCfg : ExprEvalConfig) {
       // A url
       // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
       val url = new URL(pathOrUrl)
-      var conn : HttpURLConnection = null
+      var conn: HttpURLConnection = null
       try {
         conn = url.openConnection().asInstanceOf[HttpURLConnection]
         conn.setRequestMethod("HEAD")
         return conn.getContentLengthLong()
       } catch {
-        case e : Throwable =>
+        case e: Throwable =>
           throw e
       } finally {
         if (conn != null) {

@@ -43,8 +43,5 @@ case class Options(localDirectories: Vector[Path] = Vector.empty,
   * @param tmpDir   directory for placing temporary files.
   * @param stdout   the file that has a copy of standard output. This is used in the command section.
   * @param stderr   as above for standard error.
- */
-case class ExprEvalConfig(homeDir: Path,
-                          tmpDir: Path,
-                          stdout: Path,
-                          stderr: Path)
+  */
+case class ExprEvalConfig(homeDir: Path, tmpDir: Path, stdout: Path, stderr: Path)
