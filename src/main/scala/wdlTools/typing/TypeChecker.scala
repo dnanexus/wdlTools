@@ -4,10 +4,10 @@ import java.net.URL
 import java.nio.file.Paths
 
 import wdlTools.syntax.AbstractSyntax._
-import WdlTypes._
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.Util
+import WdlTypes._
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
