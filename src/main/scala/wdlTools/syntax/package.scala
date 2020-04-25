@@ -56,6 +56,15 @@ object TextSource {
   }
 }
 
+// A syntax error that occured when parsing a document. It is generated
+// by the ANTLR machinery and we transform it into this format.
+final case class SyntaxError(docSourceURL : Option[URL],
+                             symbol: String,
+                             line: Int,
+                             charPositionInLine: Int,
+                             msg: String)
+
+/*
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
@@ -69,6 +78,7 @@ object SyntaxException {
     s"${msg} at ${text}${urlPart}"
   }
 }
+ */
 
 /**
   * Type hierarchy for comments.

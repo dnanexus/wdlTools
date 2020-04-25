@@ -1,17 +1,19 @@
 package wdlTools.syntax
 
+import java.net.URL
 import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
 
-import wdlTools.util.Options
+// Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
+//
+case class WdlAggregatingErrorListener(docSourceURL : Option[URL]) extends BaseErrorListener {
 
-case class SyntaxError(symbol: String, line: Int, charPositionInLine: Int, msg: String)
+  private var errors = Vector.empty[SyntaxError]
 
-case class ErrorListener(conf: Options) extends BaseErrorListener {
-  var errors = Vector.empty[SyntaxError]
-
+  // This is called by the antlr grammar, we have no control
+  // over this behavior.
   override def syntaxError(recognizer: Recognizer[_, _],
                            offendingSymbol: Any,
                            line: Int,
@@ -25,9 +27,15 @@ case class ErrorListener(conf: Options) extends BaseErrorListener {
         case _ =>
           offendingSymbol.toString
       }
-    val err = SyntaxError(symbolText, line, charPositionInLine, msg)
+    val err = SyntaxError(docSourceURL, symbolText, line, charPositionInLine, msg)
     errors = errors :+ err
   }
 
-  def getAllErrors: Vector[SyntaxError] = errors
+  def getErrors() : Vector[SyntaxError] = {
+    return errors
+  }
+
+  def hasErrors() : Boolean = {
+    errors.nonEmpty
+  }
 }

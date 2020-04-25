@@ -25,9 +25,9 @@ case class ParseTop(opts: Options,
   }
 
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
-    if (identifier == null)
-      throw new SyntaxException("missing identifier", getTextSource(ctx), docSourceURL)
-    identifier.getText
+/*    if (identifier == null)
+      throw new SyntaxException("missing identifier", getTextSource(ctx), docSourceURL)*/
+    identifier.getText()
   }
 
   /*

@@ -8,7 +8,6 @@ import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options) extends WdlParser(opts) {
-  // cache of documents that have already been fetched and parsed.
   private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private case class Translator(docSourceURL: Option[URL] = None) {
@@ -369,9 +368,23 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val grammar = grammarFactory.createGrammar(sourceCode.toString, Some(sourceCode.url))
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
-    val top: ConcreteSyntax.Document = visitor.parseDocument
+    val errorListener = grammar.errListener
+    val top: ConcreteSyntax.Document =
+      try {
+        val doc = visitor.parseDocument
+        if (errorListener.hasErrors())
+          throw new SyntaxException(errorListener.getErrors())
+        doc
+      } catch {
+        case e : SyntaxException =>
+          throw e
+        case e : Throwable if errorListener.hasErrors() =>
+          throw new SyntaxException(errorListener.getErrors())
+        case _ =>
+          throw new WdlSyntaxError("Encountered a non recoverable syntax error", e)
+      }
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)
   }

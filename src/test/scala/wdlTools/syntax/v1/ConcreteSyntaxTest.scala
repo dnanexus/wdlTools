@@ -3,7 +3,8 @@ package wdlTools.syntax.v1
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.WdlVersion
+
+import wdlTools.syntax.{Edge /*, SyntaxException */ , WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
@@ -607,5 +608,11 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.body.size shouldBe 1
     val call = wf.body.head.asInstanceOf[Call]
     call.name shouldBe "cd.count_dogs"
+  }
+
+  it should "report extra comma" taggedAs Edge in {
+//    assertThrows[SyntaxException] {
+      getDocument(getTaskSource("extra_comma.wdl"))
+//    }
   }
 }
