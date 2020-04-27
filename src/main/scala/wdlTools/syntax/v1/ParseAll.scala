@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import java.net.URL
 
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
-import wdlTools.syntax.{SyntaxException, WdlParser, AbstractSyntax => AST}
+import wdlTools.syntax.{SyntaxError, SyntaxAggregateException, SyntaxException, WdlParser, AbstractSyntax => AST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
@@ -371,20 +371,17 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     val grammar = grammarFactory.createGrammar(sourceCode.toString, Some(sourceCode.url))
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val errorListener = grammar.errListener
-    val top: ConcreteSyntax.Document =
-      try {
-        val doc = visitor.parseDocument
-        if (errorListener.hasErrors())
-          throw new SyntaxException(errorListener.getErrors())
-        doc
-      } catch {
-        case e : SyntaxException =>
-          throw e
-        case e : Throwable if errorListener.hasErrors() =>
-          throw new SyntaxException(errorListener.getErrors())
-        case _ =>
-          throw new WdlSyntaxError("Encountered a non recoverable syntax error", e)
+    val top: ConcreteSyntax.Document = visitor.parseDocument
+    if (errorListener.hasErrors()) {
+      // make one big report on all the syntax errors
+      val messages = errorListener.getErrors().map{
+        case SyntaxError(docSourceURL, symbol, line, position, msg) =>
+          val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+          s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
       }
+      val accuMsg = messages.mkString("\n")
+      throw new SyntaxAggregateException(accuMsg)
+    }
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)
   }

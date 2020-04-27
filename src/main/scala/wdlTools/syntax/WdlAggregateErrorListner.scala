@@ -12,8 +12,9 @@ case class WdlAggregatingErrorListener(docSourceURL : Option[URL]) extends BaseE
 
   private var errors = Vector.empty[SyntaxError]
 
-  // This is called by the antlr grammar, we have no control
-  // over this behavior.
+  // This is called by the antlr grammar during parsing.
+  // We collect these errors in a list, and report collectively
+  // when parsing is complete.
   override def syntaxError(recognizer: Recognizer[_, _],
                            offendingSymbol: Any,
                            line: Int,

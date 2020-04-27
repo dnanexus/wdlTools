@@ -64,7 +64,8 @@ final case class SyntaxError(docSourceURL : Option[URL],
                              charPositionInLine: Int,
                              msg: String)
 
-/*
+final class SyntaxAggregateException(message: String) extends Exception(message)
+
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
@@ -78,7 +79,7 @@ object SyntaxException {
     s"${msg} at ${text}${urlPart}"
   }
 }
- */
+
 
 /**
   * Type hierarchy for comments.

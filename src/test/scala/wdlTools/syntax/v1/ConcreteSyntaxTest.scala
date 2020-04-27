@@ -4,7 +4,7 @@ import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
 
-import wdlTools.syntax.{Edge /*, SyntaxException */ , WdlVersion}
+import wdlTools.syntax.{Edge, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
@@ -611,8 +611,8 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   }
 
   it should "report extra comma" taggedAs Edge in {
-//    assertThrows[SyntaxException] {
-      getDocument(getTaskSource("extra_comma.wdl"))
-//    }
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("extra_comma.wdl"))
+    }
   }
 }
