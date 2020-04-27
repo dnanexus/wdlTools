@@ -43,7 +43,7 @@ object Antlr4Util {
 
   case class Grammar[L <: Lexer, P <: Parser](lexer: L,
                                               parser: P,
-                                              errListener: ErrorListener,
+                                              errListener: WdlAggregatingErrorListener,
                                               commentChannelName: String,
                                               docSourceURL: Option[URL] = None,
                                               opts: Options) {
@@ -52,7 +52,7 @@ object Antlr4Util {
 
     def verify(): Unit = {
       // check if any errors were found
-      val errors: Vector[SyntaxError] = errListener.getAllErrors
+      val errors: Vector[SyntaxError] = errListener.getErrors
       if (errors.nonEmpty) {
         if (opts.verbosity > Verbosity.Quiet) {
           for (err <- errors) {
@@ -135,14 +135,14 @@ object Antlr4Util {
       createGrammar(sourceCode.toString, Some(sourceCode.url))
     }
 
-    def createGrammar(inp: String, docSourceUrl: Option[URL] = None): Grammar[L, P] = {
+    def createGrammar(inp: String, docSourceURL: Option[URL] = None): Grammar[L, P] = {
       val codePointBuffer: CodePointBuffer =
         CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
       val lexer: L = createLexer(CodePointCharStream.fromBuffer(codePointBuffer))
       val parser: P = createParser(new CommonTokenStream(lexer))
 
       // setting up our own error handling
-      val errListener = ErrorListener(opts)
+      val errListener = new WdlAggregatingErrorListener(docSourceURL)
       lexer.removeErrorListeners()
       lexer.addErrorListener(errListener)
       parser.removeErrorListeners()
@@ -152,7 +152,7 @@ object Antlr4Util {
         parser.setTrace(true)
       }
 
-      Grammar(lexer, parser, errListener, commentChannelName, docSourceUrl, opts)
+      Grammar(lexer, parser, errListener, commentChannelName, docSourceURL, opts)
     }
 
     def createLexer(charStream: CharStream): L
