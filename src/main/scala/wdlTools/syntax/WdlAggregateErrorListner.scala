@@ -8,7 +8,7 @@ import org.antlr.v4.runtime.Token
 
 // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
 //
-case class WdlAggregatingErrorListener(docSourceURL : Option[URL]) extends BaseErrorListener {
+case class WdlAggregatingErrorListener(docSourceURL: Option[URL]) extends BaseErrorListener {
 
   private var errors = Vector.empty[SyntaxError]
 
@@ -32,11 +32,11 @@ case class WdlAggregatingErrorListener(docSourceURL : Option[URL]) extends BaseE
     errors = errors :+ err
   }
 
-  def getErrors() : Vector[SyntaxError] = {
+  def getErrors(): Vector[SyntaxError] = {
     return errors
   }
 
-  def hasErrors() : Boolean = {
+  def hasErrors(): Boolean = {
     errors.nonEmpty
   }
 }

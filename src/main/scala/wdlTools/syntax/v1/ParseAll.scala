@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import java.net.URL
 
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
-import wdlTools.syntax.{SyntaxError, SyntaxAggregateException, SyntaxException, WdlParser, AbstractSyntax => AST}
+import wdlTools.syntax.{SyntaxException, WdlParser, AbstractSyntax => AST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
@@ -370,18 +370,10 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
     val grammar = grammarFactory.createGrammar(sourceCode.toString, Some(sourceCode.url))
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
-    val errorListener = grammar.errListener
     val top: ConcreteSyntax.Document = visitor.parseDocument
-    if (errorListener.hasErrors()) {
-      // make one big report on all the syntax errors
-      val messages = errorListener.getErrors().map{
-        case SyntaxError(docSourceURL, symbol, line, position, msg) =>
-          val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
-          s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
-      }
-      val accuMsg = messages.mkString("\n")
-      throw new SyntaxAggregateException(accuMsg)
-    }
+    val errorListener = grammar.errListener
+    if (errorListener.hasErrors())
+      throw new SyntaxException(errorListener.getErrors())
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)
   }

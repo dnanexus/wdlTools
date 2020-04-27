@@ -58,18 +58,19 @@ object TextSource {
 
 // A syntax error that occured when parsing a document. It is generated
 // by the ANTLR machinery and we transform it into this format.
-final case class SyntaxError(docSourceURL : Option[URL],
+final case class SyntaxError(docSourceURL: Option[URL],
                              symbol: String,
                              line: Int,
                              charPositionInLine: Int,
                              msg: String)
 
-final class SyntaxAggregateException(message: String) extends Exception(message)
-
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
     this(SyntaxException.formatMessage(msg, text, docSourceURL))
+  }
+  def this(errors: Seq[SyntaxError]) = {
+    this(SyntaxException.formatMessageFromErrorList(errors))
   }
 }
 
@@ -78,8 +79,17 @@ object SyntaxException {
     val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
     s"${msg} at ${text}${urlPart}"
   }
-}
 
+  def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
+    // make one big report on all the syntax errors
+    val messages = errors.map {
+      case SyntaxError(docSourceURL, symbol, line, position, msg) =>
+        val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+        s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
+    }
+    messages.mkString("\n")
+  }
+}
 
 /**
   * Type hierarchy for comments.
