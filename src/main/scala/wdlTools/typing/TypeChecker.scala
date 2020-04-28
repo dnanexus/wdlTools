@@ -7,7 +7,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.Util
-import WdlTypes._
+import wdlTools.typing.WdlTypes._
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
