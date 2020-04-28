@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{ExprEvalConfig, Options, Util, Verbosity}
+import wdlTools.util.{ExprEvalConfig, Options, Util => UUtil, Verbosity}
 import wdlTools.typing.{Stdlib => TypeStdlib, TypeChecker}
 
 class EvalTest extends FlatSpec with Matchers {
@@ -38,7 +38,7 @@ class EvalTest extends FlatSpec with Matchers {
   }
 
   def parseAndTypeCheck(file: Path): AST.Document = {
-    val doc = parser.parseDocument(Util.pathToURL(file))
+    val doc = parser.parseDocument(UUtil.pathToURL(file))
     checker.apply(doc)
     doc
   }
@@ -57,9 +57,9 @@ class EvalTest extends FlatSpec with Matchers {
     val decls: Vector[AST.Declaration] = wf.body.collect {
       case x: AST.Declaration => x
     }.toVector
-    for (decl <- decls) {
-      val wdlValue = evaluator.apply(decl.expr.get)
-      ignore(wdlValue)
-    }
+
+    val ctx = wdlTools.eval.Context(Map.empty, Map.empty)
+    val ctxEnd = evaluator.applyDeclarations(decls, ctx)
+    ctxEnd shouldBe(Map.empty)
   }
 }

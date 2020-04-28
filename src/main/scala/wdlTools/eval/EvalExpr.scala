@@ -3,17 +3,17 @@ package wdlTools.eval
 import java.net.URL
 
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
 import wdlTools.util.{ExprEvalConfig, Options}
 
 case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option[URL]) {
 
-  private def toString(value: WV, text: TextSource): String = {
+  private def getStringVal(value: WV, text: TextSource): String = {
     value match {
       case WV_String(s) => s
       case WV_File(s)   => s
-      case other        => throw new EvaluationException(s"bad value ${other}", text, docSourceURL)
+      case other        => throw new EvalException(s"bad value ${other}", text, docSourceURL)
     }
   }
 
@@ -87,7 +87,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_String(s1), WV_String(s2)) => s1 < s2
       case (WV_File(p1), WV_File(p2))     => p1 < p2
       case (_, _) =>
-        throw new EvaluationException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceURL)
     }
   }
 
@@ -101,7 +101,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_String(s1), WV_String(s2)) => s1 <= s2
       case (WV_File(p1), WV_File(p2))     => p1 <= p2
       case (_, _) =>
-        throw new EvaluationException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceURL)
     }
   }
 
@@ -115,7 +115,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_String(s1), WV_String(s2)) => s1 > s2
       case (WV_File(p1), WV_File(p2))     => p1 > p2
       case (_, _) =>
-        throw new EvaluationException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceURL)
     }
   }
 
@@ -129,7 +129,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_String(s1), WV_String(s2)) => s1 >= s2
       case (WV_File(p1), WV_File(p2))     => p1 >= p2
       case (_, _) =>
-        throw new EvaluationException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceURL)
     }
   }
 
@@ -153,7 +153,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_File(s1), WV_File(s2))   => WV_File(s1 + s2)
 
       case (_, _) =>
-        throw new EvaluationException("cannot add these values", text, docSourceURL)
+        throw new EvalException("cannot add these values", text, docSourceURL)
     }
   }
 
@@ -164,7 +164,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 - x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 - x2)
       case (_, _) =>
-        throw new EvaluationException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
     }
   }
 
@@ -175,7 +175,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 % x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 % x2)
       case (_, _) =>
-        throw new EvaluationException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
     }
   }
 
@@ -186,7 +186,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 * x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 * x2)
       case (_, _) =>
-        throw new EvaluationException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
     }
   }
 
@@ -194,219 +194,321 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
     (a, b) match {
       case (WV_Int(n1), WV_Int(n2)) =>
         if (n2 == 0)
-          throw new EvaluationException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceURL)
         WV_Int(n1 / n2)
       case (WV_Float(x1), WV_Int(n2)) =>
         if (n2 == 0)
-          throw new EvaluationException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceURL)
         WV_Float(x1 / n2)
       case (WV_Int(n1), WV_Float(x2)) =>
         if (x2 == 0)
-          throw new EvaluationException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceURL)
         WV_Float(n1 / x2)
       case (WV_Float(x1), WV_Float(x2)) =>
         if (x2 == 0)
-          throw new EvaluationException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceURL)
         WV_Float(x1 / x2)
       case (_, _) =>
-        throw new EvaluationException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
     }
   }
 
-  def apply(expr: Expr): WdlValues.WV = {
+  // Access a field in a struct or an object. For example:
+  //   Int z = x.a
+  private def exprGetName(value : WV, id : String, ctx : Context, text: TextSource) : WV = {
+    value match {
+      case WV_Struct(name, members) =>
+        members.get(id) match {
+          case None =>
+            throw new EvalException(s"Struct ${name} does not have member ${id}",
+              text, docSourceURL)
+          case Some(t) => t
+        }
+
+      case WV_Object(members) =>
+        members.get(id) match {
+          case None =>
+            throw new EvalException(s"Object does not have member ${id}",
+              text, docSourceURL)
+          case Some(t) => t
+        }
+
+      case WV_Call(name, members) =>
+        members.get(id) match {
+          case None =>
+            throw new EvalException(s"Call object ${name} does not have member ${id}",
+              text, docSourceURL)
+          case Some(t) => t
+        }
+
+      // accessing a pair element
+      case WV_Pair(l, _) if id.toLowerCase() == "left"  => l
+      case WV_Pair(_, r) if id.toLowerCase() == "right" => r
+      case WV_Pair(_, _) =>
+        throw new EvalException(s"accessing a pair with (${id}) is illegal",
+                                text, docSourceURL)
+
+      case _ =>
+        throw new EvalException(s"member access (${id}) in expression is illegal",
+                                text, docSourceURL)
+    }
+  }
+
+  def apply(expr: AST.Expr, ctx : Context): WdlValues.WV = {
     expr match {
       // concatenate an array of strings inside a command block
-      case ExprCompoundString(vec: Vector[Expr], _) =>
+      case AST.ExprCompoundString(vec: Vector[AST.Expr], _) =>
         val strArray: Vector[String] = vec.map { x =>
-          toString(apply(x), x.text)
+          val xv = apply(x, ctx)
+          getStringVal(xv, x.text)
         }
         WV_String(strArray.mkString(""))
 
       // ~{true="--yes" false="--no" boolean_value}
-      case ExprPlaceholderEqual(t: Expr, f: Expr, boolExpr: Expr, _) =>
-        apply(boolExpr) match {
-          case WV_Boolean(true)  => apply(t)
-          case WV_Boolean(false) => apply(f)
+      case AST.ExprPlaceholderEqual(t, f, boolExpr, _) =>
+        apply(boolExpr, ctx) match {
+          case WV_Boolean(true)  => apply(t, ctx)
+          case WV_Boolean(false) => apply(f, ctx)
           case other =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           expr.text,
                                           docSourceURL)
         }
 
       // ~{default="foo" optional_value}
-      case ExprPlaceholderDefault(defaultVal: Expr, optVal: Expr, _) =>
-        apply(optVal) match {
-          case WV_Null => apply(defaultVal)
+      case AST.ExprPlaceholderDefault(defaultVal, optVal, _) =>
+        apply(optVal, ctx) match {
+          case WV_Null => apply(defaultVal, ctx)
           case other   => other
         }
 
       // ~{sep=", " array_value}
-      case ExprPlaceholderSep(sep: Expr, arrayVal: Expr, _) =>
-        val sep2 = toString(apply(sep), sep.text)
-        apply(arrayVal) match {
+      case AST.ExprPlaceholderSep(sep: AST.Expr, arrayVal: AST.Expr, _) =>
+        val sep2 = getStringVal(apply(sep, ctx), sep.text)
+        apply(arrayVal, ctx) match {
           case WV_Array(ar) =>
             val elements: Vector[String] = ar.map { x =>
-              toString(x, expr.text)
+              getStringVal(x, expr.text)
             }
             WV_String(elements.mkString(sep2))
           case other =>
-            throw new EvaluationException(s"bad value ${other}, should be a string",
+            throw new EvalException(s"bad value ${other}, should be a string",
                                           expr.text,
                                           docSourceURL)
         }
 
       // operators on one argument
-      case ExprUniraryPlus(e, _) =>
-        apply(e) match {
+      case AST.ExprUniraryPlus(e, _) =>
+        apply(e, ctx) match {
           case WV_Float(f) => WV_Float(f)
           case WV_Int(k)   => WV_Int(k)
           case other =>
-            throw new EvaluationException(s"bad value ${other}, should be a number",
+            throw new EvalException(s"bad value ${other}, should be a number",
                                           expr.text,
                                           docSourceURL)
         }
 
-      case ExprUniraryMinus(e, _) =>
-        apply(e) match {
+      case AST.ExprUniraryMinus(e, _) =>
+        apply(e, ctx) match {
           case WV_Float(f) => WV_Float(-1 * f)
           case WV_Int(k)   => WV_Int(-1 * k)
           case other =>
-            throw new EvaluationException(s"bad value ${other}, should be a number",
+            throw new EvalException(s"bad value ${other}, should be a number",
                                           expr.text,
                                           docSourceURL)
         }
 
-      case ExprNegate(e, _) =>
-        apply(e) match {
+      case AST.ExprNegate(e, _) =>
+        apply(e, ctx) match {
           case WV_Boolean(b) => WV_Boolean(!b)
           case other =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           expr.text,
                                           docSourceURL)
         }
 
       // operators on two arguments
-      case ExprLor(a, b, _) =>
-        (apply(a), apply(b)) match {
+      case AST.ExprLor(a, b, _) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
+                      (av, bv) match {
           case (WV_Boolean(a1), WV_Boolean(b1)) =>
             WV_Boolean(a1 || b1)
           case (WV_Boolean(_), other) =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           b.text,
                                           docSourceURL)
           case (other, _) =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           a.text,
                                           docSourceURL)
         }
 
-      case ExprLand(a, b, _) =>
-        (apply(a), apply(b)) match {
+      case AST.ExprLand(a, b, _) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
+        (av, bv) match {
           case (WV_Boolean(a1), WV_Boolean(b1)) =>
             WV_Boolean(a1 && b1)
           case (WV_Boolean(_), other) =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           b.text,
                                           docSourceURL)
           case (other, _) =>
-            throw new EvaluationException(s"bad value ${other}, should be a boolean",
+            throw new EvalException(s"bad value ${other}, should be a boolean",
                                           a.text,
                                           docSourceURL)
         }
 
       // recursive comparison
-      case ExprEqeq(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprEqeq(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(compareEqeq(av, bv, text))
-      case ExprNeq(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprNeq(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(!compareEqeq(av, bv, text))
 
-      case ExprLt(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprLt(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(compareLt(av, bv, text))
-      case ExprLte(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprLte(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(compareLte(av, bv, text))
-      case ExprGt(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprGt(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(compareGt(av, bv, text))
-      case ExprGte(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprGte(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         WV_Boolean(compareGte(av, bv, text))
 
       // Add is overloaded, can be used to add numbers or concatenate strings
-      case ExprAdd(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprAdd(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         add(av, bv, text)
 
       // Math operations
-      case ExprSub(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprSub(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         sub(av, bv, text)
-      case ExprMod(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprMod(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         mod(av, bv, text)
-      case ExprMul(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprMul(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         multiply(av, bv, text)
-      case ExprDivide(a, b, text) =>
-        val av = apply(a)
-        val bv = apply(b)
+      case AST.ExprDivide(a, b, text) =>
+        val av = apply(a, ctx)
+        val bv = apply(b, ctx)
         divide(av, bv, text)
 
       // Access an array element at [index]
-      case ExprAt(array, index, text) =>
-        val array_v = apply(array)
-        val index_v = apply(index)
+      case AST.ExprAt(array, index, text) =>
+        val array_v = apply(array, ctx)
+        val index_v = apply(index, ctx)
         (array_v, index_v) match {
           case (WV_Array(av), WV_Int(n)) if n < av.size =>
             av(n)
           case (WV_Array(av), WV_Int(n)) =>
             val arraySize = av.size
-            throw new EvaluationException(
+            throw new EvalException(
                 s"array access out of bounds (size=${arraySize}, element accessed=${n})",
                 text,
                 docSourceURL
             )
           case (_, _) =>
-            throw new EvaluationException(s"array access requires an array and an integer",
+            throw new EvalException(s"array access requires an array and an integer",
                                           text,
                                           docSourceURL)
         }
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
-      case ExprIfThenElse(cond, tBranch, fBranch, text) =>
-        val cond_v = apply(cond)
+      case AST.ExprIfThenElse(cond, tBranch, fBranch, text) =>
+        val cond_v = apply(cond, ctx)
         cond_v match {
-          case WV_Boolean(true)  => apply(tBranch)
-          case WV_Boolean(false) => apply(fBranch)
+          case WV_Boolean(true)  => apply(tBranch, ctx)
+          case WV_Boolean(false) => apply(fBranch, ctx)
           case other =>
-            throw new EvaluationException(s"condition is not boolean", text, docSourceURL)
+            throw new EvalException(s"condition is not boolean", text, docSourceURL)
         }
-
-      case _ => throw new Exception("not implemented")
-      /*
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case ExprApply(funcName: String, elements: Vector[Expr], text: TextSource) extends Expr
+      case AST.ExprApply(funcName, elements, text) =>
+        throw new Exception("stdlib not implemented yet")
 
-  // Access a field in a struct or an object. For example:
-  //   Int z = x.a
-  case class ExprGetName(e: Expr, id: String, text: TextSource) extends Expr
- } */
+      // Access a field in a struct or an object. For example:
+      //   Int z = x.a
+      case AST.ExprGetName(e: AST.Expr, fieldName, text) =>
+        val ev = apply(e, ctx)
+        exprGetName(ev, fieldName, ctx, text)
+
+      case other =>
+        throw new Exception(s"expression ${AST.exprToString(other)} not implemented yet")
+    }
+  }
+
+  private def coerceTo(wdlType : AST.Type, value : WV) : WV = {
+    (wdlType, value) match {
+      // primitive types
+      case (AST.TypeBoolean(_), WV_Boolean(_)) => value
+      case (AST.TypeInt(_), WV_Int(_)) => value
+      case (AST.TypeInt(_), WV_Float(x)) => WV_Int(x.toInt)
+      case (AST.TypeFloat(_), WV_Int(n)) => WV_Float(n.toFloat)
+      case (AST.TypeFloat(_), WV_Float(x)) => value
+      case (AST.TypeString(_), WV_String(_))  => value
+      case (AST.TypeString(_), WV_File(s))  => WV_String(s)
+      case (AST.TypeFile(_), WV_String(s)) => WV_File(s)
+      case (AST.TypeFile(_), WV_File(_)) => value
+
+        // compound types
+        // recursively descend into the sub structures and coerce them.
+      case (AST.TypeOptional(t2, _), WV_Optional(value2)) =>
+        WV_Optional(coerceTo(t2, value2))
+      case (AST.TypeArray(t2, nonEmpty, text), WV_Array(vec)) =>
+        if (nonEmpty && vec.isEmpty)
+          throw new EvalException("array is empty", text, docSourceURL)
+        WV_Array(vec.map{ x => coerceTo(t2, x) })
+
+      case (AST.TypeMap(kt, vt, text), WV_Map(m)) =>
+        WV_Map(m.map{ case (k,v) =>
+                 coerceTo(kt, k) -> coerceTo(vt, v)
+               })
+      case (AST.TypePair(lt, rt, _), WV_Pair(l,r)) =>
+        WV_Pair(coerceTo(lt, l), coerceTo(rt, r))
+
+      case (AST.TypeIdentifier(id, text), WV_Struct(name, _)) =>
+        if (id != name)
+          throw new EvalException(s"cannot coerce struct ${name} to struct ${id}", text, docSourceURL)
+        value
+
+      case (AST.TypeObject(_), WV_Object(_)) => value
+
+      case (t, other) =>
+        throw new EvalException(s"value ${other} cannot be coerced to type ${t}",
+                                wdlType.text, docSourceURL)
+    }
+  }
+
+  // Evaluate all the declarations and return a context
+  def applyDeclarations(decls : Vector[AST.Declaration], ctx : Context) : Context = {
+    decls.foldLeft(ctx) {
+      case (accu, AST.Declaration(name, wdlType, Some(expr), _, _)) =>
+        val value = apply(expr, ctx)
+        val value2 = coerceTo(wdlType, value)
+        ctx.addBinding(name, value2)
+      case (accu, ast) =>
+        throw new Exception(s"Can not evaluate element ${ast.getClass}")
     }
   }
 }
