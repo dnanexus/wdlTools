@@ -8,7 +8,7 @@ import wdlTools.util.TypeCheckingRegime._
 import WdlTypes._
 
 // This is the WDL typesystem
-case class TUtil(conf: Options) {
+case class Util(conf: Options) {
   // Type checking rules, are we lenient or strict in checking coercions.
   private val regime = conf.typeChecking
 

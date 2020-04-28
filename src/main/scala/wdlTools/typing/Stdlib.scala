@@ -6,7 +6,7 @@ import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
 import wdlTools.syntax.{AbstractSyntax, TextSource}
-//import wdlTools.util.Util
+import wdlTools.typing.{Util => TUtil}
 
 case class Stdlib(conf: Options) {
   private val tUtil = TUtil(conf)
@@ -67,7 +67,7 @@ case class Stdlib(conf: Options) {
       WT_Function1("floor", WT_Float, WT_Int),
       WT_Function1("ceil", WT_Float, WT_Int),
       WT_Function1("round", WT_Float, WT_Int),
-      // extras not mentioned in the specification
+      // not mentioned in the specification
       WT_Function1("glob", WT_String, WT_Array(WT_File))
   )
 

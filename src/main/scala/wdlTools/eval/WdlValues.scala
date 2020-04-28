@@ -15,11 +15,10 @@ object WdlValues {
 
   // compound values
   case class WV_Pair(l: WV, r: WV) extends WV
-  case class WV_Array(value : Vector[WV]) extends WV
-  case class WV_Map(value : Map[WV, WV]) extends WV
+  case class WV_Array(value: Vector[WV]) extends WV
+  case class WV_Map(value: Map[WV, WV]) extends WV
   case class WV_Optional(value: WV) extends WV
-  case class WV_Struct(name: String,
-                       members: Map[String, WV])
-  case class WV_Object(members: Map[String, WV])
+  case class WV_Struct(name: String, members: Map[String, WV]) extends WV
+  case class WV_Object(members: Map[String, WV]) extends WV
 
 }

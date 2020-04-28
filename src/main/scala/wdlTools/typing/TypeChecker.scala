@@ -6,8 +6,9 @@ import java.nio.file.Paths
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
-import wdlTools.util.Util
+import wdlTools.util.{Util => UUtil}
 import wdlTools.typing.WdlTypes._
+import wdlTools.typing.{Util => TUtil}
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
@@ -1047,7 +1048,7 @@ case class TypeChecker(stdlib: Stdlib) {
               // will be named:
               //    stdlib
               //    C
-              val url = Util.getURL(iStat.addr.value, stdlib.conf.localDirectories)
+              val url = UUtil.getURL(iStat.addr.value, stdlib.conf.localDirectories)
               val nsName = Paths.get(url.getFile).getFileName.toString
               if (nsName.endsWith(".wdl"))
                 nsName.dropRight(".wdl".length)
