@@ -7,10 +7,10 @@ import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
 import scala.collection.JavaConverters._
 
 import wdlTools.eval.WdlValues._
-import wdlTools.util.{ExprEvalConfig, Options, Util}
+import wdlTools.util.{EvalConfig, Options, Util}
 import wdlTools.util.Verbosity._
 
-case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
+case class IoFunctions(opts: Options, evalCfg: EvalConfig) {
 
   private def isURL(pathOrUrl: String): Boolean = {
     pathOrUrl.contains("://")

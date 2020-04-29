@@ -5,8 +5,8 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{ExprEvalConfig, Options, Util => UUtil, Verbosity}
-import wdlTools.typing.{Stdlib => TypeStdlib, TypeChecker}
+import wdlTools.util.{EvalConfig, Options, Util => UUtil, Verbosity}
+import wdlTools.typing.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
 class EvalTest extends FlatSpec with Matchers {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
@@ -26,7 +26,7 @@ class EvalTest extends FlatSpec with Matchers {
     }
   }
 
-  private lazy val evalCfg: ExprEvalConfig = {
+  private lazy val evalCfg: EvalConfig = {
     val baseDir = Paths.get("/tmp/evalTest")
     val homeDir = baseDir.resolve("home")
     val tmpDir = baseDir.resolve("tmp")
@@ -34,13 +34,13 @@ class EvalTest extends FlatSpec with Matchers {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    ExprEvalConfig(homeDir, tmpDir, stdout, stderr)
+    EvalConfig(homeDir, tmpDir, stdout, stderr)
   }
 
-  def parseAndTypeCheck(file: Path): AST.Document = {
+  def parseAndTypeCheck(file: Path): (AST.Document, TypeContext) = {
     val doc = parser.parseDocument(UUtil.pathToURL(file))
-    checker.apply(doc)
-    doc
+    val typeCtx = checker.apply(doc)
+    (doc, typeCtx)
   }
 
   // ignore a value without causing a compilation error
@@ -48,8 +48,11 @@ class EvalTest extends FlatSpec with Matchers {
 
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
-    val doc = parseAndTypeCheck(file)
-    val evaluator = EvalExpr(opts, evalCfg, Some(opts.getURL(file.toString)))
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         Some(opts.getURL(file.toString)))
 
     doc.workflow should not be empty
     val wf = doc.workflow.get
@@ -58,8 +61,7 @@ class EvalTest extends FlatSpec with Matchers {
       case x: AST.Declaration => x
     }.toVector
 
-    val ctx = wdlTools.eval.Context(Map.empty, Map.empty)
-    val ctxEnd = evaluator.applyDeclarations(decls, ctx)
+    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     ctxEnd shouldBe(Map.empty)
   }
 }

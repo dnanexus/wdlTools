@@ -6,9 +6,12 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
 import wdlTools.typing.WdlTypes
-import wdlTools.util.{ExprEvalConfig, Options}
+import wdlTools.util.{EvalConfig, Options}
 
-case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option[URL]) {
+case class Eval(opts: Options,
+                evalCfg: EvalConfig,
+                structDefs : Map[String, WdlTypes.WT_Struct],
+                docSourceURL: Option[URL]) {
 
   private def getStringVal(value: WV, text: TextSource): String = {
     value match {
@@ -555,31 +558,37 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
   }
 
 
-  private def typeFromAst(t : AST.Type, ctx : Context) : WdlTypes.WT = {
-    t match {
-      case AST.TypeBoolean(_) => WdlTypes.WT_Boolean
-      case AST.TypeInt(_) => WdlTypes.WT_Int
-      case AST.TypeFloat(_) => WdlTypes.WT_Float
-      case AST.TypeString(_) => WdlTypes.WT_String
-      case AST.TypeFile(_) => WdlTypes.WT_File
+  private def typeFromAst(t : AST.Type, text : TextSource) : WdlTypes.WT = {
+    def inner(t : AST.Type) : WdlTypes.WT = {
+      t match {
+        case AST.TypeBoolean(_) => WdlTypes.WT_Boolean
+        case AST.TypeInt(_) => WdlTypes.WT_Int
+        case AST.TypeFloat(_) => WdlTypes.WT_Float
+        case AST.TypeString(_) => WdlTypes.WT_String
+        case AST.TypeFile(_) => WdlTypes.WT_File
 
-      case AST.TypeOptional(t, _) => WdlTypes.WT_Optional(typeFromAst(t, ctx))
-      case AST.TypeArray(t, _, _) => WdlTypes.WT_Array(typeFromAst(t, ctx))
-      case AST.TypeMap(k, v, _) => WdlTypes.WT_Map(typeFromAst(k, ctx), typeFromAst(v, ctx))
-      case AST.TypePair(l, r, _) => WdlTypes.WT_Pair(typeFromAst(l, ctx), typeFromAst(r, ctx))
-      case AST.TypeIdentifier(id, _) =>
+        case AST.TypeOptional(t, _) => WdlTypes.WT_Optional(inner(t))
+        case AST.TypeArray(t, _, _) => WdlTypes.WT_Array(inner(t))
+        case AST.TypeMap(k, v, _) => WdlTypes.WT_Map(inner(k), inner(v))
+        case AST.TypePair(l, r, _) => WdlTypes.WT_Pair(inner(l), inner(r))
+
         // a variable whose type is a user defined struct
-        ctx.structDefs(id)
+        case AST.TypeIdentifier(id, _) if structDefs contains id =>
+          structDefs(id)
+        case AST.TypeIdentifier(id, _) =>
+          throw new EvalException(s"struct ${id} is undefined", text, docSourceURL)
 
-      case AST.TypeObject(_) => WdlTypes.WT_Object
+        case AST.TypeObject(_) => WdlTypes.WT_Object
 
-      case AST.TypeStruct(name, members, _, _) =>
-        val members2 = members.map{
-          case AST.StructMember(name, dataType, _, _) =>
-            name -> typeFromAst(dataType, ctx)
-        }.toMap
-        WdlTypes.WT_Struct(name, members2)
+        case AST.TypeStruct(name, members, _, _) =>
+          val members2 = members.map{
+            case AST.StructMember(name, dataType, _, _) =>
+              name -> inner(dataType)
+          }.toMap
+          WdlTypes.WT_Struct(name, members2)
+      }
     }
+    inner(t)
   }
 
   // Evaluate all the declarations and return a context
@@ -587,7 +596,7 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
     decls.foldLeft(ctx) {
       case (accu, AST.Declaration(name, astWdlType, Some(expr), text, _)) =>
         val value = apply(expr, accu)
-        val wdlType : WdlTypes.WT = typeFromAst(astWdlType, ctx)
+        val wdlType : WdlTypes.WT = typeFromAst(astWdlType, text)
         val value2 = coerceTo(wdlType, value, ctx, text)
         accu.addBinding(name, value2)
       case (accu, ast) =>
