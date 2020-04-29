@@ -44,15 +44,13 @@ class EvalTest extends FlatSpec with Matchers {
     (doc, typeCtx)
   }
 
-  // ignore a value without causing a compilation error
-  def ignore[A](x: A): Unit = {}
-
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
     val (doc, typeCtx) = parseAndTypeCheck(file)
     val evaluator = Eval(opts,
                          evalCfg,
                          typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
                          Some(opts.getURL(file.toString)))
 
     doc.workflow should not be empty
@@ -98,4 +96,28 @@ class EvalTest extends FlatSpec with Matchers {
                                        ))
     bindings("name") shouldBe WV_String("Jay")
   }
+
+  it should "call stdlib" taggedAs(Edge) in {
+    val file = srcDir.resolve("stdlib.wdl")
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
+                         Some(opts.getURL(file.toString)))
+
+    doc.workflow should not be empty
+    val wf = doc.workflow.get
+
+    val decls: Vector[AST.Declaration] = wf.body.collect {
+      case x: AST.Declaration => x
+    }.toVector
+
+    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
+    ctxEnd.bindings("x") shouldBe (WV_Float(1.4))
+    ctxEnd.bindings("n1") shouldBe (WV_Int(1))
+    ctxEnd.bindings("n2") shouldBe (WV_Int(2))
+    ctxEnd.bindings("n3") shouldBe (WV_Int(1))
+  }
+
 }

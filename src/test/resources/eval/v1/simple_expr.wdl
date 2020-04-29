@@ -52,8 +52,4 @@ workflow foo {
   }
 
   String name = pr1.name
-
-  # call all the standard library functions
-  # TODO
-
 }

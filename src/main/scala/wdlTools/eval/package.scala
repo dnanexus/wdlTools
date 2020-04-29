@@ -10,6 +10,13 @@ case class Context(bindings : Map[String, WdlValues.WV]) {
   }
 }
 
+// There is a standard library implementation for each WDL version.
+trait StandardLibraryImpl {
+  def call(funcName : String,
+           args : Vector[WdlValues.WV],
+           text : TextSource) : WdlValues.WV
+}
+
 // A runtime error
 final class EvalException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
