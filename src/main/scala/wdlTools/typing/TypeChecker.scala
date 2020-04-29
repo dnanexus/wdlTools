@@ -17,7 +17,6 @@ case class TypeChecker(stdlib: Stdlib) {
   // the body of a scatter.
   type Bindings = Map[String, WT]
 
-
   private def typeEvalMathOp(expr: Expr, ctx: Context): WT = {
     val t = typeEval(expr, ctx)
     t match {

@@ -65,21 +65,21 @@ class EvalTest extends FlatSpec with Matchers {
     bindings("k0") shouldBe WV_Int(-1)
     bindings("k1") shouldBe WV_Int(1)
 
-    bindings("b1") shouldBe WV_Boolean( true || false )
-    bindings("b2") shouldBe WV_Boolean( true && false )
-    bindings("b3") shouldBe WV_Boolean( 10 == 3 )
-    bindings("b4") shouldBe WV_Boolean( 4 < 8 )
-    bindings("b5") shouldBe WV_Boolean( 4 >= 8 )
-    bindings("b6") shouldBe WV_Boolean( 4 != 8 )
-    bindings("b7") shouldBe WV_Boolean( 4 <= 8 )
-    bindings("b8") shouldBe WV_Boolean( 11 > 8 )
+    bindings("b1") shouldBe WV_Boolean(true || false)
+    bindings("b2") shouldBe WV_Boolean(true && false)
+    bindings("b3") shouldBe WV_Boolean(10 == 3)
+    bindings("b4") shouldBe WV_Boolean(4 < 8)
+    bindings("b5") shouldBe WV_Boolean(4 >= 8)
+    bindings("b6") shouldBe WV_Boolean(4 != 8)
+    bindings("b7") shouldBe WV_Boolean(4 <= 8)
+    bindings("b8") shouldBe WV_Boolean(11 > 8)
 
     // Arithmetic
-    bindings("i1") shouldBe WV_Int( 3 + 4 )
-    bindings("i2") shouldBe WV_Int( 3 - 4 )
-    bindings("i3") shouldBe WV_Int( 3 % 4 )
-    bindings("i4") shouldBe WV_Int( 3 * 4 )
-    bindings("i5") shouldBe WV_Int( 3 / 4 )
+    bindings("i1") shouldBe WV_Int(3 + 4)
+    bindings("i2") shouldBe WV_Int(3 - 4)
+    bindings("i3") shouldBe WV_Int(3 % 4)
+    bindings("i4") shouldBe WV_Int(3 * 4)
+    bindings("i5") shouldBe WV_Int(3 / 4)
 
     bindings("l0") shouldBe WV_String("a")
     bindings("l1") shouldBe WV_String("b")
@@ -89,15 +89,16 @@ class EvalTest extends FlatSpec with Matchers {
     bindings("r") shouldBe WV_Boolean(true)
 
     // structs
-    bindings("pr1") shouldBe WV_Struct("Person", Map(
-                                         "name" -> WV_String("Jay"),
-                                         "city" -> WV_String("SF"),
-                                         "age" -> WV_Int(31)
+    bindings("pr1") shouldBe WV_Struct("Person",
+                                       Map(
+                                           "name" -> WV_String("Jay"),
+                                           "city" -> WV_String("SF"),
+                                           "age" -> WV_Int(31)
                                        ))
     bindings("name") shouldBe WV_String("Jay")
   }
 
-  it should "call stdlib" taggedAs(Edge) in {
+  it should "call stdlib" taggedAs (Edge) in {
     val file = srcDir.resolve("stdlib.wdl")
     val (doc, typeCtx) = parseAndTypeCheck(file)
     val evaluator = Eval(opts,

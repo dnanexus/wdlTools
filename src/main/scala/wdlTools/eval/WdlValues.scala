@@ -22,5 +22,5 @@ object WdlValues {
   case class WV_Object(members: Map[String, WV]) extends WV
 
   // results from calling a task or workflow
-  case class WV_Call(name : String, members : Map[String, WV]) extends WV
+  case class WV_Call(name: String, members: Map[String, WV]) extends WV
 }
