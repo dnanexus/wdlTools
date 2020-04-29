@@ -5,6 +5,7 @@ import java.net.URL
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
+import wdlTools.typing.WdlTypes
 import wdlTools.util.{ExprEvalConfig, Options}
 
 case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option[URL]) {
@@ -256,6 +257,19 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
 
   def apply(expr: AST.Expr, ctx : Context): WdlValues.WV = {
     expr match {
+      case AST.ValueNull(_) => WV_Null
+      case AST.ValueBoolean(value, _) => WV_Boolean(value)
+      case AST.ValueInt(value, _) => WV_Int(value)
+      case AST.ValueFloat(value, _) => WV_Float(value)
+      case AST.ValueString(value, _) => WV_String(value)
+      case AST.ValueFile(value, _) => WV_File(value)
+
+        // accessing a variable
+      case AST.ExprIdentifier(id: String, _) if !(ctx.bindings contains id) =>
+        throw new EvalException(s"accessing undefined variable ${id}, ctx=${ctx.bindings}")
+      case AST.ExprIdentifier(id: String, _) =>
+        ctx.bindings(id)
+
       // concatenate an array of strings inside a command block
       case AST.ExprCompoundString(vec: Vector[AST.Expr], _) =>
         val strArray: Vector[String] = vec.map { x =>
@@ -263,6 +277,20 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
           getStringVal(xv, x.text)
         }
         WV_String(strArray.mkString(""))
+
+      case AST.ExprPair(l, r, _) => WV_Pair(apply(l, ctx), apply(r, ctx))
+      case AST.ExprArray(array, _) =>
+        WV_Array(array.map{ x => apply(x, ctx) })
+      case AST.ExprMap(elements, _) =>
+        WV_Map(elements.map{
+                 case AST.ExprMapItem(k, v, _) => apply(k, ctx) -> apply(v, ctx)
+               }.toMap)
+
+
+      case AST.ExprObject(elements, _) =>
+        WV_Object(elements.map{
+                    case AST.ExprObjectMember(k, v, _) => k -> apply(v, ctx)
+                  }.toMap)
 
       // ~{true="--yes" false="--no" boolean_value}
       case AST.ExprPlaceholderEqual(t, f, boolExpr, _) =>
@@ -458,55 +486,110 @@ case class EvalExpr(opts: Options, evalCfg: ExprEvalConfig, docSourceURL: Option
     }
   }
 
-  private def coerceTo(wdlType : AST.Type, value : WV) : WV = {
+  private def coerceToStruct(structName : String,
+                             memberDefs : Map[String, WdlTypes.WT],
+                             members : Map[String, WV],
+                             ctx : Context,
+                             text : TextSource) : WV_Struct = {
+    if (memberDefs.keys.toSet != members.keys.toSet)
+      throw new EvalException(s"struct ${structName} has wrong fields", text, docSourceURL)
+
+    // TODO: coerce the members to the right types
+    WV_Struct(structName, members)
+  }
+
+  private def coerceTo(wdlType : WdlTypes.WT, value : WV, ctx : Context, text : TextSource) : WV = {
     (wdlType, value) match {
       // primitive types
-      case (AST.TypeBoolean(_), WV_Boolean(_)) => value
-      case (AST.TypeInt(_), WV_Int(_)) => value
-      case (AST.TypeInt(_), WV_Float(x)) => WV_Int(x.toInt)
-      case (AST.TypeFloat(_), WV_Int(n)) => WV_Float(n.toFloat)
-      case (AST.TypeFloat(_), WV_Float(x)) => value
-      case (AST.TypeString(_), WV_String(_))  => value
-      case (AST.TypeString(_), WV_File(s))  => WV_String(s)
-      case (AST.TypeFile(_), WV_String(s)) => WV_File(s)
-      case (AST.TypeFile(_), WV_File(_)) => value
+      case (WdlTypes.WT_Boolean, WV_Boolean(_)) => value
+      case (WdlTypes.WT_Int, WV_Int(_)) => value
+      case (WdlTypes.WT_Int, WV_Float(x)) => WV_Int(x.toInt)
+      case (WdlTypes.WT_Float, WV_Int(n)) => WV_Float(n.toFloat)
+      case (WdlTypes.WT_Float, WV_Float(x)) => value
+      case (WdlTypes.WT_String, WV_String(_))  => value
+      case (WdlTypes.WT_String, WV_File(s))  => WV_String(s)
+      case (WdlTypes.WT_File, WV_String(s)) => WV_File(s)
+      case (WdlTypes.WT_File, WV_File(_)) => value
 
         // compound types
         // recursively descend into the sub structures and coerce them.
-      case (AST.TypeOptional(t2, _), WV_Optional(value2)) =>
-        WV_Optional(coerceTo(t2, value2))
-      case (AST.TypeArray(t2, nonEmpty, text), WV_Array(vec)) =>
-        if (nonEmpty && vec.isEmpty)
-          throw new EvalException("array is empty", text, docSourceURL)
-        WV_Array(vec.map{ x => coerceTo(t2, x) })
+      case (WdlTypes.WT_Optional(t2), WV_Optional(value2)) =>
+        WV_Optional(coerceTo(t2, value2, ctx, text))
+      case (WdlTypes.WT_Array(t2), WV_Array(vec)) =>
+//        if (nonEmpty && vec.isEmpty)
+//          throw new EvalException("array is empty", text, docSourceURL)
+        WV_Array(vec.map{ x => coerceTo(t2, x, ctx, text) })
 
-      case (AST.TypeMap(kt, vt, text), WV_Map(m)) =>
+      case (WdlTypes.WT_Map(kt, vt), WV_Map(m)) =>
         WV_Map(m.map{ case (k,v) =>
-                 coerceTo(kt, k) -> coerceTo(vt, v)
+                 coerceTo(kt, k, ctx, text) -> coerceTo(vt, v, ctx, text)
                })
-      case (AST.TypePair(lt, rt, _), WV_Pair(l,r)) =>
-        WV_Pair(coerceTo(lt, l), coerceTo(rt, r))
+      case (WdlTypes.WT_Pair(lt, rt), WV_Pair(l,r)) =>
+        WV_Pair(coerceTo(lt, l, ctx, text), coerceTo(rt, r, ctx, text))
 
-      case (AST.TypeIdentifier(id, text), WV_Struct(name, _)) =>
-        if (id != name)
-          throw new EvalException(s"cannot coerce struct ${name} to struct ${id}", text, docSourceURL)
+      case (WdlTypes.WT_Struct(name1, _), WV_Struct(name2, _)) =>
+        if (name1 != name2)
+          throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}", text, docSourceURL)
         value
 
-      case (AST.TypeObject(_), WV_Object(_)) => value
+        // cast of an object to a struct. I think this is legal.
+      case (WdlTypes.WT_Struct(name, memberDefs), WV_Object(members)) =>
+        coerceToStruct(name, memberDefs, members, ctx, text)
+
+      case (WdlTypes.WT_Struct(name, memberDefs), WV_Map(members)) =>
+        // convert into a mapping from string to WdlValue
+        val members2 : Map[String, WV] = members.map{
+          case (WV_String(k),v) => k -> v
+          case (other, _) =>
+            throw new EvalException(s"${other} has to be a string for this to be a struct",
+                                    text, docSourceURL)
+        }
+        coerceToStruct(name, memberDefs, members2, ctx, text)
+
+      case (WdlTypes.WT_Object, WV_Object(_)) => value
 
       case (t, other) =>
         throw new EvalException(s"value ${other} cannot be coerced to type ${t}",
-                                wdlType.text, docSourceURL)
+                                text, docSourceURL)
+    }
+  }
+
+
+  private def typeFromAst(t : AST.Type, ctx : Context) : WdlTypes.WT = {
+    t match {
+      case AST.TypeBoolean(_) => WdlTypes.WT_Boolean
+      case AST.TypeInt(_) => WdlTypes.WT_Int
+      case AST.TypeFloat(_) => WdlTypes.WT_Float
+      case AST.TypeString(_) => WdlTypes.WT_String
+      case AST.TypeFile(_) => WdlTypes.WT_File
+
+      case AST.TypeOptional(t, _) => WdlTypes.WT_Optional(typeFromAst(t, ctx))
+      case AST.TypeArray(t, _, _) => WdlTypes.WT_Array(typeFromAst(t, ctx))
+      case AST.TypeMap(k, v, _) => WdlTypes.WT_Map(typeFromAst(k, ctx), typeFromAst(v, ctx))
+      case AST.TypePair(l, r, _) => WdlTypes.WT_Pair(typeFromAst(l, ctx), typeFromAst(r, ctx))
+      case AST.TypeIdentifier(id, _) =>
+        // a variable whose type is a user defined struct
+        ctx.structDefs(id)
+
+      case AST.TypeObject(_) => WdlTypes.WT_Object
+
+      case AST.TypeStruct(name, members, _, _) =>
+        val members2 = members.map{
+          case AST.StructMember(name, dataType, _, _) =>
+            name -> typeFromAst(dataType, ctx)
+        }.toMap
+        WdlTypes.WT_Struct(name, members2)
     }
   }
 
   // Evaluate all the declarations and return a context
   def applyDeclarations(decls : Vector[AST.Declaration], ctx : Context) : Context = {
     decls.foldLeft(ctx) {
-      case (accu, AST.Declaration(name, wdlType, Some(expr), _, _)) =>
-        val value = apply(expr, ctx)
-        val value2 = coerceTo(wdlType, value)
-        ctx.addBinding(name, value2)
+      case (accu, AST.Declaration(name, astWdlType, Some(expr), text, _)) =>
+        val value = apply(expr, accu)
+        val wdlType : WdlTypes.WT = typeFromAst(astWdlType, ctx)
+        val value2 = coerceTo(wdlType, value, ctx, text)
+        accu.addBinding(name, value2)
       case (accu, ast) =>
         throw new Exception(s"Can not evaluate element ${ast.getClass}")
     }
