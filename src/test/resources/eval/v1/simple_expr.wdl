@@ -15,12 +15,8 @@ workflow foo {
   Int k0 = -1
   Int k1 = +1
 
-  # place holders
-  String s = '{true="--yes" false="--no" false}'
-  String s2 = '{default="San Francisco" city}'
+  # place holders can only be tested in command blocks
   Array[String] cities = ["SF", "LA", "NYC"]
-  String s3 = '{sep=", " cities}'
-
 
   Boolean b1 = true || false
   Boolean b2 = true && false
@@ -59,4 +55,5 @@ workflow foo {
 
   # call all the standard library functions
   # TODO
+
 }
