@@ -1,7 +1,5 @@
 package wdlTools.formatter
 
-import wdlTools.syntax.TextSource
-
 object Indenting extends Enumeration {
   type Indenting = Value
   val Always, IfNotIndented, Dedent, Reset, Never = Value
@@ -12,12 +10,52 @@ object Wrapping extends Enumeration {
   val Always, AsNeeded, Never = Value
 }
 
-trait Chunk {
-  def wrapAll: Boolean = false
+/**
+  * A position on a single line. Has a `column` that may be
+  * set to `Token.TERMINAL`, indicating it is the last token on
+  * `line`.
+  */
+trait Position {
+  def line: Int
 
-  def format(lineFormatter: LineFormatter): Unit
+  def column: Int
+}
 
-  def textSource: TextSource
+object Position {
+  val TERMINAL: Int = Int.MaxValue
+}
+
+/**
+  * An element that can be formatted by a Formatter.
+  */
+trait Span extends Position {
+
+  /**
+    * The length of the span in characters, if it were formatted without line-wrapping.
+    */
+  def length: Int
+
+  /**
+    * The last column in the span - position is 1-based and end-exclusive.
+    */
+  def endColumn: Int
+}
+
+/**
+  * Marker trait for atomic Spans - those that format themselves via their toString method.
+  */
+trait Atom {
+  def toString: String
+}
+
+trait Composite {
+
+  /**
+    * Format the contents of the composite. The `lineFormatter` passed to this method
+    * must have `isLineBegun == true` on both entry and exit.
+    * @param lineFormatter the lineFormatter
+    */
+  def formatContents(lineFormatter: LineFormatter): Unit
 }
 
 /**

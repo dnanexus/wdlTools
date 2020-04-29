@@ -68,7 +68,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
               |""".stripMargin)
     val localDir: ScallopOption[List[Path]] =
       opt[List[Path]](descr =
-        "directory in which to search for imports; ignored if --noFollowImports is specified"
+        "directory in which to search for imports; ignored if --nofollow-imports is specified"
       )
     val url: ScallopOption[URL] =
       trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
@@ -175,7 +175,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
     validateOpt(outputDir, overwrite) {
       case (None, Some(false) | None) =>
-        Left("--outputDir is required unless --overwrite is specified")
+        Left("--output-dir is required unless --overwrite is specified")
       case _ => Right(Unit)
     }
   }
@@ -214,7 +214,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
     validateOpt(outputDir, overwrite) {
       case (None, Some(false) | None) =>
-        Left("--outputDir is required unless --overwrite is specified")
+        Left("--output-dir is required unless --overwrite is specified")
       case _ => Right(Unit)
     }
   }

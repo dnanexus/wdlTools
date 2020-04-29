@@ -6,7 +6,7 @@
         Int i
 
 
-    String x = "${s}.txt"
+    String x = "${s}.txt" # This is an in-line comment
       String y = "foo"
     Int z =
       i + i + i

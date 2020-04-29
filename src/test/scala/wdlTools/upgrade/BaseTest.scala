@@ -6,10 +6,10 @@ import java.nio.file.{Path, Paths}
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.formatter.Upgrader
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{Options, Util, Verbosity}
 
 class BaseTest extends FlatSpec with Matchers {
-  private lazy val opts = Options()
+  private lazy val opts = Options(verbosity = Verbosity.Verbose)
 
   def getBeforePath(fname: String): Path = {
     Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath)

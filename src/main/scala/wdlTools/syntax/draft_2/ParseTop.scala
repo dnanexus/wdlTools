@@ -880,38 +880,16 @@ any_decls
     }
   }
 
-  /**
-    * Draft-2 doesn't have a formal input section. Informally, it is specified that inputs must be
-    * "at the top of any scope" - this is enforced by the Task grammar, but the workflow grammar allows
-    * declarations to appear anywhere in the workflow body.
-    *
-    * There are three types of declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring
-    * evaluation), and 3) bound with an expression requiring evaluation. Only the first two types of
-    * declarations may be inputs; however, all three types of declarations can be mixed together. This method
-    * creates a synthetic InputSection contianing only declarations of type 1 and 2. There is one TextSource
-    * for each sub-group of declarations that covers all of the lines starting from the previous group (or
-    * startLine for the first element) until the last line of the last declaration in the group.
-    *
-    * @param decls
-    * @param startLine
-    * @param otherElements
-    * @return
-    */
-  def createInputSection(decls: Vector[Declaration],
-                         startLine: Int,
-                         otherElements: Vector[Element]): InputSection = {
-    val sortedDecls = decls.sortWith((l, r) => l.text.line < r.text.line)
-    // collect the lines occupied by other elements
-    val elementLines: Vector[Int] = otherElements.flatMap(_.text.lineRange)
-    // this is the last possible line (non-inclusive) of the input section
-    val stopLine = sortedDecls.last.text.endLine
-
-    InputSection(decls, textSources)
-  }
-
   /* task
     : TASK Identifier LBRACE (task_element)+ RBRACE
     ;  */
+  /** Draft-2 doesn't have a formal input section. Informally, it is specified that inputs must be
+    * "at the top of any scope", which is enforced by the Task grammar. There are three types of
+    * declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring evaluation), and
+    * 3) bound with an expression requiring evaluation. Only the first two types of declarations may
+    * be inputs; however, all three types of declarations can be mixed together. This method creates
+    * a synthetic InputSection contianing only declarations of type 1 and 2.
+    */
   override def visitTask(ctx: WdlDraft2Parser.TaskContext): Task = {
     val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems = ctx.task_element().asScala.toVector
@@ -931,6 +909,7 @@ any_decls
       case x: Task_runtime_elementContext => visitTask_runtime(x.task_runtime())
     }, "runtime", ctx)
 
+    val textSource = getTextSource(ctx)
     // We treat as an input any unbound declaration as well as any bound declaration
     // that doesn't require evaluation.
     val (decls, inputDecls) = ctx
@@ -941,7 +920,9 @@ any_decls
       .toVector
       .partition(requiresEvaluation)
     val input = if (inputDecls.nonEmpty) {
-      Some(createInputSection(inputDecls, getTextSource(ctx.task_input()).line, decls))
+      Some(
+          InputSection(inputDecls, TextSource.fromSpan(inputDecls.head.text, inputDecls.last.text))
+      )
     } else {
       None
     }
@@ -957,7 +938,7 @@ any_decls
         meta = meta,
         parameterMeta = parameterMeta,
         runtime = runtime,
-        text = getTextSource(ctx)
+        text = textSource
     )
   }
 
@@ -1127,6 +1108,15 @@ scatter
     : WORKFLOW Identifier LBRACE workflow_element* RBRACE
     ;
    */
+  /** Draft-2 doesn't have a formal input section. Informally, it is specified that inputs must be
+    * "at the top of any scope" - this is enforced by the Task grammar, but the workflow grammar allows
+    * declarations to appear anywhere in the workflow body.
+    *
+    * There are three types of declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring
+    * evaluation), and 3) bound with an expression requiring evaluation. Only the first two types of
+    * declarations may be inputs; however, all three types of declarations can be mixed together. This method
+    * creates a synthetic InputSection contianing only declarations of type 1 and 2.
+    */
   override def visitWorkflow(ctx: WdlDraft2Parser.WorkflowContext): Workflow = {
     val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems: Vector[WdlDraft2Parser.Workflow_elementContext] =
@@ -1166,9 +1156,7 @@ scatter
     val inputDecls = unboundDecls ++ noEvalDecls.map(_.left.get)
     val input = if (inputDecls.nonEmpty) {
       Some(
-          createInputSection(inputDecls,
-                             wfTextSource.endLine,
-                             Vector(output, meta, parameterMeta).flatten ++ wfBody)
+          InputSection(inputDecls, TextSource.fromSpan(inputDecls.head.text, inputDecls.last.text))
       )
     } else {
       None

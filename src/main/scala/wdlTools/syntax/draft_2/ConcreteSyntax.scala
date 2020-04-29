@@ -105,18 +105,9 @@ object ConcreteSyntax {
 
   /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
     * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
-    * `InputSection` is not guaranteed to be one contiguous block, and so multiple `TextSource`es
-    * are required to describe the bounds.
+    * `InputSection` `TextSource` may overlap with other elements.
     */
-  case class InputSection(declarations: Vector[Declaration],
-                          subgroupTextSources: Vector[TextSource])
-      extends Element {
-    // Unlike other sections, the maximally covering TextSource of the draft-2 InputSection
-    // is not guaranteed to be non-overlapping with other elements.
-    override lazy val text: TextSource = {
-      TextSource.fromSpan(subgroupTextSources.head, subgroupTextSources.last)
-    }
-  }
+  case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
   case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
 
   // A command can be simple, with just one continuous string:

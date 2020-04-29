@@ -22,45 +22,54 @@ object WdlVersion {
   }
 }
 
-// source location in a WDL program. We add it to each syntax element
-// so we could do accurate error reporting.
-//
-// Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
-// the only example of this is Version, which in draft-2 documents has
-// an implicit value of WdlVersion.Draft_2, but there is no actual version
-// statement.
-//
-// line: line number
-// col : column number
-// URL:  original file or web URL
-//
-// TODO: make endCol non-inclusive
-case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
-  override def compare(that: TextSource): Int = {
-    line - that.line
+/**
+  * A multi-line element. Lines are 1-based, `endLine` is inclusive,
+  * and `endCol` is exclusive.
+  */
+trait PositionRange extends Ordered[PositionRange] {
+  def line: Int
+
+  def col: Int
+
+  def endLine: Int
+
+  def endCol: Int
+
+}
+
+/** Source location in a WDL program. We add it to each syntax element
+  * so we could do accurate error reporting. All positions are 1-indexed.
+  *
+  * Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
+  * the only example of this is Version, which in draft-2 documents has
+  * an implicit value of WdlVersion.Draft_2, but there is no actual version
+  * statement.
+  *
+  * @param line: line number starting line
+  * @param col: starting column
+  * @param endLine: ending line, end-inclusive
+  * @param endCol: ending column, end-exclusive
+  */
+case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends PositionRange {
+  lazy val lineRange: Range = line to endLine
+
+  def compare(that: PositionRange): Int = {
+    line - that.line match {
+      case 0 =>
+        col - that.col match {
+          case 0 =>
+            endLine - that.endLine match {
+              case 0     => endCol - that.endCol
+              case other => other
+            }
+          case other => other
+        }
+      case other => other
+    }
   }
 
   override def toString: String = {
     s"${line}:${col}-${endLine}:${endCol}"
-  }
-
-  lazy val lineRange: Range = line until endLine
-
-  lazy val maxCol: Int = Vector(col, endCol).max
-
-  def getBefore(startLine: Int = 0, startCol: Int = 0): TextSource = {
-    TextSource(startLine, startCol, line, col)
-  }
-
-  def getAfter(stopLine: Int, stopCol: Int = 0): TextSource = {
-    TextSource(endLine, endCol, stopLine, stopCol)
-  }
-
-  def shift(lineShift: Int = 0,
-            colShift: Int = 0,
-            endLineShift: Int = 0,
-            endColShift: Int = 0): TextSource = {
-    TextSource(line + lineShift, col + colShift, endLine + endLineShift, endCol + endColShift)
   }
 }
 
@@ -105,27 +114,12 @@ case class CommentMap(comments: Map[Int, Comment]) {
     comments.nonEmpty
   }
 
-  def maxLine: Int = comments.keys.max
+  lazy val minLine: Int = comments.keys.min
 
-  def filterBetween(start: Int, stop: Int): CommentMap = {
-    CommentMap(comments.filterKeys(i => i >= start && i <= stop))
-  }
+  lazy val maxLine: Int = comments.keys.max
 
-  def filterBetween(before: TextSource,
-                    after: TextSource,
-                    startInclusive: Boolean = false,
-                    stopInclusive: Boolean = false): CommentMap = {
-    val start = before.endLine - (if (startInclusive) 0 else 1)
-    val stop = after.line + (if (stopInclusive) 0 else 1)
-    filterBetween(start, stop)
-  }
-
-  def filterWithin(textSource: TextSource,
-                   startInclusive: Boolean = true,
-                   stopInclusive: Boolean = false): CommentMap = {
-    val start = textSource.line + (if (startInclusive) 0 else 1)
-    val stop = textSource.endLine - (if (stopInclusive) 0 else 1)
-    filterBetween(start, stop)
+  def filterWithin(range: Seq[Int]): CommentMap = {
+    CommentMap(comments.filterKeys(range.contains))
   }
 
   def toSortedVector: Vector[Comment] = {

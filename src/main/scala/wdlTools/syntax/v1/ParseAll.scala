@@ -177,7 +177,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   def translateInputSection(
       inp: CST.InputSection
   ): AST.InputSection = {
-    AST.InputSection(inp.declarations.map(translateDeclaration), Vector(inp.text))
+    AST.InputSection(inp.declarations.map(translateDeclaration), inp.text)
   }
 
   def translateOutputSection(
