@@ -131,5 +131,35 @@ class EvalTest extends FlatSpec with Matchers {
                                      WV_Array(Vector(WV_String("C"), WV_String("clam"))))))
     bd("m2") shouldBe(WV_Map(Map(WV_String("name") -> WV_String("hawk"),
                                  WV_String("kind") -> WV_String("bird"))))
+
+    // sub
+    bd("sentence1") shouldBe(WV_String("She visited three places on his trip: Aa, Ab, C, D, and E"))
+    bd("sentence2") shouldBe(WV_String("He visited three places on his trip: Berlin, Berlin, C, D, and E"))
+    bd("sentence3") shouldBe(WV_String("H      : A, A, C, D,  E"))
+
+    // transpose
+    bd("ar3") shouldBe(WV_Array(Vector(WV_Int(0), WV_Int(1), WV_Int(2))))
+    bd("ar_ar2") shouldBe(WV_Array(Vector(
+                                        WV_Array(Vector(WV_Int(1), WV_Int(4))),
+                                        WV_Array(Vector(WV_Int(2), WV_Int(5))),
+                                        WV_Array(Vector(WV_Int(3), WV_Int(6)))
+                                   )))
+
+    // zip
+    bd("zlf") shouldBe(WV_Array(Vector(
+                                  WV_Pair(WV_String("A"), WV_Boolean(true)),
+                                  WV_Pair(WV_String("B"), WV_Boolean(false)),
+                                  WV_Pair(WV_String("C"), WV_Boolean(true))
+                                )))
+
+    // cross
+    bd("cln") shouldBe(WV_Array(Vector(
+                                  WV_Pair(WV_String("A"), WV_Int(1)),
+                                  WV_Pair(WV_String("B"), WV_Int(1)),
+                                  WV_Pair(WV_String("C"), WV_Int(1)),
+                                  WV_Pair(WV_String("A"), WV_Int(13)),
+                                  WV_Pair(WV_String("B"), WV_Int(13)),
+                                  WV_Pair(WV_String("C"), WV_Int(13))
+                                )))
   }
 }

@@ -39,12 +39,12 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       "write_json" -> write_json,
 
     "size" -> size,
-/*    "sub" -> sub,
+    "sub" -> sub,
     "range" -> range,
     "transpose" -> transpose,
     "zip" -> zip,
     "cross" -> cross,
-    "length" -> length,
+/*    "length" -> length,
     "flatten" -> flatten,
     "prefix" -> prefix,
     "select_first" -> select_first,
@@ -57,10 +57,32 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 //    "glob" -> glob
   )
 
-  private def getFile(args: Vector[WV], text: TextSource): WV_File = {
+  private def getWdlFile(args: Vector[WV], text: TextSource): WV_File = {
     // process arguments
     assert(args.size == 1)
     coercion.coerceTo(WT_File, args.head, text).asInstanceOf[WV_File]
+  }
+
+  private def getWdlInt(arg: WV, text: TextSource): Int = {
+    val n = coercion.coerceTo(WT_Int, arg, text).asInstanceOf[WV_Int]
+    n.value
+  }
+
+  private def getWdlFloat(arg : WV, text : TextSource) : Double = {
+    val x = coercion.coerceTo(WT_Float, arg, text).asInstanceOf[WV_Float]
+    x.value
+  }
+
+  private def getWdlString(arg: WV, text: TextSource): String = {
+    val s = coercion.coerceTo(WT_String, arg, text).asInstanceOf[WV_String]
+    s.value
+  }
+
+  private def getWdlVector(value : WV, text : TextSource) : Vector[WV] = {
+    value match {
+      case WV_Array(ar) => ar
+      case other => throw new EvalException(s"${other} should be an array", text, docSourceURL)
+    }
   }
 
   private def stdout(args: Vector[WV], text: TextSource): WV_File = {
@@ -76,7 +98,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Array[String] read_lines(String|File)
   //
   private def read_lines(args: Vector[WV], text: TextSource): WV_Array = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     val lines = content.split("\n")
     WV_Array(lines.map(x => WV_String(x)).toVector)
@@ -85,7 +107,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Array[Array[String]] read_tsv(String|File)
   //
   private def read_tsv(args: Vector[WV], text: TextSource): WV_Array = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     val lines: Vector[String] = content.split("\n").toVector
     WV_Array(lines.map { x =>
@@ -97,7 +119,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Map[String, String] read_map(String|File)
   //
   private def read_map(args: Vector[WV], text: TextSource): WV_Map = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     val lines = content.split("\n")
     WV_Map(lines.map { x =>
@@ -112,7 +134,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 
   // Object read_object(String|File)
   private def read_object(args: Vector[WV], text: TextSource): WV_Object = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     val lines = content.split("\n")
     if (lines.size != 2)
@@ -144,7 +166,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Int read_int(String|File)
   //
   private def read_int(args: Vector[WV], text: TextSource): WV_Int = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     try {
       WV_Int(content.trim.toInt)
@@ -157,7 +179,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // String read_string(String|File)
   //
   private def read_string(args: Vector[WV], text: TextSource): WV_String = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     WV_String(content)
   }
@@ -165,7 +187,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Float read_float(String|File)
   //
   private def read_float(args: Vector[WV], text: TextSource): WV_Float = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     try {
       WV_Float(content.trim.toDouble)
@@ -178,7 +200,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   // Boolean read_boolean(String|File)
   //
   private def read_boolean(args: Vector[WV], text: TextSource): WV_Boolean = {
-    val file = getFile(args, text)
+    val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value)
     content.trim.toLowerCase() match {
       case "false" => WV_Boolean(false)
@@ -300,8 +322,8 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       case 1 =>
         WV_Float(sizeCore(args.head, text))
       case 2 =>
-        val sUnit = coercion.coerceTo(WT_String, args(1), text).asInstanceOf[WV_String]
-        val nBytesInUnit = sizeUnit(sUnit.value, text)
+        val sUnit = getWdlString(args(1), text)
+        val nBytesInUnit = sizeUnit(sUnit, text)
         val nBytes = sizeCore(args.head, text)
         WV_Float(nBytes / nBytesInUnit)
       case _ =>
@@ -309,22 +331,72 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     }
   }
 
+  // String sub(String, String, String)
+  //
+  // Given 3 String parameters input, pattern, replace, this function
+  // will replace any occurrence matching pattern in input by
+  // replace. pattern is expected to be a regular expression.
+  private def sub(args : Vector[WV], text : TextSource) : WV_String = {
+    assert(args.size == 3)
+    val input = getWdlString(args(0), text)
+    val pattern = getWdlString(args(1), text)
+    val replace = getWdlString(args(2), text)
+    WV_String(input.replaceAll(pattern, replace))
+  }
+
+
+  // Array[Int] range(Int)
+  private def range(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 1)
+    val n = getWdlInt(args.head, text)
+    val vec : Vector[WV] = Vector.tabulate(n){
+      case i => WV_Int(i)
+    }
+    WV_Array(vec)
+  }
+
+  // Array[Array[X]] transpose(Array[Array[X]])
+  //
+  private def transpose(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 1)
+    val vec : Vector[WV] = getWdlVector(args.head, text)
+    val vec_vec : Vector[Vector[WV]] = vec.map{
+      case v => getWdlVector(v, text)
+    }
+    val trValue = vec_vec.transpose
+    WV_Array(trValue.map{
+      case vec => WV_Array(vec)
+    })
+  }
+
+  // Array[Pair(X,Y)] zip(Array[X], Array[Y])
+  //
+  private def zip(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 2)
+    val ax = getWdlVector(args(0), text)
+    val ay = getWdlVector(args(1), text)
+
+    WV_Array((ax zip ay).map{
+      case (x, y) => WV_Pair(x, y)
+    })
+  }
+
+  // Array[Pair(X,Y)] cross(Array[X], Array[Y])
+  //
+  // cartesian product of two arrays. Results in an n x m sized array of pairs.
+  private def cross(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 2)
+    val ax = getWdlVector(args(0), text)
+    val ay = getWdlVector(args(1), text)
+
+    val vv = ax.map{ x =>
+      ay.map{ y => WV_Pair(x, y) }
+    }
+    WV_Array(vv.flatten)
+  }
+
   /*
-      WT_Function3("sub", WT_String, WT_String, WT_String, WT_String),
-      WT_Function1("range", WT_Int, WT_Array(WT_Int)),
-      // Array[Array[X]] transpose(Array[Array[X]])
-      WT_Function1("transpose", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Array(WT_Var(0)))),
-      // Array[Pair(X,Y)] zip(Array[X], Array[Y])
-      WT_Function2("zip",
-                   WT_Array(WT_Var(0)),
-                   WT_Array(WT_Var(1)),
-                   WT_Array(WT_Pair(WT_Var(0), WT_Var(1)))),
-      // Array[Pair(X,Y)] cross(Array[X], Array[Y])
-      WT_Function2("cross",
-                   WT_Array(WT_Var(0)),
-                   WT_Array(WT_Var(1)),
-                   WT_Array(WT_Pair(WT_Var(0), WT_Var(1)))),
-      // Integer length(Array[X])
+  // Integer length(Array[X])
       WT_Function1("length", WT_Array(WT_Var(0)), WT_Int),
       // Array[X] flatten(Array[Array[X]])
       WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
@@ -338,20 +410,20 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 
   private def floor(args: Vector[WV], text: TextSource): WV_Int = {
     assert(args.size == 1)
-    val x = coercion.coerceTo(WT_Float, args.head, text).asInstanceOf[WV_Float]
-    WV_Int(Math.floor(x.value).toInt)
+    val x = getWdlFloat(args.head, text)
+    WV_Int(Math.floor(x).toInt)
   }
 
   private def ceil(args: Vector[WV], text: TextSource): WV_Int = {
     assert(args.size == 1)
-    val x = coercion.coerceTo(WT_Float, args.head, text).asInstanceOf[WV_Float]
-    WV_Int(Math.ceil(x.value).toInt)
+    val x = getWdlFloat(args.head, text)
+    WV_Int(Math.ceil(x).toInt)
   }
 
   private def round(args: Vector[WV], text: TextSource): WV_Int = {
     assert(args.size == 1)
-    val x = coercion.coerceTo(WT_Float, args.head, text).asInstanceOf[WV_Float]
-    WV_Int(Math.round(x.value).toInt)
+    val x = getWdlFloat(args.head, text)
+    WV_Int(Math.round(x).toInt)
   }
 
   // not mentioned in the specification
