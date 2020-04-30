@@ -2,6 +2,7 @@ package wdlTools.formatter
 
 import java.net.URL
 
+import wdlTools.formatter.Spacing.Spacing
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, Parsers, TextSource, WdlVersion}
@@ -120,11 +121,15 @@ case class WdlV1Formatter(opts: Options,
     private abstract class Spans(spans: Vector[Span],
                                  wrapping: Wrapping = Wrapping.Never,
                                  quoting: Boolean = false,
-                                 spacing: Boolean = false)
+                                 spacing: Spacing = Spacing.Never)
         extends Composite {
       override lazy val length: Int = spans
         .map(_.length)
-        .sum + (if (quoting) 2 else 0) + (if (spacing) spans.length - 1 else 0)
+        .sum + (if (quoting) 2 else 0) + (spacing match {
+        case Spacing.Always    => spans.length
+        case Spacing.AfterNext => spans.length - 1
+        case Spacing.Never     => 0
+      })
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
         val adjacentFormatter = lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping)
@@ -141,7 +146,7 @@ case class WdlV1Formatter(opts: Options,
     private case class SpanSequence(spans: Vector[Span],
                                     wrapping: Wrapping = Wrapping.Never,
                                     quoting: Boolean = false,
-                                    spacing: Boolean = false)
+                                    spacing: Spacing = Spacing.Never)
         extends Spans(spans, wrapping, quoting, spacing) {
       require(spans.nonEmpty)
 
@@ -177,7 +182,7 @@ case class WdlV1Formatter(opts: Options,
                                            override val bounds: TextSource,
                                            wrapping: Wrapping = Wrapping.Never,
                                            quoting: Boolean = false,
-                                           spacing: Boolean = false)
+                                           spacing: Spacing = Spacing.Never)
         extends Spans(spans, wrapping, quoting, spacing)
         with BoundedComposite {
       override def endLine: Int = bounds.endLine
@@ -204,7 +209,9 @@ case class WdlV1Formatter(opts: Options,
             lineFormatter.append(prefix)
 
             val bodyFormatter = lineFormatter
-              .derive(increaseIndent = wrapAndIndentEnds, newSpacing = true, newWrapping = wrapping)
+              .derive(increaseIndent = wrapAndIndentEnds,
+                      newSpacing = Spacing.AfterNext,
+                      newWrapping = wrapping)
             bodyFormatter.endLine(continue = true)
             bodyFormatter.beginLine()
             bodyFormatter.append(body)
@@ -241,7 +248,7 @@ case class WdlV1Formatter(opts: Options,
             case (item, _) => item
           },
           wrapping = wrapping,
-          spacing = true
+          spacing = Spacing.AfterNext
       )
     }
 
@@ -369,7 +376,9 @@ case class WdlV1Formatter(opts: Options,
 
       override lazy val body: Composite = {
         val operLiteral = Literal.between(oper, lhs, rhs)
-        SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = true)
+        SpanSequence(Vector(lhs, operLiteral, rhs),
+                     wrapping = wrapping,
+                     spacing = Spacing.AfterNext)
       }
     }
 
@@ -388,7 +397,7 @@ case class WdlV1Formatter(opts: Options,
       override lazy val body: Composite = SpanSequence(
           options.getOrElse(Vector.empty) ++ Vector(value),
           wrapping = wrapping,
-          spacing = true
+          spacing = Spacing.AfterNext
       )
     }
 
@@ -537,7 +546,14 @@ case class WdlV1Formatter(opts: Options,
                       inString = inStringOrCommand,
                       bounds = text)
         case ExprCompoundString(value, text) if !inPlaceholder =>
-          BoundedSpanSequence(value.map(nested(_, inString = true)),
+          // Often/always an ExprCompoundString contains one or more empty
+          // ValueStrings that we want to get rid of because they're useless
+          // and can mess up formatting
+          val filteredExprs = value.filter {
+            case ValueString(s, _) => s.nonEmpty
+            case _                 => true
+          }
+          BoundedSpanSequence(filteredExprs.map(nested(_, inString = true)),
                               text,
                               quoting = !inStringOrCommand)
         // other expressions need to be wrapped in a placeholder if they
@@ -1243,7 +1259,8 @@ case class WdlV1Formatter(opts: Options,
             }
             lineFormatter.endLine()
 
-            val bodyFormatter = lineFormatter.derive(increaseIndent = true, newSpacing = false)
+            val bodyFormatter =
+              lineFormatter.derive(increaseIndent = true, newSpacing = Spacing.Never)
             bodyFormatter.beginLine()
             bodyFormatter.append(
                 buildExpression(
@@ -1268,7 +1285,8 @@ case class WdlV1Formatter(opts: Options,
             }
             lineFormatter.endLine()
 
-            val bodyFormatter = lineFormatter.derive(increaseIndent = true, newSpacing = false)
+            val bodyFormatter =
+              lineFormatter.derive(increaseIndent = true, newSpacing = Spacing.Never)
             bodyFormatter.beginLine()
             bodyFormatter.append(
                 buildExpression(

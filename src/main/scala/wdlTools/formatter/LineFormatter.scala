@@ -221,8 +221,6 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
         endLine(continue = true)
         beginLine()
-      } else if (currentSpacing.value == Spacing.AfterNext) {
-        currentSpacing.value = Spacing.Always
       } else if (addSpace) {
         currentLine.append(" ")
       }
@@ -230,7 +228,11 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
 
     span match {
       case c: Composite => c.formatContents(this)
-      case a: Atom      => currentLine.append(a.toString)
+      case a: Atom =>
+        currentLine.append(a.toString)
+        if (currentSpacing.value == Spacing.AfterNext) {
+          currentSpacing.value = Spacing.Always
+        }
       case other =>
         throw new Exception(s"Span ${other} must implement either Atom or Delegate trait")
     }
