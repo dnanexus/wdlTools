@@ -1,6 +1,7 @@
 package wdlTools.formatter
 
 import wdlTools.formatter.Indenting.Indenting
+import wdlTools.formatter.Spacing.Spacing
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.Comment
 import wdlTools.util.Util.MutableHolder
@@ -12,13 +13,14 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
                     indentStep: Int = 2,
                     initialIndentSteps: Int = 0,
                     indentation: String = " ",
-                    spacing: Boolean = true,
                     wrapping: Wrapping = Wrapping.AsNeeded,
                     maxLineWidth: Int = 100,
                     private val lines: mutable.Buffer[String],
                     private val currentLine: mutable.StringBuilder,
                     private val currentLineComments: mutable.Buffer[String],
                     private var currentIndentSteps: Int = 0,
+                    private var currentSpacing: MutableHolder[Spacing] =
+                      MutableHolder[Spacing](Spacing.Always),
                     private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false)) {
 
   private val commentStart = "^#+".r
@@ -34,7 +36,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     */
   def derive(increaseIndent: Boolean = false,
              newIndenting: Indenting = indenting,
-             newSpacing: Boolean = spacing,
+             newSpacing: Spacing = currentSpacing.value,
              newWrapping: Wrapping = wrapping): LineFormatter = {
     val newInitialIndentSteps = initialIndentSteps + (if (increaseIndent) 1 else 0)
     val newCurrentIndentSteps = if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
@@ -47,23 +49,23 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
                       indentStep,
                       newInitialIndentSteps,
                       indentation,
-                      newSpacing,
                       newWrapping,
                       maxLineWidth,
                       lines,
                       currentLine,
                       currentLineComments,
                       newCurrentIndentSteps,
+                      MutableHolder[Spacing](newSpacing),
                       lineBegun)
   }
 
   def isLineBegun: Boolean = lineBegun.value
 
-  def currentIndent: String = indentation * (currentIndentSteps * indentStep)
-
   def atLineStart: Boolean = {
     currentLine.length <= (currentIndentSteps * indentStep)
   }
+
+  def currentIndent: String = indentation * (currentIndentSteps * indentStep)
 
   def lengthRemaining: Int = {
     if (atLineStart) {
@@ -121,6 +123,9 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     }
     currentLine.clear()
     lineBegun.value = false
+    if (currentSpacing.value == Spacing.AfterNext) {
+      currentSpacing.value = Spacing.Always
+    }
   }
 
   private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
@@ -211,11 +216,13 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       beginLine()
     } else {
       val addSpace = currentLine.nonEmpty &&
-        spacing &&
+        currentSpacing.value == Spacing.Always &&
         !(currentLine.last.isWhitespace || currentLine.last == indentation.last)
       if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
         endLine(continue = true)
         beginLine()
+      } else if (currentSpacing.value == Spacing.AfterNext) {
+        currentSpacing.value = Spacing.Always
       } else if (addSpace) {
         currentLine.append(" ")
       }
@@ -244,7 +251,6 @@ object LineFormatter {
             indentStep: Int = 2,
             initialIndentSteps: Int = 0,
             indentation: String = " ",
-            spacing: Boolean = true,
             wrapping: Wrapping = Wrapping.AsNeeded,
             maxLineWidth: Int = 100): LineFormatter = {
     val lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty
@@ -255,7 +261,6 @@ object LineFormatter {
                       indentStep,
                       initialIndentSteps,
                       indentation,
-                      spacing,
                       wrapping,
                       maxLineWidth,
                       lines,

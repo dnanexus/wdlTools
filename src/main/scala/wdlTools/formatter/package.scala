@@ -10,6 +10,11 @@ object Wrapping extends Enumeration {
   val Always, AsNeeded, Never = Value
 }
 
+object Spacing extends Enumeration {
+  type Spacing = Value
+  val Always, Never, AfterNext = Value
+}
+
 /**
   * A position on a single line. Has a `column` that may be
   * set to `Token.TERMINAL`, indicating it is the last token on

@@ -9,7 +9,7 @@
     String x = "${s}.txt" # This is an in-line comment
       String y = "foo"
     Int z =
-      i + i + i
+      i + i + i # Todo: the formatter shouldn't add parens
     Int a = if i > 1 then 2
     else 3
 
