@@ -16,7 +16,7 @@ case class Stdlib(conf: Options) {
       WT_Function0("stderr", WT_File),
       WT_Function1("read_lines", WT_File, WT_Array(WT_String)),
       WT_Function1("read_tsv", WT_File, WT_Array(WT_Array(WT_String))),
-      WT_Function1("read_map", WT_File, WT_Array(WT_Array(WT_String))),
+      WT_Function1("read_map", WT_File, WT_Map(WT_String, WT_String)),
       WT_Function1("read_object", WT_File, WT_Object),
       WT_Function1("read_objects", WT_File, WT_Array(WT_Object)),
       WT_Function1("read_json", WT_File, WT_Var(0)),

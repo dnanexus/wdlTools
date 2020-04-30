@@ -115,10 +115,21 @@ class EvalTest extends FlatSpec with Matchers {
     }.toVector
 
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
-    ctxEnd.bindings("x") shouldBe (WV_Float(1.4))
-    ctxEnd.bindings("n1") shouldBe (WV_Int(1))
-    ctxEnd.bindings("n2") shouldBe (WV_Int(2))
-    ctxEnd.bindings("n3") shouldBe (WV_Int(1))
-  }
+    val bd = ctxEnd.bindings
 
+    bd("x") shouldBe (WV_Float(1.4))
+    bd("n1") shouldBe (WV_Int(1))
+    bd("n2") shouldBe (WV_Int(2))
+    bd("n3") shouldBe (WV_Int(1))
+    bd("cities2") shouldBe(WV_Array(Vector(WV_String("LA"),
+                                           WV_String("Seattle"),
+                                           WV_String("San Francisco"))))
+
+    bd("table2") shouldBe(WV_Array(Vector(
+                                     WV_Array(Vector(WV_String("A"), WV_String("allow"))),
+                                     WV_Array(Vector(WV_String("B"), WV_String("big"))),
+                                     WV_Array(Vector(WV_String("C"), WV_String("clam"))))))
+    bd("m2") shouldBe(WV_Map(Map(WV_String("name") -> WV_String("hawk"),
+                                 WV_String("kind") -> WV_String("bird"))))
+  }
 }
