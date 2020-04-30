@@ -3,58 +3,66 @@ package wdlTools.formatter
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.Comment
+import wdlTools.util.Util.MutableHolder
 
 import scala.collection.mutable
 
 class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
                     indenting: Indenting = Indenting.IfNotIndented,
-                    initialIndent: String = "",
-                    indentation: String = " ",
                     indentStep: Int = 2,
-                    spacing: String = " ",
+                    initialIndentSteps: Int = 0,
+                    indentation: String = " ",
+                    spacing: Boolean = true,
                     wrapping: Wrapping = Wrapping.AsNeeded,
                     maxLineWidth: Int = 100,
                     private val lines: mutable.Buffer[String],
                     private val currentLine: mutable.StringBuilder,
-                    private val currentIndent: mutable.StringBuilder,
                     private val currentLineComments: mutable.Buffer[String],
-                    private var lineBegun: Boolean = false) {
+                    private var currentIndentSteps: Int = 0,
+                    private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false)) {
 
   private val commentStart = "^#+".r
   private val whitespace = "[ \t\n\r]+".r
 
-  def derive(indent: Boolean = false,
-             unspaced: Boolean = false,
+  /**
+    * Derive a new LineFormatter with the current state modified by the specified parameters.
+    * @param increaseIndent whether to incerase the indent by one step
+    * @param newIndenting new value for `indenting`
+    * @param newSpacing new value for `spacing`
+    * @param newWrapping new value for `wrapping`
+    * @return
+    */
+  def derive(increaseIndent: Boolean = false,
+             newIndenting: Indenting = indenting,
+             newSpacing: Boolean = spacing,
              newWrapping: Wrapping = wrapping): LineFormatter = {
-    val newIndent = if (indent) {
-      initialIndent + (indentation * indentStep)
+    val newInitialIndentSteps = initialIndentSteps + (if (increaseIndent) 1 else 0)
+    val newCurrentIndentSteps = if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
+      newInitialIndentSteps
     } else {
-      initialIndent
-    }
-    val newSpacing = if (unspaced) {
-      ""
-    } else {
-      spacing
+      currentIndentSteps
     }
     new LineFormatter(inlineComments,
-                      indenting,
-                      newIndent,
-                      indentation,
+                      newIndenting,
                       indentStep,
+                      newInitialIndentSteps,
+                      indentation,
                       newSpacing,
                       newWrapping,
                       maxLineWidth,
                       lines,
                       currentLine,
-                      currentIndent,
                       currentLineComments,
+                      newCurrentIndentSteps,
                       lineBegun)
   }
 
-  def isLineBegun: Boolean = lineBegun
+  def isLineBegun: Boolean = lineBegun.value
+
+  def currentIndent: String = indentation * (currentIndentSteps * indentStep)
 
   def atLineStart: Boolean = {
-    currentLine.length <= currentIndent.length
+    currentLine.length <= (currentIndentSteps * indentStep)
   }
 
   def lengthRemaining: Int = {
@@ -66,35 +74,34 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
   }
 
   def emptyLine(): Unit = {
-    require(!lineBegun)
+    require(!isLineBegun)
     lines.append("")
   }
 
   def beginLine(): Unit = {
-    require(!lineBegun)
+    require(!isLineBegun)
     currentLine.append(currentIndent)
-    lineBegun = true
+    lineBegun.value = true
   }
 
   private def dent(indenting: Indenting): Unit = {
     indenting match {
-      case Indenting.Always => currentIndent.append(indentation * indentStep)
-      case Indenting.IfNotIndented if currentIndent.length == initialIndent.length =>
-        currentIndent.append(indentation * indentStep)
-      case Indenting.Dedent =>
-        val indentLength = currentIndent.length
-        if (indentLength > initialIndent.length) {
-          currentIndent.delete(indentLength - indentStep, indentLength)
-        }
+      case Indenting.Always =>
+        currentIndentSteps += 1
+      case Indenting.IfNotIndented if currentIndentSteps == initialIndentSteps =>
+        currentIndentSteps += 1
+      case Indenting.Dedent if currentIndentSteps > initialIndentSteps =>
+        currentIndentSteps -= 1
       case Indenting.Reset =>
-        currentIndent.clear()
-        currentIndent.append(initialIndent)
+        currentIndentSteps = initialIndentSteps
+      case Indenting.Never =>
+        currentIndentSteps = 0
       case _ => Unit
     }
   }
 
   def endLine(continue: Boolean = false): Unit = {
-    require(lineBegun)
+    require(isLineBegun)
     if (currentLineComments.nonEmpty) {
       if (!atLineStart) {
         currentLine.append("  ")
@@ -104,7 +111,6 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       currentLine.append(currentLineComments.mkString(" "))
       currentLineComments.clear()
     }
-    println(s"endLine ${atLineStart} ${currentLine.toString}")
     if (!atLineStart) {
       lines.append(currentLine.toString)
       if (continue) {
@@ -114,7 +120,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       }
     }
     currentLine.clear()
-    lineBegun = false
+    lineBegun.value = false
   }
 
   private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
@@ -143,7 +149,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     * @param comments the comments to add
     */
   def addLineComments(comments: Vector[Comment]): Unit = {
-    require(!lineBegun)
+    require(!isLineBegun)
 
     beginLine()
 
@@ -193,7 +199,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
   }
 
   def append(span: Span): Unit = {
-    require(lineBegun)
+    require(isLineBegun)
 
     if (inlineComments.contains(span)) {
       val trimmedComments = trimComments(inlineComments(span))
@@ -204,22 +210,16 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       endLine(continue = true)
       beginLine()
     } else {
-      val space =
-        if (currentLine.nonEmpty && !(currentLine.last.isWhitespace || currentLine.last == indentation.last)) {
-          spacing.length
-        } else {
-          0
-        }
-
-      if (wrapping == Wrapping.AsNeeded && lengthRemaining < space + span.length) {
+      val addSpace = currentLine.nonEmpty &&
+        spacing &&
+        !(currentLine.last.isWhitespace || currentLine.last == indentation.last)
+      if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
         endLine(continue = true)
         beginLine()
-      } else if (space > 0) {
-        currentLine.append(spacing)
+      } else if (addSpace) {
+        currentLine.append(" ")
       }
     }
-
-    println(s"span class ${span.getClass}")
 
     span match {
       case c: Composite => c.formatContents(this)
@@ -241,27 +241,25 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
 object LineFormatter {
   def apply(inlineComments: Map[Position, Vector[Comment]],
             indenting: Indenting = Indenting.IfNotIndented,
-            initialIndent: String = "",
-            indentation: String = " ",
             indentStep: Int = 2,
-            spacing: String = " ",
+            initialIndentSteps: Int = 0,
+            indentation: String = " ",
+            spacing: Boolean = true,
             wrapping: Wrapping = Wrapping.AsNeeded,
             maxLineWidth: Int = 100): LineFormatter = {
     val lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty
     val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-    val indent: mutable.StringBuilder = new mutable.StringBuilder(initialIndent)
     val currentLineComments: mutable.Buffer[String] = mutable.ArrayBuffer.empty
     new LineFormatter(inlineComments,
                       indenting,
-                      initialIndent,
-                      indentation,
                       indentStep,
+                      initialIndentSteps,
+                      indentation,
                       spacing,
                       wrapping,
                       maxLineWidth,
                       lines,
                       currentLine,
-                      indent,
                       currentLineComments)
   }
 }

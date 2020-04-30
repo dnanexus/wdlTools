@@ -266,4 +266,10 @@ object Util {
   def error(msg: String): Unit = {
     System.err.println(Console.RED + msg + Console.RED)
   }
+
+  /**
+    * A wrapper around a primitive that enables passing a mutable variable by reference.
+    * @param value the flag value
+    */
+  case class MutableHolder[T](var value: T)
 }

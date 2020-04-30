@@ -48,7 +48,22 @@ trait Atom {
   def toString: String
 }
 
-trait Composite {
+trait Multiline extends Ordered[Multiline] {
+  def line: Int
+
+  def endLine: Int
+
+  lazy val lineRange: Range = line to endLine
+
+  override def compare(that: Multiline): Int = {
+    line - that.line match {
+      case 0     => endLine - that.endLine
+      case other => other
+    }
+  }
+}
+
+trait Composite extends Span with Multiline {
 
   /**
     * Format the contents of the composite. The `lineFormatter` passed to this method

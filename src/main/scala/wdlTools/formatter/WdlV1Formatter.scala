@@ -117,187 +117,161 @@ case class WdlV1Formatter(opts: Options,
       }
     }
 
-    private trait Bound {
-      def bounds: TextSource
-    }
-
-    private trait BoundSpan extends Span with Bound {
-      override def line: Int = bounds.line
-
-      override def column: Int = bounds.col
-
-      override def endColumn: Int = bounds.endCol
-    }
-
-    private abstract class AdjacentBase(spans: Vector[Span],
-                                        wrapping: Wrapping = Wrapping.Never,
-                                        quoted: Boolean = false)
-        extends Span
-        with Composite {
-      override lazy val length: Int = spans.map(_.length).sum + (if (quoted) 2 else 0)
+    private abstract class Spans(spans: Vector[Span],
+                                 wrapping: Wrapping = Wrapping.Never,
+                                 quoting: Boolean = false,
+                                 spacing: Boolean = false)
+        extends Composite {
+      override lazy val length: Int = spans
+        .map(_.length)
+        .sum + (if (quoting) 2 else 0) + (if (spacing) spans.length - 1 else 0)
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
-        println(s"spans ${spans}")
-        val adjacentFormatter = lineFormatter.derive(unspaced = true, newWrapping = wrapping)
-        if (quoted) {
+        val adjacentFormatter = lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping)
+        if (quoting) {
           adjacentFormatter.append(Literal.fromStartPosition(Symbols.QuoteOpen, line, column))
         }
         adjacentFormatter.appendAll(spans)
-        if (quoted) {
+        if (quoting) {
           adjacentFormatter.append(Literal.fromEndPosition(Symbols.QuoteClose, line, endColumn))
         }
       }
     }
 
-    private case class Adjacent(spans: Vector[Span],
-                                wrapping: Wrapping = Wrapping.Never,
-                                quoted: Boolean = false)
-        extends AdjacentBase(spans, wrapping, quoted) {
+    private case class SpanSequence(spans: Vector[Span],
+                                    wrapping: Wrapping = Wrapping.Never,
+                                    quoting: Boolean = false,
+                                    spacing: Boolean = false)
+        extends Spans(spans, wrapping, quoting, spacing) {
       require(spans.nonEmpty)
-      require(spans.tail.forall(_.line == spans.head.line))
 
       override def line: Int = spans.head.line
+
+      override def endLine: Int = {
+        spans.last match {
+          case m: Multiline => m.endLine
+          case other        => other.line
+        }
+      }
 
       override def column: Int = spans.head.column
 
       override def endColumn: Int = spans.last.endColumn
     }
 
-    private case class BoundAdjacent(spans: Vector[Span],
-                                     override val bounds: TextSource,
-                                     wrapping: Wrapping = Wrapping.Never,
-                                     quoted: Boolean = false)
-        extends AdjacentBase(spans, wrapping, quoted)
-        with BoundSpan
-
-    private trait Multiline extends Ordered[Multiline] {
-      def line: Int
-
-      def endLine: Int
-
-      lazy val lineRange: Range = line to endLine
-
-      override def compare(that: Multiline): Int = {
-        line - that.line match {
-          case 0     => endLine - that.endLine
-          case other => other
-        }
-      }
+    private trait Bounded {
+      def bounds: TextSource
     }
 
-    private abstract class Group(prefix: Option[Span] = None,
-                                 suffix: Option[Span] = None,
-                                 wrapping: Wrapping = Wrapping.Never)
-        extends Span
-        with Composite {
-      protected lazy val prefixLength: Int = prefix.map(_.length).getOrElse(0)
-      protected lazy val suffixLength: Int = suffix.map(_.length).getOrElse(0)
-
-      override def formatContents(lineFormatter: LineFormatter): Unit = {
-        val wrapAndIndentPrefix = wrapping != Wrapping.Never && prefixLength > lineFormatter.lengthRemaining
-
-        if (prefix.isDefined) {
-          if (wrapAndIndentPrefix) {
-            lineFormatter.endLine(continue = true)
-            lineFormatter.beginLine()
-          }
-          lineFormatter.append(prefix.get)
-        }
-
-        val wrapBeforeBody = wrapping == Wrapping.Always || length > lineFormatter.lengthRemaining
-
-        val bodyFormatter = lineFormatter.derive(indent = wrapAndIndentPrefix && wrapBeforeBody,
-                                                 newWrapping = wrapping)
-
-        if (wrapBeforeBody) {
-          bodyFormatter.endLine(continue = true)
-          bodyFormatter.beginLine()
-        }
-
-        formatBody(bodyFormatter)
-
-        println(s"suffix ${suffix}")
-
-        if (suffix.isDefined) {
-          if (wrapBeforeBody) {
-            lineFormatter.endLine(continue = wrapAndIndentPrefix)
-            lineFormatter.beginLine()
-          }
-          lineFormatter.append(suffix.get)
-        }
-      }
-
-      def formatBody(lineFormatter: LineFormatter): Unit
-    }
-
-    private abstract class Container(items: Vector[Span],
-                                     separator: String,
-                                     prefix: Option[Span] = None,
-                                     suffix: Option[Span] = None,
-                                     wrapping: Wrapping = Wrapping.AsNeeded)
-        extends Group(prefix = prefix, suffix = suffix, wrapping = wrapping)
-        with Multiline {
-
-      private lazy val itemStr: String = items.mkString(separator)
-      private val itemLength: Int = itemStr.length
-      private val itemSpans: Vector[Span] = items.zipWithIndex.map {
-        case (item, i) if i < items.size - 1 =>
-          val delimiterLiteral = Literal.fromPrev(separator, item)
-          Adjacent(Vector(item, delimiterLiteral))
-        case (item, _) => item
-      }
-
-      override def length: Int = {
-        itemLength + prefixLength + suffixLength
-      }
-
-      def formatBody(lineFormatter: LineFormatter): Unit = {
-        lineFormatter.appendAll(itemSpans)
-      }
-    }
-
-    private trait BoundMultiline extends Bound with Multiline {
+    private trait BoundedComposite extends Composite with Bounded {
       override def line: Int = bounds.line
 
       override def endLine: Int = bounds.endLine
+
+      override def column: Int = bounds.col
+
+      override def endColumn: Int = bounds.endCol
     }
 
-    private trait BoundMultilineSpan extends BoundSpan with BoundMultiline {
-      override def line: Int = bounds.line
+    private case class BoundedSpanSequence(spans: Vector[Span],
+                                           override val bounds: TextSource,
+                                           wrapping: Wrapping = Wrapping.Never,
+                                           quoting: Boolean = false,
+                                           spacing: Boolean = false)
+        extends Spans(spans, wrapping, quoting, spacing)
+        with BoundedComposite {
+      override def endLine: Int = bounds.endLine
     }
 
-    private case class BoundDelimitedContainer(items: Vector[Span],
-                                               prefix: Option[Span] = None,
-                                               suffix: Option[Span] = None,
-                                               wrapping: Wrapping = Wrapping.AsNeeded,
-                                               override val bounds: TextSource)
-        extends Container(items,
-                          separator = s"${Symbols.ArrayDelimiter} ",
-                          prefix,
-                          suffix,
-                          wrapping)
-        with BoundMultilineSpan
+    private abstract class Group(ends: Option[(Span, Span)] = None,
+                                 val wrapping: Wrapping = Wrapping.Never)
+        extends Composite {
 
-    private case class BoundSpacedContainer(items: Vector[Span],
-                                            prefix: Option[Span] = None,
-                                            suffix: Option[Span] = None,
-                                            wrapping: Wrapping = Wrapping.Never,
-                                            override val bounds: TextSource)
-        extends Container(items, separator = " ", prefix, suffix, wrapping)
-        with BoundMultilineSpan
+      private val endLengths: (Int, Int) =
+        ends.map(e => (e._1.length, e._2.length)).getOrElse((0, 0))
+
+      override lazy val length: Int = body.length + endLengths._1 + endLengths._2
+
+      override def formatContents(lineFormatter: LineFormatter): Unit = {
+        if (ends.isDefined) {
+          val (prefix, suffix) = ends.get
+          val wrapAndIndentEnds = wrapping != Wrapping.Never && endLengths._1 > lineFormatter.lengthRemaining
+          if (wrapAndIndentEnds) {
+            lineFormatter.endLine(continue = true)
+            lineFormatter.beginLine()
+          }
+          if (wrapping == Wrapping.Always || length > lineFormatter.lengthRemaining) {
+            lineFormatter.append(prefix)
+
+            val bodyFormatter = lineFormatter
+              .derive(increaseIndent = wrapAndIndentEnds, newSpacing = true, newWrapping = wrapping)
+            bodyFormatter.endLine(continue = true)
+            bodyFormatter.beginLine()
+            bodyFormatter.append(body)
+
+            lineFormatter.endLine(continue = wrapAndIndentEnds)
+            lineFormatter.beginLine()
+            lineFormatter.append(suffix)
+          } else {
+            lineFormatter.append(SpanSequence(Vector(prefix, body, suffix), wrapping))
+          }
+        } else {
+          lineFormatter.append(body)
+        }
+      }
+
+      def body: Composite
+    }
+
+    private abstract class Container(items: Vector[Span],
+                                     delimiter: Option[String] = None,
+                                     ends: Option[(Span, Span)] = None,
+                                     override val wrapping: Wrapping = Wrapping.AsNeeded)
+        extends Group(ends = ends, wrapping = wrapping) {
+
+      override lazy val body: Composite = SpanSequence(
+          items.zipWithIndex.map {
+            case (item, i) if i < items.size - 1 =>
+              if (delimiter.isDefined) {
+                val delimiterLiteral = Literal.fromPrev(delimiter.get, item)
+                SpanSequence(Vector(item, delimiterLiteral))
+              } else {
+                item
+              }
+            case (item, _) => item
+          },
+          wrapping = wrapping,
+          spacing = true
+      )
+    }
+
+    private case class BoundedContainer(
+        items: Vector[Span],
+        ends: Option[(Span, Span)] = None,
+        override val wrapping: Wrapping = Wrapping.Never,
+        override val bounds: TextSource
+    ) extends Container(items, ends = ends, wrapping = wrapping)
+        with BoundedComposite
+
+    private case class BoundedDelimitedContainer(
+        items: Vector[Span],
+        ends: Option[(Span, Span)] = None,
+        override val wrapping: Wrapping = Wrapping.AsNeeded,
+        override val bounds: TextSource
+    ) extends Container(items, delimiter = Some(s"${Symbols.ArrayDelimiter}"), ends, wrapping)
+        with BoundedComposite
 
     private case class KeyValue(key: Span,
                                 value: Span,
                                 delimiter: String = Symbols.KeyValueDelimiter,
                                 override val bounds: TextSource)
-        extends BoundMultilineSpan
-        with Composite {
+        extends BoundedComposite {
       private val delimiterLiteral: Literal = Literal.fromPrev(delimiter, key)
 
       override def length: Int = key.length + delimiterLiteral.length + value.length + 1
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
-        lineFormatter.appendAll(Vector(Adjacent(Vector(key, delimiterLiteral)), value))
+        lineFormatter.appendAll(Vector(SpanSequence(Vector(key, delimiterLiteral)), value))
       }
     }
 
@@ -313,20 +287,21 @@ case class WdlV1Formatter(opts: Options,
         if (inner1.isDefined) {
           // making the assumption that the open token comes directly after the name
           val openLiteral = Literal.fromPrev(Symbols.TypeParamOpen, nameLiteral)
+          val prefix = SpanSequence(Vector(nameLiteral, openLiteral))
           // making the assumption that the close token comes directly before the quantifier (if any)
           val closeLiteral = if (quantifierLiteral.isDefined) {
             Literal.fromNext(Symbols.TypeParamClose, quantifierLiteral.get)
           } else {
             Literal.fromEnd(Symbols.TypeParamClose, textSource)
           }
-          BoundDelimitedContainer(
+          val suffix = SpanSequence(Vector(Some(closeLiteral), quantifierLiteral).flatten)
+          BoundedDelimitedContainer(
               Vector(inner1, inner2).flatten,
-              prefix = Some(Adjacent(Vector(nameLiteral, openLiteral))),
-              suffix = Some(Adjacent(Vector(Some(closeLiteral), quantifierLiteral).flatten)),
+              Some((prefix, suffix)),
               bounds = textSource
           )
         } else if (quantifier.isDefined) {
-          Adjacent(Vector(nameLiteral, quantifierLiteral.get))
+          SpanSequence(Vector(nameLiteral, quantifierLiteral.get))
         } else {
           nameLiteral
         }
@@ -378,44 +353,23 @@ case class WdlV1Formatter(opts: Options,
       }
     }
 
-    private abstract class ExpressionGroup(prefix: Option[Span] = None,
-                                           suffix: Option[Span] = None,
-                                           inString: Boolean,
-                                           override val bounds: TextSource)
-        extends Group(prefix = prefix,
-                      suffix = suffix,
-                      wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded)
-        with BoundMultilineSpan
-
     private case class Operation(oper: String,
                                  lhs: Span,
                                  rhs: Span,
                                  grouped: Boolean = false,
                                  inString: Boolean,
                                  override val bounds: TextSource)
-        extends ExpressionGroup(prefix = if (grouped) {
-          Some(Literal.fromStart(Symbols.GroupOpen, bounds))
+        extends Group(ends = if (grouped) {
+          Some(Literal.fromStart(Symbols.GroupOpen, bounds),
+               Literal.fromEnd(Symbols.GroupClose, bounds))
         } else {
           None
-        }, suffix = if (grouped) {
-          Some(Literal.fromEnd(Symbols.GroupClose, bounds))
-        } else {
-          None
-        }, inString, bounds) {
+        }, wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded)
+        with BoundedComposite {
 
-      private val operLiteral = Literal.between(oper, lhs, rhs)
-
-      override def length: Int = {
-        val parenLength = if (grouped) {
-          2
-        } else {
-          0
-        }
-        lhs.length + oper.length + rhs.length + 2 + parenLength
-      }
-
-      override def formatBody(lineFormatter: LineFormatter): Unit = {
-        lineFormatter.appendAll(Vector(lhs, operLiteral, rhs))
+      override lazy val body: Composite = {
+        val operLiteral = Literal.between(oper, lhs, rhs)
+        SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = true)
       }
     }
 
@@ -425,23 +379,17 @@ case class WdlV1Formatter(opts: Options,
                                    options: Option[Vector[Span]] = None,
                                    inString: Boolean,
                                    override val bounds: TextSource)
-        extends ExpressionGroup(prefix = Some(Literal.fromStart(open, bounds)),
-                                suffix = Some(Literal.fromEnd(close, bounds)),
-                                inString = inString,
-                                bounds = bounds) {
+        extends Group(
+            ends = Some(Literal.fromStart(open, bounds), Literal.fromEnd(close, bounds)),
+            wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded
+        )
+        with BoundedComposite {
 
-      override def length: Int = {
-        value.length + open.length + close.length + options
-          .map(_.map(_.length + 1).sum)
-          .getOrElse(0)
-      }
-
-      override def formatBody(lineFormatter: LineFormatter): Unit = {
-        if (options.isDefined) {
-          lineFormatter.appendAll(options.get)
-        }
-        lineFormatter.append(value)
-      }
+      override lazy val body: Composite = SpanSequence(
+          options.getOrElse(Vector.empty) ++ Vector(value),
+          wrapping = wrapping,
+          spacing = true
+      )
     }
 
     private def buildExpression(
@@ -449,7 +397,8 @@ case class WdlV1Formatter(opts: Options,
         placeholderOpen: String = Symbols.PlaceholderOpenDollar,
         inStringOrCommand: Boolean = false,
         inPlaceholder: Boolean = false,
-        inOperation: Boolean = false
+        inOperation: Boolean = false,
+        stringModifier: Option[String => String] = None
     ): Span = {
 
       /**
@@ -463,8 +412,8 @@ case class WdlV1Formatter(opts: Options,
       }
 
       /**
-        * Builds an expression that occurs nested within another expression. By default, passes all the current
-        * parameter values to the nested call.
+        * Builds an expression that occurs nested within another expression. By default, passes
+        * all the current parameter values to the nested call.
         *
         * @param nestedExpression the nested Expr
         * @param placeholderOpen  override the current value of `placeholderOpen`
@@ -478,16 +427,19 @@ case class WdlV1Formatter(opts: Options,
                  inString: Boolean = inStringOrCommand,
                  inPlaceholder: Boolean = inPlaceholder,
                  inOperation: Boolean = inOperation): Span = {
-        buildExpression(nestedExpression,
-                        placeholderOpen = placeholderOpen,
-                        inStringOrCommand = inString,
-                        inPlaceholder = inPlaceholder,
-                        inOperation = inOperation)
+        buildExpression(
+            nestedExpression,
+            placeholderOpen = placeholderOpen,
+            inStringOrCommand = inString,
+            inPlaceholder = inPlaceholder,
+            inOperation = inOperation,
+            stringModifier = stringModifier
+        )
       }
 
       def unirary(oper: String, value: Expr, textSource: TextSource): Span = {
         val operSpan = Literal.fromStart(oper, textSource)
-        Adjacent(Vector(operSpan, nested(value, inOperation = true)))
+        SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
       }
 
       def operation(oper: String, lhs: Expr, rhs: Expr, textSource: TextSource): Span = {
@@ -505,50 +457,56 @@ case class WdlV1Formatter(opts: Options,
         val exprSpan = nested(value, inPlaceholder = true)
         val eqLiteral = Literal.fromNext(Symbols.Assignment, exprSpan)
         val nameLiteral = Literal.fromNext(name, eqLiteral)
-        Adjacent(Vector(nameLiteral, eqLiteral, exprSpan))
+        SpanSequence(Vector(nameLiteral, eqLiteral, exprSpan))
       }
 
       expr match {
         // literal values
-        case ValueNull(text)           => Literal.fromStart(Symbols.Null, text)
-        case ValueString(value, text)  => literal(value, text)
+        case ValueNull(text) => Literal.fromStart(Symbols.Null, text)
+        case ValueString(value, text) =>
+          val v = if (stringModifier.isDefined) {
+            stringModifier.get(value)
+          } else {
+            value
+          }
+          literal(v, text)
         case ValueFile(value, text)    => literal(value, text)
         case ValueBoolean(value, text) => Literal.fromStart(value, text)
         case ValueInt(value, text)     => Literal.fromStart(value, text)
         case ValueFloat(value, text)   => Literal.fromStart(value, text)
         case ExprPair(left, right, text) if !(inStringOrCommand || inPlaceholder) =>
-          BoundDelimitedContainer(
+          BoundedDelimitedContainer(
               Vector(nested(left), nested(right)),
-              prefix = Some(Literal.fromStart(Symbols.GroupOpen, text)),
-              suffix = Some(Literal.fromEnd(Symbols.GroupClose, text)),
+              ends = Some(Literal.fromStart(Symbols.GroupOpen, text),
+                          Literal.fromEnd(Symbols.GroupClose, text)),
               bounds = text
           )
         case ExprArray(value, text) =>
-          BoundDelimitedContainer(
+          BoundedDelimitedContainer(
               value.map(nested(_)),
-              prefix = Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text)),
-              suffix = Some(Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
+              ends = Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text),
+                          Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
               bounds = text
           )
         case ExprMap(value, text) =>
-          BoundDelimitedContainer(
+          BoundedDelimitedContainer(
               value.map {
                 case ExprMapItem(k, v, itemText) =>
                   KeyValue(nested(k), nested(v), bounds = itemText)
               },
-              prefix = Some(Literal.fromStart(Symbols.MapOpen, text)),
-              suffix = Some(Literal.fromEnd(Symbols.MapClose, text)),
+              ends = Some(Literal.fromStart(Symbols.MapOpen, text),
+                          Literal.fromEnd(Symbols.MapClose, text)),
               wrapping = Wrapping.Always,
               bounds = text
           )
         case ExprObject(value, text) =>
-          BoundDelimitedContainer(
+          BoundedDelimitedContainer(
               value.map {
                 case ExprObjectMember(k, v, memberText) =>
                   KeyValue(Literal.fromStart(k, memberText), nested(v), bounds = memberText)
               },
-              prefix = Some(Literal.fromStart(Symbols.ObjectOpen, text)),
-              suffix = Some(Literal.fromEnd(Symbols.ObjectClose, text)),
+              ends = Some(Literal.fromStart(Symbols.ObjectOpen, text),
+                          Literal.fromEnd(Symbols.ObjectClose, text)),
               wrapping = Wrapping.Always,
               bounds = text
           )
@@ -579,7 +537,9 @@ case class WdlV1Formatter(opts: Options,
                       inString = inStringOrCommand,
                       bounds = text)
         case ExprCompoundString(value, text) if !inPlaceholder =>
-          BoundAdjacent(value.map(nested(_, inString = true)), text, quoted = !inStringOrCommand)
+          BoundedSpanSequence(value.map(nested(_, inString = true)),
+                              text,
+                              quoting = !inStringOrCommand)
         // other expressions need to be wrapped in a placeholder if they
         // appear in a string or command block
         case other =>
@@ -603,21 +563,20 @@ case class WdlV1Formatter(opts: Options,
             case ExprIdentifier(id, text)      => Literal.fromStart(id, text)
             case ExprAt(array, index, text) =>
               val arraySpan = nested(array, inPlaceholder = inStringOrCommand)
-              BoundDelimitedContainer(
+              val prefix = SpanSequence(
+                  Vector(arraySpan, Literal.fromPrev(Symbols.IndexOpen, arraySpan))
+              )
+              val suffix = Literal.fromEnd(Symbols.IndexClose, text)
+              BoundedDelimitedContainer(
                   Vector(nested(index, inPlaceholder = inStringOrCommand)),
-                  prefix = Some(
-                      Adjacent(
-                          Vector(arraySpan, Literal.fromPrev(Symbols.IndexOpen, arraySpan))
-                      )
-                  ),
-                  suffix = Some(Literal.fromEnd(Symbols.IndexClose, text)),
+                  ends = Some(prefix, suffix),
                   bounds = text
               )
             case ExprIfThenElse(cond, tBranch, fBranch, text) =>
-              val condSpan = nested(cond, inOperation = true, inPlaceholder = inStringOrCommand)
-              val tSpan = nested(tBranch, inOperation = true, inPlaceholder = inStringOrCommand)
-              val fSpan = nested(fBranch, inOperation = true, inPlaceholder = inStringOrCommand)
-              BoundSpacedContainer(
+              val condSpan = nested(cond, inOperation = false, inPlaceholder = inStringOrCommand)
+              val tSpan = nested(tBranch, inOperation = false, inPlaceholder = inStringOrCommand)
+              val fSpan = nested(fBranch, inOperation = false, inPlaceholder = inStringOrCommand)
+              BoundedContainer(
                   Vector(
                       Literal.fromStart(Symbols.If, text),
                       condSpan,
@@ -630,20 +589,19 @@ case class WdlV1Formatter(opts: Options,
                   bounds = text
               )
             case ExprApply(funcName, elements, text) =>
-              BoundDelimitedContainer(
+              val prefix = SpanSequence(
+                  Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), text)
+              )
+              val suffix = Literal.fromEnd(Symbols.FunctionCallClose, text)
+              BoundedDelimitedContainer(
                   elements.map(nested(_, inPlaceholder = inStringOrCommand)),
-                  prefix = Some(
-                      Adjacent(
-                          Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), text)
-                      )
-                  ),
-                  suffix = Some(Literal.fromEnd(Symbols.FunctionCallClose, text)),
+                  ends = Some(prefix, suffix),
                   bounds = text
               )
             case ExprGetName(e, id, text) =>
               val exprSpan = nested(e, inPlaceholder = inStringOrCommand)
               val idLiteral = Literal.fromEnd(id, text)
-              Adjacent(
+              SpanSequence(
                   Vector(exprSpan, Literal.between(Symbols.Access, exprSpan, idLiteral), idLiteral)
               )
             case other => throw new Exception(s"Unrecognized expression $other")
@@ -670,9 +628,15 @@ case class WdlV1Formatter(opts: Options,
       def format(lineFormatter: LineFormatter): Unit
     }
 
+    private trait BoundedMultiline extends Multiline with Bounded {
+      override def line: Int = bounds.line
+
+      override def endLine: Int = bounds.endLine
+    }
+
     private abstract class BoundedStatement(override val bounds: TextSource)
         extends Statement
-        with BoundMultiline {
+        with BoundedMultiline {
 
       override def format(lineFormatter: LineFormatter): Unit = {
         lineFormatter.beginLine()
@@ -829,8 +793,6 @@ case class WdlV1Formatter(opts: Options,
     private abstract class OpenSection(emtpyLineBetweenStatements: Boolean = false,
                                        topCommentsAllowed: Boolean = true)
         extends Section(emtpyLineBetweenStatements, topCommentsAllowed) {
-      // require(statements.nonEmpty)
-
       override def line: Int = sortedStatements.head.line
 
       override def endLine: Int = sortedStatements.last.endLine
@@ -870,7 +832,6 @@ case class WdlV1Formatter(opts: Options,
       override def formatContents(lineFormatter: LineFormatter): Unit = {
         lineFormatter.appendAll(lhs)
         if (rhs.isDefined) {
-          println(s"rhs ${rhs.get}")
           lineFormatter.appendAll(rhs.get)
         }
       }
@@ -905,7 +866,7 @@ case class WdlV1Formatter(opts: Options,
         lineFormatter.appendAll(Vector(Some(keywordLiteral), clauseSpan, Some(openLiteral)).flatten)
         if (bodyStatement.isDefined) {
           lineFormatter.endLine()
-          bodyStatement.get.format(lineFormatter.derive(indent = true))
+          bodyStatement.get.format(lineFormatter.derive(increaseIndent = true))
           lineFormatter.beginLine()
         }
         lineFormatter.append(closeLiteral)
@@ -946,7 +907,7 @@ case class WdlV1Formatter(opts: Options,
                                           override val endLine: Int)
             extends Section
 
-        val inputFormatter = lineFormatter.derive(indent = true)
+        val inputFormatter = lineFormatter.derive(increaseIndent = true)
         var groupStart = line
         var inputItr = inputs.iterator.buffered
         var otherItr = other.iterator.buffered
@@ -976,14 +937,12 @@ case class WdlV1Formatter(opts: Options,
         while (inputItr.hasNext) {
           val otherResult = nextGroup(otherItr, inputItr)
           if (otherResult._1.isDefined) {
-            //println(otherResult._1.get)
             otherGroups.append(otherResult._1.get)
           }
           otherItr = otherResult._2
 
           val inputResult = nextGroup(inputItr, otherItr)
           if (inputResult._1.isDefined) {
-            //println(inputResult._1.get)
             inputResult._1.get.format(inputFormatter)
           }
           inputItr = inputResult._2
@@ -1023,7 +982,7 @@ case class WdlV1Formatter(opts: Options,
       private val rhs = buildExpression(expr)
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
-        lineFormatter.appendAll(Vector(Adjacent(lhs), rhs))
+        lineFormatter.appendAll(Vector(SpanSequence(lhs), rhs))
       }
     }
 
@@ -1095,7 +1054,7 @@ case class WdlV1Formatter(opts: Options,
 
     private case class CallInputArgsContainer(args: Vector[Container])
         extends Container(args,
-                          separator = s"${Symbols.ArrayDelimiter} ",
+                          delimiter = Some(s"${Symbols.ArrayDelimiter}"),
                           wrapping = Wrapping.Always) {
       require(args.nonEmpty)
 
@@ -1115,7 +1074,7 @@ case class WdlV1Formatter(opts: Options,
       private val argChunks = inputs.value.map { inp =>
         val nameToken = Literal.fromStart(inp.name, inp.text)
         val exprSpan = buildExpression(inp.expr)
-        BoundSpacedContainer(
+        BoundedContainer(
             Vector(nameToken, Literal.between(Symbols.Assignment, nameToken, exprSpan), exprSpan),
             bounds = inp.text
         )
@@ -1123,15 +1082,13 @@ case class WdlV1Formatter(opts: Options,
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
         lineFormatter.appendAll(
-            Vector(Adjacent(inputChunks), CallInputArgsContainer(argChunks))
+            Vector(SpanSequence(inputChunks), CallInputArgsContainer(argChunks))
         )
       }
     }
 
-    private case class OpenSpacedContainer(items: Vector[Span],
-                                           prefix: Option[Span] = None,
-                                           suffix: Option[Span] = None)
-        extends Container(items, separator = " ", prefix, suffix) {
+    private case class OpenSpacedContainer(items: Vector[Span], ends: Option[(Span, Span)] = None)
+        extends Container(items, ends = ends) {
 
       require(items.nonEmpty)
 
@@ -1178,8 +1135,7 @@ case class WdlV1Formatter(opts: Options,
         Some(
             OpenSpacedContainer(
                 Vector(idToken, inToken, exprAtom),
-                prefix = Some(openToken),
-                suffix = Some(closeToken)
+                ends = Some(openToken, closeToken)
             )
         )
       }
@@ -1197,8 +1153,7 @@ case class WdlV1Formatter(opts: Options,
         Some(
             OpenSpacedContainer(
                 Vector(exprAtom),
-                prefix = Some(openToken),
-                suffix = Some(closeToken)
+                ends = Some(openToken, closeToken)
             )
         )
       }
@@ -1256,9 +1211,13 @@ case class WdlV1Formatter(opts: Options,
 
     private case class CommandBlock(command: CommandSection)
         extends BoundedStatement(command.text) {
-      private val commandStartRegexp = "^(.*)[\n\r]+(.*)".r
+      // The command block is considered "preformatted" in that we don't try to reformat it.
+      // However, we do need to try to indent it correclty. We do this by detecting the amount
+      // of indent used on the first non-empty line and remove that from every line and replace
+      // it by the lineFormatter's current indent level.
+      private val commandStartRegexp = "^(.*)[\n\r]+([ \\t]*)(.*)".r
       private val commandEndRegexp = "\\s+$".r
-      private val commandSingletonRegexp = "^(.*)[\n\r]*(.*?)\\s*$".r
+      private val commandSingletonRegexp = "^(.*)[\n\r]*[ \\t]*(.*?)\\s*$".r
 
       override def formatContents(lineFormatter: LineFormatter): Unit = {
         lineFormatter.appendAll(
@@ -1283,7 +1242,8 @@ case class WdlV1Formatter(opts: Options,
               lineFormatter.appendInlineComment(comment)
             }
             lineFormatter.endLine()
-            val bodyFormatter = lineFormatter.derive(unspaced = true)
+
+            val bodyFormatter = lineFormatter.derive(increaseIndent = true, newSpacing = false)
             bodyFormatter.beginLine()
             bodyFormatter.append(
                 buildExpression(
@@ -1294,20 +1254,21 @@ case class WdlV1Formatter(opts: Options,
             )
             bodyFormatter.endLine()
           } else {
-            val (expr, comment) = command.parts.head match {
+            val (expr, comment, indent) = command.parts.head match {
               case s: ValueString =>
                 s.value match {
-                  case commandStartRegexp(comment, body) =>
-                    (ValueString(body, s.text), comment.trim)
-                  case _ => (s, "")
+                  case commandStartRegexp(comment, indent, body) =>
+                    (ValueString(body, s.text), comment.trim, indent)
+                  case _ => (s, "", "")
                 }
-              case other => (other, "")
+              case other => (other, "", "")
             }
             if (comment.nonEmpty && comment.startsWith(Symbols.Comment)) {
               lineFormatter.appendInlineComment(comment)
             }
             lineFormatter.endLine()
-            val bodyFormatter = lineFormatter.derive(unspaced = true)
+
+            val bodyFormatter = lineFormatter.derive(increaseIndent = true, newSpacing = false)
             bodyFormatter.beginLine()
             bodyFormatter.append(
                 buildExpression(
@@ -1316,12 +1277,20 @@ case class WdlV1Formatter(opts: Options,
                     inStringOrCommand = true
                 )
             )
+
+            // Function to replace indenting in command block expressions with the current
+            // indent level of the formatter
+            val indentRegexp = s"\n${indent}".r
+            val replacement = s"\n${bodyFormatter.currentIndent}"
+            def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
+
             if (numParts > 2) {
-              command.parts.slice(1, command.parts.size - 1).foreach { chunk =>
+              command.parts.slice(1, command.parts.size - 1).foreach { expr =>
                 bodyFormatter.append(
-                    buildExpression(chunk,
+                    buildExpression(expr,
                                     placeholderOpen = Symbols.PlaceholderOpenTilde,
-                                    inStringOrCommand = true)
+                                    inStringOrCommand = true,
+                                    stringModifier = Some(replaceIndent))
                 )
               }
             }
@@ -1333,7 +1302,8 @@ case class WdlV1Formatter(opts: Options,
                       case other => other
                     },
                     placeholderOpen = Symbols.PlaceholderOpenTilde,
-                    inStringOrCommand = true
+                    inStringOrCommand = true,
+                    stringModifier = Some(replaceIndent)
                 )
             )
             bodyFormatter.endLine()
@@ -1402,7 +1372,7 @@ case class WdlV1Formatter(opts: Options,
 
     private case class DocumentSections(document: Document)
         extends Section(emtpyLineBetweenStatements = true, topCommentsAllowed = false)
-        with BoundMultiline {
+        with BoundedMultiline {
 
       override def bounds: TextSource = document.text
 
