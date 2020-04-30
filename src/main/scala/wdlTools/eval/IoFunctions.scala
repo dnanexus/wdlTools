@@ -6,29 +6,27 @@ import java.nio.charset.StandardCharsets._
 import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
 import scala.collection.JavaConverters._
 
-import wdlTools.eval.WdlValues._
-import wdlTools.util.{ExprEvalConfig, Options, Util}
+import wdlTools.util.{EvalConfig, Options, Util}
 import wdlTools.util.Verbosity._
 
-case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
+case class IoFunctions(opts: Options, evalCfg: EvalConfig) {
 
   private def isURL(pathOrUrl: String): Boolean = {
     pathOrUrl.contains("://")
   }
 
   // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-  private def readLocalFile(p: Path): WV_String = {
+  private def readLocalFile(p: Path): String = {
     if (!Files.exists(p))
       throw new RuntimeException(s"File ${p} not found")
 
     // TODO: Check that the file isn't over 256 MiB.
     // I have seen a user read a 30GiB file this case, and cause an ugly error.
 
-    val content = new String(Files.readAllBytes(p), UTF_8)
-    WV_String(content)
+    new String(Files.readAllBytes(p), UTF_8)
   }
 
-  private def readURLContent(url: URL): WV_String = {
+  private def readURLContent(url: URL): String = {
     val is = url.openStream()
     val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
 
@@ -44,8 +42,7 @@ case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
       }
 
       // make it a string
-      val strVal = new String(buffer.toByteArray(), UTF_8)
-      WV_String(strVal)
+      new String(buffer.toByteArray(), UTF_8)
     } catch {
       case e: Throwable =>
         Util.error(s"Error reading ${url.toString}")
@@ -60,7 +57,7 @@ case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
   //
   // This may be a binary file that does not lend itself to splitting into lines.
   // Hence, we aren't using the Source module.
-  def readFile(pathOrUrl: String): WV_String = {
+  def readFile(pathOrUrl: String): String = {
     if (isURL(pathOrUrl)) {
       // A URL
       val url = new URL(pathOrUrl)
@@ -80,7 +77,7 @@ case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(pathOrUrl: String, content: String): WV_File = {
+  def writeFile(pathOrUrl: String, content: String): Path = {
     if (isURL(pathOrUrl)) {
       throw new RuntimeException(
           s"writeFile: implemented only for local files (${pathOrUrl})"
@@ -89,7 +86,7 @@ case class IoFunctions(opts: Options, evalCfg: ExprEvalConfig) {
 
     val path = Paths.get(pathOrUrl)
     Files.write(path, content.getBytes())
-    WV_File(path.toString)
+    path
   }
 
   /**

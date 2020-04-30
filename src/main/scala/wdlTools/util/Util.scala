@@ -267,4 +267,7 @@ object Util {
   def error(msg: String): Unit = {
     System.err.println(Console.RED + msg + Console.RED)
   }
+
+  // ignore a value without causing a compilation error
+  def ignore[A](x: A): Unit = {}
 }

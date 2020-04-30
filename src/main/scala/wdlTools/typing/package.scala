@@ -1,7 +1,6 @@
 package wdlTools.typing
 
 import java.net.URL
-
 import wdlTools.syntax.TextSource
 
 // Type error exception
