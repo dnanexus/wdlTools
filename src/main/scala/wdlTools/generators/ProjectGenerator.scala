@@ -6,7 +6,7 @@ import java.nio.file.Path
 import wdlTools.formatter.WdlV1Formatter
 import wdlTools.generators.ProjectGenerator._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{CommentMap, WdlParser, Parsers, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
 import scala.collection.mutable
@@ -230,7 +230,7 @@ case class ProjectGenerator(opts: Options,
                        null,
                        CommentMap.empty)
     val wdlName = s"${name}.wdl"
-    val docUrl = Util.pathToURL(outputDir.resolve(wdlName))
+    val docUrl = Util.pathToUrl(outputDir.resolve(wdlName))
     generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
 
     if (readmes) {
@@ -238,17 +238,17 @@ case class ProjectGenerator(opts: Options,
     }
 
     if (dockerfile) {
-      val dockerfileUrl = Util.pathToURL(outputDir.resolve("Dockerfile"))
+      val dockerfileUrl = Util.pathToUrl(outputDir.resolve("Dockerfile"))
       generatedFiles(dockerfileUrl) = renderer.render(DOCKERFILE_TEMPLATE)
     }
 
     if (tests) {
-      val testUrl = Util.pathToURL(outputDir.resolve("tests").resolve(s"test_${name}.json"))
+      val testUrl = Util.pathToUrl(outputDir.resolve("tests").resolve(s"test_${name}.json"))
       testsGenerator.apply(testUrl, wdlName, doc)
     }
 
     if (makefile) {
-      val makefileUrl = Util.pathToURL(outputDir.resolve("Makefile"))
+      val makefileUrl = Util.pathToUrl(outputDir.resolve("Makefile"))
       generatedFiles(makefileUrl) = renderer
         .render(MAKEFILE_TEMPLATE, Map("name" -> name, "test" -> tests, "docker" -> dockerfile))
     }

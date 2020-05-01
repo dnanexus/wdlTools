@@ -32,7 +32,16 @@ case class Options(localDirectories: Vector[Path] = Vector.empty,
                    antlr4Trace: Boolean = false,
                    typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
 
-  def getURL(pathOrUrl: String, mustExist: Boolean = true): URL = {
-    Util.getURL(pathOrUrl, localDirectories, mustExist)
+  def getUrl(pathOrUrl: String, mustExist: Boolean = true): URL = {
+    Util.getUrl(pathOrUrl, localDirectories, mustExist)
   }
 }
+
+/** Configuration for expression evaluation. Some operations perform file IO.
+  *
+  * @param homeDir  the root directory for relative paths, and the root directory for search (glob).
+  * @param tmpDir   directory for placing temporary files.
+  * @param stdout   the file that has a copy of standard output. This is used in the command section.
+  * @param stderr   as above for standard error.
+  */
+case class EvalConfig(homeDir: Path, tmpDir: Path, stdout: Path, stderr: Path)

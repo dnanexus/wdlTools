@@ -52,7 +52,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] =
     listArgConverter[Path](Paths.get(_), exceptionHandler[List[Path]])
   implicit val urlConverter: ValueConverter[URL] =
-    singleArgConverter[URL](Util.getURL(_), exceptionHandler[URL])
+    singleArgConverter[URL](Util.getUrl(_), exceptionHandler[URL])
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.withName, exceptionHandler[WdlVersion])
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =

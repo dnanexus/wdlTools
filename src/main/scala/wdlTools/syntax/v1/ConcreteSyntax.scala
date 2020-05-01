@@ -178,7 +178,7 @@ object ConcreteSyntax {
       extends Element
 
   case class Version(value: WdlVersion = WdlVersion.V1, text: TextSource) extends Element
-  case class Document(docSourceURL: URL,
+  case class Document(docSourceUrl: URL,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

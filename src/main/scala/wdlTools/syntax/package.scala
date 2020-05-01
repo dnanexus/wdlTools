@@ -22,21 +22,6 @@ object WdlVersion {
   }
 }
 
-/**
-  * A multi-line element. Lines are 1-based, `endLine` is inclusive,
-  * and `endCol` is exclusive.
-  */
-trait PositionRange extends Ordered[PositionRange] {
-  def line: Int
-
-  def col: Int
-
-  def endLine: Int
-
-  def endCol: Int
-
-}
-
 /** Source location in a WDL program. We add it to each syntax element
   * so we could do accurate error reporting. All positions are 1-indexed.
   *
@@ -50,10 +35,10 @@ trait PositionRange extends Ordered[PositionRange] {
   * @param endLine: ending line, end-inclusive
   * @param endCol: ending column, end-exclusive
   */
-case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends PositionRange {
+case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
   lazy val lineRange: Range = line to endLine
 
-  def compare(that: PositionRange): Int = {
+  def compare(that: TextSource): Int = {
     line - that.line match {
       case 0 =>
         col - that.col match {
@@ -86,17 +71,38 @@ object TextSource {
   }
 }
 
+// A syntax error that occured when parsing a document. It is generated
+// by the ANTLR machinery and we transform it into this format.
+final case class SyntaxError(docSourceUrl: Option[URL],
+                             symbol: String,
+                             line: Int,
+                             charPositionInLine: Int,
+                             msg: String)
+
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
-    this(SyntaxException.formatMessage(msg, text, docSourceURL))
+  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
+    this(SyntaxException.formatMessage(msg, text, docSourceUrl))
+  }
+  def this(errors: Seq[SyntaxError]) = {
+    this(SyntaxException.formatMessageFromErrorList(errors))
   }
 }
 
 object SyntaxException {
-  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
-    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
+    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
     s"${msg} at ${text}${urlPart}"
+  }
+
+  def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
+    // make one big report on all the syntax errors
+    val messages = errors.map {
+      case SyntaxError(docSourceUrl, symbol, line, position, msg) =>
+        val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
+        s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
+    }
+    messages.mkString("\n")
   }
 }
 

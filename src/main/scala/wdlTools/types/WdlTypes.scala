@@ -1,15 +1,15 @@
-package wdlTools.typing
+package wdlTools.types
 
 // This is the WDL typesystem
 object WdlTypes {
   sealed trait WT
 
   // primitive types
-  case object WT_String extends WT
-  case object WT_File extends WT
   case object WT_Boolean extends WT
   case object WT_Int extends WT
   case object WT_Float extends WT
+  case object WT_String extends WT
+  case object WT_File extends WT
 
   // There are cases where we don't know the type. For example, an empty array, or an empty map.
   // While evaluating the right hand side we don't know the type.

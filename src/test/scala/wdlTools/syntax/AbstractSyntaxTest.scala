@@ -17,11 +17,11 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   private val parser = ParseAll(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToURL(tasksDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToURL(workflowsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
   }
 
   it should "handle import statements" in {
@@ -45,7 +45,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   it should "parse GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = parser.parseDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
@@ -54,7 +54,7 @@ class AbstractSyntaxTest extends FlatSpec with Matchers {
   it should "parse GATK joint genotyping workflow" taggedAs Edge in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = parser.parseDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1

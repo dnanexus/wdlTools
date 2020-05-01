@@ -178,7 +178,7 @@ object ConcreteSyntax {
                       text: TextSource)
       extends Element
 
-  case class Document(docSourceURL: URL,
+  case class Document(docSourceUrl: URL,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,

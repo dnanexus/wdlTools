@@ -33,7 +33,7 @@ case class Parsers(opts: Options = Options()) {
   }
 
   def parseDocument(path: Path): Document = {
-    parseDocument(Util.pathToURL(path))
+    parseDocument(Util.pathToUrl(path))
   }
 
   def parseDocument(url: URL): Document = {

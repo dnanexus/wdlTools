@@ -79,13 +79,13 @@ object Antlr4Util {
 
   case class Grammar[L <: Lexer, P <: Parser](lexer: L,
                                               parser: P,
-                                              errListener: ErrorListener,
+                                              errListener: WdlAggregatingErrorListener,
                                               comments: mutable.Map[Int, Comment],
-                                              docSourceURL: Option[URL] = None,
+                                              docSourceUrl: Option[URL] = None,
                                               opts: Options) {
     def verify(): Unit = {
       // check if any errors were found
-      val errors: Vector[SyntaxError] = errListener.getAllErrors
+      val errors: Vector[SyntaxError] = errListener.getErrors()
       if (errors.nonEmpty) {
         if (opts.verbosity > Verbosity.Quiet) {
           for (err <- errors) {
@@ -110,7 +110,7 @@ object Antlr4Util {
       val parser: P = createParser(new CommonTokenStream(lexer))
 
       // setting up our own error handling
-      val errListener = ErrorListener(opts)
+      val errListener = WdlAggregatingErrorListener(docSourceUrl)
       lexer.removeErrorListeners()
       lexer.addErrorListener(errListener)
       parser.removeErrorListeners()

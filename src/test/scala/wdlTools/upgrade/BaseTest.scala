@@ -20,7 +20,7 @@ class BaseTest extends FlatSpec with Matchers {
   }
 
   def getBeforeAfterPair(fname: String): (URL, Path) = {
-    (Util.pathToURL(getBeforePath(fname)), getAfterPath(fname))
+    (Util.pathToUrl(getBeforePath(fname)), getAfterPath(fname))
   }
 
   it should "Upgrade draft-2 to v1.0" in {

@@ -21,7 +21,7 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String,
+  def getUrl(pathOrUrl: String,
              searchPath: Vector[Path] = Vector.empty,
              mustExist: Boolean = true): URL = {
     if (pathOrUrl.contains("://")) {
@@ -49,7 +49,7 @@ object Util {
     }
   }
 
-  def pathToURL(path: Path): URL = {
+  def pathToUrl(path: Path): URL = {
     path.toUri.toURL
   }
 
@@ -266,6 +266,10 @@ object Util {
   def error(msg: String): Unit = {
     System.err.println(Console.RED + msg + Console.RED)
   }
+
+  // ignore a value without causing a compilation error
+  // TODO: log this if antlr4Trace is turned on
+  def ignore[A](x: A): Unit = {}
 
   /**
     * A wrapper around a primitive that enables passing a mutable variable by reference.

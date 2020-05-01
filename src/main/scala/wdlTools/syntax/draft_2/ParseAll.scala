@@ -8,10 +8,9 @@ import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options) extends WdlParser(opts) {
-  // cache of documents that have already been fetched and parsed.
   private val grammarFactory = WdlDraft2GrammarFactory(opts)
 
-  private case class Translator(docSourceURL: Option[URL] = None) {
+  private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
         case CST.TypeOptional(t, srcText) =>
@@ -172,7 +171,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         if (allIds contains kv.id)
           throw new SyntaxException(msg = s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         allIds = allIds + kv.id
       }
 
@@ -260,7 +259,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       val elems: Vector[AST.DocumentElement] = doc.elements.map {
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (opts.followImports) {
-            Some(followImport(getDocSourceURL(importDoc.addr.value)))
+            Some(followImport(getDocSourceUrl(importDoc.addr.value)))
           } else {
             None
           }
@@ -270,7 +269,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(WdlVersion.Draft_2, TextSource.empty)
-      AST.Document(doc.docSourceURL, version, elems, aWf, doc.text, doc.comments)
+      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
     }
   }
 
@@ -290,6 +289,10 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     val grammar = grammarFactory.createGrammar(sourceCode.toString)
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
+    val errorListener = grammar.errListener
+    if (errorListener.hasErrors()) {
+      throw new SyntaxException(errorListener.getErrors())
+    }
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)
   }

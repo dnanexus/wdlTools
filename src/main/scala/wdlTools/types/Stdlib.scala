@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.net.URL
 
@@ -6,7 +6,7 @@ import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
 import wdlTools.syntax.{AbstractSyntax, TextSource}
-//import wdlTools.util.Util
+import wdlTools.types.{Util => TUtil}
 
 case class Stdlib(conf: Options) {
   private val tUtil = TUtil(conf)
@@ -16,7 +16,7 @@ case class Stdlib(conf: Options) {
       WT_Function0("stderr", WT_File),
       WT_Function1("read_lines", WT_File, WT_Array(WT_String)),
       WT_Function1("read_tsv", WT_File, WT_Array(WT_Array(WT_String))),
-      WT_Function1("read_map", WT_File, WT_Array(WT_Array(WT_String))),
+      WT_Function1("read_map", WT_File, WT_Map(WT_String, WT_String)),
       WT_Function1("read_object", WT_File, WT_Object),
       WT_Function1("read_objects", WT_File, WT_Array(WT_Object)),
       WT_Function1("read_json", WT_File, WT_Var(0)),
@@ -58,16 +58,18 @@ case class Stdlib(conf: Options) {
       WT_Function1("length", WT_Array(WT_Var(0)), WT_Int),
       // Array[X] flatten(Array[Array[X]])
       WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
-      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_String),
+      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_Array(WT_String)),
       WT_Function1("select_first", WT_Array(WT_Optional(WT_Var(0))), WT_Var(0)),
       WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
       // simple functions again
+      // basename has two variants
       WT_Function1("basename", WT_String, WT_String),
+      WT_Function2("basename", WT_String, WT_String, WT_String),
       WT_Function1("floor", WT_Float, WT_Int),
       WT_Function1("ceil", WT_Float, WT_Int),
       WT_Function1("round", WT_Float, WT_Int),
-      // extras not mentioned in the specification
+      // not mentioned in the specification
       WT_Function1("glob", WT_String, WT_Array(WT_File))
   )
 
@@ -90,13 +92,13 @@ case class Stdlib(conf: Options) {
   private def evalOnePrototype(funcDesc: WT_StdlibFunc,
                                inputTypes: Vector[WT],
                                text: TextSource,
-                               docSourceURL: Option[URL]): Option[WT] = {
+                               docSourceUrl: Option[URL]): Option[WT] = {
     val args = funcDesc match {
       case WT_Function0(_, _) if inputTypes.isEmpty => Vector.empty
       case WT_Function1(_, arg1, _)                 => Vector(arg1)
       case WT_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
       case WT_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceURL)
+      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
     }
     try {
       val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
@@ -111,12 +113,12 @@ case class Stdlib(conf: Options) {
   def apply(funcName: String,
             inputTypes: Vector[WT],
             expr: AbstractSyntax.Expr,
-            docSourceURL: Option[URL] = None): WT = {
+            docSourceUrl: Option[URL] = None): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library",
                                 expr.text,
-                                docSourceURL)
+                                docSourceUrl)
       case Some(protoVec) =>
         protoVec
     }
@@ -124,7 +126,7 @@ case class Stdlib(conf: Options) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[WT]] = candidates.map {
-      evalOnePrototype(_, inputTypes, expr.text, docSourceURL)
+      evalOnePrototype(_, inputTypes, expr.text, docSourceUrl)
     }
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
@@ -134,7 +136,7 @@ case class Stdlib(conf: Options) {
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
-                                    |""".stripMargin, expr.text, docSourceURL)
+                                    |""".stripMargin, expr.text, docSourceUrl)
       //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
@@ -147,7 +149,7 @@ case class Stdlib(conf: Options) {
                                       |output types (${possibleOutputTypes})""".stripMargin
                                     .replaceAll("\n", " "),
                                   expr.text,
-                                  docSourceURL)
+                                  docSourceUrl)
         possibleOutputTypes.toVector.head
     }
   }

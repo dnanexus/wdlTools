@@ -3,8 +3,7 @@ package wdlTools.syntax.v1
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Comment, TextSource, WdlVersion}
-
+import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
@@ -22,15 +21,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToURL(tasksDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
   }
 
   private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToURL(workflowsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
   }
 
   private def getStructSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToURL(structsDir.resolve(fname)))
+    SourceCode.loadFrom(Util.pathToUrl(structsDir.resolve(fname)))
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
@@ -518,7 +517,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "have real world GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = getDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
@@ -528,7 +527,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getURL(url))
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = getDocument(sourceCode)
 
     doc.version.value shouldBe WdlVersion.V1
@@ -594,5 +593,11 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     wf.body.size shouldBe 1
     val call = wf.body.head.asInstanceOf[Call]
     call.name shouldBe "cd.count_dogs"
+  }
+
+  it should "report extra comma" taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("extra_comma.wdl"))
+    }
   }
 }

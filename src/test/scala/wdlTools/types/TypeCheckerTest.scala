@@ -1,17 +1,17 @@
-package wdlTools.typing
+package wdlTools.types
 
 import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.{FlatSpec, Matchers}
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Options, TypeCheckingRegime, Util, Verbosity}
+import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
 
 class TypeCheckerTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/typing/v1").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -81,11 +81,11 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
     try {
-      val doc = parser.parseDocument(Util.pathToURL(file))
+      val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
     } catch {
       case e: Throwable =>
-        Util.error(s"Type error in file ${file.toString}")
+        UUtil.error(s"Type error in file ${file.toString}")
         throw e
     }
   }
@@ -99,7 +99,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val checker = TypeChecker(stdlib)
     val checkVal =
       try {
-        val doc = parser.parseDocument(Util.pathToURL(file))
+        val doc = parser.parseDocument(UUtil.pathToUrl(file))
         checker.apply(doc)
         true
       } catch {
@@ -127,7 +127,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/typing/v1").getPath)
+        Paths.get(getClass.getResource("/types/v1").getPath)
     )
 
     // filter out files that do not appear in the control table
@@ -179,7 +179,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     )
 
     for (src <- sources) {
-      val url = Util.getURL(src)
+      val url = UUtil.getUrl(src)
       val doc = parser.parseDocument(url)
       checker.apply(doc)
     }
