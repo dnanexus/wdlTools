@@ -20,10 +20,11 @@ class LineFormatter(
     private val currentLine: mutable.StringBuilder,
     private val currentLineComments: mutable.Map[Int, String] = mutable.HashMap.empty,
     private var currentIndentSteps: Int = 0, // TODO: should this be a MutableHolder?
-    var currentSpacing: Spacing = Spacing.On,
+    private var currentSpacing: Spacing = Spacing.On,
     private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
     private val sections: mutable.Buffer[Multiline] = mutable.ArrayBuffer.empty,
-    private val currentSourceLine: MutableHolder[Int] = MutableHolder[Int](0)
+    private val currentSourceLine: MutableHolder[Int] = MutableHolder[Int](0),
+    private val skipNextSpace: MutableHolder[Boolean] = MutableHolder[Boolean](false)
 ) {
 
   private val commentStart = "^#+".r
@@ -61,7 +62,8 @@ class LineFormatter(
                       newSpacing,
                       lineBegun,
                       sections,
-                      currentSourceLine)
+                      currentSourceLine,
+                      skipNextSpace)
   }
 
   def isLineBegun: Boolean = lineBegun.value
@@ -145,9 +147,7 @@ class LineFormatter(
     }
     currentLine.clear()
     lineBegun.value = false
-    if (currentSpacing == Spacing.SkipNext) {
-      currentSpacing = Spacing.On
-    }
+    skipNextSpace.value = false
   }
 
   private def trimComment(comment: Comment): (String, Int, Boolean) = {
@@ -274,7 +274,9 @@ class LineFormatter(
     } else {
       val addSpace = currentLine.nonEmpty &&
         currentSpacing == Spacing.On &&
-        !(currentLine.last.isWhitespace || currentLine.last == indentation.last)
+        !skipNextSpace.value &&
+        !currentLine.last.isWhitespace &&
+        currentLine.last != indentation.last
       if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
         endLine(continue = true)
         beginLine()
@@ -287,13 +289,13 @@ class LineFormatter(
       case c: Composite => c.formatContents(this)
       case a: Atom =>
         currentLine.append(a.toString)
+        if (skipNextSpace.value) {
+          skipNextSpace.value = false
+        }
         if (a.line > currentSourceLine.value) {
           currentSourceLine.value = a.line
         }
         maybeAddInlineComments(a)
-        if (currentSpacing == Spacing.SkipNext) {
-          currentSpacing = Spacing.On
-        }
       case other =>
         throw new Exception(s"Span ${other} must implement either Atom or Delegate trait")
     }
@@ -301,6 +303,21 @@ class LineFormatter(
 
   def appendAll(spans: Vector[Span]): Unit = {
     spans.foreach(append)
+  }
+
+  // TODO: these two methods are a hack - they are currently needed to handle the case of
+  //  printing a prefix followed by any number of spans followed by a suffix, and suppress
+  //  the space after the prefix and before the suffix. Ideally, this would be handled by
+  //  `append` using a different `Spacing` value.
+
+  def appendPrefix(prefix: Span): Unit = {
+    append(prefix)
+    skipNextSpace.value = true
+  }
+
+  def appendSuffix(suffix: Span): Unit = {
+    skipNextSpace.value = true
+    append(suffix)
   }
 
   def toVector: Vector[String] = {

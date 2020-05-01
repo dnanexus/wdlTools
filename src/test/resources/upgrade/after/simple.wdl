@@ -11,7 +11,7 @@ task foo {
 
   String x = "${s}.txt"  # This is an in-line comment
   Int z = (i + i) + i  # Todo: the formatter shouldn't add parens
-  Int a = if (i > 1) then 2 else 3
+  Int a = if i > 1 then 2 else 3
 
   command <<<
     echo ~{x}

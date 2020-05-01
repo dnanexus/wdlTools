@@ -10,11 +10,9 @@ object Wrapping extends Enumeration {
   val Always, AsNeeded, Never = Value
 }
 
-// TODO: Add SkipPair - use that to format balanced pairs of
-// symbols, e.g. (..)
 object Spacing extends Enumeration {
   type Spacing = Value
-  val On, Off, SkipNext = Value
+  val On, Off = Value
 }
 
 /**
