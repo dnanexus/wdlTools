@@ -2,7 +2,8 @@ version 1.0
 
 task foo {
   input {
-    # This is a comment that should be reformatted
+    # This is a comment that should be reformatted - it is very long and so should be wrapped at 100
+    # characters
     String s
     Int i
     String y = "foo"

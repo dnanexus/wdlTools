@@ -10,49 +10,16 @@ object Wrapping extends Enumeration {
   val Always, AsNeeded, Never = Value
 }
 
+// TODO: Add SkipPair - use that to format balanced pairs of
+// symbols, e.g. (..)
 object Spacing extends Enumeration {
   type Spacing = Value
-  val Always, Never, AfterNext = Value
+  val On, Off, SkipNext = Value
 }
 
 /**
-  * A position on a single line. Has a `column` that may be
-  * set to `Token.TERMINAL`, indicating it is the last token on
-  * `line`.
+  * An element that (potentially) spans multiple source lines.
   */
-trait Position {
-  def line: Int
-
-  def column: Int
-}
-
-object Position {
-  val TERMINAL: Int = Int.MaxValue
-}
-
-/**
-  * An element that can be formatted by a Formatter.
-  */
-trait Span extends Position {
-
-  /**
-    * The length of the span in characters, if it were formatted without line-wrapping.
-    */
-  def length: Int
-
-  /**
-    * The last column in the span - position is 1-based and end-exclusive.
-    */
-  def endColumn: Int
-}
-
-/**
-  * Marker trait for atomic Spans - those that format themselves via their toString method.
-  */
-trait Atom {
-  def toString: String
-}
-
 trait Multiline extends Ordered[Multiline] {
   def line: Int
 
@@ -68,7 +35,48 @@ trait Multiline extends Ordered[Multiline] {
   }
 }
 
-trait Composite extends Span with Multiline {
+/**
+  * An element that can be formatted by a Formatter.
+  * Column positions are 1-based and end-exclusive
+  */
+trait Span extends Multiline {
+
+  /**
+    * The length of the span in characters, if it were formatted without line-wrapping.
+    */
+  def length: Int
+
+  /**
+    * The first column in the span.
+    */
+  def column: Int
+
+  /**
+    * The last column in the span.
+    */
+  def endColumn: Int
+}
+
+object Span {
+  // indicates the last token on a line
+  val TERMINAL: Int = Int.MaxValue
+}
+
+/**
+  * Marker trait for atomic Spans - those that format themselves via their
+  * toString method. An atomic Span is always on a single source line (i.e.
+  * `line` == `endLine`).
+  */
+trait Atom extends Span {
+  override def endLine: Int = line
+
+  def toString: String
+}
+
+/**
+  * A Span that contains other Spans and knows how to format itself.
+  */
+trait Composite extends Span {
 
   /**
     * Format the contents of the composite. The `lineFormatter` passed to this method

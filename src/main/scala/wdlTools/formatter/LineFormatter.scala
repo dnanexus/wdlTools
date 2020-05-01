@@ -3,25 +3,28 @@ package wdlTools.formatter
 import wdlTools.formatter.Indenting.Indenting
 import wdlTools.formatter.Spacing.Spacing
 import wdlTools.formatter.Wrapping.Wrapping
-import wdlTools.syntax.Comment
+import wdlTools.syntax.{Comment, CommentMap}
 import wdlTools.util.Util.MutableHolder
 
 import scala.collection.mutable
 
-class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
-                    indenting: Indenting = Indenting.IfNotIndented,
-                    indentStep: Int = 2,
-                    initialIndentSteps: Int = 0,
-                    indentation: String = " ",
-                    wrapping: Wrapping = Wrapping.AsNeeded,
-                    maxLineWidth: Int = 100,
-                    private val lines: mutable.Buffer[String],
-                    private val currentLine: mutable.StringBuilder,
-                    private val currentLineComments: mutable.Buffer[String],
-                    private var currentIndentSteps: Int = 0,
-                    private var currentSpacing: MutableHolder[Spacing] =
-                      MutableHolder[Spacing](Spacing.Always),
-                    private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false)) {
+class LineFormatter(
+    comments: CommentMap,
+    indenting: Indenting = Indenting.IfNotIndented,
+    indentStep: Int = 2,
+    initialIndentSteps: Int = 0,
+    indentation: String = " ",
+    wrapping: Wrapping = Wrapping.AsNeeded,
+    maxLineWidth: Int = 100,
+    private val lines: mutable.Buffer[String],
+    private val currentLine: mutable.StringBuilder,
+    private val currentLineComments: mutable.Map[Int, String] = mutable.HashMap.empty,
+    private var currentIndentSteps: Int = 0, // TODO: should this be a MutableHolder?
+    var currentSpacing: Spacing = Spacing.On,
+    private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
+    private val sections: mutable.Buffer[Multiline] = mutable.ArrayBuffer.empty,
+    private val currentSourceLine: MutableHolder[Int] = MutableHolder[Int](0)
+) {
 
   private val commentStart = "^#+".r
   private val whitespace = "[ \t\n\r]+".r
@@ -36,7 +39,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     */
   def derive(increaseIndent: Boolean = false,
              newIndenting: Indenting = indenting,
-             newSpacing: Spacing = currentSpacing.value,
+             newSpacing: Spacing = currentSpacing,
              newWrapping: Wrapping = wrapping): LineFormatter = {
     val newInitialIndentSteps = initialIndentSteps + (if (increaseIndent) 1 else 0)
     val newCurrentIndentSteps = if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
@@ -44,7 +47,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     } else {
       currentIndentSteps
     }
-    new LineFormatter(inlineComments,
+    new LineFormatter(comments,
                       newIndenting,
                       indentStep,
                       newInitialIndentSteps,
@@ -55,8 +58,10 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
                       currentLine,
                       currentLineComments,
                       newCurrentIndentSteps,
-                      MutableHolder[Spacing](newSpacing),
-                      lineBegun)
+                      newSpacing,
+                      lineBegun,
+                      sections,
+                      currentSourceLine)
   }
 
   def isLineBegun: Boolean = lineBegun.value
@@ -73,6 +78,21 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     } else {
       maxLineWidth - currentLine.length
     }
+  }
+
+  def beginSection(section: Multiline): Unit = {
+    sections.append(section)
+    currentSourceLine.value = section.line
+  }
+
+  def endSection(section: Multiline): Unit = {
+    require(sections.nonEmpty)
+    val popSection = sections.last
+    if (section != popSection) {
+      throw new Exception(s"Ending the wrong session: ${section} != ${popSection}")
+    }
+    maybeAppendFullLineComments(popSection, isSection = true)
+    sections.remove(sections.size - 1)
   }
 
   def emptyLine(): Unit = {
@@ -110,7 +130,9 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       }
       currentLine.append(Symbols.Comment)
       currentLine.append(" ")
-      currentLine.append(currentLineComments.mkString(" "))
+      currentLine.append(
+          currentLineComments.toVector.sortWith((a, b) => a._1 < b._1).map(_._2).mkString(" ")
+      )
       currentLineComments.clear()
     }
     if (!atLineStart) {
@@ -123,92 +145,127 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
     }
     currentLine.clear()
     lineBegun.value = false
-    if (currentSpacing.value == Spacing.AfterNext) {
-      currentSpacing.value = Spacing.Always
+    if (currentSpacing == Spacing.SkipNext) {
+      currentSpacing = Spacing.On
     }
   }
 
-  private def trimComments(comments: Vector[Comment]): Vector[(String, Int, Boolean)] = {
-    comments.map { comment =>
-      val text = comment.value.trim
-      val hashes = commentStart.findFirstIn(text)
-      if (hashes.isEmpty) {
-        throw new Exception("Expected comment to start with '#'")
-      }
-      (text.substring(hashes.get.length),
-       comment.text.line,
-       hashes.get.startsWith(Symbols.PreformattedComment))
+  private def trimComment(comment: Comment): (String, Int, Boolean) = {
+    val text = comment.value.trim
+    val hashes = commentStart.findFirstIn(text)
+    if (hashes.isEmpty) {
+      throw new Exception("Expected comment to start with '#'")
     }
-  }
-
-  def appendInlineComment(text: String): Unit = {
-    currentLineComments.append(text)
+    val preformatted = hashes.get.startsWith(Symbols.PreformattedComment)
+    val rawText = text.substring(hashes.get.length)
+    (if (preformatted) rawText else rawText.trim, comment.text.line, preformatted)
   }
 
   /**
-    * Add one or more full-line comments.
-    *
-    * Unlike the append* methods, this method requires `isLineBegun == false` on
-    * entry and exit.
-    *
-    * @param comments the comments to add
+    * Append one or more full-line comments.
+    * @param ml the Multiline before which comments should be added
+    * @param isSection if true, comments are added between the previous source line and
+    * the end of the section; otherwise comments are added between the previous source
+    * line and the beginning of `ml`
     */
-  def addLineComments(comments: Vector[Comment]): Unit = {
-    require(!isLineBegun)
+  private def maybeAppendFullLineComments(ml: Multiline, isSection: Boolean = false): Unit = {
+    val beforeLine = if (isSection) ml.endLine else ml.line
+    require(beforeLine >= currentSourceLine.value)
+    require(beforeLine <= sections.last.endLine)
 
-    beginLine()
+    val lineComments = comments.filterWithin((currentSourceLine.value + 1) until beforeLine)
 
-    var prevLine = 0
-    var preformatted = false
+    if (lineComments.nonEmpty) {
+      val sortedComments = lineComments.toSortedVector
+      val beforeDist = sortedComments.head.text.line - currentSourceLine.value
+      val afterDist = beforeLine - sortedComments.last.text.endLine
 
-    trimComments(comments).foreach {
-      case (trimmed, curLine, curPreformatted) =>
-        if (prevLine > 0 && curLine > prevLine + 1) {
-          endLine()
-          emptyLine()
-        } else if (!preformatted && curPreformatted) {
-          endLine()
-        }
-        if (curPreformatted) {
-          currentLine.append(Symbols.PreformattedComment)
-          currentLine.append(" ")
-          currentLine.append(trimmed)
-          endLine()
-          beginLine()
-        } else {
-          if (atLineStart) {
-            currentLine.append(Symbols.Comment)
+      if (beforeDist > 1) {
+        lines.append("")
+      }
+
+      var prevLine = 0
+      var preformatted = false
+
+      sortedComments.map(trimComment).foreach {
+        case (trimmed, curLine, curPreformatted) =>
+          if (prevLine > 0 && curLine > prevLine + 1) {
+            endLine()
+            emptyLine()
+            beginLine()
+          } else if (!preformatted && curPreformatted) {
+            endLine()
+            beginLine()
           }
-          if (lengthRemaining >= trimmed.length + 1) {
+          if (curPreformatted) {
+            currentLine.append(Symbols.PreformattedComment)
             currentLine.append(" ")
             currentLine.append(trimmed)
+            endLine()
+            beginLine()
           } else {
-            whitespace.split(trimmed).foreach { token =>
-              // we let the line run over for a single token that is longer than the max line length
-              // (i.e. we don't try to hyphenate)
-              if (!atLineStart && lengthRemaining < token.length + 1) {
-                endLine()
-                beginLine()
-                currentLine.append(Symbols.Comment)
-              }
+            if (atLineStart) {
+              currentLine.append(Symbols.Comment)
+            }
+            if (lengthRemaining >= trimmed.length + 1) {
               currentLine.append(" ")
-              currentLine.append(token)
+              currentLine.append(trimmed)
+            } else {
+              whitespace.split(trimmed).foreach { token =>
+                // we let the line run over for a single token that is longer than
+                // the max line length (i.e. we don't try to hyphenate)
+                if (!atLineStart && lengthRemaining < token.length + 1) {
+                  endLine()
+                  beginLine()
+                  currentLine.append(Symbols.Comment)
+                }
+                currentLine.append(" ")
+                currentLine.append(token)
+              }
             }
           }
-        }
-        prevLine = curLine
-        preformatted = curPreformatted
+          prevLine = curLine
+          preformatted = curPreformatted
+      }
+
+      endLine()
+
+      if (afterDist > 1) {
+        emptyLine()
+      }
+
+      beginLine()
     }
 
-    endLine()
+    currentSourceLine.value = ml.endLine
+  }
+
+  /**
+    * Add to `currentLineComments` any end-of-line comments associated with any of
+    * `span`'s source lines.
+    */
+  private def maybeAddInlineComments(atom: Atom): Unit = {
+    val range = atom match {
+      case m: Multiline => m.lineRange
+      case s            => s.line to s.line
+    }
+    currentLineComments ++= comments
+      .filterWithin(range)
+      .toSortedVector
+      .filter(comment => !currentLineComments.contains(comment.text.line))
+      .map(comment => comment.text.line -> trimComment(comment)._1)
+  }
+
+  def addInlineComment(line: Int, text: String): Unit = {
+    require(!currentLineComments.contains(line))
+    currentLineComments(line) = text
   }
 
   def append(span: Span): Unit = {
     require(isLineBegun)
 
-    if (inlineComments.contains(span)) {
-      val trimmedComments = trimComments(inlineComments(span))
-      currentLineComments.appendAll(trimmedComments.map(_._1))
+    if (atLineStart && sections.nonEmpty) {
+      maybeAppendFullLineComments(span)
     }
 
     if (wrapping == Wrapping.Always) {
@@ -216,7 +273,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       beginLine()
     } else {
       val addSpace = currentLine.nonEmpty &&
-        currentSpacing.value == Spacing.Always &&
+        currentSpacing == Spacing.On &&
         !(currentLine.last.isWhitespace || currentLine.last == indentation.last)
       if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
         endLine(continue = true)
@@ -230,8 +287,12 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
       case c: Composite => c.formatContents(this)
       case a: Atom =>
         currentLine.append(a.toString)
-        if (currentSpacing.value == Spacing.AfterNext) {
-          currentSpacing.value = Spacing.Always
+        if (a.line > currentSourceLine.value) {
+          currentSourceLine.value = a.line
+        }
+        maybeAddInlineComments(a)
+        if (currentSpacing == Spacing.SkipNext) {
+          currentSpacing = Spacing.On
         }
       case other =>
         throw new Exception(s"Span ${other} must implement either Atom or Delegate trait")
@@ -248,7 +309,7 @@ class LineFormatter(inlineComments: Map[Position, Vector[Comment]],
 }
 
 object LineFormatter {
-  def apply(inlineComments: Map[Position, Vector[Comment]],
+  def apply(comments: CommentMap,
             indenting: Indenting = Indenting.IfNotIndented,
             indentStep: Int = 2,
             initialIndentSteps: Int = 0,
@@ -257,8 +318,7 @@ object LineFormatter {
             maxLineWidth: Int = 100): LineFormatter = {
     val lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty
     val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-    val currentLineComments: mutable.Buffer[String] = mutable.ArrayBuffer.empty
-    new LineFormatter(inlineComments,
+    new LineFormatter(comments,
                       indenting,
                       indentStep,
                       initialIndentSteps,
@@ -266,7 +326,6 @@ object LineFormatter {
                       wrapping,
                       maxLineWidth,
                       lines,
-                      currentLine,
-                      currentLineComments)
+                      currentLine)
   }
 }
