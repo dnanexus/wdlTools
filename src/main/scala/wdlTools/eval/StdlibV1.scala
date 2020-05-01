@@ -279,9 +279,11 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     assert(args.size == 1)
     val obj = coercion.coerceTo(WT_Object, args.head, text).asInstanceOf[WV_Object]
     val keyLine = obj.members.keys.mkString("\t")
-    val valueLine = obj.members.values.map{ vw =>
-      coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String]
-    }.mkString("\t")
+    val valueLine = obj.members.values
+      .map { vw =>
+        coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String]
+      }
+      .mkString("\t")
     val content = keyLine + "\n" + valueLine
     val tmpFile: Path = iosp.mkTempFile()
     iosp.writeFile(tmpFile, content)
