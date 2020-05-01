@@ -58,7 +58,7 @@ case class Stdlib(conf: Options) {
       WT_Function1("length", WT_Array(WT_Var(0)), WT_Int),
       // Array[X] flatten(Array[Array[X]])
       WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
-      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_String),
+      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_Array(WT_String)),
       WT_Function1("select_first", WT_Array(WT_Optional(WT_Var(0))), WT_Var(0)),
       WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),

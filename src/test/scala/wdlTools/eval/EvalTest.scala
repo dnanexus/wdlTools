@@ -2,14 +2,14 @@ package wdlTools.eval
 
 import java.nio.file.{Files, Path, Paths}
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpec, Inside, Matchers}
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, Verbosity}
 import wdlTools.typing.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
-class EvalTest extends FlatSpec with Matchers {
+class EvalTest extends FlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val opts =
     Options(antlr4Trace = false, localDirectories = Vector(srcDir), verbosity = Verbosity.Quiet)
@@ -153,13 +153,40 @@ class EvalTest extends FlatSpec with Matchers {
                                 )))
 
     // cross
-    bd("cln") shouldBe(WV_Array(Vector(
-                                  WV_Pair(WV_String("A"), WV_Int(1)),
-                                  WV_Pair(WV_String("B"), WV_Int(1)),
-                                  WV_Pair(WV_String("C"), WV_Int(1)),
-                                  WV_Pair(WV_String("A"), WV_Int(13)),
-                                  WV_Pair(WV_String("B"), WV_Int(13)),
-                                  WV_Pair(WV_String("C"), WV_Int(13))
-                                )))
+    inside(bd("cln")) {
+      case WV_Array(vec) =>
+        // the order of the cross product is unspecified
+        Vector(WV_Pair(WV_String("A"), WV_Int(1)),
+               WV_Pair(WV_String("B"), WV_Int(1)),
+               WV_Pair(WV_String("C"), WV_Int(1)),
+               WV_Pair(WV_String("A"), WV_Int(13)),
+               WV_Pair(WV_String("B"), WV_Int(13)),
+               WV_Pair(WV_String("C"), WV_Int(13))).foreach{
+          case pair =>
+            vec contains pair
+        }
+    }
+
+    bd("l1") shouldBe(WV_Int(2))
+    bd("l2") shouldBe(WV_Int(6))
+
+    bd("files2") shouldBe WV_Array(Vector(WV_File("A"),
+                                          WV_File("B"),
+                                          WV_File("C"),
+                                          WV_File("G"),
+                                          WV_File("J"),
+                                          WV_File("K")))
+
+
+    bd("pref2") shouldBe WV_Array(Vector(WV_String("i_1"),
+                                         WV_String("i_3"),
+                                         WV_String("i_5"),
+                                         WV_String("i_7")))
+    bd("pref3") shouldBe WV_Array(Vector(WV_String("sub_1.0"),
+                                         WV_String("sub_3.4"),
+                                         WV_String("sub_5.1")))
+
+    bd("sel1") shouldBe WV_String("A")
+    bd("sel2") shouldBe WV_String("Henry")
   }
 }

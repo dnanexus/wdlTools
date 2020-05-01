@@ -44,11 +44,11 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     "transpose" -> transpose,
     "zip" -> zip,
     "cross" -> cross,
-/*    "length" -> length,
+    "length" -> length,
     "flatten" -> flatten,
     "prefix" -> prefix,
     "select_first" -> select_first,
-    "select_all" -> select_all,
+/*    "select_all" -> select_all,
     "defined" -> defined,
     "basename" -> basename, */
       "floor" -> floor,
@@ -395,18 +395,74 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     WV_Array(vv.flatten)
   }
 
-  /*
   // Integer length(Array[X])
-      WT_Function1("length", WT_Array(WT_Var(0)), WT_Int),
-      // Array[X] flatten(Array[Array[X]])
-      WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
-      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_String),
-      WT_Function1("select_first", WT_Array(WT_Optional(WT_Var(0))), WT_Var(0)),
-      WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
-      WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
-      // simple functions again
-      WT_Function1("basename", WT_String, WT_String),
-   */
+  //
+  private def length(args : Vector[WV], text : TextSource) : WV_Int = {
+    assert(args.size == 1)
+    val vec = getWdlVector(args.head, text)
+    WV_Int(vec.size)
+  }
+
+  // Array[X] flatten(Array[Array[X]])
+  //
+  private def flatten(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 1)
+    val vec : Vector[WV] = getWdlVector(args.head, text)
+    val vec_vec : Vector[Vector[WV]] = vec.map{
+      case v => getWdlVector(v, text)
+    }
+    WV_Array(vec_vec.flatten)
+  }
+
+  private def primitiveValueToString(wv : WV, text : TextSource) : String = {
+    wv match {
+      case WV_Boolean(value) => value.toString
+      case WV_Int(value) => value.toString
+      case WV_Float(value) => value.toString
+      case WV_String(value) => value.toString
+      case WV_File(value) => value.toString
+      case WV_Optional(x) => primitiveValueToString(x, text)
+      case other =>
+        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceURL)
+    }
+  }
+
+  // Array[String] prefix(String, Array[X])
+  //
+  // Given a String and an Array[X] where X is a primitive type, the
+  // prefix function returns an array of strings comprised of each
+  // element of the input array prefixed by the specified prefix
+  // string.
+  //
+  private def prefix(args : Vector[WV], text : TextSource) : WV_Array = {
+    assert(args.size == 2)
+    val pref = getWdlString(args(0), text)
+    val vec = getWdlVector(args(1), text)
+    WV_Array(vec.map{
+               case vw => WV_String(pref + primitiveValueToString(vw, text))
+             })
+  }
+
+  // X select_first(Array[X?])
+  //
+  // return the first none null element. Throw an exception if nothing is found
+  private def select_first(args : Vector[WV], text : TextSource) : WV = {
+    assert(args.size == 1)
+    val vec = getWdlVector(args(0), text)
+    val values = vec.flatMap{
+      case WV_Null => None
+      case WV_Optional(x) => Some(x)
+      case x => Some(x)
+    }
+    if (values.isEmpty)
+      throw new EvalException("select_first: found no non-null elements", text, docSourceURL)
+    values.head
+  }
+
+  /*
+  WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
+  WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
+  WT_Function1("basename", WT_String, WT_String),*/
 
   private def floor(args: Vector[WV], text: TextSource): WV_Int = {
     assert(args.size == 1)

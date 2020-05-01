@@ -43,4 +43,23 @@ workflow foo {
   # cross
   Array[Int] numbers = [1, 13]
   Array[Pair[String, Int]] cln = cross(letters, numbers)
+
+  # length
+  Int l1 = length(numbers)
+  Int l2 = length(cln)
+
+  # flatten
+  Array[Array[File]] files = [["A", "B", "C"], ["G"], ["J", "K"]]
+  Array[File] files2 = flatten(files)
+
+  # prefix
+  Array[Int] xx_numbers = [1, 3, 5, 7]
+  Array[String] pref2 = prefix("i_", xx_numbers)
+  Array[Float] xx_float = [1.0, 3.4, 5.1]
+  Array[String] pref3 = prefix("sub_", xx_float)
+
+  # select_first
+  String sel1 = select_first(["A", "B"])
+  String? name = "Henry"
+  String sel2 = select_first([name])
 }
