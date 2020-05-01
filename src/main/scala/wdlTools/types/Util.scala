@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.net.URL
 
@@ -31,26 +31,20 @@ case class Util(conf: Options) {
   }
 
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
-    //System.out.println(s"isCoercibleTo ${left} ${right} ")
+    //System.out.println(s"isCoercibleTo2 ${left} ${right} regime=${regime}")
     (left, right) match {
-      case (WT_String, WT_String | WT_File) => true
+      case (WT_Boolean, WT_Boolean)                                       => true
+      case (WT_Int, WT_Int)                                               => true
+      case (WT_Int, WT_Int | WT_Float | WT_String) if regime == Lenient   => true
+      case (WT_Float, WT_Int | WT_Float)                                  => true
+      case (WT_Float, WT_Int | WT_Float | WT_String) if regime == Lenient => true
 
-      // Undocumented in spec 1.0
-      case (WT_String, WT_Int | WT_Float | WT_Boolean) => true
+      // only the file -> string conversion is documented in spec 1.0
+      case (WT_String, WT_Boolean | WT_Int | WT_Float | WT_String | WT_File) => true
 
       case (WT_File, WT_String | WT_File) => true
-      case (WT_Boolean, WT_Boolean)       => true
-      case (WT_Int, WT_Int)               => true
-      case (WT_Float, WT_Int | WT_Float)  => true
 
-      // Undocumented in spec 1.0.
-      // The user should specify ciel/round/... instead of this coercion
-      case (WT_Int, WT_Float) => true
-
-      // This is going to require a runtime check. For example:
-      // Int a = "1"
-      case (WT_Int, WT_String) if regime == Lenient => true
-      case (WT_Optional(l), WT_Optional(r))         => isCoercibleTo2(l, r)
+      case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo2(l, r)
 
       // T is coercible to T?
       case (WT_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)
@@ -108,6 +102,9 @@ case class Util(conf: Options) {
       // base case, primitive types
       case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
         (x, ctx)
+      case (WT_Object, WT_Object)    => (WT_Object, ctx)
+      case (WT_Object, _: WT_Struct) => (WT_Object, ctx)
+
       case (WT_Optional(l), WT_Optional(r)) =>
         val (t, ctx2) = unify(l, r, ctx)
         (WT_Optional(t), ctx2)
@@ -237,11 +234,11 @@ case class Util(conf: Options) {
 
   def toString(t: WT): String = {
     t match {
-      case WT_String         => "String"
-      case WT_File           => "File"
       case WT_Boolean        => "Boolean"
       case WT_Int            => "Int"
       case WT_Float          => "Float"
+      case WT_String         => "String"
+      case WT_File           => "File"
       case WT_Any            => "Any"
       case WT_Var(i)         => s"Var($i)"
       case WT_Identifier(id) => s"Id(${id})"

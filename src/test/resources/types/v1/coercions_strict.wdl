@@ -35,4 +35,7 @@ workflow foo {
 
   File f = "foo"
   File f5 = f + "/all"
+
+  # check that we can convert T to T? in this way
+  String? s = "nothing much"
 }

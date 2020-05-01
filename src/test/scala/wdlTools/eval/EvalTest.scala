@@ -2,17 +2,20 @@ package wdlTools.eval
 
 import java.nio.file.{Files, Path, Paths}
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpec, Inside, Matchers}
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{EvalConfig, Options, Util => UUtil, Verbosity}
-import wdlTools.typing.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
+import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
+import wdlTools.types.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
-class EvalTest extends FlatSpec with Matchers {
+class EvalTest extends FlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val opts =
-    Options(antlr4Trace = false, localDirectories = Vector(srcDir), verbosity = Verbosity.Quiet)
+    Options(typeChecking = TypeCheckingRegime.Lenient,
+            antlr4Trace = false,
+            localDirectories = Vector(srcDir),
+            verbosity = Verbosity.Quiet)
   private val parser = ParseAll(opts)
   private val stdlib = TypeStdlib(opts)
   private val checker = TypeChecker(stdlib)
@@ -114,11 +117,137 @@ class EvalTest extends FlatSpec with Matchers {
       case x: AST.Declaration => x
     }.toVector
 
-    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
-    ctxEnd.bindings("x") shouldBe (WV_Float(1.4))
-    ctxEnd.bindings("n1") shouldBe (WV_Int(1))
-    ctxEnd.bindings("n2") shouldBe (WV_Int(2))
-    ctxEnd.bindings("n3") shouldBe (WV_Int(1))
+    val ctx = Context(Map.empty).addBinding("empty_string", WV_Null)
+    val ctxEnd = evaluator.applyDeclarations(decls, ctx)
+    val bd = ctxEnd.bindings
+
+    bd("x") shouldBe (WV_Float(1.4))
+    bd("n1") shouldBe (WV_Int(1))
+    bd("n2") shouldBe (WV_Int(2))
+    bd("n3") shouldBe (WV_Int(1))
+    bd("cities2") shouldBe (WV_Array(
+        Vector(WV_String("LA"), WV_String("Seattle"), WV_String("San Francisco"))
+    ))
+
+    bd("table2") shouldBe (WV_Array(
+        Vector(
+            WV_Array(Vector(WV_String("A"), WV_String("allow"))),
+            WV_Array(Vector(WV_String("B"), WV_String("big"))),
+            WV_Array(Vector(WV_String("C"), WV_String("clam")))
+        )
+    ))
+    bd("m2") shouldBe (WV_Map(
+        Map(WV_String("name") -> WV_String("hawk"), WV_String("kind") -> WV_String("bird"))
+    ))
+
+    // sub
+    bd("sentence1") shouldBe (WV_String(
+        "She visited three places on his trip: Aa, Ab, C, D, and E"
+    ))
+    bd("sentence2") shouldBe (WV_String(
+        "He visited three places on his trip: Berlin, Berlin, C, D, and E"
+    ))
+    bd("sentence3") shouldBe (WV_String("H      : A, A, C, D,  E"))
+
+    // transpose
+    bd("ar3") shouldBe (WV_Array(Vector(WV_Int(0), WV_Int(1), WV_Int(2))))
+    bd("ar_ar2") shouldBe (WV_Array(
+        Vector(
+            WV_Array(Vector(WV_Int(1), WV_Int(4))),
+            WV_Array(Vector(WV_Int(2), WV_Int(5))),
+            WV_Array(Vector(WV_Int(3), WV_Int(6)))
+        )
+    ))
+
+    // zip
+    bd("zlf") shouldBe (WV_Array(
+        Vector(
+            WV_Pair(WV_String("A"), WV_Boolean(true)),
+            WV_Pair(WV_String("B"), WV_Boolean(false)),
+            WV_Pair(WV_String("C"), WV_Boolean(true))
+        )
+    ))
+
+    // cross
+    inside(bd("cln")) {
+      case WV_Array(vec) =>
+        // the order of the cross product is unspecified
+        Vector(
+            WV_Pair(WV_String("A"), WV_Int(1)),
+            WV_Pair(WV_String("B"), WV_Int(1)),
+            WV_Pair(WV_String("C"), WV_Int(1)),
+            WV_Pair(WV_String("A"), WV_Int(13)),
+            WV_Pair(WV_String("B"), WV_Int(13)),
+            WV_Pair(WV_String("C"), WV_Int(13))
+        ).foreach {
+          case pair =>
+            vec contains pair
+        }
+    }
+
+    bd("l1") shouldBe (WV_Int(2))
+    bd("l2") shouldBe (WV_Int(6))
+
+    bd("files2") shouldBe WV_Array(
+        Vector(WV_File("A"), WV_File("B"), WV_File("C"), WV_File("G"), WV_File("J"), WV_File("K"))
+    )
+
+    bd("pref2") shouldBe WV_Array(
+        Vector(WV_String("i_1"), WV_String("i_3"), WV_String("i_5"), WV_String("i_7"))
+    )
+    bd("pref3") shouldBe WV_Array(
+        Vector(WV_String("sub_1.0"), WV_String("sub_3.4"), WV_String("sub_5.1"))
+    )
+
+    bd("sel1") shouldBe WV_String("A")
+    bd("sel2") shouldBe WV_String("Henry")
+    bd("sel3") shouldBe WV_Array(Vector(WV_String("Henry"), WV_String("bear"), WV_String("tree")))
+
+    bd("d1") shouldBe WV_Boolean(true)
+    bd("d2") shouldBe WV_Boolean(false)
+    bd("d3") shouldBe WV_Boolean(true)
+
+    // basename
+    bd("path1") shouldBe WV_String("C.txt")
+    bd("path2") shouldBe WV_String("nuts_and_bolts.txt")
+    bd("path3") shouldBe WV_String("docs.md")
+    bd("path4") shouldBe WV_String("C")
+    bd("path5") shouldBe WV_String("C.txt")
   }
 
+  it should "perform coercions" in {
+    val file = srcDir.resolve("coercions.wdl")
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
+                         Some(opts.getURL(file.toString)))
+
+    doc.workflow should not be empty
+    val wf = doc.workflow.get
+
+    val decls: Vector[AST.Declaration] = wf.body.collect {
+      case x: AST.Declaration => x
+    }.toVector
+
+    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
+    val bd = ctxEnd.bindings
+
+    bd("i1") shouldBe (WV_Int(13))
+    bd("i2") shouldBe (WV_Int(13))
+    bd("i3") shouldBe (WV_Int(8))
+
+    bd("x1") shouldBe (WV_Float(3))
+    bd("x2") shouldBe (WV_Float(13))
+    bd("x3") shouldBe (WV_Float(44.3))
+    bd("x4") shouldBe (WV_Float(44.3))
+    bd("x5") shouldBe (WV_Float(4.5))
+
+    bd("s1") shouldBe (WV_String("true"))
+    bd("s2") shouldBe (WV_String("3"))
+    bd("s3") shouldBe (WV_String("4.3"))
+    bd("s4") shouldBe (WV_String("hello"))
+    bd("s5") shouldBe (WV_Optional(WV_String("hello")))
+  }
 }

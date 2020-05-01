@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.net.URL
 
@@ -6,7 +6,7 @@ import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
 import wdlTools.syntax.{AbstractSyntax, TextSource}
-import wdlTools.typing.{Util => TUtil}
+import wdlTools.types.{Util => TUtil}
 
 case class Stdlib(conf: Options) {
   private val tUtil = TUtil(conf)
@@ -16,7 +16,7 @@ case class Stdlib(conf: Options) {
       WT_Function0("stderr", WT_File),
       WT_Function1("read_lines", WT_File, WT_Array(WT_String)),
       WT_Function1("read_tsv", WT_File, WT_Array(WT_Array(WT_String))),
-      WT_Function1("read_map", WT_File, WT_Array(WT_Array(WT_String))),
+      WT_Function1("read_map", WT_File, WT_Map(WT_String, WT_String)),
       WT_Function1("read_object", WT_File, WT_Object),
       WT_Function1("read_objects", WT_File, WT_Array(WT_Object)),
       WT_Function1("read_json", WT_File, WT_Var(0)),
@@ -58,12 +58,14 @@ case class Stdlib(conf: Options) {
       WT_Function1("length", WT_Array(WT_Var(0)), WT_Int),
       // Array[X] flatten(Array[Array[X]])
       WT_Function1("flatten", WT_Array(WT_Array(WT_Var(0))), WT_Array(WT_Var(0))),
-      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_String),
+      WT_Function2("prefix", WT_String, WT_Array(WT_Var(0)), WT_Array(WT_String)),
       WT_Function1("select_first", WT_Array(WT_Optional(WT_Var(0))), WT_Var(0)),
       WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
       // simple functions again
+      // basename has two variants
       WT_Function1("basename", WT_String, WT_String),
+      WT_Function2("basename", WT_String, WT_String, WT_String),
       WT_Function1("floor", WT_Float, WT_Int),
       WT_Function1("ceil", WT_Float, WT_Int),
       WT_Function1("round", WT_Float, WT_Int),

@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.nio.file.Paths
 
@@ -6,8 +6,8 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
-import wdlTools.typing.WdlTypes._
-import wdlTools.typing.{Util => TUtil}
+import wdlTools.types.WdlTypes._
+import wdlTools.types.{Util => TUtil}
 
 case class TypeChecker(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)

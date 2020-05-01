@@ -1,9 +1,9 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.net.URL
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.TextSource
-import wdlTools.typing.WdlTypes._
+import wdlTools.types.WdlTypes._
 
 // An entire context
 //

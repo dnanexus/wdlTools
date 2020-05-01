@@ -5,11 +5,12 @@ import java.net.{URL, HttpURLConnection}
 import java.nio.charset.StandardCharsets._
 import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
 import scala.collection.JavaConverters._
+import scala.util.Random
 
 import wdlTools.util.{EvalConfig, Options, Util}
 import wdlTools.util.Verbosity._
 
-case class IoFunctions(opts: Options, evalCfg: EvalConfig) {
+case class IoSupp(opts: Options, evalCfg: EvalConfig) {
 
   private def isURL(pathOrUrl: String): Boolean = {
     pathOrUrl.contains("://")
@@ -77,16 +78,8 @@ case class IoFunctions(opts: Options, evalCfg: EvalConfig) {
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(pathOrUrl: String, content: String): Path = {
-    if (isURL(pathOrUrl)) {
-      throw new RuntimeException(
-          s"writeFile: implemented only for local files (${pathOrUrl})"
-      )
-    }
-
-    val path = Paths.get(pathOrUrl)
-    Files.write(path, content.getBytes())
-    path
+  def writeFile(p: Path, content: String): Unit = {
+    Files.write(p, content.getBytes())
   }
 
   /**
@@ -147,5 +140,10 @@ case class IoFunctions(opts: Options, evalCfg: EvalConfig) {
     // a file
     val p = Paths.get(pathOrUrl)
     return p.toFile.length()
+  }
+
+  def mkTempFile(): Path = {
+    val rndName = Random.alphanumeric.take(8).mkString("")
+    evalCfg.tmpDir.resolve(rndName)
   }
 }
