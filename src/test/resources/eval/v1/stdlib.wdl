@@ -1,6 +1,10 @@
 version 1.0
 
 workflow foo {
+  input {
+    String? empty_string
+  }
+
   Float x = 1.4
   Int n1 = floor(x)
   Int n2 = ceil(x)
@@ -61,5 +65,25 @@ workflow foo {
   # select_first
   String sel1 = select_first(["A", "B"])
   String? name = "Henry"
-  String sel2 = select_first([name])
+  String sel2 = select_first([empty_string, name])
+
+  # select_all
+  Array[String] sel3 = select_all([empty_string, name, "bear", "tree"])
+
+  Boolean d1 = defined(name)
+  Boolean d2 = defined(empty_string)
+  Boolean d3 = defined(xx_numbers)
+  Boolean d4 = defined("blue")
+
+  # basename
+  String path1 = basename("/A/B/C.txt")
+  String path2 = basename("nuts_and_bolts.txt")
+  File documents = "/src/tools/docs.md"
+  String path3 = basename(documents)
+
+  String path4 = basename("/A/B/C.txt", ".txt")
+  String path5 = basename("/A/B/C.txt", ".text")
+
+  # glob
+  Array[File] texts = glob("*.txt")
 }

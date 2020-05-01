@@ -63,7 +63,9 @@ case class Stdlib(conf: Options) {
       WT_Function1("select_all", WT_Array(WT_Optional(WT_Var(0))), WT_Array(WT_Var(0))),
       WT_Function1("defined", WT_Optional(WT_Var(0)), WT_Boolean),
       // simple functions again
+      // basename has two variants
       WT_Function1("basename", WT_String, WT_String),
+      WT_Function2("basename", WT_String, WT_String, WT_String),
       WT_Function1("floor", WT_Float, WT_Int),
       WT_Function1("ceil", WT_Float, WT_Int),
       WT_Function1("round", WT_Float, WT_Int),

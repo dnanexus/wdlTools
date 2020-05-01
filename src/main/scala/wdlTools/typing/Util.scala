@@ -31,26 +31,20 @@ case class Util(conf: Options) {
   }
 
   private def isCoercibleTo2(left: WT, right: WT): Boolean = {
-    //System.out.println(s"isCoercibleTo ${left} ${right} ")
+    //System.out.println(s"isCoercibleTo2 ${left} ${right} regime=${regime}")
     (left, right) match {
-      case (WT_String, WT_String | WT_File) => true
+      case (WT_Boolean, WT_Boolean)                                       => true
+      case (WT_Int, WT_Int)                                               => true
+      case (WT_Int, WT_Int | WT_Float | WT_String) if regime == Lenient   => true
+      case (WT_Float, WT_Int | WT_Float)                                  => true
+      case (WT_Float, WT_Int | WT_Float | WT_String) if regime == Lenient => true
 
-      // Undocumented in spec 1.0
-      case (WT_String, WT_Int | WT_Float | WT_Boolean) => true
+      // only the file -> string conversion is documented in spec 1.0
+      case (WT_String, WT_Boolean | WT_Int | WT_Float | WT_String | WT_File) => true
 
       case (WT_File, WT_String | WT_File) => true
-      case (WT_Boolean, WT_Boolean)       => true
-      case (WT_Int, WT_Int)               => true
-      case (WT_Float, WT_Int | WT_Float)  => true
 
-      // Undocumented in spec 1.0.
-      // The user should specify ciel/round/... instead of this coercion
-      case (WT_Int, WT_Float) => true
-
-      // This is going to require a runtime check. For example:
-      // Int a = "1"
-      case (WT_Int, WT_String) if regime == Lenient => true
-      case (WT_Optional(l), WT_Optional(r))         => isCoercibleTo2(l, r)
+      case (WT_Optional(l), WT_Optional(r)) => isCoercibleTo2(l, r)
 
       // T is coercible to T?
       case (WT_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)

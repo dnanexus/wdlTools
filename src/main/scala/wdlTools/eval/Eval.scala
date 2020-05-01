@@ -277,7 +277,7 @@ case class Eval(opts: Options,
 
       // accessing a variable
       case AST.ExprIdentifier(id: String, _) if !(ctx.bindings contains id) =>
-        throw new EvalException(s"accessing undefined variable ${id}, ctx=${ctx.bindings}")
+        throw new EvalException(s"accessing undefined variable ${id}")
       case AST.ExprIdentifier(id: String, _) =>
         ctx.bindings(id)
 

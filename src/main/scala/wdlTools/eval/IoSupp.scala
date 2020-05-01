@@ -78,7 +78,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(p : Path, content: String): Unit = {
+  def writeFile(p: Path, content: String): Unit = {
     Files.write(p, content.getBytes())
   }
 
@@ -142,7 +142,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     return p.toFile.length()
   }
 
-  def mkTempFile() : Path = {
+  def mkTempFile(): Path = {
     val rndName = Random.alphanumeric.take(8).mkString("")
     evalCfg.tmpDir.resolve(rndName)
   }

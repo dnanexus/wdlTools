@@ -24,22 +24,52 @@ case class Coercion(docSourceURL: Option[URL]) {
       case (WdlTypes.WT_Boolean, WV_Boolean(_)) => value
       case (WdlTypes.WT_Int, WV_Int(_))         => value
       case (WdlTypes.WT_Int, WV_Float(x))       => WV_Int(x.toInt)
-      case (WdlTypes.WT_Float, WV_Int(n))       => WV_Float(n.toFloat)
-      case (WdlTypes.WT_Float, WV_Float(x))     => value
-      case (WdlTypes.WT_String, WV_String(_))   => value
-      case (WdlTypes.WT_String, WV_File(s))     => WV_String(s)
-      case (WdlTypes.WT_File, WV_String(s))     => WV_File(s)
-      case (WdlTypes.WT_File, WV_File(_))       => value
+      case (WdlTypes.WT_Int, WV_String(s)) =>
+        val n =
+          try {
+            s.toInt
+          } catch {
+            case _: NumberFormatException =>
+              throw new EvalException(s"string ${s} cannot be converted into an integer",
+                                      text,
+                                      docSourceURL)
+          }
+        WV_Int(n)
+      case (WdlTypes.WT_Float, WV_Int(n))   => WV_Float(n.toFloat)
+      case (WdlTypes.WT_Float, WV_Float(x)) => value
+      case (WdlTypes.WT_Float, WV_String(s)) =>
+        val x =
+          try {
+            s.toDouble
+          } catch {
+            case _: NumberFormatException =>
+              throw new EvalException(s"string ${s} cannot be converted into an integer",
+                                      text,
+                                      docSourceURL)
+          }
+        WV_Float(x)
+      case (WdlTypes.WT_String, WV_Boolean(b)) => WV_String(b.toString)
+      case (WdlTypes.WT_String, WV_Int(n))     => WV_String(n.toString)
+      case (WdlTypes.WT_String, WV_Float(x))   => WV_String(x.toString)
+      case (WdlTypes.WT_String, WV_String(_))  => value
+      case (WdlTypes.WT_String, WV_File(s))    => WV_String(s)
+      case (WdlTypes.WT_File, WV_String(s))    => WV_File(s)
+      case (WdlTypes.WT_File, WV_File(_))      => value
 
       // compound types
       // recursively descend into the sub structures and coerce them.
-      case (WdlTypes.WT_Optional(t2), WV_Optional(value2)) =>
-        WV_Optional(coerceTo(t2, value2, text))
-      case (WdlTypes.WT_Array(t2), WV_Array(vec)) =>
+      case (WdlTypes.WT_Optional(t), WV_Optional(v)) =>
+        WV_Optional(coerceTo(t, v, text))
+      case (WdlTypes.WT_Optional(t), v) =>
+        WV_Optional(coerceTo(t, v, text))
+      case (t, WV_Optional(v)) =>
+        coerceTo(t, v, text)
+
+      case (WdlTypes.WT_Array(t), WV_Array(vec)) =>
 //        if (nonEmpty && vec.isEmpty)
 //          throw new EvalException("array is empty", text, docSourceURL)
         WV_Array(vec.map { x =>
-          coerceTo(t2, x, text)
+          coerceTo(t, x, text)
         })
 
       case (WdlTypes.WT_Map(kt, vt), WV_Map(m)) =>
