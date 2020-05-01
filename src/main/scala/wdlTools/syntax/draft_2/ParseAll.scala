@@ -290,8 +290,8 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
-    if (errorListener.hasErrors()) {
-      throw new SyntaxException(errorListener.getErrors())
+    if (errorListener.hasErrors) {
+      throw new SyntaxException(errorListener.getErrors)
     }
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)

@@ -7,6 +7,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 
 import collection.JavaConverters._
 import org.antlr.v4.runtime.{
+  BaseErrorListener,
   BufferedTokenStream,
   CharStream,
   CodePointBuffer,
@@ -15,6 +16,8 @@ import org.antlr.v4.runtime.{
   Lexer,
   Parser,
   ParserRuleContext,
+  RecognitionException,
+  Recognizer,
   Token
 }
 import wdlTools.syntax
@@ -39,6 +42,37 @@ object Antlr4Util {
 
   def getTextSource(symbol: TerminalNode): TextSource = {
     getTextSource(symbol.getSymbol, None)
+  }
+
+  // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
+  //
+  case class WdlAggregatingErrorListener(docSourceUrl: Option[URL]) extends BaseErrorListener {
+
+    private var errors = Vector.empty[SyntaxError]
+
+    // This is called by the antlr grammar during parsing.
+    // We collect these errors in a list, and report collectively
+    // when parsing is complete.
+    override def syntaxError(recognizer: Recognizer[_, _],
+                             offendingSymbol: Any,
+                             line: Int,
+                             charPositionInLine: Int,
+                             msg: String,
+                             e: RecognitionException): Unit = {
+      val symbolText =
+        offendingSymbol match {
+          case tok: Token =>
+            tok.getText
+          case _ =>
+            offendingSymbol.toString
+        }
+      val err = SyntaxError(docSourceUrl, symbolText, line, charPositionInLine, msg)
+      errors = errors :+ err
+    }
+
+    def getErrors: Vector[SyntaxError] = errors
+
+    def hasErrors: Boolean = errors.nonEmpty
   }
 
   case class CommentListener(tokenStream: BufferedTokenStream,
@@ -85,7 +119,7 @@ object Antlr4Util {
                                               opts: Options) {
     def verify(): Unit = {
       // check if any errors were found
-      val errors: Vector[SyntaxError] = errListener.getErrors()
+      val errors: Vector[SyntaxError] = errListener.getErrors
       if (errors.nonEmpty) {
         if (opts.verbosity > Verbosity.Quiet) {
           for (err <- errors) {
