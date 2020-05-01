@@ -3,7 +3,7 @@ package wdlTools.eval
 import java.net.URL
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
-import wdlTools.typing.WdlTypes
+import wdlTools.types.WdlTypes
 
 case class Coercion(docSourceURL: Option[URL]) {
 

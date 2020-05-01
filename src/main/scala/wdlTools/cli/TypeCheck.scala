@@ -1,7 +1,7 @@
 package wdlTools.cli
 
 import wdlTools.syntax.Parsers
-import wdlTools.typing.{Context, Stdlib, TypeChecker}
+import wdlTools.types.{Context, Stdlib, TypeChecker}
 
 case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {

@@ -86,4 +86,9 @@ workflow foo {
 
   # glob
   Array[File] texts = glob("*.txt")
+
+  # write object
+  Object o = object { author : "Benjamin", year : 1973, title : "Color the sky green" }
+  File of = write_object(o)
+  Object o2 = read_object(of)
 }

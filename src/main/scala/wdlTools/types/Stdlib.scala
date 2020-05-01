@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import java.net.URL
 
@@ -6,7 +6,7 @@ import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
 import wdlTools.syntax.{AbstractSyntax, TextSource}
-import wdlTools.typing.{Util => TUtil}
+import wdlTools.types.{Util => TUtil}
 
 case class Stdlib(conf: Options) {
   private val tUtil = TUtil(conf)

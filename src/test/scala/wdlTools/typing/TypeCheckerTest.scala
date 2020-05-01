@@ -1,4 +1,4 @@
-package wdlTools.typing
+package wdlTools.types
 
 import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
@@ -11,7 +11,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/typing/v1").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -127,7 +127,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
 
   it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/typing/v1").getPath)
+        Paths.get(getClass.getResource("/types/v1").getPath)
     )
 
     // filter out files that do not appear in the control table

@@ -7,7 +7,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.typing.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
+import wdlTools.types.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
 class EvalTest extends FlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
