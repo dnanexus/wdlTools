@@ -17,14 +17,14 @@ trait StandardLibraryImpl {
 
 // A runtime error
 final class EvalException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
-    this(EvalException.formatMessage(msg, text, docSourceURL))
+  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
+    this(EvalException.formatMessage(msg, text, docSourceUrl))
   }
 }
 
 object EvalException {
-  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
-    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
+    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
     s"${msg} at ${text}${urlPart}"
   }
 }

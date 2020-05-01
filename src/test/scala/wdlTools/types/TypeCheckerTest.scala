@@ -81,7 +81,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val stdlib = Stdlib(opts2)
     val checker = TypeChecker(stdlib)
     try {
-      val doc = parser.parseDocument(UUtil.pathToURL(file))
+      val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
     } catch {
       case e: Throwable =>
@@ -99,7 +99,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     val checker = TypeChecker(stdlib)
     val checkVal =
       try {
-        val doc = parser.parseDocument(UUtil.pathToURL(file))
+        val doc = parser.parseDocument(UUtil.pathToUrl(file))
         checker.apply(doc)
         true
       } catch {
@@ -179,7 +179,7 @@ class TypeCheckerTest extends FlatSpec with Matchers {
     )
 
     for (src <- sources) {
-      val url = UUtil.getURL(src)
+      val url = UUtil.getUrl(src)
       val doc = parser.parseDocument(url)
       checker.apply(doc)
     }

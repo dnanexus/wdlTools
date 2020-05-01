@@ -12,35 +12,50 @@ object WdlVersion {
 
   val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
 
-  def fromName(name: String): WdlVersion = {
-    All.collectFirst { case v if v.name == name => v }.get
+  def withName(name: String): WdlVersion = {
+    val version = All.collectFirst { case v if v.name == name => v }
+    if (version.isDefined) {
+      version.get
+    } else {
+      throw new NoSuchElementException(s"No value found for ${name}")
+    }
   }
 }
 
-// source location in a WDL program. We add it to each syntax element
-// so we could do accurate error reporting.
-//
-// Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
-// the only example of this is Version, which in draft-2 documents has
-// an implicit value of WdlVersion.Draft_2, but there is no actual version
-// statement.
-//
-// line: line number
-// col : column number
-// URL:  original file or web URL
-//
+/** Source location in a WDL program. We add it to each syntax element
+  * so we could do accurate error reporting. All positions are 1-indexed.
+  *
+  * Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
+  * the only example of this is Version, which in draft-2 documents has
+  * an implicit value of WdlVersion.Draft_2, but there is no actual version
+  * statement.
+  *
+  * @param line: line number starting line
+  * @param col: starting column
+  * @param endLine: ending line, end-inclusive
+  * @param endCol: ending column, end-exclusive
+  */
 case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
-  override def compare(that: TextSource): Int = {
-    line - that.line
+  lazy val lineRange: Range = line to endLine
+
+  def compare(that: TextSource): Int = {
+    line - that.line match {
+      case 0 =>
+        col - that.col match {
+          case 0 =>
+            endLine - that.endLine match {
+              case 0     => endCol - that.endCol
+              case other => other
+            }
+          case other => other
+        }
+      case other => other
+    }
   }
 
   override def toString: String = {
     s"${line}:${col}-${endLine}:${endCol}"
   }
-
-  lazy val lineRange: Range = line until endLine
-
-  lazy val maxCol: Int = Vector(col, endCol).max
 }
 
 object TextSource {
@@ -58,7 +73,7 @@ object TextSource {
 
 // A syntax error that occured when parsing a document. It is generated
 // by the ANTLR machinery and we transform it into this format.
-final case class SyntaxError(docSourceURL: Option[URL],
+final case class SyntaxError(docSourceUrl: Option[URL],
                              symbol: String,
                              line: Int,
                              charPositionInLine: Int,
@@ -66,8 +81,8 @@ final case class SyntaxError(docSourceURL: Option[URL],
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceURL: Option[URL] = None) = {
-    this(SyntaxException.formatMessage(msg, text, docSourceURL))
+  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
+    this(SyntaxException.formatMessage(msg, text, docSourceUrl))
   }
   def this(errors: Seq[SyntaxError]) = {
     this(SyntaxException.formatMessageFromErrorList(errors))
@@ -75,16 +90,16 @@ final class SyntaxException(message: String) extends Exception(message) {
 }
 
 object SyntaxException {
-  def formatMessage(msg: String, text: TextSource, docSourceURL: Option[URL]): String = {
-    val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
+    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
     s"${msg} at ${text}${urlPart}"
   }
 
   def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
     // make one big report on all the syntax errors
     val messages = errors.map {
-      case SyntaxError(docSourceURL, symbol, line, position, msg) =>
-        val urlPart = docSourceURL.map(url => s" in ${url.toString}").getOrElse("")
+      case SyntaxError(docSourceUrl, symbol, line, position, msg) =>
+        val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
         s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
     }
     messages.mkString("\n")
@@ -92,15 +107,40 @@ object SyntaxException {
 }
 
 /**
-  * Type hierarchy for comments.
-  *
-  * # this is a line comment
-  * # that's split across two lines
-  * #
-  * ## this is a preformatted comment
+  * A WDL comment.
+  * @param value the comment string, including prefix ('#')
+  * @param text the location of the comment in the source file
   */
-abstract class Comment {}
-case class CommentLine(text: String) extends Comment
-case class CommentEmpty() extends Comment
-case class CommentPreformatted(lines: Seq[String]) extends Comment
-case class CommentCompound(comments: Seq[Comment]) extends Comment
+case class Comment(value: String, text: TextSource) extends Ordered[Comment] {
+  override def compare(that: Comment): Int = text.line - that.text.line
+}
+
+case class CommentMap(comments: Map[Int, Comment]) {
+  def nonEmpty: Boolean = {
+    comments.nonEmpty
+  }
+
+  lazy val minLine: Int = comments.keys.min
+
+  lazy val maxLine: Int = comments.keys.max
+
+  def filterWithin(range: Seq[Int]): CommentMap = {
+    CommentMap(comments.filterKeys(range.contains))
+  }
+
+  def toSortedVector: Vector[Comment] = {
+    comments.values.toVector.sortWith(_ < _)
+  }
+
+  def get(line: Int): Option[Comment] = {
+    comments.get(line)
+  }
+
+  def apply(line: Int): Comment = {
+    comments(line)
+  }
+}
+
+object CommentMap {
+  val empty: CommentMap = CommentMap(Map.empty)
+}

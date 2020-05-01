@@ -11,8 +11,7 @@ import wdlTools.util.{EvalConfig, Options, Util}
 import wdlTools.util.Verbosity._
 
 case class IoSupp(opts: Options, evalCfg: EvalConfig) {
-
-  private def isURL(pathOrUrl: String): Boolean = {
+  private def isUrl(pathOrUrl: String): Boolean = {
     pathOrUrl.contains("://")
   }
 
@@ -27,7 +26,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     new String(Files.readAllBytes(p), UTF_8)
   }
 
-  private def readURLContent(url: URL): String = {
+  private def readUrlContent(url: URL): String = {
     val is = url.openStream()
     val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
 
@@ -43,7 +42,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
       }
 
       // make it a string
-      new String(buffer.toByteArray(), UTF_8)
+      new String(buffer.toByteArray, UTF_8)
     } catch {
       case e: Throwable =>
         Util.error(s"Error reading ${url.toString}")
@@ -59,11 +58,11 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
   // This may be a binary file that does not lend itself to splitting into lines.
   // Hence, we aren't using the Source module.
   def readFile(pathOrUrl: String): String = {
-    if (isURL(pathOrUrl)) {
+    if (isUrl(pathOrUrl)) {
       // A URL
       val url = new URL(pathOrUrl)
       val content = url.getProtocol match {
-        case "http" | "https" => readURLContent(new URL(pathOrUrl))
+        case "http" | "https" => readUrlContent(new URL(pathOrUrl))
         case "file"           => readLocalFile(Paths.get(pathOrUrl))
         case _                => throw new RuntimeException(s"unknown protocol in URL ${url}")
       }
@@ -91,8 +90,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
       System.out.println(s"glob(${pattern})")
     }
     val baseDir = evalCfg.homeDir
-    val matcher: PathMatcher = FileSystems
-      .getDefault()
+    val matcher: PathMatcher = FileSystems.getDefault
       .getPathMatcher(s"glob:${baseDir.toString}/${pattern}")
     val retval =
       if (!Files.exists(baseDir)) {
@@ -103,7 +101,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
           .iterator()
           .asScala
           .filter(Files.isRegularFile(_))
-          .filter(matcher.matches(_))
+          .filter(matcher.matches)
           .map(_.toString)
           .toVector
         files.sorted
@@ -118,7 +116,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     * Return the size of the file located at "path"
     */
   def size(pathOrUrl: String): Long = {
-    if (isURL(pathOrUrl)) {
+    if (isUrl(pathOrUrl)) {
       // A url
       // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
       val url = new URL(pathOrUrl)
@@ -126,7 +124,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
       try {
         conn = url.openConnection().asInstanceOf[HttpURLConnection]
         conn.setRequestMethod("HEAD")
-        return conn.getContentLengthLong()
+        return conn.getContentLengthLong
       } catch {
         case e: Throwable =>
           throw e
@@ -139,7 +137,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
 
     // a file
     val p = Paths.get(pathOrUrl)
-    return p.toFile.length()
+    p.toFile.length()
   }
 
   def mkTempFile(): Path = {

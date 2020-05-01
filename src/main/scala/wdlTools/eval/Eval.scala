@@ -12,19 +12,19 @@ case class Eval(opts: Options,
                 evalCfg: EvalConfig,
                 structDefs: Map[String, WdlTypes.WT_Struct],
                 wdlVersion: WdlVersion,
-                docSourceURL: Option[URL]) {
+                docSourceUrl: Option[URL]) {
   // choose the standard library implementation based on version
   private val stdlib = wdlVersion match {
-    case WdlVersion.Draft_2 => StdlibDraft2(opts, evalCfg, docSourceURL)
-    case WdlVersion.V1      => StdlibV1(opts, evalCfg, docSourceURL)
+    case WdlVersion.Draft_2 => StdlibDraft2(opts, evalCfg, docSourceUrl)
+    case WdlVersion.V1      => StdlibV1(opts, evalCfg, docSourceUrl)
   }
-  private val coercion = Coercion(docSourceURL)
+  private val coercion = Coercion(docSourceUrl)
 
   private def getStringVal(value: WV, text: TextSource): String = {
     value match {
       case WV_String(s) => s
       case WV_File(s)   => s
-      case other        => throw new EvalException(s"bad value ${other}", text, docSourceURL)
+      case other        => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
     }
   }
 
@@ -58,9 +58,7 @@ case class Eval(opts: Options,
           false
         } else {
           // now we know the keys are all equal
-          m1.keys.forall {
-            case k => compareEqeq(m1(k), m2(k), text)
-          }
+          m1.keys.forall(k => compareEqeq(m1(k), m2(k), text))
         }
 
       // optionals
@@ -79,9 +77,7 @@ case class Eval(opts: Options,
         // been cleared at compile time.
         throw new Exception(s"error: struct ${name} does not have the corrent number of members")
       case (WV_Struct(_, members1), WV_Struct(_, members2)) =>
-        members1.keys.forall {
-          case k => compareEqeq(members1(k), members2(k), text)
-        }
+        members1.keys.forall(k => compareEqeq(members1(k), members2(k), text))
 
       case (_: WV_Object, _: WV_Object) =>
         throw new Exception("objects not implemented")
@@ -98,7 +94,7 @@ case class Eval(opts: Options,
       case (WV_String(s1), WV_String(s2)) => s1 < s2
       case (WV_File(p1), WV_File(p2))     => p1 < p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
@@ -112,7 +108,7 @@ case class Eval(opts: Options,
       case (WV_String(s1), WV_String(s2)) => s1 <= s2
       case (WV_File(p1), WV_File(p2))     => p1 <= p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
@@ -126,7 +122,7 @@ case class Eval(opts: Options,
       case (WV_String(s1), WV_String(s2)) => s1 > s2
       case (WV_File(p1), WV_File(p2))     => p1 > p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
@@ -140,7 +136,7 @@ case class Eval(opts: Options,
       case (WV_String(s1), WV_String(s2)) => s1 >= s2
       case (WV_File(p1), WV_File(p2))     => p1 >= p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceURL)
+        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
@@ -164,7 +160,7 @@ case class Eval(opts: Options,
       case (WV_File(s1), WV_File(s2))   => WV_File(s1 + s2)
 
       case (_, _) =>
-        throw new EvalException("cannot add these values", text, docSourceURL)
+        throw new EvalException("cannot add these values", text, docSourceUrl)
     }
   }
 
@@ -175,7 +171,7 @@ case class Eval(opts: Options,
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 - x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 - x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
@@ -186,7 +182,7 @@ case class Eval(opts: Options,
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 % x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 % x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
@@ -197,7 +193,7 @@ case class Eval(opts: Options,
       case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 * x2)
       case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 * x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
@@ -205,22 +201,22 @@ case class Eval(opts: Options,
     (a, b) match {
       case (WV_Int(n1), WV_Int(n2)) =>
         if (n2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceUrl)
         WV_Int(n1 / n2)
       case (WV_Float(x1), WV_Int(n2)) =>
         if (n2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceUrl)
         WV_Float(x1 / n2)
       case (WV_Int(n1), WV_Float(x2)) =>
         if (x2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceUrl)
         WV_Float(n1 / x2)
       case (WV_Float(x1), WV_Float(x2)) =>
         if (x2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceURL)
+          throw new EvalException("DivisionByZero", text, docSourceUrl)
         WV_Float(x1 / x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceURL)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
@@ -233,14 +229,14 @@ case class Eval(opts: Options,
           case None =>
             throw new EvalException(s"Struct ${name} does not have member ${id}",
                                     text,
-                                    docSourceURL)
+                                    docSourceUrl)
           case Some(t) => t
         }
 
       case WV_Object(members) =>
         members.get(id) match {
           case None =>
-            throw new EvalException(s"Object does not have member ${id}", text, docSourceURL)
+            throw new EvalException(s"Object does not have member ${id}", text, docSourceUrl)
           case Some(t) => t
         }
 
@@ -249,7 +245,7 @@ case class Eval(opts: Options,
           case None =>
             throw new EvalException(s"Call object ${name} does not have member ${id}",
                                     text,
-                                    docSourceURL)
+                                    docSourceUrl)
           case Some(t) => t
         }
 
@@ -257,12 +253,12 @@ case class Eval(opts: Options,
       case WV_Pair(l, _) if id.toLowerCase() == "left"  => l
       case WV_Pair(_, r) if id.toLowerCase() == "right" => r
       case WV_Pair(_, _) =>
-        throw new EvalException(s"accessing a pair with (${id}) is illegal", text, docSourceURL)
+        throw new EvalException(s"accessing a pair with (${id}) is illegal", text, docSourceUrl)
 
       case _ =>
         throw new EvalException(s"member access (${id}) in expression is illegal",
                                 text,
-                                docSourceURL)
+                                docSourceUrl)
     }
   }
 
@@ -312,7 +308,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       // ~{default="foo" optional_value}
@@ -334,7 +330,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a string",
                                     expr.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       // operators on one argument
@@ -345,7 +341,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a number",
                                     expr.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       case AST.ExprUniraryMinus(e, _) =>
@@ -355,7 +351,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a number",
                                     expr.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       case AST.ExprNegate(e, _) =>
@@ -364,7 +360,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       // operators on two arguments
@@ -377,11 +373,11 @@ case class Eval(opts: Options,
           case (WV_Boolean(_), other) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     b.text,
-                                    docSourceURL)
+                                    docSourceUrl)
           case (other, _) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     a.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       case AST.ExprLand(a, b, _) =>
@@ -393,11 +389,11 @@ case class Eval(opts: Options,
           case (WV_Boolean(_), other) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     b.text,
-                                    docSourceURL)
+                                    docSourceUrl)
           case (other, _) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     a.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       // recursive comparison
@@ -463,12 +459,12 @@ case class Eval(opts: Options,
             throw new EvalException(
                 s"array access out of bounds (size=${arraySize}, element accessed=${n})",
                 text,
-                docSourceURL
+                docSourceUrl
             )
           case (_, _) =>
             throw new EvalException(s"array access requires an array and an integer",
                                     text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
 
       // conditional:
@@ -478,8 +474,8 @@ case class Eval(opts: Options,
         cond_v match {
           case WV_Boolean(true)  => apply(tBranch, ctx)
           case WV_Boolean(false) => apply(fBranch, ctx)
-          case other =>
-            throw new EvalException(s"condition is not boolean", text, docSourceURL)
+          case _ =>
+            throw new EvalException(s"condition is not boolean", text, docSourceUrl)
         }
 
       // Apply a standard library function to arguments. For example:
@@ -517,13 +513,13 @@ case class Eval(opts: Options,
         case AST.TypeIdentifier(id, _) if structDefs contains id =>
           structDefs(id)
         case AST.TypeIdentifier(id, _) =>
-          throw new EvalException(s"struct ${id} is undefined", text, docSourceURL)
+          throw new EvalException(s"struct ${id} is undefined", text, docSourceUrl)
 
         case AST.TypeObject(_) => WdlTypes.WT_Object
 
-        case AST.TypeStruct(name, members, _, _) =>
+        case AST.TypeStruct(name, members, _) =>
           val members2 = members.map {
-            case AST.StructMember(name, dataType, _, _) =>
+            case AST.StructMember(name, dataType, _) =>
               name -> inner(dataType)
           }.toMap
           WdlTypes.WT_Struct(name, members2)
@@ -535,12 +531,12 @@ case class Eval(opts: Options,
   // Evaluate all the declarations and return a context
   def applyDeclarations(decls: Vector[AST.Declaration], ctx: Context): Context = {
     decls.foldLeft(ctx) {
-      case (accu, AST.Declaration(name, astWdlType, Some(expr), text, _)) =>
+      case (accu, AST.Declaration(name, astWdlType, Some(expr), text)) =>
         val value = apply(expr, accu)
         val wdlType: WdlTypes.WT = typeFromAst(astWdlType, text)
         val value2 = coercion.coerceTo(wdlType, value, text)
         accu.addBinding(name, value2)
-      case (accu, ast) =>
+      case (_, ast) =>
         throw new Exception(s"Can not evaluate element ${ast.getClass}")
     }
   }

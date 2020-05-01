@@ -188,12 +188,11 @@ task_command
 	;
 
 task_element
-	: task_output
-	| task_command
-	| task_runtime
-	| parameter_meta
-	| meta
-	| any_decls
+	: task_output #task_output_element
+	| task_command #task_command_element
+	| task_runtime #task_runtime_element
+	| parameter_meta #task_parameter_meta_element
+	| meta #task_meta_element
 	;
 
 task
@@ -239,23 +238,20 @@ conditional
 	: IF LPAREN expr RPAREN LBRACE inner_workflow_element* RBRACE
 	;
 
-workflow_input
-	: (any_decls)*
-	;
-
 workflow_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	;
 
 workflow_element
-	: workflow_output #output
-	| inner_workflow_element #inner_element
-	| parameter_meta #parameter_meta_element
-	| meta #meta_element
+	: unbound_decls #wf_decl_element
+	| workflow_output #wf_output_element
+	| inner_workflow_element #wf_inner_element
+	| parameter_meta #wf_parameter_meta_element
+	| meta #wf_meta_element
 	;
 
 workflow
-	: WORKFLOW Identifier LBRACE workflow_input workflow_element* RBRACE
+	: WORKFLOW Identifier LBRACE workflow_element* RBRACE
 	;
 
 document_element

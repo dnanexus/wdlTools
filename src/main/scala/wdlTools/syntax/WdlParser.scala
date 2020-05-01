@@ -37,8 +37,8 @@ abstract class WdlParser(opts: Options) {
 
   def parseType(text: String): Type
 
-  def getDocSourceURL(addr: String): URL = {
-    Util.getURL(addr, opts.localDirectories)
+  def getDocSourceUrl(addr: String): URL = {
+    Util.getUrl(addr, opts.localDirectories)
   }
 
   def getDocumentWalker[T](
@@ -53,8 +53,8 @@ abstract class WdlParser(opts: Options) {
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, addr, doc, _, _) if doc.isDefined =>
-          Some(Util.getURL(addr.value, opts.localDirectories) -> doc.get)
+        case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
+          Some(Util.getUrl(addr.value, opts.localDirectories) -> doc.get)
         case _ => None
       }.toMap
     }

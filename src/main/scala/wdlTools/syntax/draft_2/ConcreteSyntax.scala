@@ -2,7 +2,7 @@ package wdlTools.syntax.draft_2
 
 import java.net.URL
 
-import wdlTools.syntax.{Comment, TextSource}
+import wdlTools.syntax.{CommentMap, TextSource}
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
@@ -15,15 +15,8 @@ object ConcreteSyntax {
   sealed trait Element {
     val text: TextSource // where in the source program does this element belong
   }
-  sealed trait StatementElement extends Element {
-
-    /**
-      * An optional comment that comes directly before the element.
-      */
-    val comment: Option[Comment]
-  }
-  sealed trait WorkflowElement extends StatementElement
-  sealed trait DocumentElement extends StatementElement
+  sealed trait WorkflowElement extends Element
+  sealed trait DocumentElement extends Element
 
   // type system
   sealed trait Type extends Element
@@ -105,25 +98,17 @@ object ConcreteSyntax {
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, text: TextSource) extends Expr
   case class ExprGetName(e: Expr, id: String, text: TextSource) extends Expr
 
-  case class Declaration(name: String,
-                         wdlType: Type,
-                         expr: Option[Expr],
-                         text: TextSource,
-                         comment: Option[Comment])
+  case class Declaration(name: String, wdlType: Type, expr: Option[Expr], text: TextSource)
       extends WorkflowElement
 
   // sections
-  // In draft-2 there is no input {} block, but it is implied in the spec that inputs must appear
-  // at the top of the task/workflow. All declarations, whether bound or unbound, that appear before
-  // the first non-declaration are treated as inputs.
-  case class InputSection(declarations: Vector[Declaration],
-                          text: TextSource,
-                          comment: Option[Comment])
-      extends StatementElement
-  case class OutputSection(declarations: Vector[Declaration],
-                           text: TextSource,
-                           comment: Option[Comment])
-      extends StatementElement
+
+  /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
+    * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
+    * `InputSection` `TextSource` may overlap with other elements.
+    */
+  case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
+  case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
 
   // A command can be simple, with just one continuous string:
   //
@@ -138,33 +123,22 @@ object ConcreteSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandSection(parts: Vector[Expr], text: TextSource, comment: Option[Comment])
-      extends StatementElement
+  case class CommandSection(parts: Vector[Expr], text: TextSource) extends Element
 
-  case class RuntimeKV(id: String, expr: Expr, text: TextSource, comment: Option[Comment])
-      extends StatementElement
-  case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource, comment: Option[Comment])
-      extends StatementElement
+  case class RuntimeKV(id: String, expr: Expr, text: TextSource) extends Element
+  case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource) extends Element
 
   // meta section
-  case class MetaKV(id: String, value: String, text: TextSource, comment: Option[Comment])
-      extends StatementElement
-  case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource, comment: Option[Comment])
-      extends StatementElement
-  case class MetaSection(kvs: Vector[MetaKV], text: TextSource, comment: Option[Comment])
-      extends StatementElement
+  case class MetaKV(id: String, value: String, text: TextSource) extends Element
+  case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
+  case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 
   // imports
-  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
-
-  // import statement as read from the document
   case class ImportAddr(value: String, text: TextSource) extends Element
   case class ImportName(value: String, text: TextSource) extends Element
-  case class ImportDoc(name: Option[ImportName],
-                       aliases: Vector[ImportAlias],
-                       addr: ImportAddr,
-                       text: TextSource,
-                       comment: Option[Comment])
+
+  // import statement as read from the document
+  case class ImportDoc(name: Option[ImportName], addr: ImportAddr, text: TextSource)
       extends DocumentElement
 
   // top level definitions
@@ -176,8 +150,7 @@ object ConcreteSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
-                  text: TextSource,
-                  comment: Option[Comment])
+                  text: TextSource)
       extends DocumentElement
 
   case class CallAlias(name: String, text: TextSource) extends Element
@@ -186,19 +159,14 @@ object ConcreteSyntax {
   case class Call(name: String,
                   alias: Option[CallAlias],
                   inputs: Option[CallInputs],
-                  text: TextSource,
-                  comment: Option[Comment])
+                  text: TextSource)
       extends WorkflowElement
   case class Scatter(identifier: String,
                      expr: Expr,
                      body: Vector[WorkflowElement],
-                     text: TextSource,
-                     comment: Option[Comment])
+                     text: TextSource)
       extends WorkflowElement
-  case class Conditional(expr: Expr,
-                         body: Vector[WorkflowElement],
-                         text: TextSource,
-                         comment: Option[Comment])
+  case class Conditional(expr: Expr, body: Vector[WorkflowElement], text: TextSource)
       extends WorkflowElement
 
   case class Workflow(name: String,
@@ -207,14 +175,13 @@ object ConcreteSyntax {
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement],
-                      text: TextSource,
-                      comment: Option[Comment])
-      extends StatementElement
+                      text: TextSource)
+      extends Element
 
-  case class Document(docSourceURL: URL,
+  case class Document(docSourceUrl: URL,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,
-                      comment: Option[Comment])
-      extends StatementElement
+                      comments: CommentMap)
+      extends Element
 }

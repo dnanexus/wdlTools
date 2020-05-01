@@ -7,10 +7,10 @@ import wdlTools.syntax.TextSource
 import wdlTools.util.{EvalConfig, Options}
 import wdlTools.types.WdlTypes._
 
-case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL])
+case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
     extends StandardLibraryImpl {
   private val iosp = IoSupp(opts, evalCfg)
-  private val coercion = Coercion(docSourceURL)
+  private val coercion = Coercion(docSourceUrl)
 
   type FunctionImpl = (Vector[WdlValues.WV], TextSource) => WV
 
@@ -78,17 +78,17 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   private def getWdlVector(value: WV, text: TextSource): Vector[WV] = {
     value match {
       case WV_Array(ar) => ar
-      case other        => throw new EvalException(s"${other} should be an array", text, docSourceURL)
+      case other        => throw new EvalException(s"${other} should be an array", text, docSourceUrl)
     }
   }
 
   private def stdout(args: Vector[WV], text: TextSource): WV_File = {
-    assert(args.size == 0)
+    assert(args.isEmpty)
     WV_File(evalCfg.stdout.toString)
   }
 
   private def stderr(args: Vector[WV], text: TextSource): WV_File = {
-    assert(args.size == 0)
+    assert(args.isEmpty)
     WV_File(evalCfg.stdout.toString)
   }
 
@@ -109,7 +109,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     val lines: Vector[String] = content.split("\n").toVector
     WV_Array(lines.map { x =>
       val words = x.split("\t").toVector
-      WV_Array(words.map(WV_String(_)))
+      WV_Array(words.map(WV_String))
     })
   }
 
@@ -124,7 +124,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       if (words.length != 2)
         throw new EvalException(s"read_tsv ${file}, line has ${words.length} words",
                                 text,
-                                docSourceURL)
+                                docSourceUrl)
       WV_String(words(0)) -> WV_String(words(1))
     }.toMap)
   }
@@ -137,14 +137,14 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     if (lines.size != 2)
       throw new EvalException(s"read_object : file ${file.toString} must contain two lines",
                               text,
-                              docSourceURL)
+                              docSourceUrl)
     val keys = lines(0).split("\t")
     val values = lines(1).split("\t")
     if (keys.size != values.size)
       throw new EvalException(
           s"read_object : the number of keys (${keys.size}) must be the same as the number of values (${values.size})",
           text,
-          docSourceURL
+          docSourceUrl
       )
 
     // Note all the values are going to be strings here. This probably isn't what
@@ -158,11 +158,11 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 
   // Array[Object] read_objects(String|File)
   private def read_objects(args: Vector[WV], text: TextSource): WV_Object =
-    throw new EvalException("not implemented", text, docSourceURL)
+    throw new EvalException("not implemented", text, docSourceUrl)
 
   // mixed read_json(String|File)
   private def read_json(args: Vector[WV], text: TextSource): WV_Object =
-    throw new EvalException("not implemented", text, docSourceURL)
+    throw new EvalException("not implemented", text, docSourceUrl)
 
   // Int read_int(String|File)
   //
@@ -172,8 +172,8 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     try {
       WV_Int(content.trim.toInt)
     } catch {
-      case e: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to an integer", text, docSourceURL)
+      case _: Throwable =>
+        throw new EvalException(s"could not convert (${content}) to an integer", text, docSourceUrl)
     }
   }
 
@@ -193,8 +193,8 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     try {
       WV_Float(content.trim.toDouble)
     } catch {
-      case e: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to a float", text, docSourceURL)
+      case _: Throwable =>
+        throw new EvalException(s"could not convert (${content}) to a float", text, docSourceUrl)
     }
   }
 
@@ -207,7 +207,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       case "false" => WV_Boolean(false)
       case "true"  => WV_Boolean(true)
       case _ =>
-        throw new EvalException(s"could not convert (${content}) to a boolean", text, docSourceURL)
+        throw new EvalException(s"could not convert (${content}) to a boolean", text, docSourceUrl)
     }
   }
 
@@ -223,7 +223,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
         case other =>
           throw new EvalException(s"write_lines: element ${other} should be a string",
                                   text,
-                                  docSourceURL)
+                                  docSourceUrl)
       }
       .mkString("\n")
     val tmpFile: Path = iosp.mkTempFile()
@@ -243,11 +243,11 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
           a.map {
               case WV_String(s) => s
               case other =>
-                throw new EvalException(s"${other} should be a string", text, docSourceURL)
+                throw new EvalException(s"${other} should be a string", text, docSourceUrl)
             }
             .mkString("\t")
         case other =>
-          throw new EvalException(s"${other} should be an array", text, docSourceURL)
+          throw new EvalException(s"${other} should be an array", text, docSourceUrl)
       }
       .mkString("\n")
     val tmpFile: Path = iosp.mkTempFile()
@@ -265,7 +265,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       .map {
         case (WV_String(key), WV_String(value)) => key + "\t" + value
         case (k, v) =>
-          throw new EvalException(s"${k} ${v} should both be strings", text, docSourceURL)
+          throw new EvalException(s"${k} ${v} should both be strings", text, docSourceUrl)
       }
       .mkString("\n")
     val tmpFile: Path = iosp.mkTempFile()
@@ -291,11 +291,11 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   }
 
   private def write_objects(args: Vector[WV], text: TextSource): WV_File = {
-    throw new EvalException("write_objects: not implemented", text, docSourceURL)
+    throw new EvalException("write_objects: not implemented", text, docSourceUrl)
   }
 
   private def write_json(args: Vector[WV], text: TextSource): WV_File = {
-    throw new EvalException("write_json: not implemented", text, docSourceURL)
+    throw new EvalException("write_json: not implemented", text, docSourceUrl)
   }
 
   // Our size implementation is a little bit more general than strictly necessary.
@@ -319,7 +319,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       f(arg)
     } catch {
       case _: Throwable =>
-        throw new EvalException(s"size(${arg})", text, docSourceURL)
+        throw new EvalException(s"size(${arg})", text, docSourceUrl)
     }
   }
 
@@ -335,7 +335,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       case "mib" => 1024d * 1024d
       case "gib" => 1024d * 1024d * 1024d
       case "tib" => 1024d * 1024d * 1024d * 1024d
-      case _     => throw new EvalException(s"Unknown unit ${sUnit}", text, docSourceURL)
+      case _     => throw new EvalException(s"Unknown unit ${sUnit}", text, docSourceUrl)
     }
   }
 
@@ -350,7 +350,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
         val nBytes = sizeCore(args.head, text)
         WV_Float(nBytes / nBytesInUnit)
       case _ =>
-        throw new EvalException("size: called with wrong number of arguments", text, docSourceURL)
+        throw new EvalException("size: called with wrong number of arguments", text, docSourceUrl)
     }
   }
 
@@ -371,9 +371,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   private def range(args: Vector[WV], text: TextSource): WV_Array = {
     assert(args.size == 1)
     val n = getWdlInt(args.head, text)
-    val vec: Vector[WV] = Vector.tabulate(n) {
-      case i => WV_Int(i)
-    }
+    val vec: Vector[WV] = Vector.tabulate(n)(i => WV_Int(i))
     WV_Array(vec)
   }
 
@@ -382,13 +380,9 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   private def transpose(args: Vector[WV], text: TextSource): WV_Array = {
     assert(args.size == 1)
     val vec: Vector[WV] = getWdlVector(args.head, text)
-    val vec_vec: Vector[Vector[WV]] = vec.map {
-      case v => getWdlVector(v, text)
-    }
+    val vec_vec: Vector[Vector[WV]] = vec.map(v => getWdlVector(v, text))
     val trValue = vec_vec.transpose
-    WV_Array(trValue.map {
-      case vec => WV_Array(vec)
-    })
+    WV_Array(trValue.map(vec => WV_Array(vec)))
   }
 
   // Array[Pair(X,Y)] zip(Array[X], Array[Y])
@@ -432,22 +426,21 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   private def flatten(args: Vector[WV], text: TextSource): WV_Array = {
     assert(args.size == 1)
     val vec: Vector[WV] = getWdlVector(args.head, text)
-    val vec_vec: Vector[Vector[WV]] = vec.map {
-      case v => getWdlVector(v, text)
-    }
+    val vec_vec: Vector[Vector[WV]] = vec.map(v => getWdlVector(v, text))
     WV_Array(vec_vec.flatten)
   }
 
+  @scala.annotation.tailrec
   private def primitiveValueToString(wv: WV, text: TextSource): String = {
     wv match {
       case WV_Boolean(value) => value.toString
       case WV_Int(value)     => value.toString
       case WV_Float(value)   => value.toString
-      case WV_String(value)  => value.toString
-      case WV_File(value)    => value.toString
+      case WV_String(value)  => value
+      case WV_File(value)    => value
       case WV_Optional(x)    => primitiveValueToString(x, text)
       case other =>
-        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceURL)
+        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceUrl)
     }
   }
 
@@ -462,9 +455,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
     assert(args.size == 2)
     val pref = getWdlString(args(0), text)
     val vec = getWdlVector(args(1), text)
-    WV_Array(vec.map {
-      case vw => WV_String(pref + primitiveValueToString(vw, text))
-    })
+    WV_Array(vec.map(vw => WV_String(pref + primitiveValueToString(vw, text))))
   }
 
   // X select_first(Array[X?])
@@ -479,7 +470,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       case x              => Some(x)
     }
     if (values.isEmpty)
-      throw new EvalException("select_first: found no non-null elements", text, docSourceURL)
+      throw new EvalException("select_first: found no non-null elements", text, docSourceUrl)
     values.head
   }
 
@@ -508,9 +499,9 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
       case WV_File(s)   => s
       case WV_String(s) => s
       case other =>
-        throw new EvalException(s"${other} must be a string or a file type", text, docSourceURL)
+        throw new EvalException(s"${other} must be a string or a file type", text, docSourceUrl)
     }
-    Paths.get(filePath).getFileName().toString
+    Paths.get(filePath).getFileName.toString
   }
 
   // String basename(String)
@@ -528,7 +519,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
         val suff = getWdlString(args(1), text)
         WV_String(s.stripSuffix(suff))
       case _ =>
-        throw new EvalException(s"basename: wrong number of arguments", text, docSourceURL)
+        throw new EvalException(s"basename: wrong number of arguments", text, docSourceUrl)
     }
   }
 
@@ -561,7 +552,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 
   def call(funcName: String, args: Vector[WV], text: TextSource): WV = {
     if (!(funcTable contains funcName))
-      throw new EvalException(s"stdlib function ${funcName} not implemented", text, docSourceURL)
+      throw new EvalException(s"stdlib function ${funcName} not implemented", text, docSourceUrl)
     val impl = funcTable(funcName)
     try {
       impl(args, text)
@@ -570,7 +561,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
         val msg = s"""|calling stdlib function ${funcName} with arguments ${args}
                       |${e.getMessage}
                       |""".stripMargin
-        throw new EvalException(msg, text, docSourceURL)
+        throw new EvalException(msg, text, docSourceUrl)
     }
   }
 }

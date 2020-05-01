@@ -92,13 +92,13 @@ case class Stdlib(conf: Options) {
   private def evalOnePrototype(funcDesc: WT_StdlibFunc,
                                inputTypes: Vector[WT],
                                text: TextSource,
-                               docSourceURL: Option[URL]): Option[WT] = {
+                               docSourceUrl: Option[URL]): Option[WT] = {
     val args = funcDesc match {
       case WT_Function0(_, _) if inputTypes.isEmpty => Vector.empty
       case WT_Function1(_, arg1, _)                 => Vector(arg1)
       case WT_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
       case WT_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceURL)
+      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
     }
     try {
       val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
@@ -113,12 +113,12 @@ case class Stdlib(conf: Options) {
   def apply(funcName: String,
             inputTypes: Vector[WT],
             expr: AbstractSyntax.Expr,
-            docSourceURL: Option[URL] = None): WT = {
+            docSourceUrl: Option[URL] = None): WT = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library",
                                 expr.text,
-                                docSourceURL)
+                                docSourceUrl)
       case Some(protoVec) =>
         protoVec
     }
@@ -126,7 +126,7 @@ case class Stdlib(conf: Options) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[WT]] = candidates.map {
-      evalOnePrototype(_, inputTypes, expr.text, docSourceURL)
+      evalOnePrototype(_, inputTypes, expr.text, docSourceUrl)
     }
     val result: Vector[WT] = allCandidatePrototypes.flatten
     result.size match {
@@ -136,7 +136,7 @@ case class Stdlib(conf: Options) {
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
-                                    |""".stripMargin, expr.text, docSourceURL)
+                                    |""".stripMargin, expr.text, docSourceUrl)
       //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
@@ -149,7 +149,7 @@ case class Stdlib(conf: Options) {
                                       |output types (${possibleOutputTypes})""".stripMargin
                                     .replaceAll("\n", " "),
                                   expr.text,
-                                  docSourceURL)
+                                  docSourceUrl)
         possibleOutputTypes.toVector.head
     }
   }

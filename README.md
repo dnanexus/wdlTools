@@ -16,7 +16,7 @@ Currently, WDL draft-2 and 1.0 are supported.
     val opts = Options(followImports=true)
     val parsers = Parsers(opts)
     val wdl = new URL("file:///path/to/my/wdl")
-    val doc: Document = parsers.parse(wdl)
+    val doc: Document = parsers.parseDocument(wdl)
 ```
 
 ## Command line tools
