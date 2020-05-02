@@ -300,11 +300,12 @@ class EvalTest extends FlatSpec with Matchers with Inside {
   it should "boolean placeholder" taggedAs Edge in {
     val command = evalCommand("bool_placeholder.wdl")
     val lines = command.split("\n")
-    lines(0).trim shouldBe "--no"
-    lines(1).trim shouldBe "--yes"
+    lines(1).trim shouldBe "--no"
+    lines(2).trim shouldBe "--yes"
   }
 
-/*  ignore should "default placeholder" taggedAs Edge in {
+  it should "default placeholder" taggedAs Edge in {
     val command = evalCommand("default_placeholder.wdl")
-  }*/
+    command.trim shouldBe "hello"
+  }
 }

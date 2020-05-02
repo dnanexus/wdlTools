@@ -5,6 +5,6 @@ task foo {
 
   command <<<
     ~{true="--yes" false="--no" flag}
-    ~{true="--yes" false="--no" flag}
+    ~{true="--yes" false="--no" true}
   >>>
 }
