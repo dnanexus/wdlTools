@@ -501,20 +501,6 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     WV_Array(vec_vec.flatten)
   }
 
-  @scala.annotation.tailrec
-  private def primitiveValueToString(wv: WV, text: TextSource): String = {
-    wv match {
-      case WV_Boolean(value) => value.toString
-      case WV_Int(value)     => value.toString
-      case WV_Float(value)   => value.toString
-      case WV_String(value)  => value
-      case WV_File(value)    => value
-      case WV_Optional(x)    => primitiveValueToString(x, text)
-      case other =>
-        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceUrl)
-    }
-  }
-
   // Array[String] prefix(String, Array[X])
   //
   // Given a String and an Array[X] where X is a primitive type, the
@@ -526,7 +512,10 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     assert(args.size == 2)
     val pref = getWdlString(args(0), text)
     val vec = getWdlVector(args(1), text)
-    WV_Array(vec.map(vw => WV_String(pref + primitiveValueToString(vw, text))))
+    WV_Array(vec.map{ vw =>
+               val str = Serialize.primitiveValueToString(vw, text, docSourceUrl)
+               WV_String(pref + str)
+             })
   }
 
   // X select_first(Array[X?])

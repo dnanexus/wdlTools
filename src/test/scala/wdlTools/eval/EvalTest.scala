@@ -101,7 +101,7 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bindings("name") shouldBe WV_String("Jay")
   }
 
-  it should "call stdlib" taggedAs Edge in {
+  it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
     val (doc, typeCtx) = parseAndTypeCheck(file)
     val evaluator = Eval(opts,
@@ -261,4 +261,50 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bd("s4") shouldBe WV_String("hello")
     bd("s5") shouldBe WV_Optional(WV_String("hello"))
   }
+
+  private def evalCommand(wdlSourceFileName : String) : String = {
+    val file = srcDir.resolve(wdlSourceFileName)
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
+                         Some(opts.getUrl(file.toString)))
+
+    doc.elements should not be empty
+    val task = doc.elements.head.asInstanceOf[AST.Task]
+    val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
+    evaluator.applyCommand(task.command, ctx)
+  }
+
+  it should "evaluate simple command section"  in {
+    val command = evalCommand("command_simple.wdl")
+    command.trim shouldBe "We just discovered a new flower with 100 basepairs. Is that possible?"
+  }
+
+  it should "evaluate command section with some variables"  in {
+    val command = evalCommand("command2.wdl")
+    command.trim shouldBe "His trumpet playing is not bad"
+  }
+
+  it should "command section with several kinds of primitives"  in {
+    val command = evalCommand("command3.wdl")
+    command.trim shouldBe "His trumpet playing is good. There are 10 instruments in the band. It this true?"
+  }
+
+  it should "separator placeholder"  in {
+    val command = evalCommand("sep_placeholder.wdl")
+    command.trim shouldBe "We have lots of numbers here 1, 10, 100"
+  }
+
+  it should "boolean placeholder" taggedAs Edge in {
+    val command = evalCommand("bool_placeholder.wdl")
+    val lines = command.split("\n")
+    lines(0).trim shouldBe "--no"
+    lines(1).trim shouldBe "--yes"
+  }
+
+/*  ignore should "default placeholder" taggedAs Edge in {
+    val command = evalCommand("default_placeholder.wdl")
+  }*/
 }

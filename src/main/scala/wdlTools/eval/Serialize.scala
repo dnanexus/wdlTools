@@ -1,7 +1,9 @@
 package wdlTools.eval
 
-import wdlTools.eval.WdlValues._
+import java.net.URL
 import spray.json._
+import wdlTools.eval.WdlValues._
+import wdlTools.syntax.TextSource
 
 // The mapping of JSON type to WDL type is:
 // JSON Type 	WDL Type
@@ -52,6 +54,23 @@ object Serialize {
         WV_Array(vec.map(fromJson(_)))
       case JsObject(fields) =>
         WV_Object(fields.map{ case (k,v) => k -> fromJson(v) })
+    }
+  }
+
+  @scala.annotation.tailrec
+  def primitiveValueToString(wv: WV,
+                             text: TextSource,
+                             docSourceUrl : Option[URL]): String = {
+    wv match {
+      case WV_Null => "null"
+      case WV_Boolean(value) => value.toString
+      case WV_Int(value)     => value.toString
+      case WV_Float(value)   => value.toString
+      case WV_String(value)  => value
+      case WV_File(value)    => value
+      case WV_Optional(x)    => primitiveValueToString(x, text, docSourceUrl)
+      case other =>
+        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceUrl)
     }
   }
 }
