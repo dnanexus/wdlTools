@@ -212,14 +212,14 @@ case class Util(conf: Options) {
   def substitute(t: WT,
                  typeBindings: Map[WT_Var, WT],
                  srcText: TextSource,
-                 docSourceURL: Option[URL] = None): WT = {
+                 docSourceUrl: Option[URL] = None): WT = {
     def sub(t: WT): WT = {
       t match {
         case WT_String | WT_File | WT_Boolean | WT_Int | WT_Float => t
         case a: WT_Var if !(typeBindings contains a) =>
           throw new TypeException(s"type variable ${toString(a)} does not have a binding",
                                   srcText,
-                                  docSourceURL)
+                                  docSourceUrl)
         case a: WT_Var         => typeBindings(a)
         case id: WT_Identifier => id
         case WT_Pair(l, r)     => WT_Pair(sub(l), sub(r))
@@ -231,7 +231,7 @@ case class Util(conf: Options) {
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
                                   srcText,
-                                  docSourceURL)
+                                  docSourceUrl)
       }
     }
     sub(t)

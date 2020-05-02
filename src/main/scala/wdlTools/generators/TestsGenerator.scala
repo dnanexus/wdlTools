@@ -22,9 +22,9 @@ case class TestsGenerator(generatedFiles: mutable.Map[URL, String] = mutable.Has
         case TypeMap(k, v, _)   => JsObject(k.toString -> getDummyValue(v))
         case _: TypeObject      => JsObject("foo" -> JsString("bar"))
         case TypePair(l, r, _)  => JsObject("left" -> getDummyValue(l), "right" -> getDummyValue(r))
-        case TypeStruct(_, members, _, _) =>
+        case TypeStruct(_, members, _) =>
           JsObject(members.collect {
-            case StructMember(name, dataType, _, _) if !dataType.isInstanceOf[TypeOptional] =>
+            case StructMember(name, dataType, _) if !dataType.isInstanceOf[TypeOptional] =>
               name -> getDummyValue(dataType)
           }.toMap)
         case other => throw new Exception(s"Unrecognized type ${other}")
@@ -33,7 +33,7 @@ case class TestsGenerator(generatedFiles: mutable.Map[URL, String] = mutable.Has
 
     def addData(declarations: Vector[Declaration]): JsObject = {
       JsObject(declarations.collect {
-        case Declaration(name, wdlType, expr, _, _)
+        case Declaration(name, wdlType, expr, _)
             if expr.isEmpty && !wdlType.isInstanceOf[TypeOptional] && !data.contains(name) =>
           val dataName = s"input_${name}"
           data(dataName) = getDummyValue(wdlType)

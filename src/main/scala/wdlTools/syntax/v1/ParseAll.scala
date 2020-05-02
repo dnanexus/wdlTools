@@ -10,7 +10,7 @@ import wdlTools.util.{Options, SourceCode}
 case class ParseAll(opts: Options) extends WdlParser(opts) {
   private val grammarFactory = WdlV1GrammarFactory(opts)
 
-  private case class Translator(docSourceURL: Option[URL] = None) {
+  private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
         case CST.TypeOptional(t, srcText) =>
@@ -28,11 +28,11 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         case CST.TypeFloat(srcText)          => AST.TypeFloat(srcText)
         case CST.TypeIdentifier(id, srcText) => AST.TypeIdentifier(id, srcText)
         case CST.TypeObject(srcText)         => AST.TypeObject(srcText)
-        case CST.TypeStruct(name, members, srcText, comment) =>
+        case CST.TypeStruct(name, members, srcText) =>
           AST.TypeStruct(name, members.map {
-            case CST.StructMember(name, t, text, comment) =>
-              AST.StructMember(name, translateType(t), text, comment)
-          }, srcText, comment)
+            case CST.StructMember(name, t, text) =>
+              AST.StructMember(name, translateType(t), text)
+          }, srcText)
       }
     }
 
@@ -148,9 +148,9 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         case CST.ExprIdentifier(id, srcText) if id == "null" =>
           AST.ExprIdentifier(id, srcText)
         case CST.ExprIdentifier(id, srcText) =>
-          throw new SyntaxException(msg = s"cannot access identifier (${id}) in a meta section",
+          throw new SyntaxException(s"cannot access identifier (${id}) in a meta section",
                                     srcText,
-                                    docSourceURL)
+                                    docSourceUrl)
 
         // compound values
         case CST.ExprPair(l, r, srcText) =>
@@ -163,9 +163,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
                 case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
                   AST.ExprMapItem(AST.ExprIdentifier(k, text2), translateMetaValue(value), text)
                 case _ =>
-                  throw new SyntaxException(msg = s"Illegal meta field value",
-                                            srcText,
-                                            docSourceURL)
+                  throw new SyntaxException(s"Illegal meta field value", srcText, docSourceUrl)
               },
               srcText
           )
@@ -176,52 +174,47 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           }, srcText)
 
         case other =>
-          throw new SyntaxException(msg = "illegal expression in meta section",
-                                    other.text,
-                                    docSourceURL)
+          throw new SyntaxException("illegal expression in meta section", other.text, docSourceUrl)
       }
     }
 
     def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, translateMetaValue(kv.expr), kv.text, kv.comment)
+      AST.MetaKV(kv.id, translateMetaValue(kv.expr), kv.text)
     }
 
     def translateInputSection(
         inp: CST.InputSection
     ): AST.InputSection = {
-      AST.InputSection(inp.declarations.map(translateDeclaration), inp.text, inp.comment)
+      AST.InputSection(inp.declarations.map(translateDeclaration), inp.text)
     }
 
     def translateOutputSection(
         output: CST.OutputSection
     ): AST.OutputSection = {
-      AST.OutputSection(output.declarations.map(translateDeclaration), output.text, output.comment)
+      AST.OutputSection(output.declarations.map(translateDeclaration), output.text)
     }
 
     def translateCommandSection(
         cs: CST.CommandSection
     ): AST.CommandSection = {
-      AST.CommandSection(cs.parts.map(translateExpr), cs.text, cs.comment)
+      AST.CommandSection(cs.parts.map(translateExpr), cs.text)
     }
 
     def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
       AST.Declaration(decl.name,
                       translateType(decl.wdlType),
                       decl.expr.map(translateExpr),
-                      decl.text,
-                      decl.comment)
+                      decl.text)
     }
 
     def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.text, meta.comment)
+      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.text)
     }
 
     def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV),
-                               paramMeta.text,
-                               paramMeta.comment)
+      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text)
     }
 
     def translateRuntimeSection(
@@ -231,19 +224,18 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       var allIds = Set.empty[String]
       for (kv <- runtime.kvs) {
         if (allIds contains kv.id)
-          throw new SyntaxException(msg = s"key ${kv.id} defined twice in runtime section",
+          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
-                                    docSourceURL)
+                                    docSourceUrl)
         allIds = allIds + kv.id
       }
 
       AST.RuntimeSection(
           runtime.kvs.map {
-            case CST.RuntimeKV(id, expr, text, comment) =>
-              AST.RuntimeKV(id, translateExpr(expr), text, comment)
+            case CST.RuntimeKV(id, expr, text) =>
+              AST.RuntimeKV(id, translateExpr(expr), text)
           },
-          runtime.text,
-          runtime.comment
+          runtime.text
       )
     }
 
@@ -251,10 +243,10 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         elem: CST.WorkflowElement
     ): AST.WorkflowElement = {
       elem match {
-        case CST.Declaration(name, wdlType, expr, text, comment) =>
-          AST.Declaration(name, translateType(wdlType), expr.map(translateExpr), text, comment)
+        case CST.Declaration(name, wdlType, expr, text) =>
+          AST.Declaration(name, translateType(wdlType), expr.map(translateExpr), text)
 
-        case CST.Call(name, alias, inputs, text, comment) =>
+        case CST.Call(name, alias, inputs, text) =>
           AST.Call(
               name,
               alias.map {
@@ -262,24 +254,19 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
                   AST.CallAlias(callName, callText)
               },
               inputs.map {
-                case CST.CallInputs(inputsVec, inputsText) =>
-                  AST.CallInputs(inputsVec.map { inp =>
+                case CST.CallInputs(inputsMap, inputsText) =>
+                  AST.CallInputs(inputsMap.map { inp =>
                     AST.CallInput(inp.name, translateExpr(inp.expr), inp.text)
                   }, inputsText)
               },
-              text,
-              comment
+              text
           )
 
-        case CST.Scatter(identifier, expr, body, text, comment) =>
-          AST.Scatter(identifier,
-                      translateExpr(expr),
-                      body.map(translateWorkflowElement),
-                      text,
-                      comment)
+        case CST.Scatter(identifier, expr, body, text) =>
+          AST.Scatter(identifier, translateExpr(expr), body.map(translateWorkflowElement), text)
 
-        case CST.Conditional(expr, body, text, comment) =>
-          AST.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text, comment)
+        case CST.Conditional(expr, body, text) =>
+          AST.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text)
       }
     }
 
@@ -291,8 +278,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           wf.meta.map(translateMetaSection),
           wf.parameterMeta.map(translateParameterMetaSection),
           wf.body.map(translateWorkflowElement),
-          wf.text,
-          wf.comment
+          wf.text
       )
     }
 
@@ -300,8 +286,8 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       AST.TypeStruct(
           struct.name,
           struct.members.map {
-            case CST.StructMember(name, t, memberText, comment) =>
-              AST.StructMember(name, translateType(t), memberText, comment)
+            case CST.StructMember(name, t, memberText) =>
+              AST.StructMember(name, translateType(t), memberText)
           },
           struct.text
       )
@@ -309,7 +295,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
 
     def translateImportDoc(importDoc: CST.ImportDoc,
                            importedDoc: Option[AST.Document]): AST.ImportDoc = {
-      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.addr.text)
+      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.text)
       val nameAbst = importDoc.name.map {
         case CST.ImportName(value, text) => AST.ImportName(value, text)
       }
@@ -318,7 +304,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       }
 
       // Replace the original statement with a new one
-      AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text, importDoc.comment)
+      AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text)
     }
 
     def translateTask(task: CST.Task): AST.Task = {
@@ -331,8 +317,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
-          task.text,
-          task.comment
+          task.text
       )
     }
 
@@ -344,7 +329,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (opts.followImports) {
-            Some(followImport(getDocSourceURL(importDoc.addr.value)))
+            Some(followImport(getDocSourceUrl(importDoc.addr.value)))
           } else {
             None
           }
@@ -353,8 +338,8 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         case other                     => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
-      val version = AST.Version(doc.version.value, doc.version.text, None)
-      AST.Document(doc.docSourceURL, version, None, elems, aWf, doc.text, doc.comment)
+      val version = AST.Version(doc.version.value, doc.version.text)
+      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
     }
   }
 
@@ -372,8 +357,9 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
-    if (errorListener.hasErrors())
-      throw new SyntaxException(errorListener.getErrors())
+    if (errorListener.hasErrors) {
+      throw new SyntaxException(errorListener.getErrors)
+    }
     val translator = Translator(Some(sourceCode.url))
     translator.translateDocument(top)
   }

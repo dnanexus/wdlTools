@@ -2,24 +2,21 @@
 task wc {
   File inp_file
   # Just a random declaration
-  # with a multi-line comment
   Int i = 4 + 5
 
-  output {
+  output {  # comment after bracket
     # Int num_lines = read_int(stdout())
-    Int num_lines = 3
+    Int num_lines = 3  # end of line comment
   }
 
   command {
+    # this is inside the command and so not a WDL comment
     wc -l ${inp_file}
   }
 
   meta {
-    ## This is a pre-formatted
-    ## comment
-    # mixed with a regular comment
+    # The comment below is empty
     #
-    # that has an empty line
     author : "Robin Hood"
   }
 

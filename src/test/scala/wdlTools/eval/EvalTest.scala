@@ -42,7 +42,7 @@ class EvalTest extends FlatSpec with Matchers with Inside {
   }
 
   def parseAndTypeCheck(file: Path): (AST.Document, TypeContext) = {
-    val doc = parser.parseDocument(UUtil.pathToURL(file))
+    val doc = parser.parseDocument(UUtil.pathToUrl(file))
     val typeCtx = checker.apply(doc)
     (doc, typeCtx)
   }
@@ -54,14 +54,14 @@ class EvalTest extends FlatSpec with Matchers with Inside {
                          evalCfg,
                          typeCtx.structs,
                          wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getURL(file.toString)))
+                         Some(opts.getUrl(file.toString)))
 
     doc.workflow should not be empty
     val wf = doc.workflow.get
 
     val decls: Vector[AST.Declaration] = wf.body.collect {
       case x: AST.Declaration => x
-    }.toVector
+    }
 
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bindings = ctxEnd.bindings
@@ -101,72 +101,72 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bindings("name") shouldBe WV_String("Jay")
   }
 
-  it should "call stdlib" taggedAs (Edge) in {
+  it should "call stdlib" taggedAs Edge in {
     val file = srcDir.resolve("stdlib.wdl")
     val (doc, typeCtx) = parseAndTypeCheck(file)
     val evaluator = Eval(opts,
                          evalCfg,
                          typeCtx.structs,
                          wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getURL(file.toString)))
+                         Some(opts.getUrl(file.toString)))
 
     doc.workflow should not be empty
     val wf = doc.workflow.get
 
     val decls: Vector[AST.Declaration] = wf.body.collect {
       case x: AST.Declaration => x
-    }.toVector
+    }
 
     val ctx = Context(Map.empty).addBinding("empty_string", WV_Null)
     val ctxEnd = evaluator.applyDeclarations(decls, ctx)
     val bd = ctxEnd.bindings
 
-    bd("x") shouldBe (WV_Float(1.4))
-    bd("n1") shouldBe (WV_Int(1))
-    bd("n2") shouldBe (WV_Int(2))
-    bd("n3") shouldBe (WV_Int(1))
-    bd("cities2") shouldBe (WV_Array(
+    bd("x") shouldBe WV_Float(1.4)
+    bd("n1") shouldBe WV_Int(1)
+    bd("n2") shouldBe WV_Int(2)
+    bd("n3") shouldBe WV_Int(1)
+    bd("cities2") shouldBe WV_Array(
         Vector(WV_String("LA"), WV_String("Seattle"), WV_String("San Francisco"))
-    ))
+    )
 
-    bd("table2") shouldBe (WV_Array(
+    bd("table2") shouldBe WV_Array(
         Vector(
             WV_Array(Vector(WV_String("A"), WV_String("allow"))),
             WV_Array(Vector(WV_String("B"), WV_String("big"))),
             WV_Array(Vector(WV_String("C"), WV_String("clam")))
         )
-    ))
-    bd("m2") shouldBe (WV_Map(
+    )
+    bd("m2") shouldBe WV_Map(
         Map(WV_String("name") -> WV_String("hawk"), WV_String("kind") -> WV_String("bird"))
-    ))
+    )
 
     // sub
-    bd("sentence1") shouldBe (WV_String(
+    bd("sentence1") shouldBe WV_String(
         "She visited three places on his trip: Aa, Ab, C, D, and E"
-    ))
-    bd("sentence2") shouldBe (WV_String(
+    )
+    bd("sentence2") shouldBe WV_String(
         "He visited three places on his trip: Berlin, Berlin, C, D, and E"
-    ))
-    bd("sentence3") shouldBe (WV_String("H      : A, A, C, D,  E"))
+    )
+    bd("sentence3") shouldBe WV_String("H      : A, A, C, D,  E")
 
     // transpose
-    bd("ar3") shouldBe (WV_Array(Vector(WV_Int(0), WV_Int(1), WV_Int(2))))
-    bd("ar_ar2") shouldBe (WV_Array(
+    bd("ar3") shouldBe WV_Array(Vector(WV_Int(0), WV_Int(1), WV_Int(2)))
+    bd("ar_ar2") shouldBe WV_Array(
         Vector(
             WV_Array(Vector(WV_Int(1), WV_Int(4))),
             WV_Array(Vector(WV_Int(2), WV_Int(5))),
             WV_Array(Vector(WV_Int(3), WV_Int(6)))
         )
-    ))
+    )
 
     // zip
-    bd("zlf") shouldBe (WV_Array(
+    bd("zlf") shouldBe WV_Array(
         Vector(
             WV_Pair(WV_String("A"), WV_Boolean(true)),
             WV_Pair(WV_String("B"), WV_Boolean(false)),
             WV_Pair(WV_String("C"), WV_Boolean(true))
         )
-    ))
+    )
 
     // cross
     inside(bd("cln")) {
@@ -179,14 +179,11 @@ class EvalTest extends FlatSpec with Matchers with Inside {
             WV_Pair(WV_String("A"), WV_Int(13)),
             WV_Pair(WV_String("B"), WV_Int(13)),
             WV_Pair(WV_String("C"), WV_Int(13))
-        ).foreach {
-          case pair =>
-            vec contains pair
-        }
+        ).foreach(pair => vec contains pair)
     }
 
-    bd("l1") shouldBe (WV_Int(2))
-    bd("l2") shouldBe (WV_Int(6))
+    bd("l1") shouldBe WV_Int(2)
+    bd("l2") shouldBe WV_Int(6)
 
     bd("files2") shouldBe WV_Array(
         Vector(WV_File("A"), WV_File("B"), WV_File("C"), WV_File("G"), WV_File("J"), WV_File("K"))
@@ -236,32 +233,32 @@ class EvalTest extends FlatSpec with Matchers with Inside {
                          evalCfg,
                          typeCtx.structs,
                          wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getURL(file.toString)))
+                         Some(opts.getUrl(file.toString)))
 
     doc.workflow should not be empty
     val wf = doc.workflow.get
 
     val decls: Vector[AST.Declaration] = wf.body.collect {
       case x: AST.Declaration => x
-    }.toVector
+    }
 
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bd = ctxEnd.bindings
 
-    bd("i1") shouldBe (WV_Int(13))
-    bd("i2") shouldBe (WV_Int(13))
-    bd("i3") shouldBe (WV_Int(8))
+    bd("i1") shouldBe WV_Int(13)
+    bd("i2") shouldBe WV_Int(13)
+    bd("i3") shouldBe WV_Int(8)
 
-    bd("x1") shouldBe (WV_Float(3))
-    bd("x2") shouldBe (WV_Float(13))
-    bd("x3") shouldBe (WV_Float(44.3))
-    bd("x4") shouldBe (WV_Float(44.3))
-    bd("x5") shouldBe (WV_Float(4.5))
+    bd("x1") shouldBe WV_Float(3)
+    bd("x2") shouldBe WV_Float(13)
+    bd("x3") shouldBe WV_Float(44.3)
+    bd("x4") shouldBe WV_Float(44.3)
+    bd("x5") shouldBe WV_Float(4.5)
 
-    bd("s1") shouldBe (WV_String("true"))
-    bd("s2") shouldBe (WV_String("3"))
-    bd("s3") shouldBe (WV_String("4.3"))
-    bd("s4") shouldBe (WV_String("hello"))
-    bd("s5") shouldBe (WV_Optional(WV_String("hello")))
+    bd("s1") shouldBe WV_String("true")
+    bd("s2") shouldBe WV_String("3")
+    bd("s3") shouldBe WV_String("4.3")
+    bd("s4") shouldBe WV_String("hello")
+    bd("s5") shouldBe WV_Optional(WV_String("hello"))
   }
 }

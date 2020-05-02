@@ -42,7 +42,6 @@ OBJECT_LITERAL: 'object';
 SEP: 'sep';
 DEFAULT: 'default';
 
-
 // Primitive Literals
 IntLiteral
 	: Digits
@@ -90,9 +89,7 @@ MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
 
-WHITESPACE
-	: [ \t\r\n]+ -> channel(HIDDEN)
-	;
+WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
 Identifier: CompleteIdentifier;
 
@@ -147,7 +144,6 @@ VERSION_WHITESPACE
 	: [ \t]+ -> channel(HIDDEN)
 	;
 RELEASE_VERSION: [a-zA-Z0-9.-]+ -> popMode;
-
 
 // Fragments
 

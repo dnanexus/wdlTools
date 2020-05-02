@@ -7,6 +7,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 
 import collection.JavaConverters._
 import org.antlr.v4.runtime.{
+  BaseErrorListener,
   BufferedTokenStream,
   CharStream,
   CodePointBuffer,
@@ -15,6 +16,8 @@ import org.antlr.v4.runtime.{
   Lexer,
   Parser,
   ParserRuleContext,
+  RecognitionException,
+  Recognizer,
   Token
 }
 import wdlTools.syntax
@@ -41,15 +44,79 @@ object Antlr4Util {
     getTextSource(symbol.getSymbol, None)
   }
 
+  // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
+  //
+  case class WdlAggregatingErrorListener(docSourceUrl: Option[URL]) extends BaseErrorListener {
+
+    private var errors = Vector.empty[SyntaxError]
+
+    // This is called by the antlr grammar during parsing.
+    // We collect these errors in a list, and report collectively
+    // when parsing is complete.
+    override def syntaxError(recognizer: Recognizer[_, _],
+                             offendingSymbol: Any,
+                             line: Int,
+                             charPositionInLine: Int,
+                             msg: String,
+                             e: RecognitionException): Unit = {
+      val symbolText =
+        offendingSymbol match {
+          case tok: Token =>
+            tok.getText
+          case _ =>
+            offendingSymbol.toString
+        }
+      val err = SyntaxError(docSourceUrl, symbolText, line, charPositionInLine, msg)
+      errors = errors :+ err
+    }
+
+    def getErrors: Vector[SyntaxError] = errors
+
+    def hasErrors: Boolean = errors.nonEmpty
+  }
+
+  case class CommentListener(tokenStream: BufferedTokenStream,
+                             channelIndex: Int,
+                             docSourceUrl: Option[URL] = None,
+                             comments: mutable.Map[Int, Comment] = mutable.HashMap.empty)
+      extends AllParseTreeListener {
+    def addComments(tokens: Vector[Token]): Unit = {
+      tokens.foreach { tok =>
+        val source = Antlr4Util.getTextSource(tok, None)
+        if (comments.contains(source.line)) {
+          // TODO: should this be an error?
+        } else {
+          comments(source.line) = Comment(tok.getText, source)
+        }
+      }
+    }
+
+    override def exitEveryRule(ctx: ParserRuleContext): Unit = {
+      // full-line comments
+      if (ctx.getStart != null && ctx.getStart.getTokenIndex >= 0) {
+        val beforeComments =
+          tokenStream.getHiddenTokensToLeft(ctx.getStart.getTokenIndex, channelIndex)
+        if (beforeComments != null) {
+          addComments(beforeComments.asScala.toVector)
+        }
+      }
+      // line-end comments
+      if (ctx.getStop != null && ctx.getStop.getTokenIndex >= 0) {
+        val afterComments =
+          tokenStream.getHiddenTokensToRight(ctx.getStop.getTokenIndex, channelIndex)
+        if (afterComments != null) {
+          addComments(afterComments.asScala.toVector)
+        }
+      }
+    }
+  }
+
   case class Grammar[L <: Lexer, P <: Parser](lexer: L,
                                               parser: P,
                                               errListener: WdlAggregatingErrorListener,
-                                              commentChannelName: String,
-                                              docSourceURL: Option[URL] = None,
+                                              comments: mutable.Map[Int, Comment],
+                                              docSourceUrl: Option[URL] = None,
                                               opts: Options) {
-    val commentChannel: Int = lexer.getChannelNames.indexOf(commentChannelName)
-    require(commentChannel > 0)
-
     def verify(): Unit = {
       // check if any errors were found
       val errors: Vector[SyntaxError] = errListener.getErrors
@@ -62,71 +129,6 @@ object Antlr4Util {
         throw new Exception(s"${errors.size} syntax errors were found, stopping")
       }
     }
-
-    def getComment(ctx: ParserRuleContext, before: Boolean = true): Option[Comment] = {
-      val start = ctx.getStart
-      val idx = start.getTokenIndex
-      if (idx >= 0) {
-        val tokenStream = parser.getTokenStream.asInstanceOf[BufferedTokenStream]
-        val commentTokens = if (before) {
-          tokenStream.getHiddenTokensToLeft(idx, commentChannel)
-        } else {
-          tokenStream.getHiddenTokensToRight(idx, commentChannel)
-        }
-        if (commentTokens != null) {
-          val comments: mutable.Buffer[Comment] = mutable.ArrayBuffer.empty
-          val currentComment: mutable.Buffer[String] = mutable.ArrayBuffer.empty
-          var preformatted: Boolean = false
-          val lines = commentTokens.asScala.map(_.getText).toVector
-          lines.foreach { line =>
-            if (line.startsWith("##")) {
-              // handle pre-formatted comment line
-              if (!preformatted) {
-                if (currentComment.nonEmpty) {
-                  comments.append(CommentLine(currentComment.mkString(" ")))
-                  currentComment.clear()
-                }
-                preformatted = true
-              }
-              currentComment.append(line.substring(2).trim)
-            } else {
-              // handle regular comment line
-              val trimmed = line.substring(1).trim
-              if (preformatted) {
-                if (currentComment.nonEmpty) {
-                  comments.append(CommentPreformatted(currentComment.toVector))
-                  currentComment.clear()
-                }
-                preformatted = false
-              }
-              if (trimmed.isEmpty) {
-                if (currentComment.nonEmpty) {
-                  comments.append(CommentLine(currentComment.mkString(" ")))
-                  currentComment.clear()
-                }
-                comments.append(CommentEmpty())
-              } else {
-                currentComment.append(trimmed)
-              }
-            }
-          }
-          if (currentComment.nonEmpty) {
-            // handle final comment line
-            if (preformatted) {
-              comments.append(CommentPreformatted(currentComment.toVector))
-            } else {
-              comments.append(CommentLine(currentComment.mkString(" ")))
-            }
-          }
-          return Some(if (comments.size > 1) {
-            CommentCompound(comments.toVector)
-          } else {
-            comments.head
-          })
-        }
-      }
-      None
-    }
   }
 
   abstract class GrammarFactory[L <: Lexer, P <: Parser](opts: Options,
@@ -135,14 +137,14 @@ object Antlr4Util {
       createGrammar(sourceCode.toString, Some(sourceCode.url))
     }
 
-    def createGrammar(inp: String, docSourceURL: Option[URL] = None): Grammar[L, P] = {
+    def createGrammar(inp: String, docSourceUrl: Option[URL] = None): Grammar[L, P] = {
       val codePointBuffer: CodePointBuffer =
         CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
       val lexer: L = createLexer(CodePointCharStream.fromBuffer(codePointBuffer))
       val parser: P = createParser(new CommonTokenStream(lexer))
 
       // setting up our own error handling
-      val errListener = new WdlAggregatingErrorListener(docSourceURL)
+      val errListener = WdlAggregatingErrorListener(docSourceUrl)
       lexer.removeErrorListeners()
       lexer.addErrorListener(errListener)
       parser.removeErrorListeners()
@@ -152,7 +154,18 @@ object Antlr4Util {
         parser.setTrace(true)
       }
 
-      Grammar(lexer, parser, errListener, commentChannelName, docSourceURL, opts)
+      val comments: mutable.Map[Int, Comment] = mutable.HashMap.empty
+
+      parser.addParseListener(
+          CommentListener(
+              parser.getTokenStream.asInstanceOf[BufferedTokenStream],
+              lexer.getChannelNames.indexOf(commentChannelName),
+              docSourceUrl,
+              comments
+          )
+      )
+
+      Grammar(lexer, parser, errListener, comments, docSourceUrl, opts)
     }
 
     def createLexer(charStream: CharStream): L

@@ -1,6 +1,6 @@
 package wdlTools.util
 
-import java.io.IOException
+import java.io.{FileNotFoundException, IOException}
 
 import collection.JavaConverters._
 import java.net.URL
@@ -8,7 +8,6 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
-
 import Verbosity._
 
 object Util {
@@ -22,7 +21,7 @@ object Util {
     config.getString("wdlTools.version")
   }
 
-  def getURL(pathOrUrl: String,
+  def getUrl(pathOrUrl: String,
              searchPath: Vector[Path] = Vector.empty,
              mustExist: Boolean = true): URL = {
     if (pathOrUrl.contains("://")) {
@@ -39,8 +38,8 @@ object Util {
       } else None
       val result = resolved.getOrElse {
         if (mustExist) {
-          throw new Exception(
-              s"Could not resolve path or URL ${pathOrUrl} in search path ${searchPath}"
+          throw new FileNotFoundException(
+              s"Could not resolve path or URL ${pathOrUrl} in search path [${searchPath.mkString(",")}]"
           )
         } else {
           path
@@ -50,7 +49,7 @@ object Util {
     }
   }
 
-  def pathToURL(path: Path): URL = {
+  def pathToUrl(path: Path): URL = {
     path.toUri.toURL
   }
 
@@ -269,5 +268,12 @@ object Util {
   }
 
   // ignore a value without causing a compilation error
+  // TODO: log this if antlr4Trace is turned on
   def ignore[A](x: A): Unit = {}
+
+  /**
+    * A wrapper around a primitive that enables passing a mutable variable by reference.
+    * @param value the flag value
+    */
+  case class MutableHolder[T](var value: T)
 }

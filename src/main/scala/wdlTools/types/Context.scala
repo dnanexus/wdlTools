@@ -9,7 +9,7 @@ import wdlTools.types.WdlTypes._
 //
 // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
 // An additional variable holds a list of all imported namespaces.
-case class Context(docSourceURL: Option[URL] = None,
+case class Context(docSourceUrl: Option[URL] = None,
                    declarations: Map[String, WT] = Map.empty,
                    structs: Map[String, WT_Struct] = Map.empty,
                    callables: Map[String, WT_Callable] = Map.empty,
@@ -22,7 +22,7 @@ case class Context(docSourceURL: Option[URL] = None,
       case Some(_) =>
         throw new TypeException(s"variable ${varName} shadows an existing variable",
                                 srcText,
-                                docSourceURL)
+                                docSourceUrl)
     }
   }
 
@@ -31,7 +31,7 @@ case class Context(docSourceURL: Option[URL] = None,
       case None =>
         this.copy(structs = structs + (s.name -> s))
       case Some(_) =>
-        throw new TypeException(s"struct ${s.name} is already declared", srcText, docSourceURL)
+        throw new TypeException(s"struct ${s.name} is already declared", srcText, docSourceUrl)
     }
   }
 
@@ -43,7 +43,7 @@ case class Context(docSourceURL: Option[URL] = None,
       case Some(_) =>
         throw new TypeException(s"a callable named ${callable.name} is already declared",
                                 srcText,
-                                docSourceURL)
+                                docSourceUrl)
     }
   }
 
@@ -53,7 +53,7 @@ case class Context(docSourceURL: Option[URL] = None,
     val newVarNames = bindings.keys.toSet
     val both = existingVarNames intersect newVarNames
     if (both.nonEmpty)
-      throw new TypeException(s"Variables ${both} are being redeclared", srcText, docSourceURL)
+      throw new TypeException(s"Variables ${both} are being redeclared", srcText, docSourceUrl)
     this.copy(declarations = declarations ++ bindings)
   }
 
@@ -74,7 +74,7 @@ case class Context(docSourceURL: Option[URL] = None,
                       aliases: Vector[ImportAlias],
                       srcText: TextSource): Context = {
     if (this.namespaces contains namespace)
-      throw new TypeException(s"namespace ${namespace} already exists", srcText, iCtx.docSourceURL)
+      throw new TypeException(s"namespace ${namespace} already exists", srcText, iCtx.docSourceUrl)
 
     // There cannot be any collisions because this is a new namespace
     val iCallables = iCtx.callables.map {
@@ -112,7 +112,7 @@ case class Context(docSourceURL: Option[URL] = None,
       if (this.structs(sname) != iStructs(sname))
         throw new TypeException(s"Struct ${sname} is already defined in a different way",
                                 srcText,
-                                iCtx.docSourceURL)
+                                iCtx.docSourceUrl)
     }
 
     this.copy(structs = structs ++ iStructs,

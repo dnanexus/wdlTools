@@ -16,12 +16,12 @@ class BaseTest extends FlatSpec with Matchers {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
-  private def getWdlURL(fname: String, subdir: String): URL = {
-    Util.pathToURL(getWdlPath(fname, subdir))
+  private def getWdlUrl(fname: String, subdir: String): URL = {
+    Util.pathToUrl(getWdlPath(fname, subdir))
   }
 
   it should "handle the runtime section correctly" in {
-    val doc = parser.parseDocument(getWdlURL(fname = "simple.wdl", subdir = "after"))
+    val doc = parser.parseDocument(getWdlUrl(fname = "simple.wdl", subdir = "after"))
     doc.version.value shouldBe WdlVersion.V1
   }
 
@@ -30,7 +30,7 @@ class BaseTest extends FlatSpec with Matchers {
   }
 
   it should "reformat simple WDL" in {
-    val beforeURL = getWdlURL(fname = "simple.wdl", subdir = "before")
+    val beforeURL = getWdlUrl(fname = "simple.wdl", subdir = "before")
     val expected = getWdlSource(fname = "simple.wdl", subdir = "after")
     val formatter = WdlV1Formatter(opts)
     formatter.formatDocuments(beforeURL)

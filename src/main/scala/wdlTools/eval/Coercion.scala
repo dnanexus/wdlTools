@@ -5,14 +5,14 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
 import wdlTools.types.WdlTypes
 
-case class Coercion(docSourceURL: Option[URL]) {
+case class Coercion(docSourceUrl: Option[URL]) {
 
   private def coerceToStruct(structName: String,
                              memberDefs: Map[String, WdlTypes.WT],
                              members: Map[String, WV],
                              text: TextSource): WV_Struct = {
     if (memberDefs.keys.toSet != members.keys.toSet)
-      throw new EvalException(s"struct ${structName} has wrong fields", text, docSourceURL)
+      throw new EvalException(s"struct ${structName} has wrong fields", text, docSourceUrl)
 
     // TODO: coerce the members to the right types
     WV_Struct(structName, members)
@@ -32,11 +32,11 @@ case class Coercion(docSourceURL: Option[URL]) {
             case _: NumberFormatException =>
               throw new EvalException(s"string ${s} cannot be converted into an integer",
                                       text,
-                                      docSourceURL)
+                                      docSourceUrl)
           }
         WV_Int(n)
       case (WdlTypes.WT_Float, WV_Int(n))   => WV_Float(n.toFloat)
-      case (WdlTypes.WT_Float, WV_Float(x)) => value
+      case (WdlTypes.WT_Float, WV_Float(_)) => value
       case (WdlTypes.WT_Float, WV_String(s)) =>
         val x =
           try {
@@ -45,7 +45,7 @@ case class Coercion(docSourceURL: Option[URL]) {
             case _: NumberFormatException =>
               throw new EvalException(s"string ${s} cannot be converted into an integer",
                                       text,
-                                      docSourceURL)
+                                      docSourceUrl)
           }
         WV_Float(x)
       case (WdlTypes.WT_String, WV_Boolean(b)) => WV_String(b.toString)
@@ -84,7 +84,7 @@ case class Coercion(docSourceURL: Option[URL]) {
         if (name1 != name2)
           throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}",
                                   text,
-                                  docSourceURL)
+                                  docSourceUrl)
         value
 
       // cast of an object to a struct. I think this is legal.
@@ -98,7 +98,7 @@ case class Coercion(docSourceURL: Option[URL]) {
           case (other, _) =>
             throw new EvalException(s"${other} has to be a string for this to be a struct",
                                     text,
-                                    docSourceURL)
+                                    docSourceUrl)
         }
         coerceToStruct(name, memberDefs, members2, text)
 
@@ -107,7 +107,7 @@ case class Coercion(docSourceURL: Option[URL]) {
       case (t, other) =>
         throw new EvalException(s"value ${other} cannot be coerced to type ${t}",
                                 text,
-                                docSourceURL)
+                                docSourceUrl)
     }
   }
 }
