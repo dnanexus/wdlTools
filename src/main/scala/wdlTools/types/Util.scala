@@ -102,6 +102,10 @@ case class Util(conf: Options) {
       // base case, primitive types
       case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
         (x, ctx)
+      case (WT_Any, WT_Any) => (WT_Any, ctx)
+      case (x, WT_Any) => (x, ctx)
+      case (WT_Any, x) => (x, ctx)
+
       case (WT_Object, WT_Object)    => (WT_Object, ctx)
       case (WT_Object, _: WT_Struct) => (WT_Object, ctx)
 
@@ -223,6 +227,7 @@ case class Util(conf: Options) {
         case WT_Map(k, v)      => WT_Map(sub(k), sub(v))
         case WT_Object         => WT_Object
         case WT_Optional(t1)   => WT_Optional(sub(t1))
+        case WT_Any            => WT_Any
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
                                   srcText,

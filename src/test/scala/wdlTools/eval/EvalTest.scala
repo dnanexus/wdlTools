@@ -213,6 +213,20 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bd("path3") shouldBe WV_String("docs.md")
     bd("path4") shouldBe WV_String("C")
     bd("path5") shouldBe WV_String("C.txt")
+
+    // read/write object
+    val obj1 = WV_Object(Map("author" -> WV_String("Benjamin"),
+                             "year" -> WV_String("1973"),
+                             "title" -> WV_String("Color the sky green")))
+    val obj2 = WV_Object(Map("author" -> WV_String("Primo Levy"),
+                             "year" -> WV_String("1975"),
+                             "title" -> WV_String("The Periodic Table")))
+    bd("o2") shouldBe obj1
+    bd("arObj") shouldBe WV_Array(Vector(obj1, obj2))
+    bd("houseObj") shouldBe WV_Object(Map("city" -> WV_String("Seattle"),
+                                          "team" -> WV_String("Trail Blazers"),
+                                          "zipcode" -> WV_Int(98109)))
+
   }
 
   it should "perform coercions" in {

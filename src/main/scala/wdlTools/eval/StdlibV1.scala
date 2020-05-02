@@ -2,6 +2,7 @@ package wdlTools.eval
 
 import java.net.URL
 import java.nio.file.{Path, Paths}
+import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
 import wdlTools.util.{EvalConfig, Options}
@@ -186,8 +187,17 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   }
 
   // mixed read_json(String|File)
-  private def read_json(args: Vector[WV], text: TextSource): WV_Object =
-    throw new EvalException("not implemented", text, docSourceURL)
+  private def read_json(args: Vector[WV], text: TextSource): WV = {
+    val file = getWdlFile(args, text)
+    val content = iosp.readFile(file.value)
+    try {
+      Serialize.fromJson(content.parseJson)
+    } catch {
+      case e : JsonSerializationException =>
+        throw new EvalException(e.getMessage, text, docSourceURL)
+    }
+  }
+
 
   // Int read_int(String|File)
   //
@@ -301,7 +311,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
 
   private def lineFromObject(obj : WV_Object, text : TextSource) : String = {
     obj.members.values.map { vw =>
-      coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String]
+      coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String].value
     }.mkString("\t")
   }
 
@@ -347,7 +357,17 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceURL: Option[URL
   }
 
   private def write_json(args: Vector[WV], text: TextSource): WV_File = {
-    throw new EvalException("write_json: not implemented", text, docSourceURL)
+    assert(args.size == 1)
+    val jsv =
+      try {
+        Serialize.toJson(args.head)
+      } catch {
+        case e : JsonSerializationException =>
+          throw new EvalException(e.getMessage, text, docSourceURL)
+      }
+    val tmpFile: Path = iosp.mkTempFile()
+    iosp.writeFile(tmpFile, jsv.prettyPrint)
+    WV_File(tmpFile.toString)
   }
 
   // Our size implementation is a little bit more general than strictly necessary.
