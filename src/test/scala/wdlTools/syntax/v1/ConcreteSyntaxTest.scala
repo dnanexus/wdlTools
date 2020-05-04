@@ -600,4 +600,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
       getDocument(getWorkflowSource("extra_comma.wdl"))
     }
   }
+
+  it should "report bad types"  taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("bad_type.wdl"))
+    }
+  }
 }

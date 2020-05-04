@@ -127,12 +127,14 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlV1Parser.Wdl_typeContext): Type = {
+    if (ctx.type_base == null)
+      throw new SyntaxException("bad type", getTextSource(ctx), docSourceUrl)
     val t = visitType_base(ctx.type_base())
-    if (ctx.OPTIONAL() != null) {
-      TypeOptional(t, getTextSource(ctx))
-    } else {
-      t
-    }
+      if (ctx.OPTIONAL() != null) {
+        TypeOptional(t, getTextSource(ctx))
+      } else {
+        t
+      }
   }
 
   // EXPRESSIONS
