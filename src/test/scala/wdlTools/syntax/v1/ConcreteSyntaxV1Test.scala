@@ -1,23 +1,24 @@
-package wdlTools.syntax.draft_2
+package wdlTools.syntax.v1
 
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Comment, Edge, TextSource}
-import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.util.Verbosity.Quiet
+import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource, WdlVersion}
+import wdlTools.syntax.v1.ConcreteSyntax._
+import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
 
-class ConcreteSyntaxTest extends FlatSpec with Matchers {
-  private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
+class ConcreteSyntaxV1Test extends FlatSpec with Matchers {
+  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
+  private val structsDir = sourcePath.resolve("structs")
   private val opts = Options(
       antlr4Trace = false,
       verbosity = Quiet,
-      localDirectories = Vector(tasksDir, workflowsDir)
+      localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
-  private val grammarFactory = WdlDraft2GrammarFactory(opts)
+  private val grammarFactory = WdlV1GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
     SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
@@ -25,6 +26,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
 
   private def getWorkflowSource(fname: String): SourceCode = {
     SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
+  }
+
+  private def getStructSource(fname: String): SourceCode = {
+    SourceCode.loadFrom(Util.pathToUrl(structsDir.resolve(fname)))
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
@@ -83,27 +88,84 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle types and expressions" in {
     val doc = getDocument(getTaskSource("expressions.wdl"))
 
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    task.input.get.declarations(0) should matchPattern {
+    task.declarations(0) should matchPattern {
       case Declaration("i", _: TypeInt, Some(ExprInt(3, _)), _) =>
     }
-    task.input.get.declarations(1) should matchPattern {
+    task.declarations(1) should matchPattern {
       case Declaration("s", _: TypeString, Some(ExprString("hello world", _)), _) =>
     }
-    task.input.get.declarations(2) should matchPattern {
+    task.declarations(2) should matchPattern {
       case Declaration("x", _: TypeFloat, Some(ExprFloat(4.3, _)), _) =>
     }
-    task.input.get.declarations(3) should matchPattern {
+    task.declarations(3) should matchPattern {
       case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt", _)), _) =>
     }
-    task.input.get.declarations(4) should matchPattern {
+    task.declarations(4) should matchPattern {
       case Declaration("b", _: TypeBoolean, Some(ExprBoolean(false, _)), _) =>
     }
-    task.input.get.declarations(5) should matchPattern {
+
+    // Logical expressions
+    task.declarations(5) should matchPattern {
+      case Declaration("b2",
+                       _: TypeBoolean,
+                       Some(ExprLor(ExprBoolean(true, _), ExprBoolean(false, _), _)),
+                       _) =>
+    }
+    task.declarations(6) should matchPattern {
+      case Declaration("b3",
+                       _: TypeBoolean,
+                       Some(ExprLand(ExprBoolean(true, _), ExprBoolean(false, _), _)),
+                       _) =>
+    }
+    task.declarations(7) should matchPattern {
+      case Declaration("b4", _: TypeBoolean, Some(ExprEqeq(ExprInt(3, _), ExprInt(5, _), _)), _) =>
+    }
+    task.declarations(8) should matchPattern {
+      case Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+    }
+    task.declarations(9) should matchPattern {
+      case Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+    }
+    task.declarations(10) should matchPattern {
+      case Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+    }
+    task.declarations(11) should matchPattern {
+      case Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+    }
+    task.declarations(12) should matchPattern {
+      case Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+    }
+    task.declarations(13) should matchPattern {
+      case Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2", _), _)), _) =>
+    }
+
+    // Arithmetic
+    task.declarations(14) should matchPattern {
+      case Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+    }
+    task.declarations(15) should matchPattern {
+      case Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4, _), ExprInt(10, _), _)), _) =>
+    }
+    task.declarations(16) should matchPattern {
+      case Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10, _), ExprInt(7, _), _)), _) =>
+    }
+    task.declarations(17) should matchPattern {
+      case Declaration("j3", _: TypeInt, Some(ExprIdentifier("j", _)), _) =>
+    }
+    task.declarations(18) should matchPattern {
+      case Declaration("j4",
+                       _: TypeInt,
+                       Some(ExprAdd(ExprIdentifier("j", _), ExprInt(19, _), _)),
+                       _) =>
+    }
+
+    task.declarations(19) should matchPattern {
       case Declaration(
           "ia",
           TypeArray(_: TypeInt, false, _),
@@ -111,91 +173,19 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
           _
           ) =>
     }
-    task.input.get.declarations(6) should matchPattern {
+    task.declarations(20) should matchPattern {
       case Declaration("ia",
                        TypeArray(_: TypeInt, true, _),
                        Some(ExprArrayLiteral(Vector(ExprInt(10, _)), _)),
                        _) =>
     }
-    task.input.get.declarations(7) should matchPattern {
-      case Declaration("m", TypeMap(TypeInt(_), TypeString(_), _), Some(ExprMapLiteral(_, _)), _) =>
-    }
-    task.input.get.declarations(8) should matchPattern {
-      case Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_, _)), _) =>
-    }
-    /*(Map("A" -> ExprInt(1, _),
-     "B" -> ExprInt(2, _,
-     _))), _)) */
-
-    task.input.get.declarations(9) should matchPattern {
-      case Declaration("twenty_threes",
-                       TypePair(TypeInt(_), TypeString(_), _),
-                       Some(ExprPair(ExprInt(23, _), ExprString("twenty-three", _), _)),
-                       _) =>
-    }
-
-    // Logical expressions
-    task.declarations(0) should matchPattern {
-      case Declaration("b2",
-                       _: TypeBoolean,
-                       Some(ExprLor(ExprBoolean(true, _), ExprBoolean(false, _), _)),
-                       _) =>
-    }
-    task.declarations(1) should matchPattern {
-      case Declaration("b3",
-                       _: TypeBoolean,
-                       Some(ExprLand(ExprBoolean(true, _), ExprBoolean(false, _), _)),
-                       _) =>
-    }
-    task.declarations(2) should matchPattern {
-      case Declaration("b4", _: TypeBoolean, Some(ExprEqeq(ExprInt(3, _), ExprInt(5, _), _)), _) =>
-    }
-    task.declarations(3) should matchPattern {
-      case Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4, _), ExprInt(5, _), _)), _) =>
-    }
-    task.declarations(4) should matchPattern {
-      case Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4, _), ExprInt(5, _), _)), _) =>
-    }
-    task.declarations(5) should matchPattern {
-      case Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6, _), ExprInt(7, _), _)), _) =>
-    }
-    task.declarations(6) should matchPattern {
-      case Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6, _), ExprInt(7, _), _)), _) =>
-    }
-    task.declarations(7) should matchPattern {
-      case Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6, _), ExprInt(7, _), _)), _) =>
-    }
-    task.declarations(8) should matchPattern {
-      case Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2", _), _)), _) =>
-    }
-
-    // Arithmetic
-    task.declarations(9) should matchPattern {
-      case Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _) =>
-    }
-    task.declarations(10) should matchPattern {
-      case Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4, _), ExprInt(10, _), _)), _) =>
-    }
-    task.declarations(11) should matchPattern {
-      case Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10, _), ExprInt(7, _), _)), _) =>
-    }
-    task.declarations(12) should matchPattern {
-      case Declaration("j3", _: TypeInt, Some(ExprIdentifier("j", _)), _) =>
-    }
-    task.declarations(13) should matchPattern {
-      case Declaration("j4",
-                       _: TypeInt,
-                       Some(ExprAdd(ExprIdentifier("j", _), ExprInt(19, _), _)),
-                       _) =>
-    }
-
-    task.declarations(14) should matchPattern {
+    task.declarations(21) should matchPattern {
       case Declaration("k",
                        _: TypeInt,
                        Some(ExprAt(ExprIdentifier("ia", _), ExprInt(3, _), _)),
                        _) =>
     }
-    task.declarations(15) should matchPattern {
+    task.declarations(22) should matchPattern {
       case Declaration(
           "k2",
           _: TypeInt,
@@ -204,53 +194,73 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
           ) =>
     }
 
+    task.declarations(23) should matchPattern {
+      case Declaration("m", TypeMap(TypeInt(_), TypeString(_), _), Some(ExprMapLiteral(_, _)), _) =>
+    }
     /*    val m = task.declarations(23).expr
     m should matchPattern {
       case Map(ExprInt(1, _) -> ExprString("a", _),
                                       ExprInt(2, _) -> ExprString("b", _)),
     _)),*/
 
-    task.declarations(16) should matchPattern {
+    task.declarations(24) should matchPattern {
       case Declaration("k3",
                        _: TypeInt,
                        Some(ExprIfThenElse(ExprBoolean(true, _), ExprInt(1, _), ExprInt(2, _), _)),
                        _) =>
     }
-    task.declarations(17) should matchPattern {
+    task.declarations(25) should matchPattern {
       case Declaration("k4", _: TypeInt, Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
+    }
+
+    task.declarations(26) should matchPattern {
+      case Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_, _)), _) =>
+    }
+    /*(Map("A" -> ExprInt(1, _),
+     "B" -> ExprInt(2, _,
+     _))), _)) */
+
+    task.declarations(27) should matchPattern {
+      case Declaration("twenty_threes",
+                       TypePair(TypeInt(_), TypeString(_), _),
+                       Some(ExprPair(ExprInt(23, _), ExprString("twenty-three", _), _)),
+                       _) =>
     }
   }
 
   it should "handle get name" in {
     val doc = getDocument(getTaskSource("get_name_bug.wdl"))
 
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
     task.name shouldBe "district"
-    task.declarations(0) should matchPattern {
-      case Declaration("k", TypeInt(_), Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
-    }
+    task.input shouldBe None
     task.output shouldBe None
     task.command should matchPattern {
       case CommandSection(Vector(), _) =>
     }
     task.meta shouldBe None
     task.parameterMeta shouldBe None
+
+    task.declarations(0) should matchPattern {
+      case Declaration("k", TypeInt(_), Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
+    }
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = opts.copy(verbosity = Quiet)
     assertThrows[Exception] {
-      getDocument(getTaskSource("wrong_comment_style.wdl"), confQuiet)
+      getDocument(getTaskSource("wrong_comment_style.wdl"))
     }
   }
 
   it should "parse a task with an output section only" in {
     val doc = getDocument(getTaskSource("output_section.wdl"))
 
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -268,25 +278,26 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     doc.comments(1) should matchPattern {
       case Comment("# A task that counts how many lines a file has", TextSource(1, 0, 1, 46)) =>
     }
-    doc.comments(4) should matchPattern {
-      case Comment("# Just a random declaration", TextSource(4, 2, 4, 29)) =>
-    }
-    doc.comments(7) should matchPattern {
-      case Comment("# comment after bracket", TextSource(7, 12, 7, 35)) =>
-    }
     doc.comments(8) should matchPattern {
-      case Comment("# Int num_lines = read_int(stdout())", TextSource(8, 4, 8, 40)) =>
+      case Comment("# Just a random declaration", TextSource(8, 2, 8, 29)) =>
     }
-    doc.comments(9) should matchPattern {
-      case Comment("# end of line comment", TextSource(9, 23, 9, 44)) =>
+    doc.comments(11) should matchPattern {
+      case Comment("# comment after bracket", TextSource(11, 12, 11, 35)) =>
     }
-    doc.comments(18) should matchPattern {
-      case Comment("# The comment below is empty", TextSource(18, 4, 18, 32)) =>
+    doc.comments(12) should matchPattern {
+      case Comment("# Int num_lines = read_int(stdout())", TextSource(12, 4, 12, 40)) =>
     }
-    doc.comments(19) should matchPattern {
-      case Comment("#", TextSource(19, 4, 19, 5)) =>
+    doc.comments(13) should matchPattern {
+      case Comment("# end-of-line comment", TextSource(13, 23, 13, 44)) =>
+    }
+    doc.comments(20) should matchPattern {
+      case Comment("# The comment below is empty", TextSource(20, 4, 20, 32)) =>
+    }
+    doc.comments(21) should matchPattern {
+      case Comment("#", TextSource(21, 4, 21, 5)) =>
     }
 
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -295,11 +306,6 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.name shouldBe "wc"
     task.input.get should matchPattern {
       case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _)), _) =>
-    }
-    task.declarations should matchPattern {
-      case Vector(
-          Declaration("i", TypeInt(_), Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _)
-          ) =>
     }
     task.output.get should matchPattern {
       case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _)), _) =>
@@ -318,14 +324,18 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", "Robin Hood", _) =>
+      case MetaKV("author", ExprString("Robin Hood", _), _) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", "just because", _) =>
+      case MetaKV("inp_file", ExprString("just because", _), _) =>
+    }
+
+    task.declarations(0) should matchPattern {
+      case Declaration("i", TypeInt(_), Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _) =>
     }
   }
 
@@ -338,6 +348,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
   it should "handle string interpolation" in {
     val doc = getDocument(getTaskSource("interpolation.wdl"))
 
+    doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 1
     val elem = doc.elements(0)
     elem shouldBe a[Task]
@@ -362,10 +373,35 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
+  it should "parse structs" in {
+    val doc = getDocument(getStructSource("I.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val structs = doc.elements.collect {
+      case x: TypeStruct => x
+    }
+    structs.size shouldBe 2
+    structs(0).name shouldBe "Address"
+    structs(0).members.size shouldBe 3
+    structs(0).members should matchPattern {
+      case Vector(StructMember("street", TypeString(_), _),
+                  StructMember("city", TypeString(_), _),
+                  StructMember("zipcode", TypeInt(_), _)) =>
+    }
+
+    structs(1).name shouldBe "Data"
+    structs(1).members should matchPattern {
+      case Vector(StructMember("history", TypeFile(_), _),
+                  StructMember("date", TypeInt(_), _),
+                  StructMember("month", TypeString(_), _)) =>
+    }
+  }
+
   it should "parse a simple workflow" in {
     val doc = getDocument(getWorkflowSource("I.wdl"))
     doc.elements.size shouldBe 0
 
+    doc.version.value shouldBe WdlVersion.V1
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -413,15 +449,15 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe 0
 
     wf.meta.get shouldBe a[MetaSection]
-    wf.meta.get.kvs.size shouldEqual 1
-    wf.meta.get.kvs.head.value shouldEqual "Robert Heinlein"
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", "Robert Heinlein", _)) =>
+      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _)) =>
     }
   }
 
   it should "handle import statements" in {
     val doc = getDocument(getWorkflowSource("imports.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
 
     val imports = doc.elements.collect {
       case x: ImportDoc => x
@@ -438,8 +474,10 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     calls(2).name shouldBe "wc"
   }
 
-  it should "parse a workflow that is illegal in v1.0" in {
-    val _ = getDocument(getWorkflowSource("bad_declaration.wdl"))
+  it should "correctly report an error" in {
+    assertThrows[Exception] {
+      val _ = getDocument(getWorkflowSource("bad_declaration.wdl"))
+    }
   }
 
   it should "handle chained operations" in {
@@ -464,6 +502,7 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     val doc = getDocument(getWorkflowSource("chained_expr.wdl"))
     doc.elements.size shouldBe 0
 
+    doc.version.value shouldBe WdlVersion.V1
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -475,10 +514,30 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "handle compound expression" taggedAs Edge in {
+  it should "have real world GATK tasks" in {
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
+    val doc = getDocument(sourceCode)
+
+    doc.version.value shouldBe WdlVersion.V1
+    doc.elements.size shouldBe 19
+  }
+
+  it should "be able to handle GATK workflow" in {
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
+    val doc = getDocument(sourceCode)
+
+    doc.version.value shouldBe WdlVersion.V1
+  }
+
+  it should "handle compound expression" in {
     val doc = getDocument(getWorkflowSource("compound_expr_bug.wdl"))
     doc.elements.size shouldBe 0
 
+    doc.version.value shouldBe WdlVersion.V1
     val wf = doc.workflow.get
     wf shouldBe a[Workflow]
 
@@ -494,6 +553,63 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                      ),
                      _) =>
         ()
+    }
+  }
+
+  it should "handle call with extra comma" in {
+    val doc = getDocument(getWorkflowSource("call_bug.wdl"))
+    doc.elements.size shouldBe 1
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+  }
+
+  it should "version is a reserved keyword" in {
+    assertThrows[Exception] {
+      val _ = getDocument(getWorkflowSource("call_bug2.wdl"))
+    }
+  }
+
+  it should "relative imports" in {
+    val doc = getDocument(getWorkflowSource("relative_imports.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "library.wc"
+  }
+
+  it should "relative imports II" in {
+    val doc = getDocument(getWorkflowSource("relative_imports_II.wdl"))
+
+    doc.version.value shouldBe WdlVersion.V1
+    val wf = doc.workflow.get
+    wf shouldBe a[Workflow]
+
+    wf.body.size shouldBe 1
+    val call = wf.body.head.asInstanceOf[Call]
+    call.name shouldBe "cd.count_dogs"
+  }
+
+  it should "report extra comma" in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("extra_comma.wdl"))
+    }
+  }
+
+  it should "report bad types"  in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("bad_type.wdl"))
+    }
+  }
+
+  it should "report unterminated double quotes"  taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("unterminated_dquote.wdl"))
     }
   }
 }
