@@ -8,7 +8,7 @@ import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity._
 import wdlTools.util.{Options, SourceCode, Util}
 
-class ConcreteSyntaxTest extends FlatSpec with Matchers {
+class ConcreteSyntaxV1Test extends FlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
@@ -595,9 +595,21 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
     call.name shouldBe "cd.count_dogs"
   }
 
-  it should "report extra comma" taggedAs Edge in {
+  it should "report extra comma" in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("extra_comma.wdl"))
+    }
+  }
+
+  it should "report bad types"  in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("bad_type.wdl"))
+    }
+  }
+
+  it should "report unterminated double quotes"  taggedAs Edge in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("unterminated_dquote.wdl"))
     }
   }
 }

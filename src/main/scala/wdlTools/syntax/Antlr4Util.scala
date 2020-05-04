@@ -61,6 +61,7 @@ object Antlr4Util {
                              e: RecognitionException): Unit = {
       val symbolText =
         offendingSymbol match {
+          case null => ""
           case tok: Token =>
             tok.getText
           case _ =>
@@ -126,7 +127,7 @@ object Antlr4Util {
             System.out.println(err)
           }
         }
-        throw new Exception(s"${errors.size} syntax errors were found, stopping")
+        throw new SyntaxException(errors)
       }
     }
   }

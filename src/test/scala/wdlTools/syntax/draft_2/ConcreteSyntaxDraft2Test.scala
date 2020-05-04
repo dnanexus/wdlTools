@@ -3,12 +3,12 @@ package wdlTools.syntax.draft_2
 import java.nio.file.Paths
 
 import org.scalatest.{FlatSpec, Matchers}
-import wdlTools.syntax.{Comment, Edge, TextSource}
+import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
 
-class ConcreteSyntaxTest extends FlatSpec with Matchers {
+class ConcreteSyntaxDraft2Test extends FlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
@@ -494,6 +494,12 @@ class ConcreteSyntaxTest extends FlatSpec with Matchers {
                      ),
                      _) =>
         ()
+    }
+  }
+
+  ignore should "report bad types" in {
+    assertThrows[SyntaxException] {
+      getDocument(getWorkflowSource("bad_type.wdl"))
     }
   }
 }

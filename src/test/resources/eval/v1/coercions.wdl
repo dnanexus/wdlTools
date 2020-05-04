@@ -1,5 +1,13 @@
 version 1.0
 
+struct Tree {
+  String kind
+  String state
+  Int height
+  Int age
+}
+
+
 workflow foo {
   Boolean b1 = true
   Boolean b2 = b1
@@ -19,4 +27,13 @@ workflow foo {
   String s3 = 4.3
   String s4 = "hello"
   String? s5 = s4
+
+  Object fir = object {
+    kind : "Fir",
+    state : "Colorado",
+    height : 187,
+    age : 403
+  }
+
+  Tree fir2 = fir
 }

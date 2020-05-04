@@ -15,7 +15,7 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     Options(typeChecking = TypeCheckingRegime.Lenient,
             antlr4Trace = false,
             localDirectories = Vector(srcDir),
-            verbosity = Verbosity.Quiet)
+            verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val stdlib = TypeStdlib(opts)
   private val checker = TypeChecker(stdlib)
@@ -101,7 +101,7 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bindings("name") shouldBe WV_String("Jay")
   }
 
-  it should "call stdlib" taggedAs Edge in {
+  it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
     val (doc, typeCtx) = parseAndTypeCheck(file)
     val evaluator = Eval(opts,
@@ -210,6 +210,26 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bd("path3") shouldBe WV_String("docs.md")
     bd("path4") shouldBe WV_String("C")
     bd("path5") shouldBe WV_String("C.txt")
+
+    // read/write object
+    val obj1 = WV_Object(
+        Map("author" -> WV_String("Benjamin"),
+            "year" -> WV_String("1973"),
+            "title" -> WV_String("Color the sky green"))
+    )
+    val obj2 = WV_Object(
+        Map("author" -> WV_String("Primo Levy"),
+            "year" -> WV_String("1975"),
+            "title" -> WV_String("The Periodic Table"))
+    )
+    bd("o2") shouldBe obj1
+    bd("arObj") shouldBe WV_Array(Vector(obj1, obj2))
+    bd("houseObj") shouldBe WV_Object(
+        Map("city" -> WV_String("Seattle"),
+            "team" -> WV_String("Trail Blazers"),
+            "zipcode" -> WV_Int(98109))
+    )
+
   }
 
   it should "perform coercions" in {
@@ -247,4 +267,73 @@ class EvalTest extends FlatSpec with Matchers with Inside {
     bd("s4") shouldBe WV_String("hello")
     bd("s5") shouldBe WV_Optional(WV_String("hello"))
   }
+
+  private def evalCommand(wdlSourceFileName: String): String = {
+    val file = srcDir.resolve(wdlSourceFileName)
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
+                         Some(opts.getUrl(file.toString)))
+
+    doc.elements should not be empty
+    val task = doc.elements.head.asInstanceOf[AST.Task]
+    val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
+    evaluator.applyCommand(task.command, ctx)
+  }
+
+  it should "evaluate simple command section" in {
+    val command = evalCommand("command_simple.wdl")
+    command.trim shouldBe "We just discovered a new flower with 100 basepairs. Is that possible?"
+  }
+
+  it should "evaluate command section with some variables" in {
+    val command = evalCommand("command2.wdl")
+    command.trim shouldBe "His trumpet playing is not bad"
+  }
+
+  it should "command section with several kinds of primitives" in {
+    val command = evalCommand("command3.wdl")
+    command.trim shouldBe "His trumpet playing is good. There are 10 instruments in the band. It this true?"
+  }
+
+  it should "separator placeholder" in {
+    val command = evalCommand("sep_placeholder.wdl")
+    command.trim shouldBe "We have lots of numbers here 1, 10, 100"
+  }
+
+  it should "boolean placeholder" taggedAs Edge in {
+    val command = evalCommand("bool_placeholder.wdl")
+    val lines = command.split("\n")
+    lines(1).trim shouldBe "--no"
+    lines(2).trim shouldBe "--yes"
+  }
+
+  it should "default placeholder" taggedAs Edge in {
+    val command = evalCommand("default_placeholder.wdl")
+    command.trim shouldBe "hello"
+  }
+
+  it should "bad coercion" in {
+    val file = srcDir.resolve("bad_coercion.wdl")
+    val (doc, typeCtx) = parseAndTypeCheck(file)
+    val evaluator = Eval(opts,
+                         evalCfg,
+                         typeCtx.structs,
+                         wdlTools.syntax.WdlVersion.V1,
+                         Some(opts.getUrl(file.toString)))
+
+    doc.workflow should not be empty
+    val wf = doc.workflow.get
+
+    val decls: Vector[AST.Declaration] = wf.body.collect {
+      case x: AST.Declaration => x
+    }
+
+    assertThrows[EvalException] {
+      val _ = evaluator.applyDeclarations(decls, Context(Map.empty))
+    }
+  }
+
 }

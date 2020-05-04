@@ -2,6 +2,7 @@ package wdlTools.eval
 
 import java.net.URL
 import java.nio.file.{Path, Paths}
+import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
 import wdlTools.util.{EvalConfig, Options}
@@ -157,12 +158,45 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
   }
 
   // Array[Object] read_objects(String|File)
-  private def read_objects(args: Vector[WV], text: TextSource): WV_Object =
-    throw new EvalException("not implemented", text, docSourceUrl)
+  private def read_objects(args: Vector[WV], text: TextSource): WV_Array = {
+    val file = getWdlFile(args, text)
+    val content = iosp.readFile(file.value)
+    val lines = content.split("\n")
+    if (lines.size < 2)
+      throw new EvalException(s"read_object : file ${file.toString} must contain at least two",
+                              text,
+                              docSourceUrl)
+    val keys = lines.head.split("\t")
+    val objects = lines.tail.map { line =>
+      val values = line.split("\t")
+      if (keys.size != values.size)
+        throw new EvalException(
+            s"read_object : the number of keys (${keys.size}) must be the same as the number of values (${values.size})",
+            text,
+            docSourceUrl
+        )
+      // Note all the values are going to be strings here. This probably isn't what
+      // the user wants.
+      val m = (keys zip values).map {
+        case (k, v) =>
+          k -> WV_String(v)
+      }.toMap
+      WV_Object(m)
+    }.toVector
+    WV_Array(objects)
+  }
 
   // mixed read_json(String|File)
-  private def read_json(args: Vector[WV], text: TextSource): WV_Object =
-    throw new EvalException("not implemented", text, docSourceUrl)
+  private def read_json(args: Vector[WV], text: TextSource): WV = {
+    val file = getWdlFile(args, text)
+    val content = iosp.readFile(file.value)
+    try {
+      Serialize.fromJson(content.parseJson)
+    } catch {
+      case e: JsonSerializationException =>
+        throw new EvalException(e.getMessage, text, docSourceUrl)
+    }
+  }
 
   // Int read_int(String|File)
   //
@@ -273,29 +307,72 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     WV_File(tmpFile.toString)
   }
 
+  private def lineFromObject(obj: WV_Object, text: TextSource): String = {
+    obj.members.values
+      .map { vw =>
+        coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String].value
+      }
+      .mkString("\t")
+  }
+
   // File write_object(Object)
   //
   private def write_object(args: Vector[WV], text: TextSource): WV_File = {
     assert(args.size == 1)
     val obj = coercion.coerceTo(WT_Object, args.head, text).asInstanceOf[WV_Object]
     val keyLine = obj.members.keys.mkString("\t")
-    val valueLine = obj.members.values
-      .map { vw =>
-        coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String]
-      }
-      .mkString("\t")
+    val valueLine = lineFromObject(obj, text)
     val content = keyLine + "\n" + valueLine
     val tmpFile: Path = iosp.mkTempFile()
     iosp.writeFile(tmpFile, content)
     WV_File(tmpFile.toString)
   }
 
+  // File write_objects(Array[Object])
+  //
   private def write_objects(args: Vector[WV], text: TextSource): WV_File = {
-    throw new EvalException("write_objects: not implemented", text, docSourceUrl)
+    assert(args.size == 1)
+    val objs = coercion.coerceTo(WT_Array(WT_Object), args.head, text).asInstanceOf[WV_Array]
+    val objArray = objs.value.asInstanceOf[Vector[WV_Object]]
+    if (objArray.isEmpty)
+      throw new EvalException("write_objects: empty input array", text, docSourceUrl)
+
+    // check that all objects have the same keys
+    val fstObj = objArray(0)
+    val keys = fstObj.members.keys.toSet
+    objArray.tail.foreach { obj =>
+      if (obj.members.keys.toSet != keys)
+        throw new EvalException(
+            "write_objects: the keys are not the same for all objects in the array",
+            text,
+            docSourceUrl
+        )
+    }
+
+    val keyLine = fstObj.members.keys.mkString("\t")
+    val valueLines = objArray
+      .map { obj =>
+        lineFromObject(obj, text)
+      }
+      .mkString("\n")
+    val content = keyLine + "\n" + valueLines
+    val tmpFile: Path = iosp.mkTempFile()
+    iosp.writeFile(tmpFile, content)
+    WV_File(tmpFile.toString)
   }
 
   private def write_json(args: Vector[WV], text: TextSource): WV_File = {
-    throw new EvalException("write_json: not implemented", text, docSourceUrl)
+    assert(args.size == 1)
+    val jsv =
+      try {
+        Serialize.toJson(args.head)
+      } catch {
+        case e: JsonSerializationException =>
+          throw new EvalException(e.getMessage, text, docSourceUrl)
+      }
+    val tmpFile: Path = iosp.mkTempFile()
+    iosp.writeFile(tmpFile, jsv.prettyPrint)
+    WV_File(tmpFile.toString)
   }
 
   // Our size implementation is a little bit more general than strictly necessary.
@@ -430,20 +507,6 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     WV_Array(vec_vec.flatten)
   }
 
-  @scala.annotation.tailrec
-  private def primitiveValueToString(wv: WV, text: TextSource): String = {
-    wv match {
-      case WV_Boolean(value) => value.toString
-      case WV_Int(value)     => value.toString
-      case WV_Float(value)   => value.toString
-      case WV_String(value)  => value
-      case WV_File(value)    => value
-      case WV_Optional(x)    => primitiveValueToString(x, text)
-      case other =>
-        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSourceUrl)
-    }
-  }
-
   // Array[String] prefix(String, Array[X])
   //
   // Given a String and an Array[X] where X is a primitive type, the
@@ -455,7 +518,10 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     assert(args.size == 2)
     val pref = getWdlString(args(0), text)
     val vec = getWdlVector(args(1), text)
-    WV_Array(vec.map(vw => WV_String(pref + primitiveValueToString(vw, text))))
+    WV_Array(vec.map { vw =>
+      val str = Serialize.primitiveValueToString(vw, text, docSourceUrl)
+      WV_String(pref + str)
+    })
   }
 
   // X select_first(Array[X?])
@@ -557,6 +623,8 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     try {
       impl(args, text)
     } catch {
+      case e: EvalException =>
+        throw e
       case e: Throwable =>
         val msg = s"""|calling stdlib function ${funcName} with arguments ${args}
                       |${e.getMessage}

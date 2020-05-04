@@ -1,5 +1,11 @@
 version 1.0
 
+struct House {
+  String city
+  String team
+  Int zipcode
+}
+
 workflow foo {
   input {
     String? empty_string
@@ -87,8 +93,22 @@ workflow foo {
   # glob
   Array[File] texts = glob("*.txt")
 
-  # write object
+  # read/write object
   Object o = object { author : "Benjamin", year : 1973, title : "Color the sky green" }
   File of = write_object(o)
   Object o2 = read_object(of)
+
+  # read/write objects
+  Object o3 = object { author : "Primo Levy", year : 1975, title : "The Periodic Table" }
+  File of2 = write_objects([o, o3])
+  Array[Object] arObj = read_objects(of2)
+
+  # read/write json
+  House house = {
+    "city" : "Seattle",
+    "team" : "Trail Blazers",
+    "zipcode" : 98109
+  }
+  File hf = write_json(house)
+  Object houseObj = read_json(hf)
 }

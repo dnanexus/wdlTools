@@ -540,4 +540,16 @@ case class Eval(opts: Options,
         throw new Exception(s"Can not evaluate element ${ast.getClass}")
     }
   }
+
+  // evaluate all the parts of a command section.
+  //
+  def applyCommand(command: AST.CommandSection, ctx: Context): String = {
+    command.parts
+      .map { expr =>
+        val value = apply(expr, ctx)
+        val str = Serialize.primitiveValueToString(value, expr.text, docSourceUrl)
+        str
+      }
+      .mkString("")
+  }
 }

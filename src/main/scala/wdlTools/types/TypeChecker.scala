@@ -140,60 +140,6 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  // type check a declaration like this:
-  //  Person p1 = {
-  //    "name" : "Carly",
-  //    "height" : 168,
-  //    "age" : 40
-  //  }
-  private def checkIsObjectCoercibleToStruct(structName: String,
-                                             expr: Expr,
-                                             text: TextSource,
-                                             ctx: Context): Unit = {
-    val defFields = ctx.structs.get(structName) match {
-      case None =>
-        throw new TypeException(s"Struct ${structName} is not defined", text, ctx.docSourceUrl)
-      case Some(WT_Struct(_, fields)) => fields
-    }
-    val rhsFields: Map[String, Expr] = expr match {
-      case ExprMap(m: Vector[ExprMapItem], _) =>
-        m.map {
-          case ExprMapItem(ValueString(fName, _), e, _) => fName -> e
-          case _ =>
-            throw new TypeException(
-                s"map ${exprToString(expr)} isn't made up of string field names",
-                text,
-                ctx.docSourceUrl
-            )
-        }.toMap
-      case ExprObject(m: Vector[ExprObjectMember], _) =>
-        m.map {
-          case ExprObjectMember(fName, e, _) => fName -> e
-        }.toMap
-      case _ =>
-        throw new TypeException(
-            s"Expression ${exprToString(expr)} cannot be coereced into a struct",
-            text,
-            ctx.docSourceUrl
-        )
-    }
-
-    // Check that the all the struct fields are defined
-    if (defFields.keys.toSet != rhsFields.keys.toSet)
-      throw new TypeException(s"the fields should be ${defFields.keys.toSet}",
-                              text,
-                              ctx.docSourceUrl)
-
-    // Check that each field is of the correct type
-    defFields.foreach {
-      case (fieldName, fieldType) =>
-        val e = rhsFields(fieldName)
-        val t = typeEval(e, ctx)
-        if (!tUtil.isCoercibleTo(fieldType, t))
-          throw new TypeException(s"field ${fieldName} is badly typed", text, ctx.docSourceUrl)
-    }
-  }
-
   private def typeTranslate(t: Type, text: TextSource, ctx: Context): WT = {
     t match {
       case TypeOptional(t, _) => WT_Optional(typeTranslate(t, text, ctx))
@@ -206,9 +152,11 @@ case class TypeChecker(stdlib: Stdlib) {
       case _: TypeInt         => WT_Int
       case _: TypeFloat       => WT_Float
       case TypeIdentifier(id, _) =>
-        if (!(ctx.structs contains id))
-          throw new TypeException(s"struct ${id} has not been defined", text, ctx.docSourceUrl)
-        WT_Identifier(id)
+        ctx.structs.get(id) match {
+          case None =>
+            throw new TypeException(s"struct ${id} has not been defined", text, ctx.docSourceUrl)
+          case Some(struct) => struct
+        }
       case _: TypeObject => WT_Object
       case TypeStruct(name, members, _) =>
         WT_Struct(name, members.map {
@@ -519,25 +467,12 @@ case class TypeChecker(stdlib: Stdlib) {
       case (_, None) =>
         ()
 
-      // special case, something like this:
-      //  Person p1 = {
-      //    "name" : "Carly",
-      //    "height" : 168,
-      //    "age" : 40
-      //  }
-      //
-      // we cannot evaluate the right hand side on its own. We need the knowledge
-      // the it is actually a struct Person.
-      case (WT_Identifier(structName), Some(objExpr: ExprObject)) =>
-        checkIsObjectCoercibleToStruct(structName, objExpr, decl.text, ctx)
-      case (WT_Identifier(structName), Some(mapExpr: ExprMap)) =>
-        checkIsObjectCoercibleToStruct(structName, mapExpr, decl.text, ctx)
-
       case (_, Some(expr)) =>
         val rhsType = typeEval(expr, ctx)
         if (!tUtil.isCoercibleTo(lhsType, rhsType)) {
           throw new TypeException(s"""|${decl.name} is of type ${tUtil.toString(lhsType)}
                                       |but is assigned ${tUtil.toString(rhsType)}
+                                      |${expr}
                                       |""".stripMargin.replaceAll("\n", " "),
                                   decl.text,
                                   ctx.docSourceUrl)

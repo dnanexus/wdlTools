@@ -28,3 +28,5 @@ object EvalException {
     s"${msg} at ${text}${urlPart}"
   }
 }
+
+final class JsonSerializationException(message: String) extends Exception(message)
