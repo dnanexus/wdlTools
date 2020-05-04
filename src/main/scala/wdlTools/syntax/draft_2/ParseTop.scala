@@ -1138,22 +1138,22 @@ scatter
         visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
 
-    val wfElems : Vector[WorkflowElement] = elems.collect {
+    val wfElems: Vector[WorkflowElement] = elems.collect {
       case x: WdlDraft2Parser.Wf_inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
 
     // We treat as an input any unbound declaration as well as any bound declaration
     // that doesn't require evaluation.
-    val (noEvalDecls, wfBody) = wfElems.partition{
+    val (noEvalDecls, wfBody) = wfElems.partition {
       case d: Declaration if !requiresEvaluation(d) => true
-      case _ => false
+      case _                                        => false
     }
     val noEvalDecls2 = noEvalDecls.map(_.asInstanceOf[Declaration])
     val inputDecls = unboundDecls ++ noEvalDecls2
     val input = if (inputDecls.nonEmpty) {
       Some(
-        InputSection(inputDecls, TextSource.fromSpan(inputDecls.head.text, inputDecls.last.text))
+          InputSection(inputDecls, TextSource.fromSpan(inputDecls.head.text, inputDecls.last.text))
       )
     } else {
       None
