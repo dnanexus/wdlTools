@@ -543,11 +543,13 @@ case class Eval(opts: Options,
 
   // evaluate all the parts of a command section.
   //
-  def applyCommand(command : AST.CommandSection, ctx : Context) : String = {
-    command.parts.map{ expr =>
-      val value = apply(expr, ctx)
-      val str = Serialize.primitiveValueToString(value, expr.text, docSourceUrl)
-      str
-    }.mkString("")
+  def applyCommand(command: AST.CommandSection, ctx: Context): String = {
+    command.parts
+      .map { expr =>
+        val value = apply(expr, ctx)
+        val str = Serialize.primitiveValueToString(value, expr.text, docSourceUrl)
+        str
+      }
+      .mkString("")
   }
 }

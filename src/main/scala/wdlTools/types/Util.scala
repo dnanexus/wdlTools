@@ -54,10 +54,16 @@ case class Util(conf: Options) {
       case (WT_Pair(l1, l2), WT_Pair(r1, r2)) => isCoercibleTo2(l1, r1) && isCoercibleTo2(l2, r2)
 
       // structures are equivalent iff they have the same name
-      case (WT_Identifier(structNameL), WT_Identifier(structNameR)) =>
-        structNameL == structNameR
+      //
+      case (WT_Struct(sname1, _), WT_Struct(sname2, _)) =>
+        sname1 == sname2
 
-      case (WT_Object, WT_Object)           => true
+      // coercions to objects and structs can fail at runtime. We
+      // are not thoroughly checking them here.
+      case (WT_Object, WT_Object)    => true
+      case (_: WT_Struct, WT_Object) => true
+      case (_: WT_Struct, _: WT_Map) => true
+
       case (WT_Var(i), WT_Var(j)) if i == j => true
 
       case (_, WT_Any) => true
@@ -66,6 +72,11 @@ case class Util(conf: Options) {
   }
 
   def isCoercibleTo(left: WT, right: WT): Boolean = {
+    if (left.isInstanceOf[WT_Identifier])
+      throw new Exception(s"${left} should not appear here")
+    if (right.isInstanceOf[WT_Identifier])
+      throw new Exception(s"${right} should not appear here")
+
     (left, right) match {
       // List of special cases goes here
 
@@ -103,8 +114,8 @@ case class Util(conf: Options) {
       case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
         (x, ctx)
       case (WT_Any, WT_Any) => (WT_Any, ctx)
-      case (x, WT_Any) => (x, ctx)
-      case (WT_Any, x) => (x, ctx)
+      case (x, WT_Any)      => (x, ctx)
+      case (WT_Any, x)      => (x, ctx)
 
       case (WT_Object, WT_Object)    => (WT_Object, ctx)
       case (WT_Object, _: WT_Struct) => (WT_Object, ctx)
@@ -220,14 +231,14 @@ case class Util(conf: Options) {
           throw new TypeException(s"type variable ${toString(a)} does not have a binding",
                                   srcText,
                                   docSourceUrl)
-        case a: WT_Var         => typeBindings(a)
-        case id: WT_Identifier => id
-        case WT_Pair(l, r)     => WT_Pair(sub(l), sub(r))
-        case WT_Array(t)       => WT_Array(sub(t))
-        case WT_Map(k, v)      => WT_Map(sub(k), sub(v))
-        case WT_Object         => WT_Object
-        case WT_Optional(t1)   => WT_Optional(sub(t1))
-        case WT_Any            => WT_Any
+        case a: WT_Var       => typeBindings(a)
+        case x: WT_Struct    => x
+        case WT_Pair(l, r)   => WT_Pair(sub(l), sub(r))
+        case WT_Array(t)     => WT_Array(sub(t))
+        case WT_Map(k, v)    => WT_Map(sub(k), sub(v))
+        case WT_Object       => WT_Object
+        case WT_Optional(t1) => WT_Optional(sub(t1))
+        case WT_Any          => WT_Any
         case other =>
           throw new TypeException(s"Type ${toString(other)} should not appear in this context",
                                   srcText,

@@ -167,13 +167,13 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
                               text,
                               docSourceUrl)
     val keys = lines.head.split("\t")
-    val objects = lines.tail.map{ line =>
+    val objects = lines.tail.map { line =>
       val values = line.split("\t")
       if (keys.size != values.size)
         throw new EvalException(
-          s"read_object : the number of keys (${keys.size}) must be the same as the number of values (${values.size})",
-          text,
-          docSourceUrl
+            s"read_object : the number of keys (${keys.size}) must be the same as the number of values (${values.size})",
+            text,
+            docSourceUrl
         )
       // Note all the values are going to be strings here. This probably isn't what
       // the user wants.
@@ -193,7 +193,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     try {
       Serialize.fromJson(content.parseJson)
     } catch {
-      case e : JsonSerializationException =>
+      case e: JsonSerializationException =>
         throw new EvalException(e.getMessage, text, docSourceUrl)
     }
   }
@@ -307,11 +307,12 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     WV_File(tmpFile.toString)
   }
 
-
-  private def lineFromObject(obj : WV_Object, text : TextSource) : String = {
-    obj.members.values.map { vw =>
-      coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String].value
-    }.mkString("\t")
+  private def lineFromObject(obj: WV_Object, text: TextSource): String = {
+    obj.members.values
+      .map { vw =>
+        coercion.coerceTo(WT_String, vw, text).asInstanceOf[WV_String].value
+      }
+      .mkString("\t")
   }
 
   // File write_object(Object)
@@ -339,16 +340,21 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     // check that all objects have the same keys
     val fstObj = objArray(0)
     val keys = fstObj.members.keys.toSet
-    objArray.tail.foreach{ obj =>
+    objArray.tail.foreach { obj =>
       if (obj.members.keys.toSet != keys)
-        throw new EvalException("write_objects: the keys are not the same for all objects in the array",
-                                text, docSourceUrl)
+        throw new EvalException(
+            "write_objects: the keys are not the same for all objects in the array",
+            text,
+            docSourceUrl
+        )
     }
 
     val keyLine = fstObj.members.keys.mkString("\t")
-    val valueLines = objArray.map {
-      obj => lineFromObject(obj, text)
-    }.mkString("\n")
+    val valueLines = objArray
+      .map { obj =>
+        lineFromObject(obj, text)
+      }
+      .mkString("\n")
     val content = keyLine + "\n" + valueLines
     val tmpFile: Path = iosp.mkTempFile()
     iosp.writeFile(tmpFile, content)
@@ -361,7 +367,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
       try {
         Serialize.toJson(args.head)
       } catch {
-        case e : JsonSerializationException =>
+        case e: JsonSerializationException =>
           throw new EvalException(e.getMessage, text, docSourceUrl)
       }
     val tmpFile: Path = iosp.mkTempFile()
@@ -512,10 +518,10 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     assert(args.size == 2)
     val pref = getWdlString(args(0), text)
     val vec = getWdlVector(args(1), text)
-    WV_Array(vec.map{ vw =>
-               val str = Serialize.primitiveValueToString(vw, text, docSourceUrl)
-               WV_String(pref + str)
-             })
+    WV_Array(vec.map { vw =>
+      val str = Serialize.primitiveValueToString(vw, text, docSourceUrl)
+      WV_String(pref + str)
+    })
   }
 
   // X select_first(Array[X?])
@@ -617,7 +623,7 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
     try {
       impl(args, text)
     } catch {
-      case e : EvalException =>
+      case e: EvalException =>
         throw e
       case e: Throwable =>
         val msg = s"""|calling stdlib function ${funcName} with arguments ${args}

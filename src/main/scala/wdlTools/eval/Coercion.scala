@@ -14,8 +14,14 @@ case class Coercion(docSourceUrl: Option[URL]) {
     if (memberDefs.keys.toSet != members.keys.toSet)
       throw new EvalException(s"struct ${structName} has wrong fields", text, docSourceUrl)
 
-    // TODO: coerce the members to the right types
-    WV_Struct(structName, members)
+    // coerce each member to the struct type
+    val memValues: Map[String, WV] = memberDefs.map {
+      case (key, t) =>
+        val memVal = coerceTo(t, members(key), text)
+        key -> memVal
+    }
+
+    WV_Struct(structName, memValues)
   }
 
   def coerceTo(wdlType: WdlTypes.WT, value: WV, text: TextSource): WV = {
