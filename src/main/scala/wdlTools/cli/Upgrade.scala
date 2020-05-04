@@ -5,7 +5,7 @@ import java.nio.file.Files
 import wdlTools.formatter._
 import wdlTools.util.Util
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.language.reflectiveCalls
 
 case class Upgrade(conf: WdlToolsConf) extends Command {

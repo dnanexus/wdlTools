@@ -4,7 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.net.{URL, HttpURLConnection}
 import java.nio.charset.StandardCharsets._
 import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 import wdlTools.util.{EvalConfig, Options, Util}

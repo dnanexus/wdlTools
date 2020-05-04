@@ -3,11 +3,13 @@ package wdlTools.syntax
 import AbstractSyntax._
 import java.nio.file.Paths
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
-class AbstractSyntaxTest extends FlatSpec with Matchers {
+class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)
   private val workflowsDir = Paths.get(getClass.getResource("/syntax/v1/workflows").getPath)
   private val opts =

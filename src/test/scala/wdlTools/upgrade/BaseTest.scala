@@ -2,13 +2,13 @@ package wdlTools.upgrade
 
 import java.net.URL
 import java.nio.file.{Path, Paths}
-
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import wdlTools.formatter.Upgrader
 import wdlTools.syntax.WdlVersion
 import wdlTools.util.{Options, Util, Verbosity}
 
-class BaseTest extends FlatSpec with Matchers {
+class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val opts = Options(verbosity = Verbosity.Verbose)
 
   def getBeforePath(fname: String): Path = {

@@ -2,7 +2,7 @@ package wdlTools.util
 
 import java.io.{FileNotFoundException, IOException}
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.net.URL
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
@@ -185,7 +185,8 @@ object Util {
             "\t" -> "\\t",
             "\"" -> "\\\""
         )
-        '"' + replaceMap.foldLeft(s) { case (acc, (c, r)) => acc.replace(c, r) } + '"'
+        val buf = replaceMap.foldLeft(s) { case (acc, (c, r)) => acc.replace(c, r) }
+        s""""${buf}""""
       // For an empty Seq just use its normal String representation.
       case xs: Seq[_] if xs.isEmpty => xs.toString()
       case xs: Seq[_]               =>

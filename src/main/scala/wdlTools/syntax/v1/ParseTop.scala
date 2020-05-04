@@ -12,8 +12,8 @@ import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.syntax.{Comment, CommentMap, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.{Options, Util}
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 case class ParseTop(opts: Options,
                     grammar: Grammar[WdlV1Lexer, WdlV1Parser],

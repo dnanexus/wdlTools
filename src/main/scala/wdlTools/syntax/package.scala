@@ -125,7 +125,7 @@ case class CommentMap(comments: Map[Int, Comment]) {
   lazy val maxLine: Int = comments.keys.max
 
   def filterWithin(range: Seq[Int]): CommentMap = {
-    CommentMap(comments.filterKeys(range.contains))
+    CommentMap(comments.view.filterKeys(range.contains).toMap)
   }
 
   def toSortedVector: Vector[Comment] = {

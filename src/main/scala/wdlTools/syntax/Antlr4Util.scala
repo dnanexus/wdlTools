@@ -4,8 +4,6 @@ import java.net.URL
 import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime.tree.TerminalNode
-
-import collection.JavaConverters._
 import org.antlr.v4.runtime.{
   BaseErrorListener,
   BufferedTokenStream,
@@ -20,6 +18,7 @@ import org.antlr.v4.runtime.{
   Recognizer,
   Token
 }
+import scala.jdk.CollectionConverters._
 import wdlTools.syntax
 import wdlTools.util.{Options, SourceCode, Verbosity}
 

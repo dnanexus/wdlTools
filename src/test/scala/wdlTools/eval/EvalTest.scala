@@ -2,14 +2,17 @@ package wdlTools.eval
 
 import java.nio.file.{Files, Path, Paths}
 
-import org.scalatest.{FlatSpec, Inside, Matchers}
+import org.scalatest.Inside
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
 import wdlTools.types.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
-class EvalTest extends FlatSpec with Matchers with Inside {
+class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val opts =
     Options(typeChecking = TypeCheckingRegime.Lenient,

@@ -8,6 +8,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Parsers, TextSource, WdlVersion}
 import wdlTools.util.Options
 
+import scala.collection.BufferedIterator
 import scala.collection.mutable
 
 case class WdlV1Formatter(opts: Options,

@@ -163,7 +163,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     validateOpt(wdlVersion) {
       case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
     val outputDir: ScallopOption[Path] = opt[Path](descr =
       "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
@@ -176,7 +176,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     validateOpt(outputDir, overwrite) {
       case (None, Some(false) | None) =>
         Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
   }
   addSubcommand(format)
@@ -196,12 +196,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     validateOpt(destVersion) {
       case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
     validateOpt(srcVersion, destVersion) {
-      case (Some(src), Some(dst)) if src < dst => Right(Unit)
+      case (Some(src), Some(dst)) if src < dst => Right(())
       // ignore if srcVersion is unspecified - it will be detected and validated in the command
-      case (None, _) => Right(Unit)
+      case (None, _) => Right(())
       case _         => Left("Source version must be earlier than destination version")
     }
     val outputDir: ScallopOption[Path] = opt[Path](descr =
@@ -215,7 +215,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     validateOpt(outputDir, overwrite) {
       case (None, Some(false) | None) =>
         Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
   }
   addSubcommand(upgrade)
@@ -240,7 +240,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     validateOpt(wdlVersion) {
       case Some(version) if version != WdlVersion.V1 =>
         Left("Only WDL v1.0 is supported currently")
-      case _ => Right(Unit)
+      case _ => Right(())
     }
     val interactive: ScallopOption[Boolean] = toggle(
         descrYes = "Specify inputs and outputs interactively",

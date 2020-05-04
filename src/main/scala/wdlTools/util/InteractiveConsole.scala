@@ -70,7 +70,7 @@ case class InteractiveConsole(promptColor: String = "",
         attrs.append("]")
       case Some(values)          => attrs.append(s" s[${values.keys.mkString(",")}]")
       case _ if default.nonEmpty => attrs.append(s" [${default.get}]")
-      case _                     => Unit
+      case _                     => ()
     }
     if (optional && !attrs.endsWith("]")) {
       attrs.append("*")

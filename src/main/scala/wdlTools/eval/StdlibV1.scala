@@ -382,8 +382,8 @@ case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL
   private def sizeCore(arg: WV, text: TextSource): Double = {
     def f(arg: WV): Double = {
       arg match {
-        case WV_String(path) => iosp.size(path)
-        case WV_File(path)   => iosp.size(path)
+        case WV_String(path) => iosp.size(path).toDouble
+        case WV_File(path)   => iosp.size(path).toDouble
         case WV_Array(ar) =>
           ar.foldLeft(0.0) {
             case (accu, wv) => accu + f(wv)
