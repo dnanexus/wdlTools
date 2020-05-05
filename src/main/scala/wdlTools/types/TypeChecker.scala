@@ -3,6 +3,7 @@ package wdlTools.types
 import java.nio.file.Paths
 
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}

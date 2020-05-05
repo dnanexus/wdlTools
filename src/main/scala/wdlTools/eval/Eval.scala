@@ -4,7 +4,7 @@ import java.net.URL
 
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{AbstractSyntax => AST}
-import wdlTools.syntax.{TextSource, WdlVersion}
+import wdlTools.syntax.{Util, TextSource, WdlVersion}
 import wdlTools.types.WdlTypes
 import wdlTools.util.{EvalConfig, Options}
 
@@ -491,7 +491,7 @@ case class Eval(opts: Options,
         exprGetName(ev, fieldName, ctx, text)
 
       case other =>
-        throw new Exception(s"expression ${AST.exprToString(other)} not implemented yet")
+        throw new Exception(s"expression ${Util.exprToString(other)} not implemented yet")
     }
   }
 
