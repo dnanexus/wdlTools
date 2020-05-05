@@ -1,13 +1,13 @@
 package wdlTools.types
 
-import collection.JavaConverters._
 import java.nio.file.{Files, Path, Paths}
-
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
 import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
 
-class TypeCheckerTest extends FlatSpec with Matchers {
+class TypeCheckerTest extends AnyFlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(

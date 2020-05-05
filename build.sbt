@@ -1,7 +1,7 @@
 import sbt.Keys._
 import sbtassembly.AssemblyPlugin.autoImport._
 
-scalaVersion := "2.12.9"
+scalaVersion := "2.13.2"
 name := "wdlTools"
 organization := "com.dnanexus"
 val root = Project("root", file("."))
@@ -21,14 +21,11 @@ scalacOptions ++= Seq(
     "-explaintypes",
     "-encoding",
     "UTF-8",
-    "-Xfuture",
-    "-Xlint:by-name-right-associative",
     "-Xlint:constant",
     "-Xlint:delayedinit-select",
     "-Xlint:doc-detached",
     "-Xlint:inaccessible",
     "-Xlint:infer-any",
-//    "-Xlint:missing-interpolator",
     "-Xlint:nullary-override",
     "-Xlint:nullary-unit",
     "-Xlint:option-implicit",
@@ -37,9 +34,7 @@ scalacOptions ++= Seq(
     "-Xlint:private-shadow",
     "-Xlint:stars-align",
     "-Xlint:type-parameter-shadow",
-    "-Ypartial-unification", // https://typelevel.org/cats
     "-Ywarn-dead-code",
-    "-Ywarn-inaccessible",
     "-Ywarn-unused:implicits",
     "-Ywarn-unused:privates",
     "-Ywarn-unused:locals",
@@ -50,11 +45,6 @@ scalacOptions ++= Seq(
 assemblyJarName in assembly := "wdlTools.jar"
 logLevel in assembly := Level.Info
 //assemblyOutputPath in assembly := file("applet_resources/resources/dxWDL.jar")
-
-//antlr4Version in Antlr4 := "4.8.0"
-//antlr4PackageName in Antlr4 := Some("org.openwdl.wdl.parser")
-//antlr4GenVisitor in Antlr4 := true
-//antlr4TreatWarningsAsErrors in Antlr4 := true
 
 val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
@@ -72,8 +62,8 @@ libraryDependencies ++= Seq(
     "com.typesafe" % "config" % typesafeVersion,
     "io.spray" %% "spray-json" % sprayVersion,
     //---------- Test libraries -------------------//
-    "org.scalactic" %% "scalactic" % "3.0.1",
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+    "org.scalactic" % "scalactic_2.13" % "3.1.1",
+    "org.scalatest" % "scalatest_2.13" % "3.1.1" % "test"
 )
 
 // If an exception is thrown during tests, show the full

@@ -120,7 +120,7 @@ class LineFormatter(
         currentIndentSteps = initialIndentSteps
       case Indenting.Never =>
         currentIndentSteps = 0
-      case _ => Unit
+      case _ => ()
     }
   }
 

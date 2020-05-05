@@ -2,13 +2,15 @@ package wdlTools.syntax.draft_2
 
 import java.nio.file.Paths
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
 import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
 
-class ConcreteSyntaxDraft2Test extends FlatSpec with Matchers {
+class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")

@@ -4,7 +4,7 @@ package wdlTools.syntax.draft_2
 
 import java.net.URL
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.draft_2.WdlDraft2Parser.{
@@ -1138,22 +1138,19 @@ scatter
         visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
 
+    val wfElems: Vector[WorkflowElement] = elems.collect {
+      case x: WdlDraft2Parser.Wf_inner_elementContext =>
+        visitInner_workflow_element(x.inner_workflow_element())
+    }
+
     // We treat as an input any unbound declaration as well as any bound declaration
     // that doesn't require evaluation.
-    val (noEvalDecls, wfElems) = elems
-      .collect {
-        case x: WdlDraft2Parser.Wf_inner_elementContext =>
-          visitInner_workflow_element(x.inner_workflow_element()) match {
-            case d: Declaration if !requiresEvaluation(d) => Left(d)
-            case other                                    => Right(other)
-          }
-      }
-      .partition(_.isLeft)
-
-    val wfBody = wfElems.map(_.right.get)
-    val wfTextSource = getTextSource(ctx)
-
-    val inputDecls = unboundDecls ++ noEvalDecls.map(_.left.get)
+    val (noEvalDecls, wfBody) = wfElems.partition {
+      case d: Declaration if !requiresEvaluation(d) => true
+      case _                                        => false
+    }
+    val noEvalDecls2 = noEvalDecls.map(_.asInstanceOf[Declaration])
+    val inputDecls = unboundDecls ++ noEvalDecls2
     val input = if (inputDecls.nonEmpty) {
       Some(
           InputSection(inputDecls, TextSource.fromSpan(inputDecls.head.text, inputDecls.last.text))
@@ -1164,7 +1161,7 @@ scatter
 
     parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
-    Workflow(name, input, output, meta, parameterMeta, wfBody, wfTextSource)
+    Workflow(name, input, output, meta, parameterMeta, wfBody, getTextSource(ctx))
   }
 
   /*
