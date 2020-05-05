@@ -1201,37 +1201,31 @@ document
   }
 
   def parseDocument: Document = {
-    apply match {
-      case d: Document => d
-      case _           => throw new Exception("WDL file does not contain a valid document")
+    val ctx = grammar.parser.document
+    if (ctx == null) {
+      throw new Exception("WDL file does not contain a valid document")
     }
+    val result = visitDocument(ctx, grammar.comments)
+    grammar.verify()
+    result
   }
 
   def parseExpr: Expr = {
-    apply match {
-      case e: Expr => e
-      case _       => throw new Exception("Not a Valid expression")
+    val ctx = grammar.parser.expr_document
+    if (ctx == null) {
+      throw new Exception("Not a Valid expression")
     }
+    val result = visitExpr(ctx.expr())
+    grammar.verify()
+    result
   }
 
   def parseWdlType: Type = {
-    apply match {
-      case t: Type => t
-      case _       => throw new Exception("Not a valid WDL type")
+    val ctx = grammar.parser.type_document
+    if (ctx == null) {
+      throw new Exception("Not a valid WDL type")
     }
-  }
-
-  def apply: Element = {
-    val ctx = grammar.parser.top.document_or_fragment
-    val result = if (ctx.document != null) {
-      visitDocument(ctx.document, grammar.comments)
-    } else if (ctx.expr != null) {
-      visitExpr(ctx.expr)
-    } else if (ctx.wdl_type != null) {
-      visitWdl_type(ctx.wdl_type)
-    } else {
-      throw new Exception(s"No valid document or fragment")
-    }
+    val result = visitWdl_type(ctx.wdl_type())
     grammar.verify()
     result
   }

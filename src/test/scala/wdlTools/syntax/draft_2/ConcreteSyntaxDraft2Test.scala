@@ -499,7 +499,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
   }
 
-  ignore should "report bad types" in {
+  it should "report bad types" in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("bad_type.wdl"))
     }
