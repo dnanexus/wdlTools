@@ -175,12 +175,6 @@ class AllParseTreeListener extends WdlDraft2ParserListener with WdlV1ParserListe
   def exitWorkflow(ctx: ParserRuleContext): Unit = {}
   def enterDocument_element(ctx: ParserRuleContext): Unit = {}
   def exitDocument_element(ctx: ParserRuleContext): Unit = {}
-  def enterDocument(ctx: ParserRuleContext): Unit = {}
-  def exitDocument(ctx: ParserRuleContext): Unit = {}
-  def enterDocument_or_fragment(ctx: ParserRuleContext): Unit = {}
-  def exitDocument_or_fragment(ctx: ParserRuleContext): Unit = {}
-  def enterTop(ctx: ParserRuleContext): Unit = {}
-  def exitTop(ctx: ParserRuleContext): Unit = {}
   def enterTask_output_element(ctx: ParserRuleContext): Unit = {}
   def exitTask_output_element(ctx: ParserRuleContext): Unit = {}
   def enterTask_command_element(ctx: ParserRuleContext): Unit = {}
@@ -201,6 +195,12 @@ class AllParseTreeListener extends WdlDraft2ParserListener with WdlV1ParserListe
   def exitWf_parameter_meta_element(ctx: ParserRuleContext): Unit = {}
   def enterWf_meta_element(ctx: ParserRuleContext): Unit = {}
   def exitWf_meta_element(ctx: ParserRuleContext): Unit = {}
+  def enterDocument(ctx: ParserRuleContext): Unit = {}
+  def exitDocument(ctx: ParserRuleContext): Unit = {}
+  def enterType_document(ctx: ParserRuleContext): Unit = {}
+  def exitType_document(ctx: ParserRuleContext): Unit = {}
+  def enterExpr_document(ctx: ParserRuleContext): Unit = {}
+  def exitExpr_document(ctx: ParserRuleContext): Unit = {}
   override def enterMap_type(ctx: WdlDraft2Parser.Map_typeContext): Unit = {
     enterMap_type(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -681,17 +681,17 @@ class AllParseTreeListener extends WdlDraft2ParserListener with WdlV1ParserListe
   override def exitDocument(ctx: WdlDraft2Parser.DocumentContext): Unit = {
     exitDocument(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterDocument_or_fragment(ctx: WdlDraft2Parser.Document_or_fragmentContext): Unit = {
-    enterDocument_or_fragment(ctx.asInstanceOf[ParserRuleContext])
+  override def enterType_document(ctx: WdlDraft2Parser.Type_documentContext): Unit = {
+    enterType_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitDocument_or_fragment(ctx: WdlDraft2Parser.Document_or_fragmentContext): Unit = {
-    exitDocument_or_fragment(ctx.asInstanceOf[ParserRuleContext])
+  override def exitType_document(ctx: WdlDraft2Parser.Type_documentContext): Unit = {
+    exitType_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterTop(ctx: WdlDraft2Parser.TopContext): Unit = {
-    enterTop(ctx.asInstanceOf[ParserRuleContext])
+  override def enterExpr_document(ctx: WdlDraft2Parser.Expr_documentContext): Unit = {
+    enterExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitTop(ctx: WdlDraft2Parser.TopContext): Unit = {
-    exitTop(ctx.asInstanceOf[ParserRuleContext])
+  override def exitExpr_document(ctx: WdlDraft2Parser.Expr_documentContext): Unit = {
+    exitExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMap_type(ctx: WdlV1Parser.Map_typeContext): Unit = {
     enterMap_type(ctx.asInstanceOf[ParserRuleContext])
@@ -1225,17 +1225,17 @@ class AllParseTreeListener extends WdlDraft2ParserListener with WdlV1ParserListe
   override def exitDocument(ctx: WdlV1Parser.DocumentContext): Unit = {
     exitDocument(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterDocument_or_fragment(ctx: WdlV1Parser.Document_or_fragmentContext): Unit = {
-    enterDocument_or_fragment(ctx.asInstanceOf[ParserRuleContext])
+  override def enterType_document(ctx: WdlV1Parser.Type_documentContext): Unit = {
+    enterType_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitDocument_or_fragment(ctx: WdlV1Parser.Document_or_fragmentContext): Unit = {
-    exitDocument_or_fragment(ctx.asInstanceOf[ParserRuleContext])
+  override def exitType_document(ctx: WdlV1Parser.Type_documentContext): Unit = {
+    exitType_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterTop(ctx: WdlV1Parser.TopContext): Unit = {
-    enterTop(ctx.asInstanceOf[ParserRuleContext])
+  override def enterExpr_document(ctx: WdlV1Parser.Expr_documentContext): Unit = {
+    enterExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitTop(ctx: WdlV1Parser.TopContext): Unit = {
-    exitTop(ctx.asInstanceOf[ParserRuleContext])
+  override def exitExpr_document(ctx: WdlV1Parser.Expr_documentContext): Unit = {
+    exitExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterTask_output_element(ctx: WdlDraft2Parser.Task_output_elementContext): Unit = {
     enterTask_output_element(ctx.asInstanceOf[ParserRuleContext])

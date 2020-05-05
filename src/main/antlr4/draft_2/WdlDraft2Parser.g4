@@ -263,12 +263,10 @@ document
 	: document_element* (workflow document_element*)? EOF
 	;
 
-document_or_fragment
-  : document
-  | wdl_type
-  | expr
+type_document
+  : wdl_type EOF
   ;
 
-top
-  : document_or_fragment EOF
+expr_document
+  : expr EOF
   ;
