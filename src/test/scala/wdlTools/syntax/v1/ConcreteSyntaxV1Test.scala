@@ -601,13 +601,13 @@ class ConcreteSyntaxV1Test extends FlatSpec with Matchers {
     }
   }
 
-  it should "report bad types"  in {
+  it should "report bad types" in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("bad_type.wdl"))
     }
   }
 
-  it should "report unterminated double quotes"  taggedAs Edge in {
+  it should "report unterminated double quotes" taggedAs Edge in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("unterminated_dquote.wdl"))
     }
