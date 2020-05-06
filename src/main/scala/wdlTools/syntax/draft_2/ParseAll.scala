@@ -269,7 +269,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(WdlVersion.Draft_2, TextSource.empty)
-      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
+      AST.Document(doc.docSourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
     }
   }
 
@@ -287,7 +287,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
     val grammar = grammarFactory.createGrammar(sourceCode.toString)
-    val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
+    val visitor = ParseTop(opts, grammar, sourceCode.toString, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
     if (errorListener.hasErrors) {
@@ -298,13 +298,13 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, grammarFactory.createGrammar(text), text)
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, grammarFactory.createGrammar(text), text)
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }

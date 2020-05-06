@@ -224,6 +224,7 @@ case class ProjectGenerator(opts: Options,
     }
 
     val doc = Document(null,
+                       null,
                        Version(wdlVersion, null),
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),

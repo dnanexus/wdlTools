@@ -17,6 +17,7 @@ import scala.jdk.CollectionConverters._
 
 case class ParseTop(opts: Options,
                     grammar: Grammar[WdlV1Lexer, WdlV1Parser],
+                    docSource: String,
                     docSourceUrl: Option[URL] = None)
     extends WdlV1ParserBaseVisitor[Element] {
 
@@ -1232,6 +1233,7 @@ document
         Some(visitWorkflow(ctx.workflow()))
 
     Document(docSourceUrl.get,
+             docSource,
              version,
              elems,
              workflow,

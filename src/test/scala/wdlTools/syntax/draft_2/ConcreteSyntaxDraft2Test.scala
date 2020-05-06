@@ -30,7 +30,10 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, grammarFactory.createGrammar(sourceCode.toString), Some(sourceCode.url)).parseDocument
+    ParseTop(conf,
+             grammarFactory.createGrammar(sourceCode.toString),
+             sourceCode.toString,
+             Some(sourceCode.url)).parseDocument
   }
 
   it should "handle various types" in {

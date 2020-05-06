@@ -195,6 +195,7 @@ object AbstractSyntax {
       with Callable
 
   case class Document(docSourceUrl: URL,
+                      sourceCode: String,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

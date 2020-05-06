@@ -24,6 +24,7 @@ import scala.collection.mutable
 
 case class ParseTop(opts: Options,
                     grammar: Grammar[WdlDraft2Lexer, WdlDraft2Parser],
+                    docSource: String,
                     docSourceURL: Option[URL] = None)
     extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
@@ -1197,7 +1198,12 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(docSourceURL.get, elems, workflow, getTextSource(ctx), CommentMap(comments.toMap))
+    Document(docSourceURL.get,
+             docSource,
+             elems,
+             workflow,
+             getTextSource(ctx),
+             CommentMap(comments.toMap))
   }
 
   def parseDocument: Document = {
