@@ -11,7 +11,7 @@ import wdlTools.util.Verbosity.Quiet
 import wdlTools.util.{Options, SourceCode, Util}
 
 class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
-  private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
+  private val sourcePath = Paths.get(getClass.getResource("/wdlTools/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val opts = Options(

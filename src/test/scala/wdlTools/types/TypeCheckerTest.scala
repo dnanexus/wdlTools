@@ -11,7 +11,7 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/types/v1").getPath)
+          Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -127,7 +127,7 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
 
   it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/types/v1").getPath)
+        Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
     )
 
     // filter out files that do not appear in the control table

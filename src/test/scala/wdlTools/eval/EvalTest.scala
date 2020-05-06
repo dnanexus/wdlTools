@@ -13,7 +13,7 @@ import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Ve
 import wdlTools.types.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
-  private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
+  private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
   private val opts =
     Options(typeChecking = TypeCheckingRegime.Lenient,
             antlr4Trace = false,
