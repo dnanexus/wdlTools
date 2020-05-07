@@ -10,12 +10,12 @@ import wdlTools.types.WdlTypes._
 // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
 // An additional variable holds a list of all imported namespaces.
 case class Context(docSourceUrl: Option[URL] = None,
-                   declarations: Map[String, WT] = Map.empty,
-                   structs: Map[String, WT_Struct] = Map.empty,
-                   callables: Map[String, WT_Callable] = Map.empty,
+                   declarations: Map[String, WdlTypes.T] = Map.empty,
+                   structs: Map[String, T_Struct] = Map.empty,
+                   callables: Map[String, T_Callable] = Map.empty,
                    namespaces: Set[String] = Set.empty) {
 
-  def bindVar(varName: String, wdlType: WT, srcText: TextSource): Context = {
+  def bindVar(varName: String, wdlType: T, srcText: TextSource): Context = {
     declarations.get(varName) match {
       case None =>
         this.copy(declarations = declarations + (varName -> wdlType))
@@ -26,7 +26,7 @@ case class Context(docSourceUrl: Option[URL] = None,
     }
   }
 
-  def bind(s: WT_Struct, srcText: TextSource): Context = {
+  def bind(s: T_Struct, srcText: TextSource): Context = {
     structs.get(s.name) match {
       case None =>
         this.copy(structs = structs + (s.name -> s))
@@ -36,7 +36,7 @@ case class Context(docSourceUrl: Option[URL] = None,
   }
 
   // add a callable (task/workflow)
-  def bindCallable(callable: WT_Callable, srcText: TextSource): Context = {
+  def bindCallable(callable: T_Callable, srcText: TextSource): Context = {
     callables.get(callable.name) match {
       case None =>
         this.copy(callables = callables + (callable.name -> callable))
@@ -48,7 +48,7 @@ case class Context(docSourceUrl: Option[URL] = None,
   }
 
   // add a bunch of bindings
-  def bindVarList(bindings: Map[String, WT], srcText: TextSource): Context = {
+  def bindVarList(bindings: Map[String, WdlTypes.T], srcText: TextSource): Context = {
     val existingVarNames = declarations.keys.toSet
     val newVarNames = bindings.keys.toSet
     val both = existingVarNames intersect newVarNames
@@ -78,10 +78,10 @@ case class Context(docSourceUrl: Option[URL] = None,
 
     // There cannot be any collisions because this is a new namespace
     val iCallables = iCtx.callables.map {
-      case (name, taskSig: WT_Task) =>
+      case (name, taskSig: T_Task) =>
         val fqn = namespace + "." + name
         fqn -> taskSig.copy(name = fqn)
-      case (name, wfSig: WT_Workflow) =>
+      case (name, wfSig: T_Workflow) =>
         val fqn = namespace + "." + name
         fqn -> wfSig.copy(name = fqn)
       case other =>
@@ -102,7 +102,7 @@ case class Context(docSourceUrl: Option[URL] = None,
       case (name, iStruct) =>
         aliasesMap.get(name) match {
           case None          => name -> iStruct
-          case Some(altName) => altName -> WT_Struct(altName, iStruct.members)
+          case Some(altName) => altName -> T_Struct(altName, iStruct.members)
         }
     }
 

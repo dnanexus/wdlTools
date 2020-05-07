@@ -49,7 +49,7 @@ case class Util(conf: Options) {
       // T is coercible to T?
       case (T_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)
 
-      case (T_Array(l), T_Array(r))         => isCoercibleTo2(l, r)
+      case (T_Array(l, _), T_Array(r, _))         => isCoercibleTo2(l, r)
       case (T_Map(kl, vl), T_Map(kr, vr))   => isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)
       case (T_Pair(l1, l2), T_Pair(r1, r2)) => isCoercibleTo2(l1, r1) && isCoercibleTo2(l2, r2)
 
@@ -133,7 +133,7 @@ case class Util(conf: Options) {
         val (t, ctx2) = unify(l, r, ctx)
         (T_Optional(t), ctx2)
 
-      case (T_Array(l), T_Array(r)) =>
+      case (T_Array(l, _), T_Array(r, _)) =>
         val (t, ctx2) = unify(l, r, ctx)
         (T_Array(t), ctx2)
       case (T_Map(k1, v1), T_Map(k2, v2)) =>
@@ -234,7 +234,7 @@ case class Util(conf: Options) {
         case a: T_Var       => typeBindings(a)
         case x: T_Struct    => x
         case T_Pair(l, r)   => T_Pair(sub(l), sub(r))
-        case T_Array(t)     => T_Array(sub(t))
+        case T_Array(t, _)     => T_Array(sub(t))
         case T_Map(k, v)    => T_Map(sub(k), sub(v))
         case T_Object       => T_Object
         case T_Optional(t1) => T_Optional(sub(t1))
@@ -259,7 +259,7 @@ case class Util(conf: Options) {
       case T_Var(i)         => s"Var($i)"
       case T_Identifier(id) => s"Id(${id})"
       case T_Pair(l, r)     => s"Pair[${toString(l)}, ${toString(r)}]"
-      case T_Array(t)       => s"Array[${toString(t)}]"
+      case T_Array(t, _)    => s"Array[${toString(t)}]"
       case T_Map(k, v)      => s"Map[${toString(k)}, ${toString(v)}]"
       case T_Object         => "Object"
       case T_Optional(t)    => s"Optional[${toString(t)}]"

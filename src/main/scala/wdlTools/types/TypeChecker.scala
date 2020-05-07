@@ -302,7 +302,7 @@ case class TypeChecker(stdlib: Stdlib) {
                                   ctx.docSourceUrl)
         val vt = typeEval(value, ctx)
         vt match {
-          case T_Array(x) if tUtil.isCoercibleTo(T_String, x) =>
+          case T_Array(x, _) if tUtil.isCoercibleTo(T_String, x) =>
             T_String
           case other =>
             throw new TypeException(
@@ -345,7 +345,7 @@ case class TypeChecker(stdlib: Stdlib) {
           throw new TypeException(s"${index} must be an integer", expr.text, ctx.docSourceUrl)
         val arrayt = typeEval(array, ctx)
         arrayt match {
-          case T_Array(elemType) => elemType
+          case T_Array(elemType, _) => elemType
           case _ =>
             throw new TypeException(s"subexpression ${array} in (${expr}) must be an array",
                                     expr.text,
@@ -701,7 +701,7 @@ case class TypeChecker(stdlib: Stdlib) {
   private def applyScatter(scatter: Scatter, ctxOuter: Context): Bindings = {
     val collectionType = typeEval(scatter.expr, ctxOuter)
     val elementType = collectionType match {
-      case T_Array(elementType) => elementType
+      case T_Array(elementType, _) => elementType
       case _ =>
         throw new Exception(s"Collection in scatter (${scatter}) is not an array type")
     }
