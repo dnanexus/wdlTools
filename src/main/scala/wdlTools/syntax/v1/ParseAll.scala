@@ -218,7 +218,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     ): AST.RuntimeSection = {
       // check for duplicate ids
       runtime.kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if accu.contains(kv.id) => accu + kv.id
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
         case (_, kv) =>
           throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
@@ -351,7 +351,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
     val grammar = WdlV1Grammar.newInstance(sourceCode, opts)
-    val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
+    val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
     if (errorListener.hasErrors) {

@@ -286,7 +286,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
     val grammar = WdlDraft2Grammar.newInstance(sourceCode, opts)
-    val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
+    val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
     if (errorListener.hasErrors) {
