@@ -344,10 +344,12 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
     }
   }
 
+  private val versionRegexp = "version\\s+2.0".r
+
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
       if (!(line.trim.isEmpty || line.startsWith("#"))) {
-        return line.trim.startsWith("version 1.0")
+        return versionRegexp.matches(line.trim)
       }
     }
     false
