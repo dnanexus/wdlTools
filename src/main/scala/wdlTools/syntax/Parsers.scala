@@ -20,17 +20,19 @@ case class Parsers(opts: Options = Options()) {
   }
 
   def getParser(sourceCode: SourceCode): WdlParser = {
-    WdlVersion.All.foreach { ver =>
-      val parser = parsers(ver)
-      if (parser.canParse(sourceCode)) {
-        return parser
-      }
+    parsers.values.collectFirst {
+      case parser if parser.canParse(sourceCode) => parser
+    } match {
+      case Some(parser) => parser
+      case _            => throw new Exception(s"No parser is able to parse document ${sourceCode.url}")
     }
-    throw new Exception(s"No parser is able to parse document ${sourceCode.url}")
   }
 
   def getParser(wdlVersion: WdlVersion): WdlParser = {
-    parsers(wdlVersion)
+    parsers.get(wdlVersion) match {
+      case Some(parser) => parser
+      case _            => throw new Exception(s"No parser defined for WdlVersion ${wdlVersion}")
+    }
   }
 
   def parseDocument(path: Path): Document = {
