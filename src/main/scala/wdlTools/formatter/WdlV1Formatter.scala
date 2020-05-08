@@ -453,7 +453,7 @@ case class WdlV1Formatter(opts: Options,
         } else {
           value
         }
-        Literal.fromStart(value, text, quoted = inPlaceholder || !inStringOrCommand)
+        Literal.fromStart(v, text, quoted = inPlaceholder || !inStringOrCommand)
       case ValueBoolean(value, text) => Literal.fromStart(value, text)
       case ValueInt(value, text)     => Literal.fromStart(value, text)
       case ValueFloat(value, text)   => Literal.fromStart(value, text)

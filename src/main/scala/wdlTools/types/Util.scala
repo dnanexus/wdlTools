@@ -255,6 +255,7 @@ case class Util(conf: Options) {
       case WT_Float          => "Float"
       case WT_String         => "String"
       case WT_File           => "File"
+      case WT_Directory      => "Directory"
       case WT_Any            => "Any"
       case WT_Var(i)         => s"Var($i)"
       case WT_Identifier(id) => s"Id(${id})"

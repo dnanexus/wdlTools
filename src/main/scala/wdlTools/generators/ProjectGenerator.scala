@@ -366,6 +366,7 @@ object ProjectGenerator {
           Some(
               RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null)), null)
           ),
+          None,
           null
       )
       (task, linkedInputs)
@@ -396,7 +397,7 @@ object ProjectGenerator {
           } else {
             None
           }
-          Call(task.name, None, callInputs, null)
+          Call(task.name, None, Vector.empty, callInputs, null)
       }
 
       val (wfInputSection, _) = getInput(inputs.toVector)

@@ -3,12 +3,7 @@ package wdlTools.syntax.v1
 import java.net.URL
 
 import org.openwdl.wdl.parser.v1.{WdlV1Lexer, WdlV1Parser}
-import wdlTools.syntax.Antlr4Util.{
-  Grammar,
-  ParseTreeListenerFactory,
-  WdlAggregatingErrorListener,
-  createGrammar
-}
+import wdlTools.syntax.Antlr4Util.{Grammar, WdlAggregatingErrorListener, createGrammar}
 import wdlTools.util.{Options, SourceCode}
 
 case class WdlV1Grammar(override val lexer: WdlV1Lexer,

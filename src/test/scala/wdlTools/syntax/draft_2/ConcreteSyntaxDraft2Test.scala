@@ -19,7 +19,6 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir)
   )
-  private val grammarFactory = WdlDraft2GrammarFactory(opts)
 
   private def getTaskSource(fname: String): SourceCode = {
     SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
@@ -30,7 +29,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, grammarFactory.createGrammar(sourceCode.toString), Some(sourceCode.url)).parseDocument
+    ParseTop(conf, WdlDraft2Grammar.newInstance(sourceCode, opts)).parseDocument
   }
 
   it should "handle various types" in {
