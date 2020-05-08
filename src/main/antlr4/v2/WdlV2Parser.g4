@@ -131,7 +131,7 @@ expr_core
   ;
 
 version
-  : VERSION RELEASE_VERSION
+  : VERSION ReleaseVersion
   ;
 
 import_alias
@@ -193,8 +193,8 @@ task_output
   ;
 
 task_command
-  : COMMAND task_command_string_part task_command_expr_with_string* EndCommand
-  | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
+  : COMMAND BeginLBrace task_command_string_part task_command_expr_with_string* EndCommand
+  | COMMAND BeginHereDoc task_command_string_part task_command_expr_with_string* EndCommand
   ;
 
 task_command_string_part
@@ -247,7 +247,7 @@ call_body
   : LBRACE call_inputs? RBRACE
   ;
 
-call_afters
+call_after
   : AFTER Identifier
   ;
 
@@ -256,7 +256,7 @@ call_name
     ;
 
 call
-  : CALL call_name call_alias? (call_afters)*  call_body?
+  : CALL call_name call_alias? (call_after)*  call_body?
   ;
 
 scatter
@@ -296,4 +296,12 @@ document_element
 
 document
   : version document_element* (workflow document_element*)? EOF
+  ;
+
+type_document
+  : wdl_type EOF
+  ;
+
+expr_document
+  : expr EOF
   ;

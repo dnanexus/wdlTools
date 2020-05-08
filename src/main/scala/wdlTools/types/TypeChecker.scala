@@ -171,7 +171,6 @@ case class TypeChecker(stdlib: Stdlib) {
     expr match {
       // base cases, primitive types
       case _: ValueString  => WT_String
-      case _: ValueFile    => WT_File
       case _: ValueBoolean => WT_Boolean
       case _: ValueInt     => WT_Int
       case _: ValueFloat   => WT_Float

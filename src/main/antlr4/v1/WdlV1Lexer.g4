@@ -90,11 +90,6 @@ WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
 Identifier: CompleteIdentifier;
 
-mode Version;
-
-VersionWhitespace: [ \t]+ -> channel(HIDDEN);
-ReleaseVersion: [a-zA-Z0-9.-]+ -> popMode;
-
 mode SquoteInterpolatedString;
 
 SQuoteEscapedChar: '\\' . -> type(StringPart);
@@ -145,6 +140,11 @@ CommandCurlyString: '{' -> type(CommandStringPart);
 StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
 EndCommand: '}' -> mode(DEFAULT_MODE);
 CommandStringPart: ~[$~{}]+;
+
+mode Version;
+
+VersionWhitespace: [ \t]+ -> channel(HIDDEN);
+ReleaseVersion: [a-zA-Z0-9.-]+ -> popMode;
 
 // Fragments
 

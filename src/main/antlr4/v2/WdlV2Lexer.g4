@@ -42,9 +42,7 @@ ARRAY: 'Array';
 MAP: 'Map';
 PAIR: 'Pair';
 AFTER: 'after';
-
-HEREDOC_COMMAND: 'command' ' '* '<<<' -> pushMode(HereDocCommand);
-COMMAND: 'command' ' '* '{' -> pushMode(Command);
+COMMAND: 'command'-> mode(Command);
 
 // Primitive Literals
 NONELITERAL: 'None';
@@ -122,6 +120,12 @@ DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(
 EndDQuote: '"' ->  popMode, type(DQUOTE);
 DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
 
+mode Command;
+
+BeginWhitespace: [ \t\r\n]* -> channel(HIDDEN);
+BeginHereDoc: '<<<' -> mode(HereDocCommand);
+BeginLBrace: '{' -> mode(CurlyCommand);
+
 mode HereDocCommand;
 
 HereDocUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
@@ -130,11 +134,11 @@ HereDocTildeString: '~' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
 HereDocCurlyStringCommand: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
-EndHereDocCommand: '>>>' -> popMode, type(EndCommand);
+EndHereDocCommand: '>>>' -> mode(DEFAULT_MODE), type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
 HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 
-mode Command;
+mode CurlyCommand;
 
 CommandEscapedChar: '\\' . -> type(CommandStringPart);
 CommandUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
@@ -142,15 +146,13 @@ CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
 StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
-EndCommand: '}' -> popMode;
+EndCommand: '}' -> mode(DEFAULT_MODE);
 CommandStringPart: ~[$~{}]+;
 
 mode Version;
 
-VERSION_WHITESPACE
-	: [ \t]+ -> channel(HIDDEN)
-	;
-RELEASE_VERSION: [a-zA-Z0-9.-]+ -> popMode;
+VersionWhitespace: [ \t]+ -> channel(HIDDEN);
+ReleaseVersion: [a-zA-Z0-9.-]+ -> popMode;
 
 // Fragments
 

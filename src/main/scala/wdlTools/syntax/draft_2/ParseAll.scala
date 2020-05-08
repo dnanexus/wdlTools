@@ -35,7 +35,6 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       e match {
         // values
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
         case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
@@ -198,6 +197,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
                 case CST.CallAlias(callName, callText) =>
                   AST.CallAlias(callName, callText)
               },
+              Vector.empty,
               inputs.map {
                 case CST.CallInputs(inputsVec, inputsText) =>
                   AST.CallInputs(inputsVec.map { inp =>
@@ -248,6 +248,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
+          None,
           task.text
       )
     }

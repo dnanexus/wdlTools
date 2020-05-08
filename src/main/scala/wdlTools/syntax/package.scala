@@ -9,6 +9,7 @@ sealed abstract class WdlVersion(val name: String, val order: Int) extends Order
 object WdlVersion {
   case object Draft_2 extends WdlVersion("draft-2", 0)
   case object V1 extends WdlVersion("1.0", 1)
+  case object V2 extends WdlVersion("2.0", 2)
 
   val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
 

@@ -40,7 +40,6 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       e match {
         // values
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
         case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
@@ -138,7 +137,6 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       value match {
         // values
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
         case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
@@ -221,13 +219,12 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         runtime: CST.RuntimeSection
     ): AST.RuntimeSection = {
       // check for duplicate ids
-      var allIds = Set.empty[String]
-      for (kv <- runtime.kvs) {
-        if (allIds contains kv.id)
+      runtime.kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
           throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
                                     docSourceUrl)
-        allIds = allIds + kv.id
       }
 
       AST.RuntimeSection(
@@ -253,6 +250,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
                 case CST.CallAlias(callName, callText) =>
                   AST.CallAlias(callName, callText)
               },
+              Vector.empty,
               inputs.map {
                 case CST.CallInputs(inputsMap, inputsText) =>
                   AST.CallInputs(inputsMap.map { inp =>
@@ -317,6 +315,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
+          None,
           task.text
       )
     }

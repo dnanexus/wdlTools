@@ -4,7 +4,7 @@ import sbtassembly.AssemblyPlugin.autoImport._
 scalaVersion := "2.13.2"
 name := "wdlTools"
 organization := "com.dnanexus"
-val root = Project("root", file("."))
+val root = project.in(file("."))
 
 // reduce the maximum number of errors shown by the Scala compiler
 maxErrors := 7
