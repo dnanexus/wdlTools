@@ -11,7 +11,8 @@ import scala.collection.mutable
 case class Parsers(opts: Options = Options()) {
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts),
-      WdlVersion.V1 -> v1.ParseAll(opts)
+      WdlVersion.V1 -> v1.ParseAll(opts),
+      WdlVersion.V2 -> v2.ParseAll(opts)
   )
 
   def getParser(url: URL): WdlParser = {

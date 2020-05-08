@@ -31,10 +31,10 @@ object WdlVersion {
   * an implicit value of WdlVersion.Draft_2, but there is no actual version
   * statement.
   *
-  * @param line: line number starting line
+  * @param line: starting line number
   * @param col: starting column
-  * @param endLine: ending line, end-inclusive
-  * @param endCol: ending column, end-exclusive
+  * @param endLine: line (end-inclusive) on which the last token ends
+  * @param endCol: column (end-exclusive) at which the last token ends
   */
 case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
   lazy val lineRange: Range = line to endLine

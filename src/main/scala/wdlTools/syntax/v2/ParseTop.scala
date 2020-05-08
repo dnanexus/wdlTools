@@ -6,8 +6,8 @@ import java.net.URL
 
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.tree.TerminalNode
-import org.openwdl.wdl.parser.v2.{WdlV2Lexer, WdlV2Parser, WdlV2ParserBaseVisitor}
-import wdlTools.syntax.Antlr4Util.{Grammar, getTextSource}
+import org.openwdl.wdl.parser.v2.{WdlV2Parser, WdlV2ParserBaseVisitor}
+import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.v2.ConcreteSyntax._
 import wdlTools.syntax.{Comment, CommentMap, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.{Options, Util}
@@ -15,9 +15,7 @@ import wdlTools.util.{Options, Util}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
-case class ParseTop(opts: Options,
-                    grammar: Grammar[WdlV2Lexer, WdlV2Parser],
-                    docSourceUrl: Option[URL] = None)
+case class ParseTop(opts: Options, grammar: WdlV2Grammar, docSourceUrl: Option[URL] = None)
     extends WdlV2ParserBaseVisitor[Element] {
 
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
@@ -1146,33 +1144,26 @@ document
              CommentMap(comments.toMap))
   }
 
+  def visitExprDocument(ctx: WdlV2Parser.Expr_documentContext): Expr = {
+    visitExpr(ctx.expr())
+  }
+
+  def visitTypeDocument(ctx: WdlV2Parser.Type_documentContext): Type = {
+    visitWdl_type(ctx.wdl_type())
+  }
+
   def parseDocument: Document = {
-    val ctx = grammar.parser.document
-    if (ctx == null) {
-      throw new Exception("WDL file does not contain a valid document")
-    }
-    val result = visitDocument(ctx, grammar.comments)
-    grammar.verify()
-    result
+    grammar
+      .visitDocument[WdlV2Parser.DocumentContext, Document](grammar.parser.document, visitDocument)
   }
 
   def parseExpr: Expr = {
-    val ctx = grammar.parser.expr_document
-    if (ctx == null) {
-      throw new Exception("Not a Valid expression")
-    }
-    val result = visitExpr(ctx.expr())
-    grammar.verify()
-    result
+    grammar.visitFragment[WdlV2Parser.Expr_documentContext, Expr](grammar.parser.expr_document,
+                                                                  visitExprDocument)
   }
 
   def parseWdlType: Type = {
-    val ctx = grammar.parser.type_document
-    if (ctx == null) {
-      throw new Exception("Not a valid WDL type")
-    }
-    val result = visitWdl_type(ctx.wdl_type())
-    grammar.verify()
-    result
+    grammar.visitFragment[WdlV2Parser.Type_documentContext, Type](grammar.parser.type_document,
+                                                                  visitTypeDocument)
   }
 }

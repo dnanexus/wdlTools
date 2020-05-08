@@ -8,8 +8,6 @@ import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options) extends WdlParser(opts) {
-  private val grammarFactory = WdlDraft2GrammarFactory(opts)
-
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
@@ -287,7 +285,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = grammarFactory.createGrammar(sourceCode.toString)
+    val grammar = WdlDraft2Grammar.newInstance(sourceCode, opts)
     val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
@@ -299,13 +297,13 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, opts))
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, opts))
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }
