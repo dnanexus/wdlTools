@@ -17,8 +17,8 @@ case class TypeEval(stdlib: Stdlib) {
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
-  type Bindings = Map[String, T]
   type WdlType = WdlTypes.T
+  type Bindings = Map[String, WdlType]
 
   private def typeEvalMathOp(expr: AST.Expr, ctx: Context): WdlType = {
     val t = typeEval(expr, ctx)
@@ -551,7 +551,7 @@ case class TypeEval(stdlib: Stdlib) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: AST.Task, ctxOuter: Context): T_Task = {
+  private def applyTask(task: AST.Task, ctxOuter: Context): (TAT.Task, T_Task) = {
     val ctx: Context = task.input match {
       case None => ctxOuter
       case Some(inpSection) =>
@@ -805,7 +805,7 @@ case class TypeEval(stdlib: Stdlib) {
     }
   }
 
-  private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): Context = {
+  private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): (TAT.Document, Context) = {
     val ctx: Context = wf.input match {
       case None => ctxOuter
       case Some(inpSection) =>
@@ -844,30 +844,19 @@ case class TypeEval(stdlib: Stdlib) {
     ctxFinal
   }
 
-  // Main entry point
-  //
-  // check if the WDL document is correctly typed. Otherwise, throw an exception
-  // describing the problem in a human readable fashion.
-  private def apply2(doc: AST.Document): Context = {
-    val initCtx = Context(
-        docSourceUrl = Some(doc.docSourceUrl),
-        taxDoc = TAT.Document(doc.docSourceUrl,
-                              doc.sourceCode,
-                              TAT.Version(doc.version.value, doc.version.text),
-                              Vector.empty[TAT.DocumentElement],
-                              None,
-                              doc.text,
-                              doc.comments)
-    )
+  private def apply2(doc: AST.Document): (TAT.Document, Context) = {
+    val initCtx = Context(docSourceUrl = Some(doc.docSourceUrl))
 
-    val context: Context =
-      doc.elements.foldLeft(initCtx) {
-        case (accu: Context, task: AST.Task) =>
-          val tt = applyTask(task, accu)
-          accu.bindCallable(tt, task.text)
+    val (context, elements) =
+      doc.elements.foldLeft((initCtx, Vector.empty[TAT.WorkflowElement])) {
+        case (ctx, elems, task: AST.Task) =>
+          val (task2, taskSig) = applyTask(task, ctx)
+          (ctx.bindCallable(taskSig, task.text),
+           elems :+ task2)
 
-        case (accu: Context, iStat: AST.ImportDoc) =>
-          val iCtx = apply2(iStat.doc.get)
+        case (ctx, elems, iStat: AST.ImportDoc) =>
+          // recurse into the imported document, add types
+          val (itDoc, iCtx) = apply2(iStat.doc.get)
 
           // Figure out what to name the sub-document
           val namespace = iStat.name match {
@@ -888,28 +877,49 @@ case class TypeEval(stdlib: Stdlib) {
             case Some(x) => x.value
           }
 
-          // add the externally visible definitions to the context
-          accu.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text)
+          val importDoc = TAT.ImportDoc(iStat.name,
+                                        iStat.aliases.map( ),
+                                        iStat.add.value,
+                                        iDoc,
+                                        iStat.text)
 
-        case (accu: Context, struct: AST.TypeStruct) =>
+          // add the externally visible definitions to the context
+          (ctx.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text),
+           elems :+ importDoc)
+
+        case (ctx, tDoc, struct: AST.TypeStruct) =>
           // Add the struct to the context
           val t = typeFromAst(struct, struct.text, accu)
           val t2 = t.asInstanceOf[T_Struct]
           accu.bind(t2, struct.text)
 
-        case (_, other) =>
+        case (_, _, other) =>
           throw new Exception(s"sanity: wrong element type in workflow $other")
       }
 
     // now that we have types for everything else, we can check the workflow
-    doc.workflow match {
-      case None     => context
-      case Some(wf) => applyWorkflow(wf, context)
+    val wf = doc.workflow match {
+      case None     => None
+      case Some(wf) => Some(applyWorkflow(wf, context))
     }
+
+    TAT.Document(doc.docSourceUrl,
+                 doc.sourceCode,
+                 TAT.Version(doc.version.value, doc.version.text),
+                 elements,
+                 wf,
+                 doc.text,
+                 doc.comments)
   }
 
+  // Main entry point
+  //
+  // check if the WDL document is correctly typed. Otherwise, throw an exception
+  // describing the problem in a human readable fashion. Return a document
+  // with types.
+  //
   def apply(doc: AST.Document): TAT.Document = {
-    val ctx = apply2(doc)
-    ctx.taxDoc
+    val (tDoc, _) = apply2(doc)
+    taxDoc
   }
 }

@@ -25,11 +25,11 @@ object TypedAbstractSyntax {
   // values
   sealed trait Value extends Expr
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Value
-  case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Value
-  case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Value
   case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Value
   case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Value
   case class ValueFloat(value: Double, wdlType: WdlType, text: TextSource) extends Value
+  case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Value
+  case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Value
 
   case class ExprIdentifier(id: String, wdlType: WdlType, text: TextSource) extends Expr
 
