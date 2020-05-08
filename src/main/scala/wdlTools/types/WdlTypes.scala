@@ -82,13 +82,5 @@ object WdlTypes {
 
   // A function with three arguments. For example:
   // String sub(String, String, String)
-  case class T_Function3(name: String, arg1: T, arg2: T, arg3: T, output: T)
-      extends T_StdlibFunc
-
-  // A value for each type variable.
-  //
-  // This is used when we have polymorphic types,
-  // such as when calling standard library functions. We need to keep
-  // track of the latest value for each type variable.
-  type TypeUnificationContext = Map[T_Var, T]
+  case class T_Function3(name: String, arg1: T, arg2: T, arg3: T, output: T) extends T_StdlibFunc
 }

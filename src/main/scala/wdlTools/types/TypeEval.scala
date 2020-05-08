@@ -2,27 +2,29 @@ package wdlTools.types
 
 import java.nio.file.Paths
 
-import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{Util => TUtil}
+import wdlTools.types.{TypedAbstractSyntax => TAT}
 
-case class TypeChecker(stdlib: Stdlib) {
+case class TypeEval(stdlib: Stdlib) {
   private val tUtil = TUtil(stdlib.conf)
   private val regime = stdlib.conf.typeChecking
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
   type Bindings = Map[String, T]
+  type WdlType = WdlTypes.T
 
-  private def typeEvalMathOp(expr: Expr, ctx: Context): T = {
+  private def typeEvalMathOp(expr: AST.Expr, ctx: Context): WdlType = {
     val t = typeEval(expr, ctx)
     t match {
-      case _: TypeInt   => T_Int
-      case _: TypeFloat => T_Float
+      case _: AST.TypeInt   => T_Int
+      case _: AST.TypeFloat => T_Float
       case _ =>
         throw new TypeException(s"${exprToString(expr)} must be an integer or a float",
                                 expr.text,
@@ -34,14 +36,14 @@ case class TypeChecker(stdlib: Stdlib) {
   // 1) The result of adding two integers is an integer
   // 2)    -"-                   floats   -"-   float
   // 3)    -"-                   strings  -"-   string
-  private def typeEvalAdd(a: Expr, b: Expr, ctx: Context): T = {
+  private def typeEvalAdd(a: AST.Expr, b: AST.Expr, ctx: Context): WdlType = {
     def isPseudoString(x: T): Boolean = {
       x match {
-        case T_String              => true
+        case T_String             => true
         case T_Optional(T_String) => true
-        case T_File                => true
+        case T_File               => true
         case T_Optional(T_File)   => true
-        case _                      => false
+        case _                    => false
       }
     }
     val at = typeEval(a, ctx)
@@ -61,7 +63,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // NON STANDARD
       // there are WDL programs where we add optional strings
-      case (T_String, x) if isPseudoString(x)                     => T_String
+      case (T_String, x) if isPseudoString(x)                   => T_String
       case (T_String, T_Optional(T_Int)) if regime == Lenient   => T_String
       case (T_String, T_Optional(T_Float)) if regime == Lenient => T_String
 
@@ -77,7 +79,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private def typeEvalMathOp(a: Expr, b: Expr, ctx: Context): T = {
+  private def typeEvalMathOp(a: AST.Expr, b: AST.Expr, ctx: Context): WdlType = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
@@ -94,7 +96,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private def typeEvalLogicalOp(expr: Expr, ctx: Context): T = {
+  private def typeEvalLogicalOp(expr: AST.Expr, ctx: Context): WdlType = {
     val t = typeEval(expr, ctx)
     t match {
       case T_Boolean => T_Boolean
@@ -107,7 +109,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private def typeEvalLogicalOp(a: Expr, b: Expr, ctx: Context): T = {
+  private def typeEvalLogicalOp(a: AST.Expr, b: AST.Expr, ctx: Context): WdlType = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     (at, bt) match {
@@ -119,7 +121,7 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private def typeEvalCompareOp(a: Expr, b: Expr, ctx: Context): T = {
+  private def typeEvalCompareOp(a: AST.Expr, b: AST.Expr, ctx: Context): WdlType = {
     val at = typeEval(a, ctx)
     val bt = typeEval(b, ctx)
     if (at == bt) {
@@ -141,44 +143,44 @@ case class TypeChecker(stdlib: Stdlib) {
     }
   }
 
-  private def typeTranslate(t: Type, text: TextSource, ctx: Context): T = {
+  private def typeFromAst(t: AST.Type, text: TextSource, ctx: Context): WdlType = {
     t match {
-      case TypeOptional(t, _) => T_Optional(typeTranslate(t, text, ctx))
-      case TypeArray(t, _, _) => T_Array(typeTranslate(t, text, ctx))
-      case TypeMap(k, v, _)   => T_Map(typeTranslate(k, text, ctx), typeTranslate(v, text, ctx))
-      case TypePair(l, r, _)  => T_Pair(typeTranslate(l, text, ctx), typeTranslate(r, text, ctx))
-      case _: TypeString      => T_String
-      case _: TypeFile        => T_File
-      case _: TypeBoolean     => T_Boolean
-      case _: TypeInt         => T_Int
-      case _: TypeFloat       => T_Float
-      case TypeIdentifier(id, _) =>
+      case AST.TypeOptional(t, _) => T_Optional(typeFromAst(t, text, ctx))
+      case AST.TypeArray(t, _, _) => T_Array(typeFromAst(t, text, ctx))
+      case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, text, ctx), typeFromAst(v, text, ctx))
+      case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, text, ctx), typeFromAst(r, text, ctx))
+      case _: AST.TypeString      => T_String
+      case _: AST.TypeFile        => T_File
+      case _: AST.TypeBoolean     => T_Boolean
+      case _: AST.TypeInt         => T_Int
+      case _: AST.TypeFloat       => T_Float
+      case AST.TypeIdentifier(id, _) =>
         ctx.structs.get(id) match {
           case None =>
             throw new TypeException(s"struct ${id} has not been defined", text, ctx.docSourceUrl)
           case Some(struct) => struct
         }
-      case _: TypeObject => T_Object
-      case TypeStruct(name, members, _) =>
+      case _: AST.TypeObject => T_Object
+      case AST.TypeStruct(name, members, _) =>
         T_Struct(name, members.map {
-          case StructMember(name, t2, _) => name -> typeTranslate(t2, text, ctx)
+          case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, text, ctx)
         }.toMap)
     }
   }
 
   // Figure out what the type of an expression is.
   //
-  private def typeEval(expr: Expr, ctx: Context): T = {
+  private def typeEval(expr: AST.Expr, ctx: Context): WdlType = {
     expr match {
       // base cases, primitive types
-      case _: ValueString  => T_String
-      case _: ValueFile    => T_File
-      case _: ValueBoolean => T_Boolean
-      case _: ValueInt     => T_Int
-      case _: ValueFloat   => T_Float
+      case _: AST.ValueString  => T_String
+      case _: AST.ValueFile    => T_File
+      case _: AST.ValueBoolean => T_Boolean
+      case _: AST.ValueInt     => T_Int
+      case _: AST.ValueFloat   => T_Float
 
       // an identifier has to be bound to a known type
-      case ExprIdentifier(id, _) =>
+      case AST.ExprIdentifier(id, _) =>
         ctx.declarations.get(id) match {
           case None =>
             throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceUrl)
@@ -186,7 +188,7 @@ case class TypeChecker(stdlib: Stdlib) {
         }
 
       // All the sub-exressions have to be strings, or coercible to strings
-      case ExprCompoundString(vec, _) =>
+      case AST.ExprCompoundString(vec, _) =>
         vec foreach { subExpr =>
           val t = typeEval(subExpr, ctx)
           if (!tUtil.isCoercibleTo(T_String, t))
@@ -198,13 +200,13 @@ case class TypeChecker(stdlib: Stdlib) {
         }
         T_String
 
-      case ExprPair(l, r, _)                => T_Pair(typeEval(l, ctx), typeEval(r, ctx))
-      case ExprArray(vec, _) if vec.isEmpty =>
+      case AST.ExprPair(l, r, _)                => T_Pair(typeEval(l, ctx), typeEval(r, ctx))
+      case AST.ExprArray(vec, _) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
         // TODO: replace the Any type with a type-parameter
         T_Array(T_Any)
 
-      case ExprArray(vec, _) =>
+      case AST.ExprArray(vec, _) =>
         val vecTypes = vec.map(typeEval(_, ctx))
         val (t, _) =
           try {
@@ -219,17 +221,17 @@ case class TypeChecker(stdlib: Stdlib) {
           }
         T_Array(t)
 
-      case _: ExprObject =>
+      case _: AST.ExprObject =>
         T_Object
 
-      case ExprMap(m, _) if m.isEmpty =>
+      case AST.ExprMap(m, _) if m.isEmpty =>
         // The map type is unknown.
         // TODO: replace the Any type with a type-parameter
         T_Map(T_Any, T_Any)
 
-      case ExprMap(m, _) =>
+      case AST.ExprMap(m, _) =>
         // figure out the types from the first element
-        val mTypes: Map[T, T] = m.map { item: ExprMapItem =>
+        val mTypes: Map[T, T] = m.map { item: AST.ExprMapItem =>
           typeEval(item.key, ctx) -> typeEval(item.value, ctx)
         }.toMap
         val (tk, _) =
@@ -254,7 +256,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // These are expressions like:
       // ${true="--yes" false="--no" boolean_value}
-      case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
+      case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, _) =>
         val tType = typeEval(t, ctx)
         val fType = typeEval(f, ctx)
         if (fType != tType)
@@ -274,12 +276,12 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // An expression like:
       // ${default="foo" optional_value}
-      case ExprPlaceholderDefault(default: Expr, value: Expr, _) =>
+      case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, _) =>
         val vt = typeEval(value, ctx)
         val dt = typeEval(default, ctx)
         vt match {
           case T_Optional(vt2) if tUtil.isCoercibleTo(dt, vt2) => dt
-          case vt2 if tUtil.isCoercibleTo(dt, vt2)              =>
+          case vt2 if tUtil.isCoercibleTo(dt, vt2)             =>
             // another unsavory case. The optional_value is NOT optional.
             dt
           case _ =>
@@ -294,7 +296,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // An expression like:
       // ${sep=", " array_value}
-      case ExprPlaceholderSep(sep: Expr, value: Expr, _) =>
+      case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, _) =>
         val sepType = typeEval(sep, ctx)
         if (sepType != T_String)
           throw new TypeException(s"separator ${sep} in ${expr} must have string type",
@@ -313,33 +315,33 @@ case class TypeChecker(stdlib: Stdlib) {
         }
 
       // math operators on one argument
-      case ExprUniraryPlus(value, _)  => typeEvalMathOp(value, ctx)
-      case ExprUniraryMinus(value, _) => typeEvalMathOp(value, ctx)
+      case AST.ExprUniraryPlus(value, _)  => typeEvalMathOp(value, ctx)
+      case AST.ExprUniraryMinus(value, _) => typeEvalMathOp(value, ctx)
 
       // logical operators
-      case ExprLor(a: Expr, b: Expr, _)  => typeEvalLogicalOp(a, b, ctx)
-      case ExprLand(a: Expr, b: Expr, _) => typeEvalLogicalOp(a, b, ctx)
-      case ExprNegate(value: Expr, _)    => typeEvalLogicalOp(value, ctx)
+      case AST.ExprLor(a: AST.Expr, b: AST.Expr, _)  => typeEvalLogicalOp(a, b, ctx)
+      case AST.ExprLand(a: AST.Expr, b: AST.Expr, _) => typeEvalLogicalOp(a, b, ctx)
+      case AST.ExprNegate(value: AST.Expr, _)        => typeEvalLogicalOp(value, ctx)
 
       // equality comparisons
-      case ExprEqeq(a: Expr, b: Expr, _) => typeEvalCompareOp(a, b, ctx)
-      case ExprNeq(a: Expr, b: Expr, _)  => typeEvalCompareOp(a, b, ctx)
-      case ExprLt(a: Expr, b: Expr, _)   => typeEvalCompareOp(a, b, ctx)
-      case ExprGte(a: Expr, b: Expr, _)  => typeEvalCompareOp(a, b, ctx)
-      case ExprLte(a: Expr, b: Expr, _)  => typeEvalCompareOp(a, b, ctx)
-      case ExprGt(a: Expr, b: Expr, _)   => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprEqeq(a: AST.Expr, b: AST.Expr, _) => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprNeq(a: AST.Expr, b: AST.Expr, _)  => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprLt(a: AST.Expr, b: AST.Expr, _)   => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprGte(a: AST.Expr, b: AST.Expr, _)  => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprLte(a: AST.Expr, b: AST.Expr, _)  => typeEvalCompareOp(a, b, ctx)
+      case AST.ExprGt(a: AST.Expr, b: AST.Expr, _)   => typeEvalCompareOp(a, b, ctx)
 
       // add is overloaded, it is a special case
-      case ExprAdd(a: Expr, b: Expr, _) => typeEvalAdd(a, b, ctx)
+      case AST.ExprAdd(a: AST.Expr, b: AST.Expr, _) => typeEvalAdd(a, b, ctx)
 
       // math operators on two arguments
-      case ExprSub(a: Expr, b: Expr, _)    => typeEvalMathOp(a, b, ctx)
-      case ExprMod(a: Expr, b: Expr, _)    => typeEvalMathOp(a, b, ctx)
-      case ExprMul(a: Expr, b: Expr, _)    => typeEvalMathOp(a, b, ctx)
-      case ExprDivide(a: Expr, b: Expr, _) => typeEvalMathOp(a, b, ctx)
+      case AST.ExprSub(a: AST.Expr, b: AST.Expr, _)    => typeEvalMathOp(a, b, ctx)
+      case AST.ExprMod(a: AST.Expr, b: AST.Expr, _)    => typeEvalMathOp(a, b, ctx)
+      case AST.ExprMul(a: AST.Expr, b: AST.Expr, _)    => typeEvalMathOp(a, b, ctx)
+      case AST.ExprDivide(a: AST.Expr, b: AST.Expr, _) => typeEvalMathOp(a, b, ctx)
 
       // Access an array element at [index]
-      case ExprAt(array: Expr, index: Expr, _) =>
+      case AST.ExprAt(array: AST.Expr, index: AST.Expr, _) =>
         val idxt = typeEval(index, ctx)
         if (idxt != T_Int)
           throw new TypeException(s"${index} must be an integer", expr.text, ctx.docSourceUrl)
@@ -354,7 +356,7 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
-      case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
+      case AST.ExprIfThenElse(cond: AST.Expr, tBranch: AST.Expr, fBranch: AST.Expr, _) =>
         val condType = typeEval(cond, ctx)
         if (condType != T_Boolean)
           throw new TypeException(s"condition ${exprToString(cond)} must be a boolean",
@@ -380,13 +382,13 @@ case class TypeChecker(stdlib: Stdlib) {
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case ExprApply(funcName: String, elements: Vector[Expr], _) =>
+      case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], _) =>
         val elementTypes = elements.map(typeEval(_, ctx))
         stdlib.apply(funcName, elementTypes, expr)
 
       // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a
-      case ExprGetName(e: Expr, id: String, _) =>
+      case AST.ExprGetName(e: AST.Expr, id: String, _) =>
         val et = typeEval(e, ctx)
         et match {
           case T_Struct(name, members) =>
@@ -461,8 +463,8 @@ case class TypeChecker(stdlib: Stdlib) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  private def applyDecl(decl: Declaration, ctx: Context): (String, T) = {
-    val lhsType: T = typeTranslate(decl.wdlType, decl.text, ctx)
+  private def applyDecl(decl: AST.Declaration, ctx: Context): (String, T) = {
+    val lhsType: WdlType = typeFromAst(decl.wdlType, decl.text, ctx)
     (lhsType, decl.expr) match {
       // Int x
       case (_, None) =>
@@ -483,7 +485,7 @@ case class TypeChecker(stdlib: Stdlib) {
   }
 
   // type check the input section and return bindings for all of the input variables.
-  private def applyInputSection(inputSection: InputSection, ctx: Context): Bindings = {
+  private def applyInputSection(inputSection: AST.InputSection, ctx: Context): Bindings = {
     inputSection.declarations.foldLeft(Map.empty[String, T]) {
       case (accu, decl) =>
         val (varName, typ) = applyDecl(decl, ctx.bindVarList(accu, inputSection.text))
@@ -492,7 +494,7 @@ case class TypeChecker(stdlib: Stdlib) {
   }
 
   // type check the input section and return bindings for all of the output variables.
-  private def applyOutputSection(outputSection: OutputSection, ctx: Context): Bindings = {
+  private def applyOutputSection(outputSection: AST.OutputSection, ctx: Context): Bindings = {
     outputSection.declarations.foldLeft(Map.empty[String, T]) {
       case (accu, decl) =>
         // check the declaration and add a binding for its (variable -> wdlType)
@@ -502,42 +504,42 @@ case class TypeChecker(stdlib: Stdlib) {
   }
 
   // calculate the type signature of a workflow or a task
-  private def calcSignature(inputSection: Option[InputSection],
-                            outputSection: Option[OutputSection],
+  private def calcSignature(inputSection: Option[AST.InputSection],
+                            outputSection: Option[AST.OutputSection],
                             ctx: Context): (Map[String, (T, Boolean)], Map[String, T]) = {
 
     val inputType: Map[String, (T, Boolean)] = inputSection match {
       case None => Map.empty
-      case Some(InputSection(decls, _)) =>
+      case Some(AST.InputSection(decls, _)) =>
         decls.map {
-          case Declaration(name, wdlType, Some(_), text) =>
+          case AST.Declaration(name, wdlType, Some(_), text) =>
             // input has a default value, caller may omit it.
-            val t = typeTranslate(wdlType, text, ctx)
+            val t = typeFromAst(wdlType, text, ctx)
             name -> (t, true)
 
-          case Declaration(name, TypeOptional(wdlType, _), _, text) =>
+          case AST.Declaration(name, AST.TypeOptional(wdlType, _), _, text) =>
             // input is optional, caller can omit it.
-            val t = typeTranslate(wdlType, text, ctx)
+            val t = typeFromAst(wdlType, text, ctx)
             name -> (T_Optional(t), true)
 
-          case Declaration(name, wdlType, _, text) =>
+          case AST.Declaration(name, wdlType, _, text) =>
             // input is compulsory
-            val t = typeTranslate(wdlType, text, ctx)
+            val t = typeFromAst(wdlType, text, ctx)
             name -> (t, false)
         }.toMap
     }
     val outputType: Map[String, T] = outputSection match {
       case None => Map.empty
-      case Some(OutputSection(decls, _)) =>
-        decls.map(decl => decl.name -> typeTranslate(decl.wdlType, decl.text, ctx)).toMap
+      case Some(AST.OutputSection(decls, _)) =>
+        decls.map(decl => decl.name -> typeFromAst(decl.wdlType, decl.text, ctx)).toMap
     }
     (inputType, outputType)
   }
 
   // The runtime section can make use of values defined in declarations
-  private def applyRuntime(rtSection: RuntimeSection, ctx: Context): Unit = {
+  private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): Unit = {
     rtSection.kvs.foreach {
-      case RuntimeKV(_, expr, _) =>
+      case AST.RuntimeKV(_, expr, _) =>
         val _ = typeEval(expr, ctx)
     }
   }
@@ -549,7 +551,7 @@ case class TypeChecker(stdlib: Stdlib) {
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: Task, ctxOuter: Context): T_Task = {
+  private def applyTask(task: AST.Task, ctxOuter: Context): T_Task = {
     val ctx: Context = task.input match {
       case None => ctxOuter
       case Some(inpSection) =>
@@ -572,9 +574,9 @@ case class TypeChecker(stdlib: Stdlib) {
     task.command.parts.foreach { expr =>
       val t = typeEval(expr, ctxDecl)
       val valid = t match {
-        case x if tUtil.isPrimitive(x)              => true
+        case x if tUtil.isPrimitive(x)             => true
         case T_Optional(x) if tUtil.isPrimitive(x) => true
-        case _                                      => false
+        case _                                     => false
       }
       if (!valid)
         throw new TypeException(
@@ -597,9 +599,9 @@ case class TypeChecker(stdlib: Stdlib) {
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
   //    and arguments that have defaults can be skipped.
-  private def applyCall(call: Call, ctx: Context): (String, T_Call) = {
+  private def applyCall(call: AST.Call, ctx: Context): (String, T_Call) = {
     val callerInputs: Map[String, T] = call.inputs match {
-      case Some(CallInputs(value, _)) =>
+      case Some(AST.CallInputs(value, _)) =>
         value.map { inp =>
           inp.name -> typeEval(inp.expr, ctx)
         }.toMap
@@ -698,7 +700,7 @@ case class TypeChecker(stdlib: Stdlib) {
   //
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
-  private def applyScatter(scatter: Scatter, ctxOuter: Context): Bindings = {
+  private def applyScatter(scatter: AST.Scatter, ctxOuter: Context): Bindings = {
     val collectionType = typeEval(scatter.expr, ctxOuter)
     val elementType = collectionType match {
       case T_Array(elementType, _) => elementType
@@ -710,20 +712,20 @@ case class TypeChecker(stdlib: Stdlib) {
 
     // Add an array type to all variables defined in the scatter body
     val bodyBindings: Bindings = scatter.body.foldLeft(Map.empty[String, T]) {
-      case (accu: Bindings, decl: Declaration) =>
+      case (accu: Bindings, decl: AST.Declaration) =>
         val (varName, typ) = applyDecl(decl, ctxInner.bindVarList(accu, decl.text))
         accu + (varName -> typ)
 
-      case (accu: Bindings, call: Call) =>
+      case (accu: Bindings, call: AST.Call) =>
         val (callName, callType) = applyCall(call, ctxInner.bindVarList(accu, call.text))
         accu + (callName -> callType)
 
-      case (accu: Bindings, subSct: Scatter) =>
+      case (accu: Bindings, subSct: AST.Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, ctxInner.bindVarList(accu, subSct.text))
         accu ++ sctBindings
 
-      case (accu: Bindings, cond: Conditional) =>
+      case (accu: Bindings, cond: AST.Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, ctxInner.bindVarList(accu, cond.text))
         accu ++ condBindings
@@ -750,10 +752,10 @@ case class TypeChecker(stdlib: Stdlib) {
   //   Int? --> Int?
   // Avoid this:
   //   Int?  --> Int??
-  private def makeOptional(t: T): T = {
+  private def makeOptional(t: WdlType): WdlType = {
     t match {
       case T_Optional(x) => x
-      case x              => T_Optional(x)
+      case x             => T_Optional(x)
     }
   }
 
@@ -761,7 +763,7 @@ case class TypeChecker(stdlib: Stdlib) {
   // This is different than the scoping rules for other programming languages.
   //
   // Add an optional modifier to all the types inside the body.
-  private def applyConditional(cond: Conditional, ctxOuter: Context): Bindings = {
+  private def applyConditional(cond: AST.Conditional, ctxOuter: Context): Bindings = {
     val condType = typeEval(cond.expr, ctxOuter)
     if (condType != T_Boolean)
       throw new Exception(s"Expression ${cond.expr} must have boolean type")
@@ -770,20 +772,20 @@ case class TypeChecker(stdlib: Stdlib) {
     // [outer] is what we produce, which has the optional modifier applied to
     // everything.
     val bodyBindings = cond.body.foldLeft(Map.empty[String, T]) {
-      case (accu: Bindings, decl: Declaration) =>
+      case (accu: Bindings, decl: AST.Declaration) =>
         val (varName, typ) = applyDecl(decl, ctxOuter.bindVarList(accu, decl.text))
         accu + (varName -> typ)
 
-      case (accu: Bindings, call: Call) =>
+      case (accu: Bindings, call: AST.Call) =>
         val (callName, callType) = applyCall(call, ctxOuter.bindVarList(accu, call.text))
         accu + (callName -> callType)
 
-      case (accu: Bindings, subSct: Scatter) =>
+      case (accu: Bindings, subSct: AST.Scatter) =>
         // a nested scatter
         val sctBindings = applyScatter(subSct, ctxOuter.bindVarList(accu, subSct.text))
         accu ++ sctBindings
 
-      case (accu: Bindings, cond: Conditional) =>
+      case (accu: Bindings, cond: AST.Conditional) =>
         // a nested conditional
         val condBindings = applyConditional(cond, ctxOuter.bindVarList(accu, cond.text))
         accu ++ condBindings
@@ -798,12 +800,12 @@ case class TypeChecker(stdlib: Stdlib) {
           case (name, t) => name -> makeOptional(t)
         }
         callName -> T_Call(callType.name, callOutput)
-      case (varName, typ: T) =>
+      case (varName, typ: WdlType) =>
         varName -> makeOptional(typ)
     }
   }
 
-  private def applyWorkflow(wf: Workflow, ctxOuter: Context): Context = {
+  private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): Context = {
     val ctx: Context = wf.input match {
       case None => ctxOuter
       case Some(inpSection) =>
@@ -812,19 +814,19 @@ case class TypeChecker(stdlib: Stdlib) {
     }
 
     val ctxBody = wf.body.foldLeft(ctx) {
-      case (accu: Context, decl: Declaration) =>
+      case (accu: Context, decl: AST.Declaration) =>
         val (name, typ) = applyDecl(decl, accu)
         accu.bindVar(name, typ, decl.text)
 
-      case (accu: Context, call: Call) =>
+      case (accu: Context, call: AST.Call) =>
         val (callName, callType) = applyCall(call, accu)
         accu.bindVar(callName, callType, call.text)
 
-      case (accu: Context, scatter: Scatter) =>
+      case (accu: Context, scatter: AST.Scatter) =>
         val sctBindings = applyScatter(scatter, accu)
         accu.bindVarList(sctBindings, scatter.text)
 
-      case (accu: Context, cond: Conditional) =>
+      case (accu: Context, cond: AST.Conditional) =>
         val condBindings = applyConditional(cond, accu)
         accu.bindVarList(condBindings, cond.text)
 
@@ -846,15 +848,26 @@ case class TypeChecker(stdlib: Stdlib) {
   //
   // check if the WDL document is correctly typed. Otherwise, throw an exception
   // describing the problem in a human readable fashion.
-  def apply(doc: Document, ctxOuter: Option[Context] = None): Context = {
+  private def apply2(doc: AST.Document): Context = {
+    val initCtx = Context(
+        docSourceUrl = Some(doc.docSourceUrl),
+        taxDoc = TAT.Document(doc.docSourceUrl,
+                              doc.sourceCode,
+                              TAT.Version(doc.version.value, doc.version.text),
+                              Vector.empty[TAT.DocumentElement],
+                              None,
+                              doc.text,
+                              doc.comments)
+    )
+
     val context: Context =
-      doc.elements.foldLeft(ctxOuter.getOrElse(Context(Some(doc.docSourceUrl)))) {
-        case (accu: Context, task: Task) =>
+      doc.elements.foldLeft(initCtx) {
+        case (accu: Context, task: AST.Task) =>
           val tt = applyTask(task, accu)
           accu.bindCallable(tt, task.text)
 
-        case (accu: Context, iStat: ImportDoc) =>
-          val iCtx = apply(iStat.doc.get)
+        case (accu: Context, iStat: AST.ImportDoc) =>
+          val iCtx = apply2(iStat.doc.get)
 
           // Figure out what to name the sub-document
           val namespace = iStat.name match {
@@ -878,9 +891,9 @@ case class TypeChecker(stdlib: Stdlib) {
           // add the externally visible definitions to the context
           accu.bindImportedDoc(namespace, iCtx, iStat.aliases, iStat.text)
 
-        case (accu: Context, struct: TypeStruct) =>
+        case (accu: Context, struct: AST.TypeStruct) =>
           // Add the struct to the context
-          val t = typeTranslate(struct, struct.text, accu)
+          val t = typeFromAst(struct, struct.text, accu)
           val t2 = t.asInstanceOf[T_Struct]
           accu.bind(t2, struct.text)
 
@@ -893,5 +906,10 @@ case class TypeChecker(stdlib: Stdlib) {
       case None     => context
       case Some(wf) => applyWorkflow(wf, context)
     }
+  }
+
+  def apply(doc: AST.Document): TAT.Document = {
+    val ctx = apply2(doc)
+    ctx.taxDoc
   }
 }

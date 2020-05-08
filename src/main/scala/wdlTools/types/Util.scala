@@ -7,10 +7,16 @@ import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
 import WdlTypes._
 
-// This is the WDL typesystem
 case class Util(conf: Options) {
-  // Type checking rules, are we lenient or strict in checking coercions.
+  // Type checking rules. Are we lenient or strict in checking coercions?
   private val regime = conf.typeChecking
+
+  // A value for each type variable.
+  //
+  // This is used when we have polymorphic types,
+  // such as when calling standard library functions. We need to keep
+  // track of the latest value for each type variable.
+  type TypeUnificationContext = Map[T_Var, T]
 
   // check if the right hand side of an assignment matches the left hand side
   //
@@ -26,17 +32,17 @@ case class Util(conf: Options) {
   def isPrimitive(t: T): Boolean = {
     t match {
       case T_String | T_File | T_Boolean | T_Int | T_Float => true
-      case _                                                    => false
+      case _                                               => false
     }
   }
 
   private def isCoercibleTo2(left: T, right: T): Boolean = {
     //System.out.println(s"isCoercibleTo2 ${left} ${right} regime=${regime}")
     (left, right) match {
-      case (T_Boolean, T_Boolean)                                       => true
-      case (T_Int, T_Int)                                               => true
+      case (T_Boolean, T_Boolean)                                     => true
+      case (T_Int, T_Int)                                             => true
       case (T_Int, T_Int | T_Float | T_String) if regime == Lenient   => true
-      case (T_Float, T_Int | T_Float)                                  => true
+      case (T_Float, T_Int | T_Float)                                 => true
       case (T_Float, T_Int | T_Float | T_String) if regime == Lenient => true
 
       // only the file -> string conversion is documented in spec 1.0
@@ -49,7 +55,7 @@ case class Util(conf: Options) {
       // T is coercible to T?
       case (T_Optional(l), r) if regime <= Moderate => isCoercibleTo2(l, r)
 
-      case (T_Array(l, _), T_Array(r, _))         => isCoercibleTo2(l, r)
+      case (T_Array(l, _), T_Array(r, _))   => isCoercibleTo2(l, r)
       case (T_Map(kl, vl), T_Map(kr, vr))   => isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)
       case (T_Pair(l1, l2), T_Pair(r1, r2)) => isCoercibleTo2(l1, r1) && isCoercibleTo2(l2, r2)
 
@@ -67,7 +73,7 @@ case class Util(conf: Options) {
       case (T_Var(i), T_Var(j)) if i == j => true
 
       case (_, T_Any) => true
-      case _           => false
+      case _          => false
     }
   }
 
@@ -114,8 +120,8 @@ case class Util(conf: Options) {
       case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
         (x, ctx)
       case (T_Any, T_Any) => (T_Any, ctx)
-      case (x, T_Any)      => (x, ctx)
-      case (T_Any, x)      => (x, ctx)
+      case (x, T_Any)     => (x, ctx)
+      case (T_Any, x)     => (x, ctx)
 
       case (T_Object, T_Object)    => (T_Object, ctx)
       case (T_Object, _: T_Struct) => (T_Object, ctx)
@@ -234,7 +240,7 @@ case class Util(conf: Options) {
         case a: T_Var       => typeBindings(a)
         case x: T_Struct    => x
         case T_Pair(l, r)   => T_Pair(sub(l), sub(r))
-        case T_Array(t, _)     => T_Array(sub(t))
+        case T_Array(t, _)  => T_Array(sub(t))
         case T_Map(k, v)    => T_Map(sub(k), sub(v))
         case T_Object       => T_Object
         case T_Optional(t1) => T_Optional(sub(t1))

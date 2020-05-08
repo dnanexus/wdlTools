@@ -11,7 +11,8 @@ import wdlTools.util.{Options, SourceCode, Util, Verbosity}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/wdlTools/syntax/v1/tasks").getPath)
-  private val workflowsDir = Paths.get(getClass.getResource("/wdlTools/syntax/v1/workflows").getPath)
+  private val workflowsDir =
+    Paths.get(getClass.getResource("/wdlTools/syntax/v1/workflows").getPath)
   private val opts =
     Options(antlr4Trace = false,
             localDirectories = Vector(tasksDir, workflowsDir),

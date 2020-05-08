@@ -9,9 +9,6 @@ object AbstractSyntax {
   }
   sealed trait WorkflowElement extends Element
   sealed trait DocumentElement extends Element
-  sealed trait Callable {
-    val name: String
-  }
 
   // type system
   sealed trait Type extends Element
@@ -162,7 +159,6 @@ object AbstractSyntax {
                   runtime: Option[RuntimeSection],
                   text: TextSource)
       extends DocumentElement
-      with Callable
 
   // TODO: support comments - only one comment before inputs
   case class CallAlias(name: String, text: TextSource) extends Element
@@ -192,7 +188,6 @@ object AbstractSyntax {
                       body: Vector[WorkflowElement],
                       text: TextSource)
       extends Element
-      with Callable
 
   case class Document(docSourceUrl: URL,
                       sourceCode: String,

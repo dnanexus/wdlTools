@@ -45,15 +45,12 @@ case class Stdlib(conf: Options) {
       // Array[Array[X]] transpose(Array[Array[X]])
       T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
       // Array[Pair(X,Y)] zip(Array[X], Array[Y])
-      T_Function2("zip",
-                   T_Array(T_Var(0)),
-                   T_Array(T_Var(1)),
-                   T_Array(T_Pair(T_Var(0), T_Var(1)))),
+      T_Function2("zip", T_Array(T_Var(0)), T_Array(T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
       // Array[Pair(X,Y)] cross(Array[X], Array[Y])
       T_Function2("cross",
-                   T_Array(T_Var(0)),
-                   T_Array(T_Var(1)),
-                   T_Array(T_Pair(T_Var(0), T_Var(1)))),
+                  T_Array(T_Var(0)),
+                  T_Array(T_Var(1)),
+                  T_Array(T_Pair(T_Var(0), T_Var(1)))),
       // Integer length(Array[X])
       T_Function1("length", T_Array(T_Var(0)), T_Int),
       // Array[X] flatten(Array[Array[X]])
@@ -98,7 +95,7 @@ case class Stdlib(conf: Options) {
       case T_Function1(_, arg1, _)                 => Vector(arg1)
       case T_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
       case T_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                        => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
+      case _                                       => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
     }
     try {
       val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
