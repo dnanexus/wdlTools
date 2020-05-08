@@ -131,14 +131,10 @@ object AbstractSyntax {
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 
-  case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
+  case class Version(value: WdlVersion, text: TextSource) extends Element
 
   // import statement with the AST for the referenced document
-  case class ImportAddr(value: String, text: TextSource) extends Element {
-    def isLocal: Boolean = {
-      !(value.contains("://") && value.startsWith("file"))
-    }
-  }
+  case class ImportAddr(value: String, text: TextSource) extends Element
   case class ImportName(value: String, text: TextSource) extends Element
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
   case class ImportDoc(name: Option[ImportName],
@@ -160,7 +156,6 @@ object AbstractSyntax {
                   text: TextSource)
       extends DocumentElement
 
-  // TODO: support comments - only one comment before inputs
   case class CallAlias(name: String, text: TextSource) extends Element
   case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
   case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element

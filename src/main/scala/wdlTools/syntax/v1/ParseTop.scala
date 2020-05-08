@@ -1203,9 +1203,9 @@ document_element
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: WdlV1Parser.VersionContext): Version = {
-    if (ctx.RELEASE_VERSION() == null)
+    if (ctx.ReleaseVersion() == null)
       throw new Exception("version not specified")
-    val value = ctx.RELEASE_VERSION().getText
+    val value = ctx.ReleaseVersion().getText
     Version(WdlVersion.withName(value), getTextSource(ctx))
   }
 
