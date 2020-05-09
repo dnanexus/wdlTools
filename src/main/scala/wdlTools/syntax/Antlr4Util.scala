@@ -1,15 +1,11 @@
 package wdlTools.syntax
 
 import java.net.URL
-import java.nio.ByteBuffer
 
 import org.antlr.v4.runtime.tree.{ParseTreeListener, TerminalNode}
 import org.antlr.v4.runtime.{
   BaseErrorListener,
   BufferedTokenStream,
-  CodePointBuffer,
-  CodePointCharStream,
-  CommonTokenStream,
   Lexer,
   Parser,
   ParserRuleContext,
@@ -20,10 +16,9 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.{Options, SourceCode, Verbosity}
+import wdlTools.util.{Options, Verbosity}
 
 import scala.collection.mutable
-import scala.reflect.ClassTag
 
 object Antlr4Util {
   def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
@@ -118,7 +113,7 @@ object Antlr4Util {
     def createParseTreeListeners(grammar: Grammar): Vector[ParseTreeListener]
   }
 
-  private case class CommentListenerFactory() extends ParseTreeListenerFactory {
+  private case object CommentListenerFactory extends ParseTreeListenerFactory {
     override def createParseTreeListeners(grammar: Grammar): Vector[ParseTreeListener] = {
       Vector(
           CommentListener(
@@ -131,14 +126,25 @@ object Antlr4Util {
     }
   }
 
+  private val defaultListenerFactories = Vector(CommentListenerFactory)
+
   class Grammar(
       val lexer: Lexer,
       val parser: Parser,
-      val errListener: WdlAggregatingErrorListener,
       val docSourceUrl: Option[URL] = None,
       val opts: Options,
       val comments: mutable.Map[Int, Comment] = mutable.HashMap.empty
   ) {
+    val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSourceUrl)
+    // setting up our own error handling
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(errListener)
+    parser.removeErrorListeners()
+    parser.addErrorListener(errListener)
+
+    if (opts.antlr4Trace) {
+      parser.setTrace(true)
+    }
 
     def getChannel(name: String): Int = {
       val channel = lexer.getChannelNames.indexOf(name)
@@ -148,6 +154,10 @@ object Antlr4Util {
 
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
+
+    defaultListenerFactories.foreach(
+        _.createParseTreeListeners(this).map(parser.addParseListener)
+    )
 
     def getHiddenTokens(ctx: ParserRuleContext,
                         channel: Int = hiddenChannel,
@@ -256,50 +266,5 @@ object Antlr4Util {
       afterParse()
       result
     }
-  }
-
-  def createGrammar[L <: Lexer, P <: Parser, G <: Grammar](
-      sourceCode: SourceCode,
-      opts: Options
-  )(implicit lexerTag: ClassTag[L], parserTag: ClassTag[P], grammarTag: ClassTag[G]): G = {
-    createGrammar[L, P, G](sourceCode.toString, Some(sourceCode.url), opts)
-  }
-
-  def createGrammar[L <: Lexer, P <: Parser, G <: Grammar](
-      inp: String,
-      docSourceUrl: Option[URL] = None,
-      opts: Options
-  )(implicit lexerTag: ClassTag[L], parserTag: ClassTag[P], grammarTag: ClassTag[G]): G = {
-    val codePointBuffer: CodePointBuffer =
-      CodePointBuffer.withBytes(ByteBuffer.wrap(inp.getBytes()))
-    val charStream = CodePointCharStream.fromBuffer(codePointBuffer)
-    val lexer =
-      lexerTag.runtimeClass.getDeclaredConstructors.head.newInstance(charStream).asInstanceOf[L]
-    val parser = parserTag.runtimeClass.getDeclaredConstructors.head
-      .newInstance(new CommonTokenStream(lexer))
-      .asInstanceOf[P]
-
-    val errListener = WdlAggregatingErrorListener(docSourceUrl)
-    // setting up our own error handling
-    lexer.removeErrorListeners()
-    lexer.addErrorListener(errListener)
-    parser.removeErrorListeners()
-    parser.addErrorListener(errListener)
-
-    if (opts.antlr4Trace) {
-      parser.setTrace(true)
-    }
-
-    val grammar = grammarTag.runtimeClass.getDeclaredConstructors.head
-      .newInstance(lexer, parser, errListener, docSourceUrl, opts)
-      .asInstanceOf[G]
-
-    // add other listeners
-    val defaultListenerFactories = Vector(CommentListenerFactory())
-    defaultListenerFactories.foreach(
-        _.createParseTreeListeners(grammar).map(grammar.parser.addParseListener)
-    )
-
-    grammar
   }
 }

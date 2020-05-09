@@ -363,13 +363,13 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }
