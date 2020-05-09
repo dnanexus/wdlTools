@@ -13,10 +13,9 @@ case class Context(docSourceUrl: Option[URL] = None,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
                    structs: Map[String, T_Struct] = Map.empty,
                    callables: Map[String, T_Callable] = Map.empty,
-                   namespaces: Set[String] = Set.empty,
-                   taxDoc: TypedAbstractSyntax.Document) {
+                   namespaces: Set[String] = Set.empty)
 
-  def bindVar(varName: String, wdlType: T, srcText: TextSource): Context = {
+  def bindVar(varName: String, wdlType: WdlTypes.T, srcText: TextSource): Context = {
     declarations.get(varName) match {
       case None =>
         this.copy(declarations = declarations + (varName -> wdlType))

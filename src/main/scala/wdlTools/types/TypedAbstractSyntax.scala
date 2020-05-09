@@ -15,6 +15,7 @@ object TypedAbstractSyntax {
   sealed trait DocumentElement extends Element
   sealed trait Callable {
     val name: String
+    val wdlType : WdlTypes.T_Callable
   }
 
   // expressions
@@ -132,7 +133,7 @@ object TypedAbstractSyntax {
 
   case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
 
-  // import statement with the AST for the referenced document
+  // import statement with the typed-AST for the referenced document
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
   case class ImportDoc(name: String,
                        aliases: Vector[ImportAlias],
@@ -143,6 +144,7 @@ object TypedAbstractSyntax {
 
   // A task
   case class Task(name: String,
+                  wdlType : WdlTypes.T_Task,
                   input: Option[InputSection],
                   output: Option[OutputSection],
                   command: CommandSection, // the command section is required
@@ -174,6 +176,7 @@ object TypedAbstractSyntax {
 
   // A workflow
   case class Workflow(name: String,
+                      wdlType : WdlTypes.T_Workflow,
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],

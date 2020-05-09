@@ -109,12 +109,12 @@ case class Stdlib(conf: Options) {
 
   def apply(funcName: String,
             inputTypes: Vector[T],
-            expr: AbstractSyntax.Expr,
+            text : TextSource,
             docSourceUrl: Option[URL] = None): T = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library",
-                                expr.text,
+                                text,
                                 docSourceUrl)
       case Some(protoVec) =>
         protoVec
@@ -123,7 +123,7 @@ case class Stdlib(conf: Options) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[T]] = candidates.map {
-      evalOnePrototype(_, inputTypes, expr.text, docSourceUrl)
+      evalOnePrototype(_, inputTypes, text, docSourceUrl)
     }
     val result: Vector[T] = allCandidatePrototypes.flatten
     result.size match {
@@ -133,7 +133,7 @@ case class Stdlib(conf: Options) {
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
-                                    |""".stripMargin, expr.text, docSourceUrl)
+                                    |""".stripMargin, text, docSourceUrl)
       //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
         result.head
@@ -145,7 +145,7 @@ case class Stdlib(conf: Options) {
           throw new TypeException(s"""|Call to ${funcName} matches ${n} prototypes with different
                                       |output types (${possibleOutputTypes})""".stripMargin
                                     .replaceAll("\n", " "),
-                                  expr.text,
+                                  text,
                                   docSourceUrl)
         possibleOutputTypes.toVector.head
     }
