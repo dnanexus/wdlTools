@@ -66,9 +66,9 @@ case class ProjectGenerator(opts: Options,
 
   def requiresEvaluation(expr: Expr): Boolean = {
     expr match {
-      case _: ValueString | _: ValueFile | _: ValueBoolean | _: ValueInt | _: ValueFloat => false
-      case ExprPair(l, r, _)                                                             => requiresEvaluation(l) || requiresEvaluation(r)
-      case ExprArray(value, _)                                                           => value.exists(requiresEvaluation)
+      case _: ValueString | _: ValueBoolean | _: ValueInt | _: ValueFloat => false
+      case ExprPair(l, r, _)                                              => requiresEvaluation(l) || requiresEvaluation(r)
+      case ExprArray(value, _)                                            => value.exists(requiresEvaluation)
       case ExprMap(value, _) =>
         value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
       case ExprObject(value, _) => value.exists(member => requiresEvaluation(member.value))
@@ -366,6 +366,7 @@ object ProjectGenerator {
           Some(
               RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null)), null)
           ),
+          None,
           null
       )
       (task, linkedInputs)
@@ -396,7 +397,7 @@ object ProjectGenerator {
           } else {
             None
           }
-          Call(task.name, None, callInputs, null)
+          Call(task.name, None, Vector.empty, callInputs, null)
       }
 
       val (wfInputSection, _) = getInput(inputs.toVector)

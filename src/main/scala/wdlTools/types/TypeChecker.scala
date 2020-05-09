@@ -148,6 +148,7 @@ case class TypeChecker(stdlib: Stdlib) {
       case TypePair(l, r, _)  => WT_Pair(typeTranslate(l, text, ctx), typeTranslate(r, text, ctx))
       case _: TypeString      => WT_String
       case _: TypeFile        => WT_File
+      case _: TypeDirectory   => WT_Directory
       case _: TypeBoolean     => WT_Boolean
       case _: TypeInt         => WT_Int
       case _: TypeFloat       => WT_Float
@@ -171,7 +172,6 @@ case class TypeChecker(stdlib: Stdlib) {
     expr match {
       // base cases, primitive types
       case _: ValueString  => WT_String
-      case _: ValueFile    => WT_File
       case _: ValueBoolean => WT_Boolean
       case _: ValueInt     => WT_Int
       case _: ValueFloat   => WT_Float

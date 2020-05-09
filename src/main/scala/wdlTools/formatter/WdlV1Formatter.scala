@@ -396,16 +396,6 @@ case class WdlV1Formatter(opts: Options,
   ): Span = {
 
     /**
-      * Creates a Literal whose `quoting` depends on whether we're already inside a string literal.
-      *
-      * @param value the value to wrap
-      * @return a Literal
-      */
-    def literal(value: String, textSource: TextSource): Literal = {
-      Literal.fromStart(value, textSource, quoted = inPlaceholder || !inStringOrCommand)
-    }
-
-    /**
       * Builds an expression that occurs nested within another expression. By default, passes
       * all the current parameter values to the nested call.
       *
@@ -463,8 +453,7 @@ case class WdlV1Formatter(opts: Options,
         } else {
           value
         }
-        literal(v, text)
-      case ValueFile(value, text)    => literal(value, text)
+        Literal.fromStart(v, text, quoted = inPlaceholder || !inStringOrCommand)
       case ValueBoolean(value, text) => Literal.fromStart(value, text)
       case ValueInt(value, text)     => Literal.fromStart(value, text)
       case ValueFloat(value, text)   => Literal.fromStart(value, text)

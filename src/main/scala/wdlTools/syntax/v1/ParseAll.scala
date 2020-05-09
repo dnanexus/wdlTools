@@ -8,8 +8,6 @@ import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options) extends WdlParser(opts) {
-  private val grammarFactory = WdlV1GrammarFactory(opts)
-
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
@@ -40,7 +38,6 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       e match {
         // values
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
         case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
@@ -138,7 +135,6 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       value match {
         // values
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprFile(value, srcText)    => AST.ValueFile(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
         case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
@@ -221,13 +217,12 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
         runtime: CST.RuntimeSection
     ): AST.RuntimeSection = {
       // check for duplicate ids
-      var allIds = Set.empty[String]
-      for (kv <- runtime.kvs) {
-        if (allIds contains kv.id)
+      runtime.kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
           throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
                                     docSourceUrl)
-        allIds = allIds + kv.id
       }
 
       AST.RuntimeSection(
@@ -253,6 +248,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
                 case CST.CallAlias(callName, callText) =>
                   AST.CallAlias(callName, callText)
               },
+              Vector.empty,
               inputs.map {
                 case CST.CallInputs(inputsMap, inputsText) =>
                   AST.CallInputs(inputsMap.map { inp =>
@@ -317,6 +313,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
+          None,
           task.text
       )
     }
@@ -342,19 +339,20 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
     }
   }
+  private val versionRegexp = "version\\s+1.0".r
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
       if (!(line.trim.isEmpty || line.startsWith("#"))) {
-        return line.trim.startsWith("version 1.0")
+        return versionRegexp.matches(line.trim)
       }
     }
     false
   }
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = grammarFactory.createGrammar(sourceCode.toString, Some(sourceCode.url))
-    val visitor = ParseTop(opts, grammar, Some(sourceCode.url))
+    val grammar = WdlV1Grammar.newInstance(sourceCode, opts)
+    val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
     if (errorListener.hasErrors) {
@@ -365,13 +363,13 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, grammarFactory.createGrammar(text))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }

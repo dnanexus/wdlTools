@@ -1,4 +1,4 @@
-lexer grammar WdlV1Lexer;
+lexer grammar WdlV2Lexer;
 
 channels { COMMENTS }
 
@@ -23,23 +23,29 @@ INPUT: 'input';
 OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta';
 META: 'meta';
-COMMAND: 'command'-> mode(Command);
+HINTS: 'hints';
 RUNTIME: 'runtime';
+RUNTIMECPU: 'cpu';
+RUNTIMECONTAINER: 'container';
+RUNTIMEMEMORY: 'memory';
+RUNTIMEGPU: 'gpu';
+RUNTIMEDISKS: 'disks';
+RUNTIMEMAXRETRIES: 'maxRetries';
+RUNTIMERETURNCODES: 'returnCodes';
 BOOLEAN: 'Boolean';
 INT: 'Int';
 FLOAT: 'Float';
 STRING: 'String';
 FILE: 'File';
+DIRECTORY: 'Directory';
 ARRAY: 'Array';
 MAP: 'Map';
 PAIR: 'Pair';
-OBJECT: 'Object';
-OBJECT_LITERAL: 'object';
-
-SEP: 'sep';
-DEFAULT: 'default';
+AFTER: 'after';
+COMMAND: 'command'-> mode(Command);
 
 // Primitive Literals
+NONELITERAL: 'None';
 IntLiteral
 	: Digits
 	| SignedDigits
@@ -86,7 +92,9 @@ MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
 
-WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
+WHITESPACE
+	: [ \t\r\n]+ -> channel(HIDDEN)
+	;
 
 Identifier: CompleteIdentifier;
 
@@ -161,18 +169,18 @@ fragment IdentifierFollow
 	;
 
 fragment EscapeSequence
-	: '\\' [btnfr"'\\]
-	| '\\' ([0-3]? [0-7])? [0-7]
-	| '\\' UnicodeEsc
-	;
+    : '\\' [btnfr"'\\]
+    | '\\' ([0-3]? [0-7])? [0-7]
+    | '\\' UnicodeEsc
+    ;
 
 fragment UnicodeEsc
-	: 'u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?
-	;
+   : 'u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?
+   ;
 
 fragment HexDigit
-	: [0-9a-fA-F]
-	;
+   : [0-9a-fA-F]
+   ;
 
 fragment Digit
 	: [0-9]

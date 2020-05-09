@@ -17,6 +17,7 @@ case class Eval(opts: Options,
   private val stdlib = wdlVersion match {
     case WdlVersion.Draft_2 => StdlibDraft2(opts, evalCfg, docSourceUrl)
     case WdlVersion.V1      => StdlibV1(opts, evalCfg, docSourceUrl)
+    case WdlVersion.V2      => throw new Exception("WDL V2 is not yet supported")
   }
   private val coercion = Coercion(docSourceUrl)
 
@@ -269,7 +270,6 @@ case class Eval(opts: Options,
       case AST.ValueInt(value, _)     => WV_Int(value)
       case AST.ValueFloat(value, _)   => WV_Float(value)
       case AST.ValueString(value, _)  => WV_String(value)
-      case AST.ValueFile(value, _)    => WV_File(value)
 
       // accessing a variable
       case AST.ExprIdentifier(id: String, _) if !(ctx.bindings contains id) =>
