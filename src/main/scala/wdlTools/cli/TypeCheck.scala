@@ -3,6 +3,7 @@ package wdlTools.cli
 import wdlTools.syntax.Parsers
 import wdlTools.types.{Context, Stdlib, TypeChecker}
 
+// TODO: nicely format errors, including JSON output
 case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.check.url()
