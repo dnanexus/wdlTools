@@ -1,0 +1,36 @@
+{
+  "P001": {
+    "name": "whitespace_tabs",
+    "description": "Use of tabs in whitespace"
+  },
+  "P002": {
+    "name": "odd_indent",
+    "description": "Indent by odd number of whitespace characters"
+  },
+  "P003": {
+    "name": "multiple_blank_lines",
+    "description": "More than one blank line between sections"
+  },
+  "P004": {
+    "name": "top_level_indent",
+    "description": "A top-level element is indented"
+  },
+  "P005": {
+    "name": "deprecated_command_style",
+    "description": "Deprecated command block style - use ~{} instead"
+  },
+  "A001": {
+    "name": "non_portable_task",
+    "description": "Non-portable task"
+  },
+  "A002": {
+    "name": "no_task_inputs",
+    "description": "Suspicious lack of task inputs (is this task really idempotent and portable?",
+    "severity": "Warning"
+  },
+  "A003": {
+    "name": "no_task_outputs",
+    "description": "Suspicious lack of task outputs (is this task really idempotent and portable?",
+    "severity": "Warning"
+  }
+}

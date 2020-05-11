@@ -7,6 +7,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.check.url()
     val opts = conf.check.getOptions
+    require(opts.followImports)
     val parsers = Parsers(opts)
     val checker = TypeChecker(Stdlib(opts))
 

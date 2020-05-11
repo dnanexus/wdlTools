@@ -34,7 +34,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlV1Grammar.newInstance(sourceCode, opts)).parseDocument
+    ParseTop(conf, WdlV1Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {

@@ -49,7 +49,8 @@ abstract class WdlParser(opts: Options) {
   }
 
   case class Walker[T](sourceCode: SourceCode,
-                       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
+                       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T],
+                       mayRevisit: Boolean = false)
       extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
@@ -61,7 +62,7 @@ abstract class WdlParser(opts: Options) {
 
     def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
       def addDocument(url: URL, doc: Document): Unit = {
-        if (!results.contains(url)) {
+        if (mayRevisit || !results.contains(url)) {
           visitor(url, doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {

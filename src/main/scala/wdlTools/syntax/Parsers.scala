@@ -4,15 +4,17 @@ import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.Document
+import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.util.{Options, SourceCode, Util}
 
 import scala.collection.mutable
 
-case class Parsers(opts: Options = Options()) {
+case class Parsers(opts: Options = Options(),
+                   listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty) {
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseAll(opts),
-      WdlVersion.V1 -> v1.ParseAll(opts),
-      WdlVersion.V2 -> v2.ParseAll(opts)
+      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories),
+      WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories),
+      WdlVersion.V2 -> v2.ParseAll(opts, listenerFactories)
   )
 
   def getParser(url: URL): WdlParser = {
@@ -47,10 +49,11 @@ case class Parsers(opts: Options = Options()) {
 
   def getDocumentWalker[T](
       url: URL,
-      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
+      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T],
+      mayRevisit: Boolean = false
   ): DocumentWalker[T] = {
     val sourceCode = SourceCode.loadFrom(url)
     val parser = getParser(sourceCode)
-    parser.Walker(sourceCode, results)
+    parser.Walker(sourceCode, results, mayRevisit)
   }
 }
