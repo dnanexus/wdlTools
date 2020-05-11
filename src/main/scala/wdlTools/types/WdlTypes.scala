@@ -56,7 +56,7 @@ object WdlTypes {
   case class T_Workflow(name: String, input: Map[String, (T, Boolean)], output: Map[String, T])
       extends T_Callable
 
-  // The type of a call to a task or a workflow.
+  // Result from calling a task or a workflow.
   case class T_Call(name: String, output: Map[String, T]) extends T
 
   // A standard library function implemented by the engine.

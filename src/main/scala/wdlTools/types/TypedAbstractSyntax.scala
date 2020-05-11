@@ -15,7 +15,7 @@ object TypedAbstractSyntax {
   sealed trait DocumentElement extends Element
   sealed trait Callable {
     val name: String
-    val wdlType : WdlTypes.T_Callable
+    val wdlType: WdlTypes.T_Callable
   }
 
   // expressions
@@ -144,7 +144,7 @@ object TypedAbstractSyntax {
 
   // A task
   case class Task(name: String,
-                  wdlType : WdlTypes.T_Task,
+                  wdlType: WdlTypes.T_Task,
                   input: Option[InputSection],
                   output: Option[OutputSection],
                   command: CommandSection, // the command section is required
@@ -156,12 +156,19 @@ object TypedAbstractSyntax {
       extends DocumentElement
       with Callable
 
-  case class CallAlias(name: String, text: TextSource) extends Element
-  case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
-  case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
-  case class Call(name: String,
-                  alias: Option[CallAlias],
-                  inputs: Option[CallInputs],
+  // The name of the call may not contain dots. Examples:
+  //
+  // fully-qualified-name          actual-name
+  // -----                         ---
+  // call lib.concat as concat     concat
+  // call add                      add
+  // call a.b.c                    c
+  //
+  case class Call(fullyQualifiedName: String,
+                  wdlType: WdlTypes.T_Call,
+                  alias: Option[String],
+                  actualName: String,
+                  inputs: Map[String, Expr],
                   text: TextSource)
       extends WorkflowElement
 
@@ -176,7 +183,7 @@ object TypedAbstractSyntax {
 
   // A workflow
   case class Workflow(name: String,
-                      wdlType : WdlTypes.T_Workflow,
+                      wdlType: WdlTypes.T_Workflow,
                       input: Option[InputSection],
                       output: Option[OutputSection],
                       meta: Option[MetaSection],

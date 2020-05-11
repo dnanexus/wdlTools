@@ -9,7 +9,7 @@ import wdlTools.syntax.{AbstractSyntax, TextSource}
 import wdlTools.types.{Util => TUtil}
 
 case class Stdlib(conf: Options) {
-  private val tUtil = TUtil(conf)
+  private val unify = Unification(conf)
 
   private val stdlibV1_0: Vector[T_StdlibFunc] = Vector(
       T_Function0("stdout", T_File),
@@ -98,8 +98,8 @@ case class Stdlib(conf: Options) {
       case _                                       => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
     }
     try {
-      val (_, ctx) = tUtil.unifyFunctionArguments(args, inputTypes, Map.empty)
-      val t = tUtil.substitute(funcDesc.output, ctx, text)
+      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
+      val t = unify.substitute(funcDesc.output, ctx, text)
       Some(t)
     } catch {
       case _: TypeUnificationException =>
@@ -109,7 +109,7 @@ case class Stdlib(conf: Options) {
 
   def apply(funcName: String,
             inputTypes: Vector[T],
-            text : TextSource,
+            text: TextSource,
             docSourceUrl: Option[URL] = None): T = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
@@ -128,8 +128,8 @@ case class Stdlib(conf: Options) {
     val result: Vector[T] = allCandidatePrototypes.flatten
     result.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(tUtil.toString).mkString("\n")
-        val candidatesStr = candidates.map(tUtil.toString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(Util.typeToString).mkString("\n")
+        val candidatesStr = candidates.map(Util.typeToString(_)).mkString("\n")
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}

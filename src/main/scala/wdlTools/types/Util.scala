@@ -4,6 +4,7 @@ import java.net.URL
 
 import wdlTools.util.Options
 import WdlTypes._
+import wdlTools.types.{TypedAbstractSyntax => TAT}
 
 object Util {
   // check if the right hand side of an assignment matches the left hand side
@@ -105,87 +106,91 @@ object Util {
   }
 
   // Utility function for writing an expression in a human readable form
-  def exprToString(expr: Expr): String = {
+  def exprToString(expr: TAT.Expr): String = {
     expr match {
-      case ValueNull(_, _)                    => "null"
-      case ValueString(value, _, _)           => value
-      case ValueFile(value, _, _)             => value
-      case ValueBoolean(value: Boolean, _, _) => value.toString
-      case ValueInt(value, _, _)              => value.toString
-      case ValueFloat(value, _, _)            => value.toString
-      case ExprIdentifier(id: String, _, _)   => id
+      case TAT.ValueNull(_, _)                    => "null"
+      case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
+      case TAT.ValueInt(value, _, _)              => value.toString
+      case TAT.ValueFloat(value, _, _)            => value.toString
+      case TAT.ValueString(value, _, _)           => value
+      case TAT.ValueFile(value, _, _)             => value
+      case TAT.ExprIdentifier(id: String, _, _)   => id
 
-      case ExprCompoundString(value: Vector[Expr], _, _) =>
+      case TAT.ExprCompoundString(value, _, _) =>
         val vec = value.map(exprToString).mkString(", ")
         s"ExprCompoundString(${vec})"
-      case ExprPair(l, r, _, _) => s"(${exprToString(l)}, ${exprToString(r)})"
-      case ExprArray(value: Vector[Expr], _, _) =>
+      case TAT.ExprPair(l, r, _, _) => s"(${exprToString(l)}, ${exprToString(r)})"
+      case TAT.ExprArray(value, _, _) =>
         "[" + value.map(exprToString).mkString(", ") + "]"
-      case ExprMap(value: Vector[ExprMapItem], _, _) =>
-        val m = value
-          .map(exprToString)
+      case TAT.ExprMap(value, _, _) =>
+        val m2 = value
+          .map {
+            case (k, v) => s"${exprToString(k)} : ${exprToString(v)}"
+          }
+          .toMap
           .mkString(", ")
-        "{ " + m + " }"
-      case ExprMapItem(key, value, _, _) =>
-        s"${exprToString(key)} : ${exprToString(value)}"
-      case ExprObject(value: Vector[ExprObjectMember], _, _) =>
-        val m = value
-          .map(exprToString)
+        "{ " + m2 + " }"
+      case TAT.ExprObject(value, _, _) =>
+        val m2 = value
+          .map {
+            case (k, v) => s"${k} : ${exprToString(v)}"
+          }
+          .toMap
           .mkString(", ")
-        s"object($m)"
-      case ExprObjectMember(key, value, _, _) =>
-        s"${key} : ${exprToString(value)}"
+        "{ " + m2 + " }"
+        s"object($m2)"
+
       // ~{true="--yes" false="--no" boolean_value}
-      case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _, _) =>
         s"{true=${exprToString(t)} false=${exprToString(f)} ${exprToString(value)}"
 
       // ~{default="foo" optional_value}
-      case ExprPlaceholderDefault(default: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderDefault(default: Expr, value: Expr, _, _) =>
         s"{default=${exprToString(default)} ${exprToString(value)}}"
 
       // ~{sep=", " array_value}
-      case ExprPlaceholderSep(sep: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderSep(sep: Expr, value: Expr, _, _) =>
         s"{sep=${exprToString(sep)} ${exprToString(value)}"
 
       // operators on one argument
-      case ExprUniraryPlus(value: Expr, _, _) =>
+      case TAT.ExprUniraryPlus(value: Expr, _, _) =>
         s"+ ${exprToString(value)}"
-      case ExprUniraryMinus(value: Expr, _, _) =>
+      case TAT.ExprUniraryMinus(value: Expr, _, _) =>
         s"- ${exprToString(value)}"
-      case ExprNegate(value: Expr, _, _) =>
+      case TAT.ExprNegate(value: Expr, _, _) =>
         s"not(${exprToString(value)})"
 
       // operators on two arguments
-      case ExprLor(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} || ${exprToString(b)}"
-      case ExprLand(a: Expr, b: Expr, _, _)   => s"${exprToString(a)} && ${exprToString(b)}"
-      case ExprEqeq(a: Expr, b: Expr, _, _)   => s"${exprToString(a)} == ${exprToString(b)}"
-      case ExprLt(a: Expr, b: Expr, _, _)     => s"${exprToString(a)} < ${exprToString(b)}"
-      case ExprGte(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} >= ${exprToString(b)}"
-      case ExprNeq(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} != ${exprToString(b)}"
-      case ExprLte(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} <= ${exprToString(b)}"
-      case ExprGt(a: Expr, b: Expr, _, _)     => s"${exprToString(a)} > ${exprToString(b)}"
-      case ExprAdd(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} + ${exprToString(b)}"
-      case ExprSub(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} - ${exprToString(b)}"
-      case ExprMod(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} % ${exprToString(b)}"
-      case ExprMul(a: Expr, b: Expr, _, _)    => s"${exprToString(a)} * ${exprToString(b)}"
-      case ExprDivide(a: Expr, b: Expr, _, _) => s"${exprToString(a)} / ${exprToString(b)}"
+      case TAT.ExprLor(a, b, _, _)    => s"${exprToString(a)} || ${exprToString(b)}"
+      case TAT.ExprLand(a, b, _, _)   => s"${exprToString(a)} && ${exprToString(b)}"
+      case TAT.ExprEqeq(a, b, _, _)   => s"${exprToString(a)} == ${exprToString(b)}"
+      case TAT.ExprLt(a, b, _, _)     => s"${exprToString(a)} < ${exprToString(b)}"
+      case TAT.ExprGte(a, b, _, _)    => s"${exprToString(a)} >= ${exprToString(b)}"
+      case TAT.ExprNeq(a, b, _, _)    => s"${exprToString(a)} != ${exprToString(b)}"
+      case TAT.ExprLte(a, b, _, _)    => s"${exprToString(a)} <= ${exprToString(b)}"
+      case TAT.ExprGt(a, b, _, _)     => s"${exprToString(a)} > ${exprToString(b)}"
+      case TAT.ExprAdd(a, b, _, _)    => s"${exprToString(a)} + ${exprToString(b)}"
+      case TAT.ExprSub(a, b, _, _)    => s"${exprToString(a)} - ${exprToString(b)}"
+      case TAT.ExprMod(a, b, _, _)    => s"${exprToString(a)} % ${exprToString(b)}"
+      case TAT.ExprMul(a, b, _, _)    => s"${exprToString(a)} * ${exprToString(b)}"
+      case TAT.ExprDivide(a, b, _, _) => s"${exprToString(a)} / ${exprToString(b)}"
 
       // Access an array element at [index]
-      case ExprAt(array: Expr, index: Expr, _, _) =>
+      case TAT.ExprAt(array, index, _, _) =>
         s"${exprToString(array)}[${index}]"
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
-      case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _, _) =>
+      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
         s"if (${exprToString(cond)}) then ${exprToString(tBranch)} else ${exprToString(fBranch)}"
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case ExprApply(funcName: String, elements: Vector[Expr], _, _) =>
+      case TAT.ExprApply(funcName: String, elements: Vector[Expr], _, _) =>
         val args = elements.map(exprToString).mkString(", ")
         s"${funcName}(${args})"
 
-      case ExprGetName(e: Expr, id: String, _, _) =>
+      case TAT.ExprGetName(e, id: String, _, _) =>
         s"${exprToString(e)}.${id}"
     }
   }
