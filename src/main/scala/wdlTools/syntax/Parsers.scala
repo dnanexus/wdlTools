@@ -49,11 +49,10 @@ case class Parsers(opts: Options = Options(),
 
   def getDocumentWalker[T](
       url: URL,
-      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T],
-      mayRevisit: Boolean = false
+      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
   ): DocumentWalker[T] = {
     val sourceCode = SourceCode.loadFrom(url)
     val parser = getParser(sourceCode)
-    parser.Walker(sourceCode, results, mayRevisit)
+    parser.Walker(sourceCode, results)
   }
 }

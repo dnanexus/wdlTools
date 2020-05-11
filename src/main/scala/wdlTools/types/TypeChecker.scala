@@ -847,7 +847,7 @@ case class TypeChecker(stdlib: Stdlib) {
   // describing the problem in a human readable fashion.
   def apply(doc: Document, ctxOuter: Option[Context] = None): Context = {
     val context: Context =
-      doc.elements.foldLeft(ctxOuter.getOrElse(Context(Some(doc.docSourceUrl)))) {
+      doc.elements.foldLeft(ctxOuter.getOrElse(Context(Some(doc.sourceUrl)))) {
         case (accu: Context, task: Task) =>
           val tt = applyTask(task, accu)
           accu.bindCallable(tt, task.text)
