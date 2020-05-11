@@ -39,34 +39,33 @@ case class Linter(opts: Options,
 
   def apply(url: URL): Unit = {
     val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
-    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events, mayRevisit = true).walk {
-      (url, doc, _) =>
-        val astRules = rules.view.filterKeys(Rules.astRules.contains)
-        if (astRules.nonEmpty) {
-          if (!events.contains(url)) {
-            val docEvents = mutable.ArrayBuffer.empty[LintEvent]
-            events(url) = docEvents
-          }
-          // First run the TypeChecker to infer the types of all expressions
-          val stdlib = Stdlib(opts)
-          val typeChecker = TypeChecker(stdlib)
-          val typesContext = typeChecker.apply(doc)
-          // Now execute the linter rules
-          val visitors = astRules.map {
-            case (id, severity) =>
-              Rules.astRules(id)(
-                  id,
-                  severity,
-                  doc.version.value,
-                  typesContext,
-                  stdlib,
-                  events(url),
-                  Some(url)
-              )
-          }.toVector
-          val astWalker = LinterASTWalker(opts, visitors)
-          astWalker.apply(doc)
+    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (url, doc, _) =>
+      val astRules = rules.view.filterKeys(Rules.astRules.contains)
+      if (astRules.nonEmpty) {
+        if (!events.contains(url)) {
+          val docEvents = mutable.ArrayBuffer.empty[LintEvent]
+          events(url) = docEvents
         }
+        // First run the TypeChecker to infer the types of all expressions
+        val stdlib = Stdlib(opts)
+        val typeChecker = TypeChecker(stdlib)
+        val typesContext = typeChecker.apply(doc)
+        // Now execute the linter rules
+        val visitors = astRules.map {
+          case (id, severity) =>
+            Rules.astRules(id)(
+                id,
+                severity,
+                doc.version.value,
+                typesContext,
+                stdlib,
+                events(url),
+                Some(url)
+            )
+        }.toVector
+        val astWalker = LinterASTWalker(opts, visitors)
+        astWalker.apply(doc)
+      }
     }
   }
 }
