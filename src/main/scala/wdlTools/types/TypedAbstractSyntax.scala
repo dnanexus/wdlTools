@@ -127,8 +127,17 @@ object TypedAbstractSyntax {
   case class RuntimeSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // meta section
-  case class ParameterMetaSection(kvs: Map[String, Expr], text: TextSource) extends Element
-  case class MetaSection(kvs: Map[String, Expr], text: TextSource) extends Element
+  sealed trait MetaValue
+  case object MetaNull extends MetaValue
+  case class MetaBoolean(value : Boolean) extends MetaValue
+  case class MetaInt(value : Int) extends MetaValue
+  case class MetaFloat(value : Double) extends MetaValue
+  case class MetaString(value : String) extends MetaValue
+  case class MetaObject(value : Map[String, MetaValue]) extends MetaValue
+  case class MetaArray(value : Vector[MetaValue]) extends MetaValue
+
+  case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
+  case class MetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
 
   case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
 

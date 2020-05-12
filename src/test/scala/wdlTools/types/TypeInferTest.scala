@@ -69,8 +69,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   )
 
   // test to include/exclude
-  private val includeList
-      : Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
+  private val includeList: Option[Set[String]] = Some(Set("shadow_II.wdl"))
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {

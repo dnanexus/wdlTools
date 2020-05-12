@@ -527,6 +527,10 @@ case class TypeInfer(stdlib: Stdlib) {
   //   Int x = 5
   //   Int x = 7 + y
   private def applyDecl(decl: AST.Declaration, ctx: Context): TAT.Declaration = {
+    if (ctx.declarations contains decl.name)
+      throw new TypeException(s"variable ${decl.name} shadows an existing variable",
+                              decl.text,
+                              ctx.docSourceUrl)
     val lhsType: WdlType = typeFromAst(decl.wdlType, decl.text, ctx)
     (lhsType, decl.expr) match {
       // Int x
@@ -648,10 +652,40 @@ case class TypeInfer(stdlib: Stdlib) {
     TAT.RuntimeSection(m, rtSection.text)
   }
 
+  private def metaValueFromExpr(expr : AST.Expr) : MetaValue = {
+    expr match {
+      case ValueNull(_) => MetaNull
+      case ValueBoolean(value, _) => MetaBoolean(value)
+      case ValueInt(value, _) => MetaInt(value)
+      case ValueFloat(value, _) => MetaFloat(value)
+      case ValueString(value, _) => MetaString(value)
+      case ValueFile(value, _) => MetaString(value)
+      case ExprIdentifier(id, _) => MetaString(id)
+      case ExprArray(vec, _) => MetaArray(vec.map(metaValueFromExpr(_)))
+      case ExprMap(members, _) =>
+        MetaMap(members.map {
+                  case ExprMapItem(key, value) => key -> metaValueFromExpr(value)
+                }.toMap)
+      case ExprObject(members, _) =>
+        MetaMap(members.map {
+                  case ExprObjectMember(key, value) => key -> metaValueFromExpr(value)
+                }.toMap)
+      case other =>
+        throw new EvalException(s"${exprToString(other)} is not a meta value")
+    }
+  }
+
   private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.Expr] = {
-    val emptyCtx = Context(docSourceUrl = ctx.docSourceUrl)
     kvs.map {
-      case AST.MetaKV(k, v, _) => k -> applyExpr(v, emptyCtx)
+      case AST.MetaKV(k, v, text) =>
+        try {
+          k -> metaValueFromExpr(v)
+        } catch {
+          case _ : Throwable =>
+            throw new TypeException(s"${exprToString(v)} is an invalid meta value",
+                                    expr.text,
+                                    ctx.docSourceUrl)
+        }
     }.toMap
   }
 
