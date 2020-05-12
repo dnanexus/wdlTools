@@ -26,7 +26,7 @@ object ConcreteSyntax {
   case class TypeFloat(text: TextSource) extends Type
   case class TypeIdentifier(id: String, text: TextSource) extends Type
   case class TypeObject(text: TextSource) extends Type
-  case class StructMember(name: String, dataType: Type, text: TextSource) extends Element
+  case class StructMember(name: String, wdlType: Type, text: TextSource) extends Element
   case class TypeStruct(name: String, members: Vector[StructMember], text: TextSource)
       extends Type
       with DocumentElement

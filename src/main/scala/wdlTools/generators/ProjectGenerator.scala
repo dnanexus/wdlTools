@@ -59,7 +59,7 @@ case class ProjectGenerator(opts: Options,
       case TypeArray(t, _, _)        => containsFile(t)
       case TypeMap(k, v, _)          => containsFile(k) || containsFile(v)
       case TypePair(l, r, _)         => containsFile(l) || containsFile(r)
-      case TypeStruct(_, members, _) => members.exists(x => containsFile(x.dataType))
+      case TypeStruct(_, members, _) => members.exists(x => containsFile(x.wdlType))
       case _                         => false
     }
   }
@@ -234,7 +234,7 @@ case class ProjectGenerator(opts: Options,
     generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
 
     if (readmes) {
-      readmeGenerator.apply(docUrl, doc)
+      readmeGenerator.apply(doc)
     }
 
     if (dockerfile) {

@@ -39,12 +39,12 @@ case class Linter(opts: Options,
 
   def apply(url: URL): Unit = {
     val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
-    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (url, doc, _) =>
+    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>
       val astRules = rules.view.filterKeys(Rules.astRules.contains)
       if (astRules.nonEmpty) {
-        if (!events.contains(url)) {
+        if (!events.contains(doc.sourceUrl)) {
           val docEvents = mutable.ArrayBuffer.empty[LintEvent]
-          events(url) = docEvents
+          events(doc.sourceUrl) = docEvents
         }
         // First run the TypeChecker to infer the types of all expressions
         val stdlib = Stdlib(opts)
@@ -59,8 +59,8 @@ case class Linter(opts: Options,
                 doc.version.value,
                 typesContext,
                 stdlib,
-                events(url),
-                Some(url)
+                events(doc.sourceUrl),
+                Some(doc.sourceUrl)
             )
         }.toVector
         val astWalker = LinterASTWalker(opts, visitors)
