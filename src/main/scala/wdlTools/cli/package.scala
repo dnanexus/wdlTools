@@ -165,19 +165,16 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(())
     }
-    val outputDir: ScallopOption[Path] = opt[Path](descr =
-      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr =
+          "Directory in which to output formatted WDL files; if not specified, the input files are overwritten",
+        short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(
         descrYes = "Overwrite existing files",
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
-    validateOpt(outputDir, overwrite) {
-      case (None, Some(false) | None) =>
-        Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(())
-    }
   }
   addSubcommand(format)
 
@@ -236,19 +233,16 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       case (None, _) => Right(())
       case _         => Left("Source version must be earlier than destination version")
     }
-    val outputDir: ScallopOption[Path] = opt[Path](descr =
-      "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten"
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr =
+          "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten",
+        short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(
         descrYes = "Overwrite existing files",
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
-    validateOpt(outputDir, overwrite) {
-      case (None, Some(false) | None) =>
-        Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(())
-    }
   }
   addSubcommand(upgrade)
 
