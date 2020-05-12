@@ -25,12 +25,12 @@
   },
   "A002": {
     "name": "no_task_inputs",
-    "description": "Suspicious lack of task inputs (is this task really idempotent and portable?",
+    "description": "Suspicious lack of task inputs (is this task really idempotent and portable?)",
     "severity": "Warning"
   },
   "A003": {
     "name": "no_task_outputs",
-    "description": "Suspicious lack of task outputs (is this task really idempotent and portable?",
+    "description": "Suspicious lack of task outputs (is this task really idempotent and portable?)",
     "severity": "Warning"
   }
 }
