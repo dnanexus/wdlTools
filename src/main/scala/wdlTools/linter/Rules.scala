@@ -17,7 +17,7 @@ import scala.collection.mutable
 //  * winstanley: https://github.com/broadinstitute/winstanley
 object Rules {
   // Parser-level rules
-  // These are mostly to check things reated to whitespace, which is not
+  // These are mostly to check things related to whitespace, which is not
   // accessible from the AST
 
   // ideally we could provide the id as a class annotation, but dealing with annotations
