@@ -37,7 +37,6 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "imports.wdl" -> TResult(correct = true),
       "linear.wdl" -> TResult(correct = true),
       "nested.wdl" -> TResult(correct = true),
-      "types.wdl" -> TResult(correct = true),
       "coercions_questionable.wdl" -> TResult(correct = true, Some(TypeCheckingRegime.Lenient)),
       "coercions_strict.wdl" -> TResult(correct = true),
       "bad_stdlib_calls.wdl" -> TResult(correct = false),
@@ -45,12 +44,14 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "scatter_I.wdl" -> TResult(correct = false),
       "shadow_II.wdl" -> TResult(correct = false),
       "shadow.wdl" -> TResult(correct = false),
+      "polymorphic_types.wdl" -> TResult(correct = true),
       // correct tasks
       "command_string.wdl" -> TResult(correct = true),
       "comparisons.wdl" -> TResult(correct = true),
       "library.wdl" -> TResult(correct = true),
       "simple.wdl" -> TResult(correct = true),
       "stdlib.wdl" -> TResult(correct = true),
+      "output_section.wdl" -> TResult(correct = true),
       // incorrect tasks
       "comparison1.wdl" -> TResult(correct = false),
       "comparison2.wdl" -> TResult(correct = false),
@@ -61,15 +62,15 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "expressions.wdl" -> TResult(correct = true),
       "expressions_bad.wdl" -> TResult(correct = false),
       // metadata
-      "metadata_null_value.wdl" -> TResult(correct = true),
-      "metadata_complex.wdl" -> TResult(correct = true),
+      "meta_null_value.wdl" -> TResult(correct = true),
+      "meta_section_compound.wdl" -> TResult(correct = true),
       // runtime section
       "runtime_section_I.wdl" -> TResult(correct = true),
       "runtime_section_bad.wdl" -> TResult(correct = false)
   )
 
   // test to include/exclude
-  private val includeList: Option[Set[String]] = Some(Set("shadow_II.wdl"))
+  private val includeList: Option[Set[String]] = None
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
@@ -129,17 +130,24 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
         Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
     )
 
+    // check that all results have a corresponding file
+    val fileNames = testFiles.map(_.getFileName().toString).toSet
+    val controlNames = controlTable.keys.toSet
+    val diff1 = fileNames.diff(controlNames)
+    if (diff1.nonEmpty)
+      throw new Exception(s"files ${diff1} do not have a matching solution")
+    val diff2 = controlNames.diff(fileNames)
+    if (diff2.nonEmpty)
+      throw new Exception(s"solutions ${diff2} do not have a matching test file")
+
     // filter out files that do not appear in the control table
     val testFiles2 = testFiles.flatMap { testFile =>
       val name = testFile.getFileName.toString
       if (!includeExcludeCheck(name)) {
         None
       } else {
-        controlTable.get(name) match {
-          case None => None
-          case Some(tResult) =>
-            Some(testFile, tResult)
-        }
+        val tResult = controlTable(name)
+        Some(testFile, tResult)
       }
     }
 

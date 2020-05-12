@@ -50,7 +50,6 @@ object TypedAbstractSyntax {
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
   //
-  // They occur only in command blocks.
   case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, wdlType: WdlType, text: TextSource)
       extends Expr
   case class ExprPlaceholderDefault(default: Expr, value: Expr, wdlType: WdlType, text: TextSource)
@@ -126,7 +125,7 @@ object TypedAbstractSyntax {
   case class CommandSection(parts: Vector[Expr], text: TextSource) extends Element
   case class RuntimeSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
-  // meta section
+  // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue
   case object MetaNull extends MetaValue
   case class MetaBoolean(value : Boolean) extends MetaValue
@@ -136,6 +135,7 @@ object TypedAbstractSyntax {
   case class MetaObject(value : Map[String, MetaValue]) extends MetaValue
   case class MetaArray(value : Vector[MetaValue]) extends MetaValue
 
+  // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
   case class MetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
 

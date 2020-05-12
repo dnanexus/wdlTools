@@ -6,6 +6,7 @@ import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
+import wdlTools.syntax.{Util => SUtil}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{isPrimitive, typeToString, exprToString}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
@@ -652,40 +653,46 @@ case class TypeInfer(stdlib: Stdlib) {
     TAT.RuntimeSection(m, rtSection.text)
   }
 
-  private def metaValueFromExpr(expr : AST.Expr) : MetaValue = {
+  // convert the generic expression syntax into a specialized JSON object
+  // language for meta values only.
+  private def metaValueFromExpr(expr : AST.Expr, ctx : Context) : TAT.MetaValue = {
     expr match {
-      case ValueNull(_) => MetaNull
-      case ValueBoolean(value, _) => MetaBoolean(value)
-      case ValueInt(value, _) => MetaInt(value)
-      case ValueFloat(value, _) => MetaFloat(value)
-      case ValueString(value, _) => MetaString(value)
-      case ValueFile(value, _) => MetaString(value)
-      case ExprIdentifier(id, _) => MetaString(id)
-      case ExprArray(vec, _) => MetaArray(vec.map(metaValueFromExpr(_)))
-      case ExprMap(members, _) =>
-        MetaMap(members.map {
-                  case ExprMapItem(key, value) => key -> metaValueFromExpr(value)
-                }.toMap)
-      case ExprObject(members, _) =>
-        MetaMap(members.map {
-                  case ExprObjectMember(key, value) => key -> metaValueFromExpr(value)
-                }.toMap)
+      case AST.ValueNull(_) => TAT.MetaNull
+      case AST.ValueBoolean(value, _) => TAT.MetaBoolean(value)
+      case AST.ValueInt(value, _) => TAT.MetaInt(value)
+      case AST.ValueFloat(value, _) => TAT.MetaFloat(value)
+      case AST.ValueString(value, _) => TAT.MetaString(value)
+      case AST.ValueFile(value, _) => TAT.MetaString(value)
+      case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaNull
+      case AST.ExprIdentifier(id, _) => TAT.MetaString(id)
+      case AST.ExprArray(vec, _) => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
+      case AST.ExprMap(members, _) =>
+        TAT.MetaObject(members.map {
+                         case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
+                           key -> metaValueFromExpr(value, ctx)
+                         case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
+                           key -> metaValueFromExpr(value, ctx)
+                         case other =>
+                           throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+                       }.toMap)
+      case AST.ExprObject(members, _) =>
+        TAT.MetaObject(members.map {
+                         case AST.ExprObjectMember(key, value, _) =>
+                           key -> metaValueFromExpr(value, ctx)
+                         case other =>
+                           throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+                       }.toMap)
       case other =>
-        throw new EvalException(s"${exprToString(other)} is not a meta value")
+        throw new TypeException(s"${SUtil.exprToString(other)} is an invalid meta value",
+                                expr.text,
+                                ctx.docSourceUrl)
     }
   }
 
-  private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.Expr] = {
+  private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
     kvs.map {
       case AST.MetaKV(k, v, text) =>
-        try {
-          k -> metaValueFromExpr(v)
-        } catch {
-          case _ : Throwable =>
-            throw new TypeException(s"${exprToString(v)} is an invalid meta value",
-                                    expr.text,
-                                    ctx.docSourceUrl)
-        }
+          k -> metaValueFromExpr(v, ctx)
     }.toMap
   }
 
