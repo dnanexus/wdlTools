@@ -5,8 +5,7 @@ import java.net.URL
 import WdlTypes._
 import wdlTools.util.Options
 //import wdlTools.util.Verbosity._
-import wdlTools.syntax.{AbstractSyntax, TextSource}
-import wdlTools.types.{Util => TUtil}
+import wdlTools.syntax.TextSource
 
 case class Stdlib(conf: Options) {
   private val unify = Unification(conf)

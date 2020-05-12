@@ -3,9 +3,10 @@ package wdlTools.types
 import java.net.URL
 
 import wdlTools.syntax.TextSource
+import wdlTools.types.Util.{typeToString, isPrimitive}
+import wdlTools.types.WdlTypes._
 import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
-import WdlTypes._
 
 case class Unification(conf: Options) {
   // Type checking rules. Are we lenient or strict in checking coercions?
@@ -216,7 +217,7 @@ case class Unification(conf: Options) {
       t match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
         case a: T_Var if !(typeBindings contains a) =>
-          throw new TypeException(s"type variable ${toString(a)} does not have a binding",
+          throw new TypeException(s"type variable ${typeToString(a)} does not have a binding",
                                   srcText,
                                   docSourceUrl)
         case a: T_Var       => typeBindings(a)
@@ -228,7 +229,7 @@ case class Unification(conf: Options) {
         case T_Optional(t1) => T_Optional(sub(t1))
         case T_Any          => T_Any
         case other =>
-          throw new TypeException(s"Type ${toString(other)} should not appear in this context",
+          throw new TypeException(s"Type ${typeToString(other)} should not appear in this context",
                                   srcText,
                                   docSourceUrl)
       }

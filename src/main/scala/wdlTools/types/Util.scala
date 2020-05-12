@@ -1,9 +1,6 @@
 package wdlTools.types
 
-import java.net.URL
-
-import wdlTools.util.Options
-import WdlTypes._
+import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
 object Util {
@@ -123,41 +120,37 @@ object Util {
       case TAT.ExprArray(value, _, _) =>
         "[" + value.map(exprToString).mkString(", ") + "]"
       case TAT.ExprMap(value, _, _) =>
-        val m2 = value
+        "{" + value
           .map {
             case (k, v) => s"${exprToString(k)} : ${exprToString(v)}"
           }
-          .toMap
-          .mkString(", ")
-        "{ " + m2 + " }"
+          .mkString(", ") + "}"
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
             case (k, v) => s"${k} : ${exprToString(v)}"
           }
-          .toMap
           .mkString(", ")
-        "{ " + m2 + " }"
         s"object($m2)"
 
       // ~{true="--yes" false="--no" boolean_value}
-      case TAT.ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
         s"{true=${exprToString(t)} false=${exprToString(f)} ${exprToString(value)}"
 
       // ~{default="foo" optional_value}
-      case TAT.ExprPlaceholderDefault(default: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderDefault(default, value, _, _) =>
         s"{default=${exprToString(default)} ${exprToString(value)}}"
 
       // ~{sep=", " array_value}
-      case TAT.ExprPlaceholderSep(sep: Expr, value: Expr, _, _) =>
+      case TAT.ExprPlaceholderSep(sep, value, _, _) =>
         s"{sep=${exprToString(sep)} ${exprToString(value)}"
 
       // operators on one argument
-      case TAT.ExprUniraryPlus(value: Expr, _, _) =>
+      case TAT.ExprUniraryPlus(value, _, _) =>
         s"+ ${exprToString(value)}"
-      case TAT.ExprUniraryMinus(value: Expr, _, _) =>
+      case TAT.ExprUniraryMinus(value, _, _) =>
         s"- ${exprToString(value)}"
-      case TAT.ExprNegate(value: Expr, _, _) =>
+      case TAT.ExprNegate(value, _, _) =>
         s"not(${exprToString(value)})"
 
       // operators on two arguments
@@ -186,7 +179,7 @@ object Util {
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case TAT.ExprApply(funcName: String, elements: Vector[Expr], _, _) =>
+      case TAT.ExprApply(funcName, elements, _, _) =>
         val args = elements.map(exprToString).mkString(", ")
         s"${funcName}(${args})"
 

@@ -7,7 +7,7 @@ import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
 import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
 
-class TypeEvalTest extends AnyFlatSpec with Matchers {
+class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(
@@ -79,7 +79,7 @@ class TypeEvalTest extends AnyFlatSpec with Matchers {
       case Some(x) => opts.copy(typeChecking = x)
     }
     val stdlib = Stdlib(opts2)
-    val checker = TypeEval(stdlib)
+    val checker = TypeInfer(stdlib)
     try {
       val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
@@ -96,7 +96,7 @@ class TypeEvalTest extends AnyFlatSpec with Matchers {
       case Some(x) => opts.copy(typeChecking = x)
     }
     val stdlib = Stdlib(opts2)
-    val checker = TypeEval(stdlib)
+    val checker = TypeInfer(stdlib)
     val checkVal =
       try {
         val doc = parser.parseDocument(UUtil.pathToUrl(file))
@@ -155,7 +155,7 @@ class TypeEvalTest extends AnyFlatSpec with Matchers {
   it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
-    val checker = TypeEval(stdlib)
+    val checker = TypeInfer(stdlib)
 
     val sources = Vector(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",

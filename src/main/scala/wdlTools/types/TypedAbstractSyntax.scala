@@ -24,13 +24,12 @@ object TypedAbstractSyntax {
   }
 
   // values
-  sealed trait Value extends Expr
-  case class ValueNull(wdlType: WdlType, text: TextSource) extends Value
-  case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Value
-  case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Value
-  case class ValueFloat(value: Double, wdlType: WdlType, text: TextSource) extends Value
-  case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Value
-  case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Value
+  case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueFloat(value: Double, wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Expr
 
   case class ExprIdentifier(id: String, wdlType: WdlType, text: TextSource) extends Expr
 
@@ -135,10 +134,10 @@ object TypedAbstractSyntax {
 
   // import statement with the typed-AST for the referenced document
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
-  case class ImportDoc(name: String,
+  case class ImportDoc(name: Option[String],
                        aliases: Vector[ImportAlias],
                        addr: String,
-                       doc: Option[Document],
+                       doc: Document,
                        text: TextSource)
       extends DocumentElement
 

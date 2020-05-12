@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.types.{Stdlib => TypeStdlib, TypeEval, TypedAbstractSyntax => TAT}
+import wdlTools.types.{Stdlib => TypeStdlib, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
@@ -20,7 +20,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
             verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val stdlib = TypeStdlib(opts)
-  private val typeEval = TypeEval(stdlib)
+  private val typeInfer = TypeInfer(stdlib)
 
   def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {
@@ -45,7 +45,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parser.parseDocument(UUtil.pathToUrl(file))
-    typeEval.apply(doc)
+    typeInfer.apply(doc)
   }
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
