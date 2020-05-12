@@ -29,7 +29,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlDraft2Grammar.newInstance(sourceCode, opts)).parseDocument
+    ParseTop(conf, WdlDraft2Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {

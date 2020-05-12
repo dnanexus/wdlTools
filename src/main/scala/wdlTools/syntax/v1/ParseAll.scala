@@ -2,12 +2,16 @@ package wdlTools.syntax.v1
 
 import java.net.URL
 
+import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{SyntaxException, WdlParser, AbstractSyntax => AST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
-case class ParseAll(opts: Options) extends WdlParser(opts) {
+case class ParseAll(opts: Options,
+                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty)
+    extends WdlParser(opts) {
+
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
@@ -339,7 +343,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
       AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
     }
   }
-  private val versionRegexp = "version\\s+1.0".r
+  private val versionRegexp = "version\\s+1.0.*".r
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
@@ -351,7 +355,7 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = WdlV1Grammar.newInstance(sourceCode, opts)
+    val grammar = WdlV1Grammar.newInstance(sourceCode, listenerFactories, opts)
     val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
@@ -363,13 +367,13 @@ case class ParseAll(opts: Options) extends WdlParser(opts) {
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, listenerFactories, opts = opts))
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, opts = opts))
+    val parser = ParseTop(opts, WdlV1Grammar.newInstance(text, listenerFactories, opts = opts))
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }

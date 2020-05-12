@@ -186,7 +186,7 @@ task_command_string_part
 	;
 
 task_command_expr_part
-	: StringCommandStart	(expression_placeholder_option)* expr RBRACE
+	: StringCommandStart (expression_placeholder_option)* expr RBRACE
 	;
 
 task_command_expr_with_string

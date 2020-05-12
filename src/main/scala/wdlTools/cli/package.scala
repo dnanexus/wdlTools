@@ -165,21 +165,50 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(())
     }
-    val outputDir: ScallopOption[Path] = opt[Path](descr =
-      "Directory in which to output formatted WDL files; if not specified, the input files are overwritten"
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr =
+          "Directory in which to output formatted WDL files; if not specified, the input files are overwritten",
+        short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(
         descrYes = "Overwrite existing files",
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
-    validateOpt(outputDir, overwrite) {
-      case (None, Some(false) | None) =>
-        Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(())
-    }
   }
   addSubcommand(format)
+
+  val lint = new ParserSubcommandWithFollowOption(
+      name = "lint",
+      description = "Check WDL file for common mistakes and bad code smells"
+  ) {
+    val config: ScallopOption[Path] = opt[Path](descr = "Path to lint config file")
+    val includeRules: ScallopOption[List[String]] = opt[List[String]](
+        descr =
+          "Lint rules to include; may be of the form '<rule>=<level>' to change the default level"
+    )
+    val excludeRules: ScallopOption[List[String]] =
+      opt[List[String]](descr = "Lint rules to exclude")
+    validateOpt(config, includeRules, excludeRules) {
+      case _ if config.isDefined && (includeRules.isDefined || excludeRules.isDefined) =>
+        Left("--config and --include-rules/--exclude-rules are mutually exclusive")
+      case _ => Right(())
+    }
+    val json: ScallopOption[Boolean] = toggle(
+        descrYes = "Output lint errors as JSON",
+        descrNo = "Output lint errors as plain text",
+        default = Some(false)
+    )
+    val outputFile: ScallopOption[Path] = opt[Path](
+        descr = "File in which to write lint errors; if not specified, errors are written to stdout"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+  }
+  addSubcommand(lint)
 
   val upgrade = new ParserSubcommandWithFollowOption(
       name = "upgrade",
@@ -204,19 +233,16 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       case (None, _) => Right(())
       case _         => Left("Source version must be earlier than destination version")
     }
-    val outputDir: ScallopOption[Path] = opt[Path](descr =
-      "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten"
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr =
+          "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten",
+        short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(
         descrYes = "Overwrite existing files",
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
-    validateOpt(outputDir, overwrite) {
-      case (None, Some(false) | None) =>
-        Left("--output-dir is required unless --overwrite is specified")
-      case _ => Right(())
-    }
   }
   addSubcommand(upgrade)
 
@@ -244,7 +270,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
     val interactive: ScallopOption[Boolean] = toggle(
         descrYes = "Specify inputs and outputs interactively",
-        descrNo = "(Defaut) Do not specify inputs and outputs interactively",
+        descrNo = "(Default) Do not specify inputs and outputs interactively",
         default = Some(false)
     )
     val workflow: ScallopOption[Boolean] = toggle(

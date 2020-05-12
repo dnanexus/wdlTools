@@ -129,8 +129,10 @@ object Antlr4Util {
   private val defaultListenerFactories = Vector(CommentListenerFactory)
 
   class Grammar(
+      val version: WdlVersion,
       val lexer: Lexer,
       val parser: Parser,
+      val listenerFactories: Vector[ParseTreeListenerFactory],
       val docSourceUrl: Option[URL] = None,
       val opts: Options,
       val comments: mutable.Map[Int, Comment] = mutable.HashMap.empty
@@ -155,7 +157,7 @@ object Antlr4Util {
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
 
-    defaultListenerFactories.foreach(
+    (defaultListenerFactories ++ listenerFactories).foreach(
         _.createParseTreeListeners(this).map(parser.addParseListener)
     )
 
@@ -265,6 +267,7 @@ object Antlr4Util {
       val result = visitor(ctx)
       afterParse()
       result
+
     }
   }
 }
