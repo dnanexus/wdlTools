@@ -38,9 +38,9 @@ You can very easily generate and preview your documentation using [mkDocs](https
     ```
     $ pip install mkdocs
     ```
-3. In the same directory that contains the `docs` folder, add a `mkdocs.yaml` file:
+3. In the same directory that contains the `docs` folder, add a `mkdocs.yml` file:
     ```yaml
-    # mkdocs.yaml
+    # mkdocs.yml
     site_name: simple
     
     theme:
