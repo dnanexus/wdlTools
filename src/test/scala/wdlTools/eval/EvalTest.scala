@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.types.{Stdlib => TypeStdlib, TypeInfer, TypedAbstractSyntax => TAT}
+import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
@@ -19,8 +19,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
             localDirectories = Vector(srcDir),
             verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
-  private val stdlib = TypeStdlib(opts)
-  private val typeInfer = TypeInfer(stdlib)
+  private val typeInfer = TypeInfer(opts)
 
   def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {

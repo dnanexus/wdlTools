@@ -79,8 +79,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
     }
-    val stdlib = Stdlib(opts2)
-    val checker = TypeInfer(stdlib)
+    val checker = TypeInfer(opts2)
     try {
       val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
@@ -96,8 +95,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
     }
-    val stdlib = Stdlib(opts2)
-    val checker = TypeInfer(stdlib)
+    val checker = TypeInfer(opts2)
     val checkVal =
       try {
         val doc = parser.parseDocument(UUtil.pathToUrl(file))
@@ -162,8 +160,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
-    val stdlib = Stdlib(opts2)
-    val checker = TypeInfer(stdlib)
+    val checker = TypeInfer(opts2)
 
     val sources = Vector(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",

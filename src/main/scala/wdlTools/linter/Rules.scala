@@ -212,7 +212,6 @@ object Rules {
       Severity,
       WdlVersion,
       types.Context,
-      types.Stdlib,
       mutable.Buffer[LintEvent],
       Option[URL]
   ) => LinterAstRule
@@ -323,7 +322,6 @@ object Rules {
                                  severity: Severity,
                                  version: WdlVersion,
                                  typesContext: types.Context,
-                                 stdlib: types.Stdlib,
                                  events: mutable.Buffer[LintEvent],
                                  docSourceUrl: Option[URL])
       extends LinterAstRule(id, severity, docSourceUrl, events) {
@@ -342,7 +340,6 @@ object Rules {
                               severity: Severity,
                               version: WdlVersion,
                               typesContext: types.Context,
-                              stdlib: types.Stdlib,
                               events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
       extends LinterAstRule(id, severity, docSourceUrl, events) {
@@ -357,7 +354,6 @@ object Rules {
                                severity: Severity,
                                version: WdlVersion,
                                typesContext: types.Context,
-                               stdlib: types.Stdlib,
                                events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
       extends LinterAstRule(id, severity, docSourceUrl, events) {
