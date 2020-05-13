@@ -1,73 +1,73 @@
 package wdlTools.syntax
 
-import wdlTools.syntax.ASTVisitor.Context
+import wdlTools.syntax.AbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Options
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
-class ASTVisitor {
-  def visitDocument(ctx: Context[Document]): Unit = {}
+class AbstractSyntaxTreeVisitor {
+  def visitDocument(ctx: VisitorContext[Document]): Unit = {}
 
-  def visitIdentifier[P <: Element](identifier: String, parent: Context[P]): Unit = {}
+  def visitIdentifier[P <: Element](identifier: String, parent: VisitorContext[P]): Unit = {}
 
-  def visitVersion(ctx: Context[Version]): Unit = {}
+  def visitVersion(ctx: VisitorContext[Version]): Unit = {}
 
-  def visitImportName(ctx: Context[ImportName]): Unit = {}
+  def visitImportName(ctx: VisitorContext[ImportName]): Unit = {}
 
-  def visitImportAlias(ctx: Context[ImportAlias]): Unit = {}
+  def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {}
 
-  def visitImportDoc(ctx: Context[ImportDoc]): Unit = {}
+  def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {}
 
-  def visitStruct(ctx: Context[TypeStruct]): Unit = {}
+  def visitStruct(ctx: VisitorContext[TypeStruct]): Unit = {}
 
-  def visitDataType(ctx: Context[Type]): Unit = {}
+  def visitDataType(ctx: VisitorContext[Type]): Unit = {}
 
-  def visitStructMember(ctx: Context[StructMember]): Unit = {}
+  def visitStructMember(ctx: VisitorContext[StructMember]): Unit = {}
 
-  def visitExpression(ctx: Context[Expr]): Unit = {}
+  def visitExpression(ctx: VisitorContext[Expr]): Unit = {}
 
-  def visitDeclaration(ctx: Context[Declaration]): Unit = {}
+  def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
 
-  def visitInputSection(ctx: Context[InputSection]): Unit = {}
+  def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {}
 
-  def visitOutputSection(ctx: Context[OutputSection]): Unit = {}
+  def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {}
 
-  def visitCallAlias(ctx: Context[CallAlias]): Unit = {}
+  def visitCallAlias(ctx: VisitorContext[CallAlias]): Unit = {}
 
-  def visitCallInput(ctx: Context[CallInput]): Unit = {}
+  def visitCallInput(ctx: VisitorContext[CallInput]): Unit = {}
 
-  def visitCall(ctx: Context[Call]): Unit = {}
+  def visitCall(ctx: VisitorContext[Call]): Unit = {}
 
-  def visitScatter(ctx: Context[Scatter]): Unit = {}
+  def visitScatter(ctx: VisitorContext[Scatter]): Unit = {}
 
-  def visitConditional(ctx: Context[Conditional]): Unit = {}
+  def visitConditional(ctx: VisitorContext[Conditional]): Unit = {}
 
-  def visitBody[P <: Element](body: Vector[WorkflowElement], ctx: Context[P]): Unit = {}
+  def visitBody[P <: Element](body: Vector[WorkflowElement], ctx: VisitorContext[P]): Unit = {}
 
-  def visitMetaKV(ctx: Context[MetaKV]): Unit = {}
+  def visitMetaKV(ctx: VisitorContext[MetaKV]): Unit = {}
 
-  def visitMetaSection(ctx: Context[MetaSection]): Unit = {}
+  def visitMetaSection(ctx: VisitorContext[MetaSection]): Unit = {}
 
-  def visitParameterMetaSection(ctx: Context[ParameterMetaSection]): Unit = {}
+  def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {}
 
-  def visitWorkflow(ctx: Context[Workflow]): Unit = {}
+  def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {}
 
-  def visitCommandSection(ctx: Context[CommandSection]): Unit = {}
+  def visitCommandSection(ctx: VisitorContext[CommandSection]): Unit = {}
 
-  def visitRuntimeKV(ctx: Context[RuntimeKV]): Unit = {}
+  def visitRuntimeKV(ctx: VisitorContext[RuntimeKV]): Unit = {}
 
-  def visitRuntimeSection(ctx: Context[RuntimeSection]): Unit = {}
+  def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {}
 
-  def visitTask(ctx: Context[Task]): Unit = {}
+  def visitTask(ctx: VisitorContext[Task]): Unit = {}
 }
 
-object ASTVisitor {
-  class Context[T <: Element](val element: T, val parent: Option[Context[_]] = None) {
-    def getParent[P <: Element]: Context[P] = {
+object AbstractSyntaxTreeVisitor {
+  class VisitorContext[T <: Element](val element: T, val parent: Option[VisitorContext[_]] = None) {
+    def getParent[P <: Element]: VisitorContext[P] = {
       if (parent.isDefined) {
-        parent.get.asInstanceOf[Context[P]]
+        parent.get.asInstanceOf[VisitorContext[P]]
       } else {
         throw new Exception("Context does not have a parent")
       }
@@ -75,7 +75,7 @@ object ASTVisitor {
 
     def getParentExecutable: Option[Element] = {
       @tailrec
-      def getExecutable(ctx: Context[_]): Option[Element] = {
+      def getExecutable(ctx: VisitorContext[_]): Option[Element] = {
         ctx.element match {
           case t: Task                   => Some(t)
           case w: Workflow               => Some(w)
@@ -86,12 +86,12 @@ object ASTVisitor {
       getExecutable(this)
     }
 
-    def findParent[P <: Element](implicit tag: ClassTag[P]): Option[Context[P]] = {
+    def findParent[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
       if (parent.isDefined) {
         @tailrec
-        def find(ctx: Context[_]): Option[Context[P]] = {
+        def find(ctx: VisitorContext[_]): Option[VisitorContext[P]] = {
           ctx.element match {
-            case _: P                      => Some(ctx.asInstanceOf[Context[P]])
+            case _: P                      => Some(ctx.asInstanceOf[VisitorContext[P]])
             case _ if ctx.parent.isDefined => find(ctx.parent.get)
             case _                         => None
           }
@@ -104,8 +104,8 @@ object ASTVisitor {
   }
 }
 
-class ASTWalker(opts: Options) extends ASTVisitor {
-  override def visitDocument(ctx: Context[Document]): Unit = {
+class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor {
+  override def visitDocument(ctx: VisitorContext[Document]): Unit = {
     visitVersion(createContext[Version, Document](ctx.element.version, ctx))
 
     ctx.element.elements.collect { case imp: ImportDoc => imp }.foreach { imp =>
@@ -125,16 +125,16 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitImportName(ctx: Context[ImportName]): Unit = {
+  override def visitImportName(ctx: VisitorContext[ImportName]): Unit = {
     visitIdentifier[ImportName](ctx.element.value, ctx)
   }
 
-  override def visitImportAlias(ctx: Context[ImportAlias]): Unit = {
+  override def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {
     visitIdentifier[ImportAlias](ctx.element.id1, ctx)
     visitIdentifier[ImportAlias](ctx.element.id2, ctx)
   }
 
-  override def visitImportDoc(ctx: Context[ImportDoc]): Unit = {
+  override def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {
     if (ctx.element.name.isDefined) {
       visitImportName(createContext[ImportName, ImportDoc](ctx.element.name.get, ctx))
     }
@@ -146,18 +146,18 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitStruct(ctx: Context[TypeStruct]): Unit = {
+  override def visitStruct(ctx: VisitorContext[TypeStruct]): Unit = {
     ctx.element.members.foreach { member =>
       visitStructMember(createContext[StructMember, TypeStruct](member, ctx))
     }
   }
 
-  override def visitStructMember(ctx: Context[StructMember]): Unit = {
+  override def visitStructMember(ctx: VisitorContext[StructMember]): Unit = {
     visitDataType(createContext[Type, StructMember](ctx.element.dataType, ctx))
     visitIdentifier[StructMember](ctx.element.name, ctx)
   }
 
-  override def visitDeclaration(ctx: Context[Declaration]): Unit = {
+  override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
     visitDataType(createContext[Type, Declaration](ctx.element.wdlType, ctx))
     visitIdentifier[Declaration](ctx.element.name, ctx)
     if (ctx.element.expr.isDefined) {
@@ -165,28 +165,28 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitInputSection(ctx: Context[InputSection]): Unit = {
+  override def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {
     ctx.element.declarations.foreach { decl =>
       visitDeclaration(createContext[Declaration, InputSection](decl, ctx))
     }
   }
 
-  override def visitOutputSection(ctx: Context[OutputSection]): Unit = {
+  override def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {
     ctx.element.declarations.foreach { decl =>
       visitDeclaration(createContext[Declaration, OutputSection](decl, ctx))
     }
   }
 
-  override def visitCallAlias(ctx: Context[CallAlias]): Unit = {
+  override def visitCallAlias(ctx: VisitorContext[CallAlias]): Unit = {
     visitIdentifier[CallAlias](ctx.element.name, ctx)
   }
 
-  override def visitCallInput(ctx: Context[CallInput]): Unit = {
+  override def visitCallInput(ctx: VisitorContext[CallInput]): Unit = {
     visitIdentifier[CallInput](ctx.element.name, ctx)
     visitExpression(createContext[Expr, CallInput](ctx.element.expr, ctx))
   }
 
-  override def visitCall(ctx: Context[Call]): Unit = {
+  override def visitCall(ctx: VisitorContext[Call]): Unit = {
     visitIdentifier[Call](ctx.element.name, ctx)
     if (ctx.element.alias.isDefined) {
       visitCallAlias(createContext[CallAlias, Call](ctx.element.alias.get, ctx))
@@ -198,18 +198,19 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitScatter(ctx: Context[Scatter]): Unit = {
+  override def visitScatter(ctx: VisitorContext[Scatter]): Unit = {
     visitIdentifier[Scatter](ctx.element.identifier, ctx)
     visitExpression(createContext[Expr, Scatter](ctx.element.expr, ctx))
     visitBody[Scatter](ctx.element.body, ctx)
   }
 
-  override def visitConditional(ctx: Context[Conditional]): Unit = {
+  override def visitConditional(ctx: VisitorContext[Conditional]): Unit = {
     visitExpression(createContext[Expr, Conditional](ctx.element.expr, ctx))
     visitBody[Conditional](ctx.element.body, ctx)
   }
 
-  override def visitBody[P <: Element](body: Vector[WorkflowElement], ctx: Context[P]): Unit = {
+  override def visitBody[P <: Element](body: Vector[WorkflowElement],
+                                       ctx: VisitorContext[P]): Unit = {
     body.foreach {
       case decl: Declaration => visitDeclaration(createContext[Declaration, P](decl, ctx))
       case call: Call        => visitCall(createContext[Call, P](call, ctx))
@@ -220,24 +221,24 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitMetaKV(ctx: Context[MetaKV]): Unit = {
+  override def visitMetaKV(ctx: VisitorContext[MetaKV]): Unit = {
     visitIdentifier[MetaKV](ctx.element.id, ctx)
     visitExpression(createContext[Expr, MetaKV](ctx.element.expr, ctx))
   }
 
-  override def visitMetaSection(ctx: Context[MetaSection]): Unit = {
+  override def visitMetaSection(ctx: VisitorContext[MetaSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
       visitMetaKV(createContext[MetaKV, MetaSection](kv, ctx))
     }
   }
 
-  override def visitParameterMetaSection(ctx: Context[ParameterMetaSection]): Unit = {
+  override def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
       visitMetaKV(createContext[MetaKV, ParameterMetaSection](kv, ctx))
     }
   }
 
-  override def visitWorkflow(ctx: Context[Workflow]): Unit = {
+  override def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {
     if (ctx.element.input.isDefined) {
       visitInputSection(createContext[InputSection, Workflow](ctx.element.input.get, ctx))
     }
@@ -259,24 +260,24 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     }
   }
 
-  override def visitCommandSection(ctx: Context[CommandSection]): Unit = {
+  override def visitCommandSection(ctx: VisitorContext[CommandSection]): Unit = {
     ctx.element.parts.foreach { expr =>
       visitExpression(createContext[Expr, CommandSection](expr, ctx))
     }
   }
 
-  override def visitRuntimeKV(ctx: Context[RuntimeKV]): Unit = {
+  override def visitRuntimeKV(ctx: VisitorContext[RuntimeKV]): Unit = {
     visitIdentifier[RuntimeKV](ctx.element.id, ctx)
     visitExpression(createContext[Expr, RuntimeKV](ctx.element.expr, ctx))
   }
 
-  override def visitRuntimeSection(ctx: Context[RuntimeSection]): Unit = {
+  override def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
       visitRuntimeKV(createContext[RuntimeKV, RuntimeSection](kv, ctx))
     }
   }
 
-  override def visitTask(ctx: Context[Task]): Unit = {
+  override def visitTask(ctx: VisitorContext[Task]): Unit = {
     if (ctx.element.input.isDefined) {
       visitInputSection(createContext[InputSection, Task](ctx.element.input.get, ctx))
     }
@@ -307,11 +308,12 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     visitDocument(ctx)
   }
 
-  def createContext[T <: Element](element: T): Context[T] = {
-    new Context[T](element)
+  def createContext[T <: Element](element: T): VisitorContext[T] = {
+    new VisitorContext[T](element)
   }
 
-  def createContext[T <: Element, P <: Element](element: T, parent: Context[P]): Context[T] = {
-    new Context[T](element, Some(parent.asInstanceOf[Context[Element]]))
+  def createContext[T <: Element, P <: Element](element: T,
+                                                parent: VisitorContext[P]): VisitorContext[T] = {
+    new VisitorContext[T](element, Some(parent.asInstanceOf[VisitorContext[Element]]))
   }
 }

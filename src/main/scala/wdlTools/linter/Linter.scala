@@ -21,14 +21,14 @@ case class LinterParserRuleFactory(
     val docEvents: mutable.Buffer[LintEvent] = mutable.ArrayBuffer.empty
     events(grammar.docSourceUrl.get) = docEvents
     rules.collect {
-      case (id, severity) if Rules.parserRules.contains(id) =>
-        Rules.parserRules(id)(id, severity, docEvents, grammar)
+      case (id, severity) if ParserRules.allRules.contains(id) =>
+        ParserRules.allRules(id)(id, severity, docEvents, grammar)
     }.toVector
   }
 }
 
 case class Linter(opts: Options,
-                  rules: Map[String, Severity] = Rules.defaultRules,
+                  rules: Map[String, Severity] = Linter.defaultRules,
                   events: mutable.Map[URL, mutable.Buffer[LintEvent]] = mutable.HashMap.empty) {
   def hasEvents: Boolean = events.nonEmpty
 
@@ -40,30 +40,51 @@ case class Linter(opts: Options,
   def apply(url: URL): Unit = {
     val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
     parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (url, doc, _) =>
-      val astRules = rules.view.filterKeys(Rules.astRules.contains)
-      if (astRules.nonEmpty) {
+      val astRules = rules.view.filterKeys(AstRules.allRules.contains)
+      val tstRules = rules.view.filterKeys(TstRules.allRules.contains)
+      if (astRules.nonEmpty || tstRules.nonEmpty) {
         if (!events.contains(url)) {
           val docEvents = mutable.ArrayBuffer.empty[LintEvent]
           events(url) = docEvents
         }
-        // First run the TypeChecker to infer the types of all expressions
-        val typeChecker = TypeInfer(opts)
-        val (_, typesContext) = typeChecker.apply(doc)
         // Now execute the linter rules
-        val visitors = astRules.map {
-          case (id, severity) =>
-            Rules.astRules(id)(
-                id,
-                severity,
-                doc.version.value,
-                typesContext,
-                events(url),
-                Some(url)
-            )
-        }.toVector
-        val astWalker = LinterASTWalker(opts, visitors)
-        astWalker.apply(doc)
+        if (astRules.nonEmpty) {
+          val visitors = astRules.map {
+            case (id, severity) =>
+              AstRules.allRules(id)(
+                  id,
+                  severity,
+                  doc.version.value,
+                  events(url),
+                  Some(url)
+              )
+          }.toVector
+          val astWalker = LinterAstWalker(opts, visitors)
+          astWalker.apply(doc)
+        }
+        if (tstRules.nonEmpty) {
+          // Run TypeINfer to infer the types of all expressions
+          val (typedDoc, _) = TypeInfer(opts).apply(doc)
+          val visitors = tstRules.map {
+            case (id, severity) =>
+              TstRules.allRules(id)(
+                  id,
+                  severity,
+                  doc.version.value,
+                  events(url),
+                  Some(url)
+              )
+          }.toVector
+          val tstWalker = LinterTstWalker(opts, visitors)
+          tstWalker.apply(typedDoc)
+        }
       }
     }
   }
+}
+
+object Linter {
+  val defaultRules: Map[String, Severity] = (
+      ParserRules.allRules.keys.toVector ++ AstRules.allRules.keys.toVector ++ TstRules.allRules.keys.toVector
+  ).map(_ -> Severity.Default).toMap
 }

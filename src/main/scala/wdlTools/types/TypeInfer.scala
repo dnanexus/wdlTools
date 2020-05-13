@@ -286,9 +286,8 @@ case class TypeInfer(conf: Options) {
 
       case AST.ExprMap(value, text) =>
         // figure out the types from the first element
-        val m: Map[TAT.Expr, TAT.Expr] = value.map {
-          case item: AST.ExprMapItem =>
-            applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
+        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
+          applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)

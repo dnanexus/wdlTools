@@ -2,7 +2,6 @@ package wdlTools.types
 
 import java.net.URL
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
-import wdlTools.types.WdlTypes
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
@@ -25,12 +24,13 @@ object TypedAbstractSyntax {
 
   // values
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueNone(wdlType: WdlType, text: TextSource) extends Expr
   case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueFloat(value: Double, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Expr
-
+  case class ValueDirectory(value: String, wdlType: WdlType, text: TextSource) extends Expr
   case class ExprIdentifier(id: String, wdlType: WdlType, text: TextSource) extends Expr
 
   // represents strings with interpolation. These occur only in command blocks.
@@ -139,7 +139,7 @@ object TypedAbstractSyntax {
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
   case class MetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
 
-  case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
+  case class Version(value: WdlVersion, text: TextSource) extends Element
 
   // import statement with the typed-AST for the referenced document
   case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
