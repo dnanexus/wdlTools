@@ -20,8 +20,8 @@ import wdlTools.util.Options
 
 import scala.collection.mutable
 
-case class ParseTop(opts: Options,
-                    grammar: WdlDraft2Grammar) extends WdlDraft2ParserBaseVisitor[Element] {
+case class ParseTop(opts: Options, grammar: WdlDraft2Grammar)
+    extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
       throw new SyntaxException("missing identifier", getTextSource(ctx), grammar.docSourceUrl)
@@ -1204,8 +1204,8 @@ document_element
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(docSourceURL.get,
-             docSource,
+    Document(grammar.docSourceUrl.get,
+             grammar.docSource,
              elems,
              workflow,
              getTextSource(ctx),

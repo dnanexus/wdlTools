@@ -223,7 +223,6 @@ case class TypeInfer(stdlib: Stdlib) {
       case AST.ValueInt(value, text)     => TAT.ValueInt(value, T_Int, text)
       case AST.ValueFloat(value, text)   => TAT.ValueFloat(value, T_Float, text)
       case AST.ValueString(value, text)  => TAT.ValueString(value, T_String, text)
-      case AST.ValueFile(value, text)    => TAT.ValueFile(value, T_File, text)
 
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
@@ -495,11 +494,12 @@ case class TypeInfer(stdlib: Stdlib) {
 
   private def typeFromAst(t: AST.Type, text: TextSource, ctx: Context): WdlType = {
     t match {
-      case _: AST.TypeString      => T_String
-      case _: AST.TypeFile        => T_File
       case _: AST.TypeBoolean     => T_Boolean
       case _: AST.TypeInt         => T_Int
       case _: AST.TypeFloat       => T_Float
+      case _: AST.TypeString      => T_String
+      case _: AST.TypeFile        => T_File
+      case _: AST.TypeDirectory   => T_Directory
       case AST.TypeOptional(t, _) => T_Optional(typeFromAst(t, text, ctx))
       case AST.TypeArray(t, _, _) => T_Array(typeFromAst(t, text, ctx))
       case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, text, ctx), typeFromAst(v, text, ctx))
@@ -528,11 +528,11 @@ case class TypeInfer(stdlib: Stdlib) {
   //   Int x = 5
   //   Int x = 7 + y
   private def applyDecl(decl: AST.Declaration,
-                        bindings : Map[String, WdlType],
+                        bindings: Map[String, WdlType],
                         ctx: Context,
-                        canShadow : Boolean = false): TAT.Declaration = {
+                        canShadow: Boolean = false): TAT.Declaration = {
     ctx.lookup(decl.name, bindings, decl.text) match {
-      case None => ()
+      case None                 => ()
       case Some(_) if canShadow =>
         // There are cases where we want to allow shadowing. For example, it
         // is legal to have an output variable with the same name as an input variable.
@@ -578,8 +578,7 @@ case class TypeInfer(stdlib: Stdlib) {
       inputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           val tDecl = applyDecl(decl, bindings, ctx)
-          (tDecls :+ tDecl,
-           bindings + (tDecl.name -> tDecl.wdlType))
+          (tDecls :+ tDecl, bindings + (tDecl.name -> tDecl.wdlType))
       }
     TAT.InputSection(tDecls, inputSection.text)
   }
@@ -607,7 +606,7 @@ case class TypeInfer(stdlib: Stdlib) {
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
-          val tDecl = applyDecl(decl, bindings, ctx, canShadow=true)
+          val tDecl = applyDecl(decl, bindings, ctx, canShadow = true)
           val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
           (tDecls :+ tDecl, bindings2)
       }
@@ -659,33 +658,32 @@ case class TypeInfer(stdlib: Stdlib) {
 
   // convert the generic expression syntax into a specialized JSON object
   // language for meta values only.
-  private def metaValueFromExpr(expr : AST.Expr, ctx : Context) : TAT.MetaValue = {
+  private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(_) => TAT.MetaNull
-      case AST.ValueBoolean(value, _) => TAT.MetaBoolean(value)
-      case AST.ValueInt(value, _) => TAT.MetaInt(value)
-      case AST.ValueFloat(value, _) => TAT.MetaFloat(value)
-      case AST.ValueString(value, _) => TAT.MetaString(value)
-      case AST.ValueFile(value, _) => TAT.MetaString(value)
+      case AST.ValueNull(_)                          => TAT.MetaNull
+      case AST.ValueBoolean(value, _)                => TAT.MetaBoolean(value)
+      case AST.ValueInt(value, _)                    => TAT.MetaInt(value)
+      case AST.ValueFloat(value, _)                  => TAT.MetaFloat(value)
+      case AST.ValueString(value, _)                 => TAT.MetaString(value)
       case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaNull
-      case AST.ExprIdentifier(id, _) => TAT.MetaString(id)
-      case AST.ExprArray(vec, _) => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
+      case AST.ExprIdentifier(id, _)                 => TAT.MetaString(id)
+      case AST.ExprArray(vec, _)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
       case AST.ExprMap(members, _) =>
         TAT.MetaObject(members.map {
-                         case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
-                           key -> metaValueFromExpr(value, ctx)
-                         case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
-                           key -> metaValueFromExpr(value, ctx)
-                         case other =>
-                           throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-                       }.toMap)
+          case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
+            key -> metaValueFromExpr(value, ctx)
+          case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
+            key -> metaValueFromExpr(value, ctx)
+          case other =>
+            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+        }.toMap)
       case AST.ExprObject(members, _) =>
         TAT.MetaObject(members.map {
-                         case AST.ExprObjectMember(key, value, _) =>
-                           key -> metaValueFromExpr(value, ctx)
-                         case other =>
-                           throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-                       }.toMap)
+          case AST.ExprObjectMember(key, value, _) =>
+            key -> metaValueFromExpr(value, ctx)
+          case other =>
+            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+        }.toMap)
       case other =>
         throw new TypeException(s"${SUtil.exprToString(other)} is an invalid meta value",
                                 expr.text,
@@ -696,7 +694,7 @@ case class TypeInfer(stdlib: Stdlib) {
   private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
     kvs.map {
       case AST.MetaKV(k, v, text) =>
-          k -> metaValueFromExpr(v, ctx)
+        k -> metaValueFromExpr(v, ctx)
     }.toMap
   }
 
@@ -734,8 +732,7 @@ case class TypeInfer(stdlib: Stdlib) {
       task.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           val tDecl = applyDecl(decl, bindings, ctx)
-          (tDecls :+ tDecl,
-           bindings + (tDecl.name -> tDecl.wdlType))
+          (tDecls :+ tDecl, bindings + (tDecl.name -> tDecl.wdlType))
       }
     val ctxDecl = ctx.bindVarList(bindings, task.text)
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
@@ -1033,7 +1030,7 @@ case class TypeInfer(stdlib: Stdlib) {
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
-    val initCtx = Context(docSourceUrl = Some(doc.docSourceUrl))
+    val initCtx = Context(docSourceUrl = Some(doc.sourceUrl))
 
     // translate each of the elements in the document
     val (context, elements) =
@@ -1089,7 +1086,7 @@ case class TypeInfer(stdlib: Stdlib) {
         (Some(tWf), ctxFinal)
     }
 
-    val tDoc = TAT.Document(doc.docSourceUrl,
+    val tDoc = TAT.Document(doc.sourceUrl,
                             doc.sourceCode,
                             TAT.Version(doc.version.value, doc.version.text),
                             elements,
@@ -1105,8 +1102,9 @@ case class TypeInfer(stdlib: Stdlib) {
   // describing the problem in a human readable fashion. Return a document
   // with types.
   //
-  def apply(doc: AST.Document): TAT.Document = {
-    val (tDoc, _) = applyDoc(doc)
-    tDoc
+  def apply(doc: AST.Document): (TAT.Document, Context) = {
+    //val (tDoc, _) = applyDoc(doc)
+    //tDoc
+    applyDoc(doc)
   }
 }

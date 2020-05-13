@@ -1235,7 +1235,7 @@ document
         Some(visitWorkflow(ctx.workflow()))
 
     Document(grammar.docSourceUrl.get,
-             docSource,
+             grammar.docSource,
              version,
              elems,
              workflow,

@@ -7,6 +7,7 @@ object Util {
   def exprToString(expr: Expr): String = {
     expr match {
       case ValueNull(_)                    => "null"
+      case ValueNone(_)                    => "None"
       case ValueString(value, _)           => value
       case ValueBoolean(value: Boolean, _) => value.toString
       case ValueInt(value, _)              => value.toString

@@ -45,7 +45,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parser.parseDocument(UUtil.pathToUrl(file))
-    typeInfer.apply(doc)
+    val (tDoc, _) = typeInfer.apply(doc)
+    tDoc
   }
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {

@@ -11,32 +11,32 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 // There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
 // An additional variable holds a list of all imported namespaces.
 case class Context(docSourceUrl: Option[URL] = None,
-                   inputs : Map[String, WdlTypes.T] = Map.empty,
+                   inputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
                    structs: Map[String, T_Struct] = Map.empty,
                    callables: Map[String, T_Callable] = Map.empty,
                    namespaces: Set[String] = Set.empty) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName : String,
-             bindings : Map[String, WdlType],
-             srcText : TextSource) : Option[WdlType] = {
+  def lookup(varName: String,
+             bindings: Map[String, WdlType],
+             srcText: TextSource): Option[WdlType] = {
     inputs.get(varName) match {
-      case None => ()
+      case None    => ()
       case Some(t) => return Some(t)
     }
     declarations.get(varName) match {
-      case None => ()
+      case None    => ()
       case Some(t) => return Some(t)
     }
     bindings.get(varName) match {
-      case None => ()
+      case None    => ()
       case Some(t) => return Some(t)
     }
     None
   }
 
-  def bindInputSection(inputSection : TAT.InputSection) : Context = {
+  def bindInputSection(inputSection: TAT.InputSection): Context = {
     // building bindings
     val bindings = inputSection.declarations.map { tDecl =>
       tDecl.name -> tDecl.wdlType
@@ -59,7 +59,7 @@ case class Context(docSourceUrl: Option[URL] = None,
     structs.get(s.name) match {
       case None =>
         this.copy(structs = structs + (s.name -> s))
-      case Some(existingStruct : T_Struct) =>
+      case Some(existingStruct: T_Struct) =>
         if (s != existingStruct)
           throw new TypeException(s"struct ${s.name} is already declared", srcText, docSourceUrl)
         // The struct is defined a second time, with the exact same definition. Ignore.

@@ -13,8 +13,15 @@ case class WdlDraft2Grammar(override val lexer: WdlDraft2Lexer,
                             override val parser: WdlDraft2Parser,
                             override val listenerFactories: Vector[ParseTreeListenerFactory],
                             override val docSourceUrl: Option[URL] = None,
+                            override val docSource: String,
                             override val opts: Options)
-    extends Grammar(WdlVersion.Draft_2, lexer, parser, listenerFactories, docSourceUrl, opts)
+    extends Grammar(WdlVersion.Draft_2,
+                    lexer,
+                    parser,
+                    listenerFactories,
+                    docSourceUrl,
+                    docSource,
+                    opts)
 
 object WdlDraft2Grammar {
   def newInstance(sourceCode: SourceCode,
@@ -32,6 +39,6 @@ object WdlDraft2Grammar {
     val charStream = CodePointCharStream.fromBuffer(codePointBuffer)
     val lexer = new WdlDraft2Lexer(charStream)
     val parser = new WdlDraft2Parser(new CommonTokenStream(lexer))
-    new WdlDraft2Grammar(lexer, parser, listenerFactories, docSourceUrl, opts)
+    new WdlDraft2Grammar(lexer, parser, listenerFactories, docSourceUrl, text, opts)
   }
 }
