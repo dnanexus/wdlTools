@@ -1076,7 +1076,8 @@ case class TypeInfer(conf: Options) {
         case ((ctx, elems), struct: AST.TypeStruct) =>
           // Add the struct to the context
           val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
-          (ctx.bindStruct(tStruct, struct.text), elems)
+          val defStruct = TAT.StructDefinition(struct.name, tStruct.members, struct.text)
+          (ctx.bindStruct(tStruct, struct.text), elems :+ defStruct)
       }
 
     // now that we have types for everything else, we can check the workflow

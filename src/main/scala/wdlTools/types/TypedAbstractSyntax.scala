@@ -150,6 +150,10 @@ object TypedAbstractSyntax {
                        text: TextSource)
       extends DocumentElement
 
+  // a definition of a struct
+  case class StructDefinition(name: String, members: Map[String, WdlType], text: TextSource)
+      extends DocumentElement
+
   // A task
   case class Task(name: String,
                   wdlType: WdlTypes.T_Task,
