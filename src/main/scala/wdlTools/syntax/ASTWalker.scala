@@ -153,7 +153,7 @@ class ASTWalker(opts: Options) extends ASTVisitor {
   }
 
   override def visitStructMember(ctx: Context[StructMember]): Unit = {
-    visitDataType(createContext[Type, StructMember](ctx.element.dataType, ctx))
+    visitDataType(createContext[Type, StructMember](ctx.element.wdlType, ctx))
     visitIdentifier[StructMember](ctx.element.name, ctx)
   }
 

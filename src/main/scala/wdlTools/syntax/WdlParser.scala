@@ -8,7 +8,7 @@ import wdlTools.util.{Options, SourceCode, Util}
 import scala.collection.mutable
 
 trait DocumentWalker[T] {
-  def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
+  def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
 
 abstract class WdlParser(opts: Options) {
@@ -59,13 +59,13 @@ abstract class WdlParser(opts: Options) {
       }.toMap
     }
 
-    def walk(visitor: (URL, Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
+    def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
       val visited: mutable.Set[URL] = mutable.HashSet.empty
 
       def addDocument(url: URL, doc: Document): Unit = {
         if (!visited.contains(url)) {
           visited.add(url)
-          visitor(url, doc, results)
+          visitor(doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {
               case (uri, doc) => addDocument(uri, doc)

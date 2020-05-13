@@ -35,6 +35,7 @@ This document does *not* specify formatting rules for code within task command b
       select_first([bar, "hello"])
     )
     ```
+
 ## Casing
 
 * WDL file names: `snake_case.wdl`
@@ -55,6 +56,48 @@ This document does *not* specify formatting rules for code within task command b
       Int opt1
       String opt2
     }
+    ```
+
+## Comments
+
+WDL supports single-line comments appearing anywhere on a line, including at the end of a line of code. Comments start with the '#' character.
+
+* Indent full-line comments at the same level as the next non-comment line
+* End-of-line comments should have two spaces between the end of the code and the comment
+* Wrap comments at a maximum of 100 characters (the same as code)
+* Do not place comments before the 'version' statement
+
+wdlTools supports additional comment syntax that is not a part of the WDL specification:
+
+* Pre-formatted comments begin with two hashes ('##') - these comments are not reformatted by the code formatter
+    ```wdl
+    version 1.0
+    
+    ## This comment is not re-formatted
+    ##   blah blah blah
+    task foo { ... }
+    ```
+
+### Documentation comments
+
+The wdlTools [docgen](Commands/Docgen.md) tool normally ignores comments. However, you may use the documentation comment syntax to provide comments that the documentation tool will recognize and include in the generated documentation.
+
+* A comment that begins with three hashes ('###') is a documentation comment (it is also treated as a pre-formatted comment and so will not be reformatted by the code formatter.)
+    ```wdl
+    version 1.0
+  
+    ### This is a documentation comment
+    task foo { ... }
+    ```
+* A documentation comment is always associated with the element that follows it immediately on the next line (i.e. there can be no blank lines between the documentation comment and the element it is annotating).
+  * The only exception to this is a top-level comment, which must appear immediately following the 'version' statement and be preceeded and followed by blank lines:
+    ```wdl
+    version 1.0
+    
+    ### This is a top-level comment
+    
+    ### This comment refers to the following task
+    task foo { ... }
     ```
 
 ## Expressions
@@ -120,4 +163,4 @@ This document does *not* specify formatting rules for code within task command b
         * Specify file names explicitly when there are a small number of output files
         * When using `glob()` to return an array of files, write your command block to place the output files in a separate directory, to avoid accidentally selecting additional files
 * Runtime
-    * Be explicit about resource requirements if they are known; e.g. if a single CPU is required, specify `cpu: 1` rather than omitting `cpu`.∑∑
+    * Be explicit about resource requirements if they are known; e.g. if a single CPU is required, specify `cpu: 1` rather than omitting `cpu`.

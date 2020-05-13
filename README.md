@@ -34,6 +34,7 @@ $ java -jar wdlTools.jar [command] --help
 The following commands are currently available. They should be considered "alpha" quality - please report any bugs/enhancements using the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
 
 * [check](doc/Commands/Check.md): type-check a WDL file
+* [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
 * [format](doc/Commands/Format.md): reformat a WDL file
 * [lint](doc/Commands/Lint.md): detect "lint" (i.e. incorrect style or potentially problematic code) in a WDL file
 * [new](doc/Commands/New.md): generate a new WDL project

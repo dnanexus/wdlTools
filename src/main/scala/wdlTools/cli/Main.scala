@@ -8,6 +8,7 @@ object Main extends App {
     case Some(subcommand) =>
       val command: Command = subcommand match {
         case conf.check    => TypeCheck(conf)
+        case conf.docgen   => Docgen(conf)
         case conf.format   => Format(conf)
         case conf.lint     => Lint(conf)
         case conf.upgrade  => Upgrade(conf)

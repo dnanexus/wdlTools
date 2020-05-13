@@ -885,7 +885,7 @@ case class WdlV1Formatter(opts: Options,
   }
 
   private case class StructMemberStatement(member: StructMember)
-      extends DeclarationBase(member.name, member.dataType, bounds = member.text)
+      extends DeclarationBase(member.name, member.wdlType, bounds = member.text)
 
   private case class MembersSection(members: Vector[StructMember], override val bounds: TextSource)
       extends InnerSection(bounds) {
@@ -1338,8 +1338,8 @@ case class WdlV1Formatter(opts: Options,
   }
 
   def formatDocuments(url: URL): Unit = {
-    Parsers(opts).getDocumentWalker[Vector[String]](url, documents).walk { (url, doc, results) =>
-      results(url) = formatDocument(doc)
+    Parsers(opts).getDocumentWalker[Vector[String]](url, documents).walk { (doc, results) =>
+      results(doc.sourceUrl) = formatDocument(doc)
     }
   }
 }
