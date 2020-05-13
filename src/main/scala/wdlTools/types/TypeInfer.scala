@@ -572,15 +572,15 @@ case class TypeInfer(stdlib: Stdlib) {
       throw new TypeException("Input section has duplicate definitions",
                               inputSection.text,
                               ctx.docSourceUrl)
-/*    val both = varNames.toSet intersect ctx.declarations.keys.toSet
-    if (both.nonEmpty)
-      throw new TypeException(s"Definitions ${both} shadow exisiting declarations",
-                              inputSection.text,
-                              ctx.docSourceUrl) */
+
     // translate each declaration
-    val tDecls = inputSection.declarations.map { decl =>
-      applyDecl(decl, Map.empty, ctx)
-    }
+    val (tDecls, _) =
+      inputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
+        case ((tDecls, bindings), decl) =>
+          val tDecl = applyDecl(decl, bindings, ctx)
+          (tDecls :+ tDecl,
+           bindings + (tDecl.name -> tDecl.wdlType))
+      }
     TAT.InputSection(tDecls, inputSection.text)
   }
 

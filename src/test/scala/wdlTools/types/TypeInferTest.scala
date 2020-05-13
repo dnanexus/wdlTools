@@ -51,6 +51,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "library.wdl" -> TResult(correct = true),
       "simple.wdl" -> TResult(correct = true),
       "stdlib.wdl" -> TResult(correct = true),
+      "input_section.wdl" -> TResult(correct = true),
       "output_section.wdl" -> TResult(correct = true),
       // incorrect tasks
       "comparison1.wdl" -> TResult(correct = false),
