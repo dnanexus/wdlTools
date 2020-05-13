@@ -215,7 +215,7 @@ case class TypeInfer(stdlib: Stdlib) {
 
   // Add the type to an expression
   //
-  private def applyExpr(expr: AST.Expr, ctx: Context): TAT.Expr = {
+  private def applyExpr(expr: AST.Expr, bindings: Bindings, ctx: Context): TAT.Expr = {
     expr match {
       // null can be any type optional
       case AST.ValueNull(text)           => TAT.ValueNull(T_Optional(T_Any), text)
@@ -228,7 +228,7 @@ case class TypeInfer(stdlib: Stdlib) {
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
       case AST.ExprIdentifier(id, text) =>
-        ctx.declarations.get(id) match {
+        ctx.lookup(id, bindings, text) match {
           case None =>
             throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceUrl)
           case Some(t) =>
@@ -238,7 +238,7 @@ case class TypeInfer(stdlib: Stdlib) {
       // All the sub-exressions have to be strings, or coercible to strings
       case AST.ExprCompoundString(vec, text) =>
         val vec2 = vec.map { subExpr =>
-          val e2 = applyExpr(subExpr, ctx)
+          val e2 = applyExpr(subExpr, bindings, ctx)
           if (!unify.isCoercibleTo(T_String, e2.wdlType))
             throw new TypeException(
                 s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
@@ -250,8 +250,8 @@ case class TypeInfer(stdlib: Stdlib) {
         TAT.ExprCompoundString(vec2, T_String, text)
 
       case AST.ExprPair(l, r, text) =>
-        val l2 = applyExpr(l, ctx)
-        val r2 = applyExpr(r, ctx)
+        val l2 = applyExpr(l, bindings, ctx)
+        val r2 = applyExpr(r, bindings, ctx)
         val t = T_Pair(l2.wdlType, r2.wdlType)
         TAT.ExprPair(l2, r2, t, text)
 
@@ -260,7 +260,7 @@ case class TypeInfer(stdlib: Stdlib) {
         TAT.ExprArray(Vector.empty, T_Array(T_Any), text)
 
       case AST.ExprArray(vec, text) =>
-        val tVecExprs = vec.map(applyExpr(_, ctx))
+        val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
         val (t, _) =
           try {
             unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)
@@ -277,7 +277,7 @@ case class TypeInfer(stdlib: Stdlib) {
       case AST.ExprObject(members, text) =>
         val members2 = members.map {
           case AST.ExprObjectMember(key, value, _) =>
-            key -> applyExpr(value, ctx)
+            key -> applyExpr(value, bindings, ctx)
         }.toMap
         TAT.ExprObject(members2, T_Object, text)
 
@@ -289,7 +289,7 @@ case class TypeInfer(stdlib: Stdlib) {
         // figure out the types from the first element
         val m: Map[TAT.Expr, TAT.Expr] = value.map {
           case item: AST.ExprMapItem =>
-            applyExpr(item.key, ctx) -> applyExpr(item.value, ctx)
+            applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
@@ -300,15 +300,15 @@ case class TypeInfer(stdlib: Stdlib) {
       // These are expressions like:
       // ${true="--yes" false="--no" boolean_value}
       case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, text) =>
-        val te = applyExpr(t, ctx)
-        val fe = applyExpr(f, ctx)
+        val te = applyExpr(t, bindings, ctx)
+        val fe = applyExpr(f, bindings, ctx)
         if (te.wdlType != fe.wdlType)
           throw new TypeException(s"""|subexpressions ${exprToString(te)} and ${exprToString(fe)}
                                       |must have the same type""".stripMargin
                                     .replaceAll("\n", " "),
                                   text,
                                   ctx.docSourceUrl)
-        val ve = applyExpr(value, ctx)
+        val ve = applyExpr(value, bindings, ctx)
         if (ve.wdlType != T_Boolean)
           throw new TypeException(
               s"""|condition ${exprToString(ve)} should have boolean type,
@@ -322,8 +322,8 @@ case class TypeInfer(stdlib: Stdlib) {
       // An expression like:
       // ${default="foo" optional_value}
       case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, text) =>
-        val de = applyExpr(default, ctx)
-        val ve = applyExpr(value, ctx)
+        val de = applyExpr(default, bindings, ctx)
+        val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
           case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
           case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
@@ -343,12 +343,12 @@ case class TypeInfer(stdlib: Stdlib) {
       // An expression like:
       // ${sep=", " array_value}
       case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, text) =>
-        val se = applyExpr(sep, ctx)
+        val se = applyExpr(sep, bindings, ctx)
         if (se.wdlType != T_String)
           throw new TypeException(s"separator ${exprToString(se)} must have string type",
                                   text,
                                   ctx.docSourceUrl)
-        val ve = applyExpr(value, ctx)
+        val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
           case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
             T_String
@@ -363,83 +363,83 @@ case class TypeInfer(stdlib: Stdlib) {
 
       // math operators on one argument
       case AST.ExprUniraryPlus(value, text) =>
-        val ve = applyExpr(value, ctx)
+        val ve = applyExpr(value, bindings, ctx)
         TAT.ExprUniraryPlus(ve, typeEvalMathOp(ve, ctx), text)
       case AST.ExprUniraryMinus(value, text) =>
-        val ve = applyExpr(value, ctx)
+        val ve = applyExpr(value, bindings, ctx)
         TAT.ExprUniraryMinus(ve, typeEvalMathOp(ve, ctx), text)
 
       // logical operators
       case AST.ExprLor(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprLor(ae, be, typeEvalLogicalOp(ae, be, ctx), text)
       case AST.ExprLand(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprLand(ae, be, typeEvalLogicalOp(ae, be, ctx), text)
       case AST.ExprNegate(value: AST.Expr, text) =>
-        val e = applyExpr(value, ctx)
+        val e = applyExpr(value, bindings, ctx)
         TAT.ExprNegate(e, typeEvalLogicalOp(e, ctx), text)
 
       // equality comparisons
       case AST.ExprEqeq(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprEqeq(ae, be, typeEvalCompareOp(ae, be, ctx), text)
       case AST.ExprNeq(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprNeq(ae, be, typeEvalCompareOp(ae, be, ctx), text)
       case AST.ExprLt(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprLt(ae, be, typeEvalCompareOp(ae, be, ctx), text)
       case AST.ExprGte(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprGte(ae, be, typeEvalCompareOp(ae, be, ctx), text)
       case AST.ExprLte(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprLte(ae, be, typeEvalCompareOp(ae, be, ctx), text)
       case AST.ExprGt(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprGt(ae, be, typeEvalCompareOp(ae, be, ctx), text)
 
       // add is overloaded, it is a special case
       case AST.ExprAdd(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprAdd(ae, be, typeEvalAdd(ae, be, ctx), text)
 
       // math operators on two arguments
       case AST.ExprSub(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprSub(ae, be, typeEvalMathOp(ae, be, ctx), text)
       case AST.ExprMod(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprMod(ae, be, typeEvalMathOp(ae, be, ctx), text)
       case AST.ExprMul(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprMul(ae, be, typeEvalMathOp(ae, be, ctx), text)
       case AST.ExprDivide(a: AST.Expr, b: AST.Expr, text) =>
-        val ae = applyExpr(a, ctx)
-        val be = applyExpr(b, ctx)
+        val ae = applyExpr(a, bindings, ctx)
+        val be = applyExpr(b, bindings, ctx)
         TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be, ctx), text)
 
       // Access an array element at [index]
       case AST.ExprAt(array: AST.Expr, index: AST.Expr, text) =>
-        val eIndex = applyExpr(index, ctx)
+        val eIndex = applyExpr(index, bindings, ctx)
         if (eIndex.wdlType != T_Int)
           throw new TypeException(s"${exprToString(eIndex)} must be an integer",
                                   text,
                                   ctx.docSourceUrl)
-        val eArray = applyExpr(array, ctx)
+        val eArray = applyExpr(array, bindings, ctx)
         val t = eArray.wdlType match {
           case T_Array(elemType, _) => elemType
           case _ =>
@@ -452,13 +452,13 @@ case class TypeInfer(stdlib: Stdlib) {
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
       case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, text) =>
-        val eCond = applyExpr(cond, ctx)
+        val eCond = applyExpr(cond, bindings, ctx)
         if (eCond.wdlType != T_Boolean)
           throw new TypeException(s"condition ${exprToString(eCond)} must be a boolean",
                                   eCond.text,
                                   ctx.docSourceUrl)
-        val eTrueBranch = applyExpr(trueBranch, ctx)
-        val eFalseBranch = applyExpr(falseBranch, ctx)
+        val eTrueBranch = applyExpr(trueBranch, bindings, ctx)
+        val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
         val t =
           try {
             val (t, _) = unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)
@@ -480,14 +480,14 @@ case class TypeInfer(stdlib: Stdlib) {
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
       case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], text) =>
-        val eElements = elements.map(applyExpr(_, ctx))
+        val eElements = elements.map(applyExpr(_, bindings, ctx))
         val t = stdlib.apply(funcName, eElements.map(_.wdlType), expr.text)
         TAT.ExprApply(funcName, eElements, t, text)
 
       // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a
       case AST.ExprGetName(expr: AST.Expr, id: String, text) =>
-        val e = applyExpr(expr, ctx)
+        val e = applyExpr(expr, bindings, ctx)
         val t = typeEvalExprGetName(e, id, ctx)
         TAT.ExprGetName(e, id, t, text)
     }
@@ -527,18 +527,28 @@ case class TypeInfer(stdlib: Stdlib) {
   //   Int x
   //   Int x = 5
   //   Int x = 7 + y
-  private def applyDecl(decl: AST.Declaration, ctx: Context): TAT.Declaration = {
-    if (ctx.declarations contains decl.name)
-      throw new TypeException(s"variable ${decl.name} shadows an existing variable",
-                              decl.text,
-                              ctx.docSourceUrl)
+  private def applyDecl(decl: AST.Declaration,
+                        bindings : Map[String, WdlType],
+                        ctx: Context,
+                        canShadow : Boolean = false): TAT.Declaration = {
+    ctx.lookup(decl.name, bindings, decl.text) match {
+      case None => ()
+      case Some(_) if canShadow =>
+        // There are cases where we want to allow shadowing. For example, it
+        // is legal to have an output variable with the same name as an input variable.
+        ()
+      case Some(_) =>
+        throw new TypeException(s"variable ${decl.name} shadows an existing variable",
+                                decl.text,
+                                ctx.docSourceUrl)
+    }
     val lhsType: WdlType = typeFromAst(decl.wdlType, decl.text, ctx)
     (lhsType, decl.expr) match {
       // Int x
       case (_, None) =>
         TAT.Declaration(decl.name, lhsType, None, decl.text)
       case (_, Some(expr)) =>
-        val e = applyExpr(expr, ctx)
+        val e = applyExpr(expr, bindings, ctx)
         val rhsType = e.wdlType
         if (!unify.isCoercibleTo(lhsType, rhsType)) {
           throw new TypeException(s"""|${decl.name} is of type ${typeToString(lhsType)}
@@ -553,37 +563,28 @@ case class TypeInfer(stdlib: Stdlib) {
   }
 
   // type check the input section, and see that there are no double definitions.
-  // return:
-  // 1) bindings for all of the input variables
-  // 2) a new typed input section
+  // return a new typed input section
   //
-  private def applyInputSection(inputSection: AST.InputSection,
-                                ctx: Context): (TAT.InputSection, Bindings) = {
+  private def applyInputSection(inputSection: AST.InputSection, ctx: Context): TAT.InputSection = {
     // check there are no duplicates
     val varNames = inputSection.declarations.map(_.name)
     if (varNames.size > varNames.toSet.size)
       throw new TypeException("Input section has duplicate definitions",
                               inputSection.text,
                               ctx.docSourceUrl)
-    val both = varNames.toSet intersect ctx.declarations.keys.toSet
+/*    val both = varNames.toSet intersect ctx.declarations.keys.toSet
     if (both.nonEmpty)
       throw new TypeException(s"Definitions ${both} shadow exisiting declarations",
                               inputSection.text,
-                              ctx.docSourceUrl)
+                              ctx.docSourceUrl) */
     // translate each declaration
     val tDecls = inputSection.declarations.map { decl =>
-      applyDecl(decl, ctx)
+      applyDecl(decl, Map.empty, ctx)
     }
-    val tInputSection = TAT.InputSection(tDecls, inputSection.text)
-
-    // building bindings
-    val bindings = tDecls.map { tDecl =>
-      tDecl.name -> tDecl.wdlType
-    }.toMap
-    (tInputSection, bindings)
+    TAT.InputSection(tDecls, inputSection.text)
   }
 
-  // type check the input section and return bindings for all of the output variables.
+  // Calculate types for the outputs, and return a new typed output section
   private def applyOutputSection(outputSection: AST.OutputSection,
                                  ctx: Context): TAT.OutputSection = {
     val text = outputSection.text
@@ -592,6 +593,9 @@ case class TypeInfer(stdlib: Stdlib) {
     val varNames = outputSection.declarations.map(_.name)
     if (varNames.size > varNames.toSet.size)
       throw new TypeException("Output section has duplicate definitions", text, ctx.docSourceUrl)
+    // output variables can shadow input definitions, but not intermediate
+    // values. This is weird, but is used here:
+    // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
     val both = varNames.toSet intersect ctx.declarations.keys.toSet
     if (both.nonEmpty)
       throw new TypeException(s"Definitions ${both} shadow exisiting declarations",
@@ -603,7 +607,7 @@ case class TypeInfer(stdlib: Stdlib) {
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
-          val tDecl = applyDecl(decl, ctx.bindVarList(bindings, text))
+          val tDecl = applyDecl(decl, bindings, ctx, canShadow=true)
           val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
           (tDecls :+ tDecl, bindings2)
       }
@@ -648,7 +652,7 @@ case class TypeInfer(stdlib: Stdlib) {
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
     val m = rtSection.kvs.map {
       case AST.RuntimeKV(name, expr, _) =>
-        name -> applyExpr(expr, ctx)
+        name -> applyExpr(expr, Map.empty, ctx)
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
   }
@@ -720,26 +724,26 @@ case class TypeInfer(stdlib: Stdlib) {
       case None =>
         (None, ctxOuter)
       case Some(inpSection) =>
-        val (tInpSection, bindings) = applyInputSection(inpSection, ctxOuter)
-        val ctx = ctxOuter.bindVarList(bindings, task.text)
+        val tInpSection = applyInputSection(inpSection, ctxOuter)
+        val ctx = ctxOuter.bindInputSection(tInpSection)
         (Some(tInpSection), ctx)
     }
 
     // add types to the declarations, and accumulate context
-    val (tDeclarations, ctxDecl) =
-      task.declarations.foldLeft((Vector.empty[TAT.Declaration], ctx)) {
-        case ((tDeclarations, ctx), decl) =>
-          val tDecl = applyDecl(decl, ctx)
-          val ctx2 = ctx.bindVar(tDecl.name, tDecl.wdlType, decl.text)
-          (tDeclarations :+ tDecl, ctx2)
+    val (tDeclarations, bindings) =
+      task.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
+        case ((tDecls, bindings), decl) =>
+          val tDecl = applyDecl(decl, bindings, ctx)
+          (tDecls :+ tDecl,
+           bindings + (tDecl.name -> tDecl.wdlType))
       }
-
+    val ctxDecl = ctx.bindVarList(bindings, task.text)
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section
     val cmdParts = task.command.parts.map { expr =>
-      val e = applyExpr(expr, ctxDecl)
+      val e = applyExpr(expr, Map.empty, ctxDecl)
       val valid = e.wdlType match {
         case x if isPrimitive(x)             => true
         case T_Optional(x) if isPrimitive(x) => true
@@ -784,7 +788,7 @@ case class TypeInfer(stdlib: Stdlib) {
     val callerInputs: Map[String, TAT.Expr] = call.inputs match {
       case Some(AST.CallInputs(value, _)) =>
         value.map { inp =>
-          inp.name -> applyExpr(inp.expr, ctx)
+          inp.name -> applyExpr(inp.expr, Map.empty, ctx)
         }.toMap
       case None => Map.empty
     }
@@ -897,7 +901,7 @@ case class TypeInfer(stdlib: Stdlib) {
   ): (Bindings, Vector[TAT.WorkflowElement]) = {
     body.foldLeft((Map.empty[String, WdlType], Vector.empty[TAT.WorkflowElement])) {
       case ((bindings, wElements), decl: AST.Declaration) =>
-        val tDecl = applyDecl(decl, ctx.bindVarList(bindings, decl.text))
+        val tDecl = applyDecl(decl, bindings, ctx)
         (bindings + (tDecl.name -> tDecl.wdlType), wElements :+ tDecl)
 
       case ((bindings, wElements), call: AST.Call) =>
@@ -926,7 +930,7 @@ case class TypeInfer(stdlib: Stdlib) {
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
   private def applyScatter(scatter: AST.Scatter, ctxOuter: Context): (TAT.Scatter, Bindings) = {
-    val eCollection = applyExpr(scatter.expr, ctxOuter)
+    val eCollection = applyExpr(scatter.expr, Map.empty, ctxOuter)
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case _ =>
@@ -972,7 +976,7 @@ case class TypeInfer(stdlib: Stdlib) {
   // Add an optional modifier to all the types inside the body.
   private def applyConditional(cond: AST.Conditional,
                                ctxOuter: Context): (TAT.Conditional, Bindings) = {
-    val condExpr = applyExpr(cond.expr, ctxOuter)
+    val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter)
     if (condExpr.wdlType != T_Boolean)
       throw new Exception(s"Expression ${exprToString(condExpr)} must have boolean type")
 
@@ -1002,8 +1006,8 @@ case class TypeInfer(stdlib: Stdlib) {
       case None =>
         (None, ctxOuter)
       case Some(inpSection) =>
-        val (tInpSection, bindings) = applyInputSection(inpSection, ctxOuter)
-        val ctx = ctxOuter.bindVarList(bindings, wf.text)
+        val tInpSection = applyInputSection(inpSection, ctxOuter)
+        val ctx = ctxOuter.bindInputSection(tInpSection)
         (Some(tInpSection), ctx)
     }
 
@@ -1073,7 +1077,7 @@ case class TypeInfer(stdlib: Stdlib) {
         case ((ctx, elems), struct: AST.TypeStruct) =>
           // Add the struct to the context
           val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
-          (ctx.bind(tStruct, struct.text), elems)
+          (ctx.bindStruct(tStruct, struct.text), elems)
       }
 
     // now that we have types for everything else, we can check the workflow
