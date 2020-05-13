@@ -1,7 +1,7 @@
 package wdlTools.cli
 
 import wdlTools.syntax.Parsers
-import wdlTools.types.{Context, Stdlib, TypeInfer}
+import wdlTools.types.{Context, TypeInfer}
 
 // TODO: nicely format errors, including JSON output
 case class TypeCheck(conf: WdlToolsConf) extends Command {
@@ -10,7 +10,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     val opts = conf.check.getOptions
     require(opts.followImports)
     val parsers = Parsers(opts)
-    val checker = TypeInfer(Stdlib(opts))
+    val checker = TypeInfer(opts)
 
     parsers.getDocumentWalker[Context](url).walk { (_, doc, _) =>
       // TODO: rather than throw an exception as soon as a type error is encountered, accumulate all errors
