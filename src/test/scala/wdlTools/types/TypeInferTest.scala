@@ -7,11 +7,11 @@ import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
 import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
 
-class TypeCheckerTest extends AnyFlatSpec with Matchers {
+class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = Options(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/types/v1").getPath)
+          Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -37,20 +37,22 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
       "imports.wdl" -> TResult(correct = true),
       "linear.wdl" -> TResult(correct = true),
       "nested.wdl" -> TResult(correct = true),
-      "types.wdl" -> TResult(correct = true),
       "coercions_questionable.wdl" -> TResult(correct = true, Some(TypeCheckingRegime.Lenient)),
       "coercions_strict.wdl" -> TResult(correct = true),
       "bad_stdlib_calls.wdl" -> TResult(correct = false),
       "scatter_II.wdl" -> TResult(correct = false),
       "scatter_I.wdl" -> TResult(correct = false),
-      "shadow_II.wdl" -> TResult(correct = false),
+      "shadow_II.wdl" -> TResult(correct = true),
       "shadow.wdl" -> TResult(correct = false),
+      "polymorphic_types.wdl" -> TResult(correct = true),
       // correct tasks
       "command_string.wdl" -> TResult(correct = true),
       "comparisons.wdl" -> TResult(correct = true),
       "library.wdl" -> TResult(correct = true),
       "simple.wdl" -> TResult(correct = true),
       "stdlib.wdl" -> TResult(correct = true),
+      "input_section.wdl" -> TResult(correct = true),
+      "output_section.wdl" -> TResult(correct = true),
       // incorrect tasks
       "comparison1.wdl" -> TResult(correct = false),
       "comparison2.wdl" -> TResult(correct = false),
@@ -61,16 +63,15 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
       "expressions.wdl" -> TResult(correct = true),
       "expressions_bad.wdl" -> TResult(correct = false),
       // metadata
-      "metadata_null_value.wdl" -> TResult(correct = true),
-      "metadata_complex.wdl" -> TResult(correct = true),
+      "meta_null_value.wdl" -> TResult(correct = true),
+      "meta_section_compound.wdl" -> TResult(correct = true),
       // runtime section
       "runtime_section_I.wdl" -> TResult(correct = true),
       "runtime_section_bad.wdl" -> TResult(correct = false)
   )
 
   // test to include/exclude
-  private val includeList
-      : Option[Set[String]] = None // Some(Set("metadata_null_value.wdl", "metadata_complex.wdl"))
+  private val includeList: Option[Set[String]] = None
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
@@ -79,7 +80,7 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
       case Some(x) => opts.copy(typeChecking = x)
     }
     val stdlib = Stdlib(opts2)
-    val checker = TypeChecker(stdlib)
+    val checker = TypeInfer(stdlib)
     try {
       val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
@@ -96,7 +97,7 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
       case Some(x) => opts.copy(typeChecking = x)
     }
     val stdlib = Stdlib(opts2)
-    val checker = TypeChecker(stdlib)
+    val checker = TypeInfer(stdlib)
     val checkVal =
       try {
         val doc = parser.parseDocument(UUtil.pathToUrl(file))
@@ -127,8 +128,18 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
 
   it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/types/v1").getPath)
+        Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
     )
+
+    // check that all results have a corresponding file
+    val fileNames = testFiles.map(_.getFileName().toString).toSet
+    val controlNames = controlTable.keys.toSet
+    val diff1 = fileNames.diff(controlNames)
+    if (diff1.nonEmpty)
+      throw new Exception(s"files ${diff1} do not have a matching solution")
+    val diff2 = controlNames.diff(fileNames)
+    if (diff2.nonEmpty)
+      throw new Exception(s"solutions ${diff2} do not have a matching test file")
 
     // filter out files that do not appear in the control table
     val testFiles2 = testFiles.flatMap { testFile =>
@@ -136,11 +147,8 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
       if (!includeExcludeCheck(name)) {
         None
       } else {
-        controlTable.get(name) match {
-          case None => None
-          case Some(tResult) =>
-            Some(testFile, tResult)
-        }
+        val tResult = controlTable(name)
+        Some(testFile, tResult)
       }
     }
 
@@ -155,7 +163,7 @@ class TypeCheckerTest extends AnyFlatSpec with Matchers {
   it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
     val stdlib = Stdlib(opts2)
-    val checker = TypeChecker(stdlib)
+    val checker = TypeInfer(stdlib)
 
     val sources = Vector(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",

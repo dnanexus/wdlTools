@@ -134,6 +134,7 @@ object Antlr4Util {
       val parser: Parser,
       val listenerFactories: Vector[ParseTreeListenerFactory],
       val docSourceUrl: Option[URL] = None,
+      val docSource: String,
       val opts: Options,
       val comments: mutable.Map[Int, Comment] = mutable.HashMap.empty
   ) {

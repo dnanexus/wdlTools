@@ -272,7 +272,7 @@ case class ParseAll(opts: Options,
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(WdlVersion.Draft_2, TextSource.empty)
-      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
+      AST.Document(doc.docSourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
     }
   }
 

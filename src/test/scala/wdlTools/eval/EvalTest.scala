@@ -7,13 +7,12 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.types.{Context => TypeContext, Stdlib => TypeStdlib, TypeChecker}
+import wdlTools.types.{Stdlib => TypeStdlib, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
-  private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
+  private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
   private val opts =
     Options(typeChecking = TypeCheckingRegime.Lenient,
             antlr4Trace = false,
@@ -21,7 +20,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
             verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val stdlib = TypeStdlib(opts)
-  private val checker = TypeChecker(stdlib)
+  private val typeInfer = TypeInfer(stdlib)
 
   def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {
@@ -44,28 +43,30 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     EvalConfig(homeDir, tmpDir, stdout, stderr)
   }
 
-  def parseAndTypeCheck(file: Path): (AST.Document, TypeContext) = {
+  def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parser.parseDocument(UUtil.pathToUrl(file))
-    val typeCtx = checker.apply(doc)
-    (doc, typeCtx)
+    val (tDoc, _) = typeInfer.apply(doc)
+    tDoc
+  }
+
+  def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
+    val tDoc = parseAndTypeCheck(file)
+    val evaluator =
+      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, Some(opts.getUrl(file.toString)))
+
+    tDoc.workflow should not be empty
+    val wf = tDoc.workflow.get
+
+    val decls: Vector[TAT.Declaration] = wf.body.collect {
+      case x: TAT.Declaration => x
+    }
+
+    (evaluator, decls)
   }
 
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
-    val (doc, typeCtx) = parseAndTypeCheck(file)
-    val evaluator = Eval(opts,
-                         evalCfg,
-                         typeCtx.structs,
-                         wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getUrl(file.toString)))
-
-    doc.workflow should not be empty
-    val wf = doc.workflow.get
-
-    val decls: Vector[AST.Declaration] = wf.body.collect {
-      case x: AST.Declaration => x
-    }
-
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bindings = ctxEnd.bindings
     bindings("k0") shouldBe WV_Int(-1)
@@ -106,20 +107,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
-    val (doc, typeCtx) = parseAndTypeCheck(file)
-    val evaluator = Eval(opts,
-                         evalCfg,
-                         typeCtx.structs,
-                         wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getUrl(file.toString)))
-
-    doc.workflow should not be empty
-    val wf = doc.workflow.get
-
-    val decls: Vector[AST.Declaration] = wf.body.collect {
-      case x: AST.Declaration => x
-    }
-
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctx = Context(Map.empty).addBinding("empty_string", WV_Null)
     val ctxEnd = evaluator.applyDeclarations(decls, ctx)
     val bd = ctxEnd.bindings
@@ -237,20 +225,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "perform coercions" in {
     val file = srcDir.resolve("coercions.wdl")
-    val (doc, typeCtx) = parseAndTypeCheck(file)
-    val evaluator = Eval(opts,
-                         evalCfg,
-                         typeCtx.structs,
-                         wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getUrl(file.toString)))
-
-    doc.workflow should not be empty
-    val wf = doc.workflow.get
-
-    val decls: Vector[AST.Declaration] = wf.body.collect {
-      case x: AST.Declaration => x
-    }
-
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bd = ctxEnd.bindings
 
@@ -273,15 +248,12 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
-    val (doc, typeCtx) = parseAndTypeCheck(file)
-    val evaluator = Eval(opts,
-                         evalCfg,
-                         typeCtx.structs,
-                         wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getUrl(file.toString)))
+    val tDoc = parseAndTypeCheck(file)
+    val evaluator =
+      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, Some(opts.getUrl(file.toString)))
 
-    doc.elements should not be empty
-    val task = doc.elements.head.asInstanceOf[AST.Task]
+    tDoc.elements should not be empty
+    val task = tDoc.elements.head.asInstanceOf[TAT.Task]
     val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
     evaluator.applyCommand(task.command, ctx)
   }
@@ -320,20 +292,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "bad coercion" in {
     val file = srcDir.resolve("bad_coercion.wdl")
-    val (doc, typeCtx) = parseAndTypeCheck(file)
-    val evaluator = Eval(opts,
-                         evalCfg,
-                         typeCtx.structs,
-                         wdlTools.syntax.WdlVersion.V1,
-                         Some(opts.getUrl(file.toString)))
-
-    doc.workflow should not be empty
-    val wf = doc.workflow.get
-
-    val decls: Vector[AST.Declaration] = wf.body.collect {
-      case x: AST.Declaration => x
-    }
-
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     assertThrows[EvalException] {
       val _ = evaluator.applyDeclarations(decls, Context(Map.empty))
     }
