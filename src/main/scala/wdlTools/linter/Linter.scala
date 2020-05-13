@@ -64,13 +64,14 @@ case class Linter(opts: Options,
         }
         if (tstRules.nonEmpty) {
           // Run TypeINfer to infer the types of all expressions
-          val (typedDoc, _) = TypeInfer(opts).apply(doc)
+          val (typedDoc, ctx) = TypeInfer(opts).apply(doc)
           val visitors = tstRules.map {
             case (id, severity) =>
               TstRules.allRules(id)(
                   id,
                   severity,
                   doc.version.value,
+                  ctx.stdlib,
                   events(url),
                   Some(url)
               )

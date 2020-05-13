@@ -211,4 +211,20 @@ case class Stdlib(conf: Options, version: WdlVersion) {
         possibleOutputTypes.toVector.head
     }
   }
+
+  /**
+    * Returns a Vector of all the signatures for the given function,
+    * where a signature is a tuple of (param_types, return_type),
+    * where param_types is a Vector of the parameter types.
+    * @param funcName the function name
+    * @return
+    */
+  def getSignatures(funcName: String): Vector[(Vector[T], T)] = {
+    funcProtoMap(funcName).map {
+      case T_Function0(_, output)                   => (Vector.empty, output)
+      case T_Function1(_, arg1, output)             => (Vector(arg1), output)
+      case T_Function2(_, arg1, arg2, output)       => (Vector(arg1, arg2), output)
+      case T_Function3(_, arg1, arg2, arg3, output) => (Vector(arg1, arg2, arg3), output)
+    }
+  }
 }
