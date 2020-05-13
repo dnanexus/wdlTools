@@ -10,6 +10,7 @@ object WdlTypes {
   case object T_Float extends T
   case object T_String extends T
   case object T_File extends T
+  case object T_Directory extends T
 
   // There are cases where we don't know the type. For example, an empty array, or an empty map.
   // While evaluating the right hand side we don't know the type.

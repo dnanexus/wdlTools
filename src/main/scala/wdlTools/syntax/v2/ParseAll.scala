@@ -1,17 +1,16 @@
-package wdlTools.syntax.draft_2
+package wdlTools.syntax.v2
 
 import java.net.URL
 
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.syntax.{SyntaxException, TextSource, WdlParser, WdlVersion, AbstractSyntax => AST}
-import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
+import wdlTools.syntax.v2.{ConcreteSyntax => CST}
+import wdlTools.syntax.{SyntaxException, WdlParser, AbstractSyntax => AST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty)
     extends WdlParser(opts) {
-
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
@@ -25,17 +24,23 @@ case class ParseAll(opts: Options,
           AST.TypePair(translateType(l), translateType(r), srcText)
         case CST.TypeString(srcText)         => AST.TypeString(srcText)
         case CST.TypeFile(srcText)           => AST.TypeFile(srcText)
+        case CST.TypeDirectory(srcText)      => AST.TypeDirectory(srcText)
         case CST.TypeBoolean(srcText)        => AST.TypeBoolean(srcText)
         case CST.TypeInt(srcText)            => AST.TypeInt(srcText)
         case CST.TypeFloat(srcText)          => AST.TypeFloat(srcText)
         case CST.TypeIdentifier(id, srcText) => AST.TypeIdentifier(id, srcText)
-        case CST.TypeObject(srcText)         => AST.TypeObject(srcText)
+        case CST.TypeStruct(name, members, srcText) =>
+          AST.TypeStruct(name, members.map {
+            case CST.StructMember(name, t, text) =>
+              AST.StructMember(name, translateType(t), text)
+          }, srcText)
       }
     }
 
     def translateExpr(e: CST.Expr): AST.Expr = {
       e match {
-        // values
+        // value
+        case CST.ExprNone(srcText)           => AST.ValueNone(srcText)
         case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
         case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
         case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
@@ -53,21 +58,6 @@ case class ParseAll(opts: Options,
           AST.ExprMap(m.map { item =>
             AST.ExprMapItem(translateExpr(item.key), translateExpr(item.value), item.text)
           }, srcText)
-        case CST.ExprObjectLiteral(m, srcText) =>
-          AST.ExprObject(m.map { member =>
-            AST.ExprObjectMember(member.key, translateExpr(member.value), member.text)
-          }, srcText)
-
-        // string place holders
-        case CST.ExprPlaceholderEqual(t, f, value, srcText) =>
-          AST.ExprPlaceholderEqual(translateExpr(t),
-                                   translateExpr(f),
-                                   translateExpr(value),
-                                   srcText)
-        case CST.ExprPlaceholderDefault(default, value, srcText) =>
-          AST.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
-        case CST.ExprPlaceholderSep(sep, value, srcText) =>
-          AST.ExprPlaceholderSep(translateExpr(sep), translateExpr(value), srcText)
 
         // operators on one argument
         case CST.ExprUniraryPlus(value, srcText) =>
@@ -124,8 +114,52 @@ case class ParseAll(opts: Options,
       }
     }
 
+    // The meta values are a subset of the expression syntax.
+    //
+    // $meta_value = $string | $number | $boolean | 'null' | $meta_object | $meta_array
+    // $meta_object = '{}' | '{' $parameter_meta_kv (, $parameter_meta_kv)* '}'
+    // $meta_array = '[]' |  '[' $meta_value (, $meta_value)* ']'
+    //
+    private def translateMetaValue(value: CST.Expr): AST.Expr = {
+      value match {
+        // values
+        case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
+        case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
+        case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
+        case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
+
+        // special handling for null. It appears as an identifier here, even though
+        // it has not been defined, and it is no identifier.
+        case CST.ExprIdentifier(id, srcText) if id == "null" =>
+          AST.ExprIdentifier(id, srcText)
+        case CST.ExprIdentifier(id, srcText) =>
+          throw new SyntaxException(s"cannot access identifier (${id}) in a meta section",
+                                    srcText,
+                                    docSourceUrl)
+
+        // compound values
+        case CST.ExprPair(l, r, srcText) =>
+          AST.ExprPair(translateMetaValue(l), translateMetaValue(r), srcText)
+        case CST.ExprArrayLiteral(vec, srcText) =>
+          AST.ExprArray(vec.map(translateMetaValue), srcText)
+        case CST.ExprMapLiteral(m, srcText) =>
+          AST.ExprMap(
+              m.map {
+                case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
+                  AST.ExprMapItem(AST.ExprIdentifier(k, text2), translateMetaValue(value), text)
+                case _ =>
+                  throw new SyntaxException(s"Illegal meta field value", srcText, docSourceUrl)
+              },
+              srcText
+          )
+
+        case other =>
+          throw new SyntaxException("illegal expression in meta section", other.text, docSourceUrl)
+      }
+    }
+
     def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, AST.ValueString(kv.value, kv.text), kv.text)
+      AST.MetaKV(kv.id, translateMetaValue(kv.expr), kv.text)
     }
 
     def translateInputSection(
@@ -167,13 +201,12 @@ case class ParseAll(opts: Options,
         runtime: CST.RuntimeSection
     ): AST.RuntimeSection = {
       // check for duplicate ids
-      var allIds = Set.empty[String]
-      for (kv <- runtime.kvs) {
-        if (allIds contains kv.id)
-          throw new SyntaxException(msg = s"key ${kv.id} defined twice in runtime section",
+      runtime.kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
+          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
                                     docSourceUrl)
-        allIds = allIds + kv.id
       }
 
       AST.RuntimeSection(
@@ -185,6 +218,26 @@ case class ParseAll(opts: Options,
       )
     }
 
+    def translateHintsSection(
+        hints: CST.HintsSection
+    ): AST.HintsSection = {
+      hints.kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
+          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
+                                    kv.text,
+                                    docSourceUrl)
+      }
+
+      AST.HintsSection(
+          hints.kvs.map {
+            case CST.HintsKV(id, expr, text) =>
+              AST.HintsKV(id, translateExpr(expr), text)
+          },
+          hints.text
+      )
+    }
+
     def translateWorkflowElement(
         elem: CST.WorkflowElement
     ): AST.WorkflowElement = {
@@ -192,17 +245,20 @@ case class ParseAll(opts: Options,
         case CST.Declaration(name, wdlType, expr, text) =>
           AST.Declaration(name, translateType(wdlType), expr.map(translateExpr), text)
 
-        case CST.Call(name, alias, inputs, text) =>
+        case CST.Call(name, alias, afters, inputs, text) =>
           AST.Call(
               name,
               alias.map {
                 case CST.CallAlias(callName, callText) =>
                   AST.CallAlias(callName, callText)
               },
-              Vector.empty,
+              afters.map {
+                case CST.CallAfter(afterName, afterText) =>
+                  AST.CallAfter(afterName, afterText)
+              },
               inputs.map {
-                case CST.CallInputs(inputsVec, inputsText) =>
-                  AST.CallInputs(inputsVec.map { inp =>
+                case CST.CallInputs(inputsMap, inputsText) =>
+                  AST.CallInputs(inputsMap.map { inp =>
                     AST.CallInput(inp.name, translateExpr(inp.expr), inp.text)
                   }, inputsText)
               },
@@ -229,15 +285,29 @@ case class ParseAll(opts: Options,
       )
     }
 
+    def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
+      AST.TypeStruct(
+          struct.name,
+          struct.members.map {
+            case CST.StructMember(name, t, memberText) =>
+              AST.StructMember(name, translateType(t), memberText)
+          },
+          struct.text
+      )
+    }
+
     def translateImportDoc(importDoc: CST.ImportDoc,
                            importedDoc: Option[AST.Document]): AST.ImportDoc = {
-      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.addr.text)
+      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.text)
       val nameAbst = importDoc.name.map {
         case CST.ImportName(value, text) => AST.ImportName(value, text)
       }
+      val aliasesAbst: Vector[AST.ImportAlias] = importDoc.aliases.map {
+        case CST.ImportAlias(x, y, alText) => AST.ImportAlias(x, y, alText)
+      }
 
       // Replace the original statement with a new one
-      AST.ImportDoc(nameAbst, Vector.empty, addrAbst, importedDoc, importDoc.text)
+      AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text)
     }
 
     def translateTask(task: CST.Task): AST.Task = {
@@ -250,7 +320,7 @@ case class ParseAll(opts: Options,
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
-          None,
+          task.hints.map(translateHintsSection),
           task.text
       )
     }
@@ -260,6 +330,7 @@ case class ParseAll(opts: Options,
     def translateDocument(doc: ConcreteSyntax.Document): AST.Document = {
       // translate all the elements of the document to the abstract syntax
       val elems: Vector[AST.DocumentElement] = doc.elements.map {
+        case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (opts.followImports) {
             Some(followImport(getDocSourceUrl(importDoc.addr.value)))
@@ -271,25 +342,24 @@ case class ParseAll(opts: Options,
         case other                     => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
-      val version = AST.Version(WdlVersion.Draft_2, TextSource.empty)
-      AST.Document(doc.docSourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
+      val version = AST.Version(doc.version.value, doc.version.text)
+      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
     }
   }
 
+  private val versionRegexp = "version\\s+2.0.*".r
+
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
-      val trimmed = line.trim
-      if (!(trimmed.isEmpty || trimmed.startsWith("#"))) {
-        return trimmed.trim.startsWith("import") ||
-          trimmed.startsWith("workflow") ||
-          trimmed.startsWith("task")
+      if (!(line.trim.isEmpty || line.startsWith("#"))) {
+        return versionRegexp.matches(line.trim)
       }
     }
     false
   }
 
   override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = WdlDraft2Grammar.newInstance(sourceCode, listenerFactories, opts)
+    val grammar = WdlV2Grammar.newInstance(sourceCode, listenerFactories, opts)
     val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
@@ -301,13 +371,13 @@ case class ParseAll(opts: Options,
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, listenerFactories, opts = opts))
+    val parser = ParseTop(opts, WdlV2Grammar.newInstance(text, listenerFactories, opts = opts))
     val translator = Translator()
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, listenerFactories, opts = opts))
+    val parser = ParseTop(opts, WdlV2Grammar.newInstance(text, listenerFactories, opts = opts))
     val translator = Translator()
     translator.translateType(parser.parseWdlType)
   }

@@ -8,7 +8,6 @@ object Util {
     expr match {
       case ValueNull(_)                    => "null"
       case ValueString(value, _)           => value
-      case ValueFile(value, _)             => value
       case ValueBoolean(value: Boolean, _) => value.toString
       case ValueInt(value, _)              => value.toString
       case ValueFloat(value, _)            => value.toString

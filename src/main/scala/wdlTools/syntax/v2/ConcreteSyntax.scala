@@ -1,17 +1,12 @@
-package wdlTools.syntax.draft_2
+package wdlTools.syntax.v2
 
 import java.net.URL
 
-import wdlTools.syntax.{CommentMap, TextSource}
+import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 
-// A parser based on a WDL grammar written by Patrick Magee. The tool
-// underlying the grammar is Antlr4.
-//
-
-// A concrete syntax for draft-2 of the Workflow Description Language (WDL). This shouldn't be used
+// A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
 object ConcreteSyntax {
-
   sealed trait Element {
     val text: TextSource // where in the source program does this element belong
   }
@@ -26,14 +21,20 @@ object ConcreteSyntax {
   case class TypePair(l: Type, r: Type, text: TextSource) extends Type
   case class TypeString(text: TextSource) extends Type
   case class TypeFile(text: TextSource) extends Type
+  case class TypeDirectory(text: TextSource) extends Type
   case class TypeBoolean(text: TextSource) extends Type
   case class TypeInt(text: TextSource) extends Type
   case class TypeFloat(text: TextSource) extends Type
   case class TypeIdentifier(id: String, text: TextSource) extends Type
-  case class TypeObject(text: TextSource) extends Type
+  case class StructMember(name: String, dataType: Type, text: TextSource) extends Element
+  case class TypeStruct(name: String, members: Vector[StructMember], text: TextSource)
+      extends Type
+      with DocumentElement
 
   // expressions
   sealed trait Expr extends Element
+  case class ExprNull(text: TextSource) extends Expr
+  case class ExprNone(text: TextSource) extends Expr
   case class ExprString(value: String, text: TextSource) extends Expr
   case class ExprBoolean(value: Boolean, text: TextSource) extends Expr
   case class ExprInt(value: Int, text: TextSource) extends Expr
@@ -46,34 +47,9 @@ object ConcreteSyntax {
   case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
   case class ExprMapLiteral(value: Vector[ExprMapItem], text: TextSource) extends Expr
   case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
-  case class ExprObjectLiteral(value: Vector[ExprObjectMember], text: TextSource) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr], text: TextSource) extends Expr
 
   case class ExprIdentifier(id: String, text: TextSource) extends Expr
-
-  // These are parts of string interpolation expressions like:
-  //
-  // ${true="--yes" false="--no" boolean_value}
-  // ${default="foo" optional_value}
-  // ${sep=", " array_value}
-  //
-  trait PlaceHolderPart extends Element
-  // true="--yes"    false="--no"
-  case class ExprPlaceholderPartEqual(b: Boolean, value: Expr, text: TextSource)
-      extends PlaceHolderPart
-  // default="foo"
-  case class ExprPlaceholderPartDefault(value: Expr, text: TextSource) extends PlaceHolderPart
-  // sep=", "
-  case class ExprPlaceholderPartSep(value: Expr, text: TextSource) extends PlaceHolderPart
-
-  // These are full expressions of the same kind
-  //
-  // ${true="--yes" false="--no" boolean_value}
-  // ${default="foo" optional_value}
-  // ${sep=", " array_value}
-  case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, text: TextSource) extends Expr
-  case class ExprPlaceholderDefault(default: Expr, value: Expr, text: TextSource) extends Expr
-  case class ExprPlaceholderSep(sep: Expr, value: Expr, text: TextSource) extends Expr
 
   case class ExprUniraryPlus(value: Expr, text: TextSource) extends Expr
   case class ExprUniraryMinus(value: Expr, text: TextSource) extends Expr
@@ -101,11 +77,6 @@ object ConcreteSyntax {
       extends WorkflowElement
 
   // sections
-
-  /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
-    * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
-    * `InputSection` `TextSource` may overlap with other elements.
-    */
   case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
   case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
 
@@ -128,16 +99,24 @@ object ConcreteSyntax {
   case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource) extends Element
 
   // meta section
-  case class MetaKV(id: String, value: String, text: TextSource) extends Element
+  case class MetaKV(id: String, expr: Expr, text: TextSource) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
+
+  // hints section
+  case class HintsKV(id: String, expr: Expr, text: TextSource) extends Element
+  case class HintsSection(kvs: Vector[HintsKV], text: TextSource) extends Element
 
   // imports
   case class ImportAddr(value: String, text: TextSource) extends Element
   case class ImportName(value: String, text: TextSource) extends Element
+  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
 
   // import statement as read from the document
-  case class ImportDoc(name: Option[ImportName], addr: ImportAddr, text: TextSource)
+  case class ImportDoc(name: Option[ImportName],
+                       aliases: Vector[ImportAlias],
+                       addr: ImportAddr,
+                       text: TextSource)
       extends DocumentElement
 
   // top level definitions
@@ -149,14 +128,17 @@ object ConcreteSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
+                  hints: Option[HintsSection],
                   text: TextSource)
       extends DocumentElement
 
   case class CallAlias(name: String, text: TextSource) extends Element
+  case class CallAfter(name: String, text: TextSource) extends Element
   case class CallInput(name: String, expr: Expr, text: TextSource) extends Element
   case class CallInputs(value: Vector[CallInput], text: TextSource) extends Element
   case class Call(name: String,
                   alias: Option[CallAlias],
+                  afters: Vector[CallAfter],
                   inputs: Option[CallInputs],
                   text: TextSource)
       extends WorkflowElement
@@ -177,8 +159,9 @@ object ConcreteSyntax {
                       text: TextSource)
       extends Element
 
+  case class Version(value: WdlVersion = WdlVersion.V2, text: TextSource) extends Element
   case class Document(docSourceUrl: URL,
-                      docSource: String,
+                      version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,

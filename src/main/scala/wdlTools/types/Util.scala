@@ -29,6 +29,7 @@ object Util {
       case T_Float          => "Float"
       case T_String         => "String"
       case T_File           => "File"
+      case T_Directory      => "Directory"
       case T_Any            => "Any"
       case T_Var(i)         => s"Var($i)"
       case T_Identifier(id) => s"Id(${id})"

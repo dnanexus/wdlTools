@@ -9,14 +9,18 @@ The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. 
 Currently, WDL draft-2 and 1.0 are supported.
 
 ```scala
-    import java.net.URL
-    import wdlTools.syntax.AbstractSyntax._
-    import wdlTools.syntax.Parsers
-    import wdlTools.util.Options
-    val opts = Options(followImports=true)
-    val parsers = Parsers(opts)
-    val wdl = new URL("file:///path/to/my/wdl")
-    val doc: Document = parsers.parseDocument(wdl)
+import java.net.URL
+import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.Parsers
+import wdlTools.util.Options
+val opts = Options(followImports=true)
+val parsers = Parsers(opts)
+val wdl = new URL("file:///path/to/my/wdl")
+val doc: Document = parsers.parseDocument(wdl)
+// print the source locations of all tasks in the document
+doc.elements.foreach {
+  case task: Task => println(s"Task ${task.name} is at ${task.text} in ${doc.sourceUrl}")
+}
 ```
 
 ## Command line tools
@@ -31,6 +35,7 @@ The following commands are currently available. They should be considered "alpha
 
 * [check](doc/Commands/Check.md): type-check a WDL file
 * [format](doc/Commands/Format.md): reformat a WDL file
+* [lint](doc/Commands/Lint.md): detect "lint" (i.e. incorrect style or potentially problematic code) in a WDL file
 * [new](doc/Commands/New.md): generate a new WDL project
 * [printAST](doc/Commands/PrintAST.md): print the Abstract Syntax Tree for a WDL document
 * [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxWDL](https://github.com/dnanexus/dxWDL)
