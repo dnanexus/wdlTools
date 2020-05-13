@@ -5,6 +5,7 @@ import java.nio.file.Paths
 
 import wdlTools.generators.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.Options
 
@@ -213,7 +214,11 @@ case class DocumentationGenerator(
                 .map(inp => getDeclarationDocumentation(inp.declarations, wf.parameterMeta))
                 .getOrElse(Vector.empty),
               wf.output
-                .map(inp => getDeclarationDocumentation(inp.declarations, wf.parameterMeta, false))
+                .map(inp =>
+                  getDeclarationDocumentation(inp.declarations,
+                                              wf.parameterMeta,
+                                              defaultAllowed = false)
+                )
                 .getOrElse(Vector.empty),
               getCallDocumentation(wf.body),
               wf.meta.map(getMetaDocumentation).getOrElse(Vector.empty),
@@ -228,7 +233,10 @@ case class DocumentationGenerator(
                 .map(inp => getDeclarationDocumentation(inp.declarations, task.parameterMeta))
                 .getOrElse(Vector.empty),
               task.output
-                .map(inp => getDeclarationDocumentation(inp.declarations, task.parameterMeta, false)
+                .map(inp =>
+                  getDeclarationDocumentation(inp.declarations,
+                                              task.parameterMeta,
+                                              defaultAllowed = false)
                 )
                 .getOrElse(Vector.empty),
               task.runtime

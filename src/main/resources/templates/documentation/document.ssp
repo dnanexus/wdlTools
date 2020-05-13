@@ -1,6 +1,7 @@
 <%@ import val doc: wdlTools.generators.DocumentationGenerator.WdlDocumentation %>
 <%
 import wdlTools.syntax.AbstractSyntax._
+import wdlTools.syntax.Util._
 import wdlTools.generators.DocumentationGenerator._
 import java.nio.file.Paths
 def typeToString(wdlType: Type): String = {
