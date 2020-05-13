@@ -153,7 +153,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   addSubcommand(check)
 
   val docgen = new ParserSubcommandWithFollowOption(
-      name = "dogen",
+      name = "docgen",
       description = "Generate documentation from a WDL file and all its dependencies"
   ) {
     val title: ScallopOption[String] = opt[String](

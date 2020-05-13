@@ -1,0 +1,7 @@
+<%@ val title: String %>
+<%@ val pages: Vector[String] %>
+# ${title}
+
+#for (page <- pages)
+  * [${page.replace(".md", "")}](${page})
+#end

@@ -1,0 +1,200 @@
+<%@ import val doc: wdlTools.generators.DocumentationGenerator.WdlDocumentation %>
+<%
+import wdlTools.syntax.AbstractSyntax._
+import wdlTools.generators.DocumentationGenerator._
+import java.nio.file.Paths
+def typeToString(wdlType: Type): String = {
+  wdlType match {
+    case TypeOptional(t, _)        => s"${typeToString(t)}?"
+    case TypeArray(t, nonEmpty, _) => s"Array[${typeToString(t)}]${if (nonEmpty) "+" else ""}"
+    case TypeMap(k, v, _)          => s"Map[${typeToString(k)}, ${typeToString(v)}]"
+    case TypePair(l, r, _)         => s"Pair[${typeToString(l)}, ${typeToString(r)}]"
+    case TypeString(_)             => "String"
+    case TypeFile(_)               => "File"
+    case TypeDirectory(_)          => "Directory"
+    case TypeBoolean(_)            => "Boolean"
+    case TypeInt(_)                => "Int"
+    case TypeFloat(_)              => "Float"
+    case TypeIdentifier(id, _)     => s"[${id}](#${id})"
+    case TypeObject(_)             => "Object"
+    case TypeStruct(name, _, _)    => s"[${name}](#${name})"
+  }
+}
+def formatMetaValue(metaValue: ValueDocumentation, indent: String = ""): String = {
+  metaValue match {
+    case SimpleValueDocumentation(value, comment) =>
+      if (comment.isDefined) {
+        s"${exprToString(value)} (${comment.get})"
+      } else {
+        exprToString(value)
+      }
+      case ListValueDocumentation(value, comment) => s"${value.map(x => formatMetaValue(x, indent + "    ")).mkString(", ")}"
+      case MapValueDocumentation(value, comment) =>
+        val indent2 = s"${indent}    "
+        val items = value.map(x => s"${indent2}* ${x._1}: ${formatMetaValue(x._2, indent2 + "    ")}")
+        s"\n${items.mkString("\n")}"
+  }
+}
+%>
+# [${Paths.get(doc.sourceUrl.getPath).getFileName}](${doc.sourceUrl})
+
+<% if (doc.comment.isDefined) {%>
+${doc.comment.get}
+
+<% } %>
+<%
+if (doc.imports.nonEmpty) {
+%>
+* [Imports](#imports)
+<%
+}
+if (doc.workflow.isDefined) {
+%>
+* [Workflow ${doc.workflow.get.name}](#workflow)
+<%
+}
+if (doc.tasks.nonEmpty) {
+%>
+* [Tasks](#tasks)
+<% for (task <- doc.tasks) { %>
+    * [${task.name}](#${task.name})
+<% } %>
+<% } %>
+<%
+if (doc.imports.nonEmpty) {
+%>
+
+## Imports
+
+<% for (imp <- doc.imports) { %>
+* [${imp.name}](${imp.addr})<% if (imp.comment.isDefined) { %>: ${imp.comment.get}<% } %>
+
+<% for ((name, alias) <- imp.aliases) { %>
+    * ${name} as ${alias}
+<% } %>
+<% } %>
+<% } %>
+<% if (doc.workflow.isDefined) { %>
+
+<a name="workflow"></a>
+## Workflow ${doc.workflow.get.name}
+<% if (doc.workflow.get.comment.isDefined) { %>
+
+${doc.workflow.get.comment.get}
+<% } %>
+<% if (doc.workflow.get.meta.nonEmpty) { %>
+
+### Metadata
+
+<% for (kv <- doc.workflow.get.meta) { %>
+* ${kv.key}: ${formatMetaValue(kv.value)}
+<% } %>
+<% } %>
+<% if (doc.workflow.get.inputs.nonEmpty) { %>
+
+### Inputs
+
+<% for (inp <- doc.workflow.get.inputs) { %>
+* ${typeToString(inp.wdlType)} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
+<% if (inp.defaultValue.isDefined) { %>
+
+  * Default value: ${inp.defaultValue.get}
+<% } %>
+<% if (inp.meta.isDefined) { %>
+
+    * Metadata: ${formatMetaValue(inp.meta.get, "    ")}
+<% } %>
+<% } %>
+
+<% } %>
+<% if (doc.workflow.get.outputs.nonEmpty) {%>
+
+### Outputs
+
+<% for (out <- doc.workflow.get.outputs) { %>
+* ${typeToString(out.wdlType)} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
+<% if (out.meta.isDefined) { %>
+
+    * Metadata: ${formatMetaValue(out.meta.get, "    ")}
+<% } %>
+<% } %>
+
+<% } %>
+<% if (doc.workflow.get.calls.nonEmpty) { %>
+
+### Calls
+
+<% for (call <- doc.workflow.get.calls) { %>
+* [${call.name}](#${call.name})<% if (call.comment.isDefined) { %>: ${call.comment.get}<% } %>
+<% } %>
+<% } %>
+
+<% } %>
+<% if (doc.tasks.nonEmpty) { %>
+
+## Tasks
+<% for (task <- doc.tasks) { %>
+
+### ${task.name}
+<% if (task.comment.isDefined) { %>
+
+${task.comment.get}
+<% } %>
+<% if (task.meta.nonEmpty) { %>
+
+#### Metadata
+
+<% for (kv <- task.meta) { %>
+* ${kv.key}: ${formatMetaValue(kv.value)}
+<% } %>
+<% } %>
+<% if (task.inputs.nonEmpty) { %>
+
+#### Inputs
+
+<% for (inp <- task.inputs) { %>
+* ${typeToString(inp.wdlType)} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
+<% if (inp.defaultValue.isDefined) { %>
+
+    * Default value: ${inp.defaultValue.get}
+<% } %>
+<% if (inp.meta.isDefined) { %>
+    * Metadata: ${formatMetaValue(inp.meta.get, "    ")}
+<% } %>
+<% } %>
+
+<% } %>
+<% if (task.outputs.nonEmpty) {%>
+
+#### Outputs
+
+<% for (out <- task.outputs) { %>
+* ${typeToString(out.wdlType)} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
+<% if (out.defaultValue.isDefined) { %>
+
+    * Default value: ${out.defaultValue.get}
+<% } %>
+<% if (out.meta.isDefined) { %>
+    * Metadata: ${formatMetaValue(out.meta.get, "    ")}
+<% } %>
+<% } %>
+
+<% } %>
+<% if (task.runtime.nonEmpty) { %>
+
+#### Runtime
+
+<% for (kv <- task.runtime) { %>
+* ${kv.key}: ${formatMetaValue(kv.value)}
+<% } %>
+<% } %>
+<% if (task.hints.nonEmpty) { %>
+
+#### Hints
+
+<% for (kv <- task.hints) { %>
+* ${kv.key}: ${formatMetaValue(kv.value)}
+<% } %>
+<% } %>
+<% } %>
+<% } %>

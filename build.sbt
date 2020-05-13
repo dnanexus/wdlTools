@@ -4,7 +4,10 @@ import sbtassembly.AssemblyPlugin.autoImport._
 scalaVersion := "2.13.2"
 name := "wdlTools"
 organization := "com.dnanexus"
-val root = project.in(file("."))
+// temporarily depend on scalate master until 1.9.6 is released (this is a scala 2.13.2 compatibility issue)
+val root = project
+  .in(file("."))
+  .dependsOn(ProjectRef(uri("https://github.com/scalate/scalate.git"), "scalate-core"))
 
 // reduce the maximum number of errors shown by the Scala compiler
 maxErrors := 7
@@ -51,6 +54,8 @@ val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.5"
 val sprayVersion = "1.3.5"
+val scalacticVersion = "3.1.1"
+val scalatestVersion = "3.1.1"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
@@ -58,12 +63,12 @@ libraryDependencies ++= Seq(
     // command line parser
     "org.rogach" %% "scallop" % scallopVersion,
     // template engine
-    "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
+    //"org.scalatra.scalate" %% "scalate-core" % scalateVersion,
     "com.typesafe" % "config" % typesafeVersion,
     "io.spray" %% "spray-json" % sprayVersion,
     //---------- Test libraries -------------------//
-    "org.scalactic" % "scalactic_2.13" % "3.1.1",
-    "org.scalatest" % "scalatest_2.13" % "3.1.1" % "test"
+    "org.scalactic" % "scalactic_2.13" % scalacticVersion,
+    "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )
 
 // If an exception is thrown during tests, show the full
