@@ -340,7 +340,7 @@ case class ParseAll(opts: Options,
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(doc.version.value, doc.version.text)
-      AST.Document(doc.docSourceUrl, version, elems, aWf, doc.text, doc.comments)
+      AST.Document(doc.docSourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
     }
   }
   private val versionRegexp = "version\\s+1.0.*".r

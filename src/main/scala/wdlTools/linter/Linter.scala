@@ -6,7 +6,7 @@ import org.antlr.v4.runtime.tree.ParseTreeListener
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers}
-import wdlTools.types.{Stdlib, TypeChecker}
+import wdlTools.types.TypeInfer
 import wdlTools.util.Options
 
 import scala.collection.mutable
@@ -47,9 +47,8 @@ case class Linter(opts: Options,
           events(doc.sourceUrl) = docEvents
         }
         // First run the TypeChecker to infer the types of all expressions
-        val stdlib = Stdlib(opts)
-        val typeChecker = TypeChecker(stdlib)
-        val typesContext = typeChecker.apply(doc)
+        val typeChecker = TypeInfer(opts)
+        val (_, typesContext) = typeChecker.apply(doc)
         // Now execute the linter rules
         val visitors = astRules.map {
           case (id, severity) =>
@@ -58,7 +57,6 @@ case class Linter(opts: Options,
                 severity,
                 doc.version.value,
                 typesContext,
-                stdlib,
                 events(doc.sourceUrl),
                 Some(doc.sourceUrl)
             )

@@ -12,11 +12,11 @@ class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val opts = Options(verbosity = Verbosity.Verbose)
 
   def getBeforePath(fname: String): Path = {
-    Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath)
+    Paths.get(getClass.getResource(s"/wdlTools/upgrade/before/${fname}").getPath)
   }
 
   def getAfterPath(fname: String): Path = {
-    Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath)
+    Paths.get(getClass.getResource(s"/wdlTools/upgrade/after/${fname}").getPath)
   }
 
   def getBeforeAfterPair(fname: String): (URL, Path) = {

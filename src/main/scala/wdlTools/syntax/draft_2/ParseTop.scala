@@ -1205,6 +1205,7 @@ document_element
         Some(visitWorkflow(ctx.workflow()))
 
     Document(grammar.docSourceUrl.get,
+             grammar.docSource,
              elems,
              workflow,
              getTextSource(ctx),

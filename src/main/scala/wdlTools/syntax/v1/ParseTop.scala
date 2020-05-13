@@ -14,7 +14,6 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 case class ParseTop(opts: Options, grammar: WdlV1Grammar) extends WdlV1ParserBaseVisitor[Element] {
-
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
       throw new SyntaxException("missing identifier", getTextSource(ctx), grammar.docSourceUrl)
@@ -1236,6 +1235,7 @@ document
         Some(visitWorkflow(ctx.workflow()))
 
     Document(grammar.docSourceUrl.get,
+             grammar.docSource,
              version,
              elems,
              workflow,

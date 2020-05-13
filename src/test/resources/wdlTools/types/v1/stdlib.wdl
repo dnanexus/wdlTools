@@ -10,6 +10,6 @@ task foo {
 
   command {}
   output {
-    Int disk_size = disk_size
+    Int disk_size2 = disk_size
   }
 }
