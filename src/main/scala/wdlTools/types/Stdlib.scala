@@ -4,13 +4,30 @@ import java.net.URL
 
 import WdlTypes._
 import wdlTools.util.Options
-//import wdlTools.util.Verbosity._
 import wdlTools.syntax.{TextSource, WdlVersion}
 
 case class Stdlib(conf: Options, version: WdlVersion) {
-  private[wdltools] val unify = Unification(conf)
+  private val unify = Unification(conf)
 
-  private val draft2Prototypes: Vector[T_StdlibFunc] = Vector(
+  // Some functions are overloaded and can take several kinds of arguments.
+  // A particulary problematic one is size.
+  // There is WDL code that calls size with File, and File?. So what is the prototype of "size" ?
+  //
+  // We chould use:
+  //       T_File -> T_Float
+  // or
+  //       T_File? -> T_Float
+  // or both:
+  //       T_File -> T_Float
+  //       T_File? -> T_Float
+  //
+  // A constraint we wish to maintain is that looking up a function prototype will
+  // return just one result. Therefore, we ended up with the prototype:
+  //       T_File? -> T_Float
+  // because with the current type system T_File? is more general than T_File.
+  // This is not pretty.
+
+  private val draft2Prototypes: Vector[T_Function] = Vector(
       T_Function0("stdout", T_File),
       T_Function0("stderr", T_File),
       T_Function1("read_lines", T_File, T_Array(T_String)),
@@ -30,10 +47,8 @@ case class Stdlib(conf: Options, version: WdlVersion) {
       T_Function1("write_objects", T_Array(T_Object), T_File),
       T_Function1("write_json", T_Any, T_File),
       // Size can take several kinds of arguments.
-      T_Function1("size", T_File, T_Float),
       T_Function1("size", T_Optional(T_File), T_Float),
       // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      T_Function2("size", T_File, T_String, T_Float),
       T_Function2("size", T_Optional(T_File), T_String, T_Float),
       T_Function3("sub", T_String, T_String, T_String, T_String),
       T_Function1("range", T_Int, T_Array(T_Int)),
@@ -65,7 +80,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
   )
 
   // Add the signatures for draft2 and v2 here
-  private val v1Prototypes: Vector[T_StdlibFunc] = Vector(
+  private val v1Prototypes: Vector[T_Function] = Vector(
       T_Function0("stdout", T_File),
       T_Function0("stderr", T_File),
       T_Function1("read_lines", T_File, T_Array(T_String)),
@@ -85,15 +100,11 @@ case class Stdlib(conf: Options, version: WdlVersion) {
       T_Function1("write_objects", T_Array(T_Object), T_File),
       T_Function1("write_json", T_Any, T_File),
       // Size can take several kinds of arguments.
-      T_Function1("size", T_File, T_Float),
       T_Function1("size", T_Optional(T_File), T_Float),
       T_Function1("size", T_Array(T_File), T_Float),
-      T_Function1("size", T_Array(T_Optional(T_File)), T_Float),
       // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      T_Function2("size", T_File, T_String, T_Float),
       T_Function2("size", T_Optional(T_File), T_String, T_Float),
       T_Function2("size", T_Array(T_File), T_String, T_Float),
-      T_Function2("size", T_Array(T_Optional(T_File)), T_String, T_Float),
       T_Function3("sub", T_String, T_String, T_String, T_String),
       T_Function1("range", T_Int, T_Array(T_Int)),
       // Array[Array[X]] transpose(Array[Array[X]])
@@ -125,7 +136,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
   )
 
   // choose the standard library prototypes according to the WDL version
-  private val protoTable: Vector[T_StdlibFunc] = version match {
+  private val protoTable: Vector[T_Function] = version match {
     case WdlVersion.Draft_2 => draft2Prototypes
     case WdlVersion.V1      => v1Prototypes
     case WdlVersion.V2      => throw new Exception("Wdl version 2 not implemented yet")
@@ -133,13 +144,13 @@ case class Stdlib(conf: Options, version: WdlVersion) {
 
   // build a mapping from a function name to all of its prototypes.
   // Some functions are overloaded, so they may have several.
-  private val funcProtoMap: Map[String, Vector[T_StdlibFunc]] = {
-    protoTable.foldLeft(Map.empty[String, Vector[T_StdlibFunc]]) {
-      case (accu, funcDesc: T_StdlibFunc) =>
+  private val funcProtoMap: Map[String, Vector[T_Function]] = {
+    protoTable.foldLeft(Map.empty[String, Vector[T_Function]]) {
+      case (accu, funcDesc: T_Function) =>
         accu.get(funcDesc.name) match {
           case None =>
             accu + (funcDesc.name -> Vector(funcDesc))
-          case Some(protoVec: Vector[T_StdlibFunc]) =>
+          case Some(protoVec: Vector[T_Function]) =>
             accu + (funcDesc.name -> (protoVec :+ funcDesc))
         }
     }
@@ -147,21 +158,23 @@ case class Stdlib(conf: Options, version: WdlVersion) {
 
   // evaluate the output type of a function. This may require calculation because
   // some functions are polymorphic in their inputs.
-  private def evalOnePrototype(funcDesc: T_StdlibFunc,
+  private def evalOnePrototype(funcDesc: T_Function,
                                inputTypes: Vector[T],
                                text: TextSource,
-                               docSourceUrl: Option[URL]): Option[T] = {
-    val args = funcDesc match {
-      case T_Function0(_, _) if inputTypes.isEmpty => Vector.empty
-      case T_Function1(_, arg1, _)                 => Vector(arg1)
-      case T_Function2(_, arg1, arg2, _)           => Vector(arg1, arg2)
-      case T_Function3(_, arg1, arg2, arg3, _)     => Vector(arg1, arg2, arg3)
-      case _                                       => throw new TypeException(s"${funcDesc.name} is not a function", text, docSourceUrl)
+                               docSourceUrl: Option[URL]): Option[(T, T_Function)] = {
+    val arity = inputTypes.size
+    val args = (arity, funcDesc) match {
+      case (0, T_Function0(_, _))                   => Vector.empty
+      case (1, T_Function1(_, arg1, _))             => Vector(arg1)
+      case (2, T_Function2(_, arg1, arg2, _))       => Vector(arg1, arg2)
+      case (3, T_Function3(_, arg1, arg2, arg3, _)) => Vector(arg1, arg2, arg3)
+      case (_, _) =>
+        return None
     }
     try {
       val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
       val t = unify.substitute(funcDesc.output, ctx, text)
-      Some(t)
+      Some((t, funcDesc))
     } catch {
       case _: TypeUnificationException =>
         None
@@ -171,7 +184,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
   def apply(funcName: String,
             inputTypes: Vector[T],
             text: TextSource,
-            docSourceUrl: Option[URL] = None): T = {
+            docSourceUrl: Option[URL] = None): (T, T_Function) = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library",
@@ -183,11 +196,11 @@ case class Stdlib(conf: Options, version: WdlVersion) {
 
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
-    val allCandidatePrototypes: Vector[Option[T]] = candidates.map {
+    val allCandidatePrototypes: Vector[Option[(T, T_Function)]] = candidates.map {
       evalOnePrototype(_, inputTypes, text, docSourceUrl)
     }
-    val result: Vector[T] = allCandidatePrototypes.flatten
-    result.size match {
+    val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
+    results.size match {
       case 0 =>
         val inputsStr = inputTypes.map(Util.typeToString).mkString("\n")
         val candidatesStr = candidates.map(Util.typeToString(_)).mkString("\n")
@@ -195,36 +208,24 @@ case class Stdlib(conf: Options, version: WdlVersion) {
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
                                     |""".stripMargin, text, docSourceUrl)
-      //Util.warning(e.getMessage, conf.verbosity)
       case 1 =>
-        result.head
+        results.head
       case n =>
         // Match more than one prototype. If they all have the same output type, then it doesn't matter
         // though.
-        val possibleOutputTypes: Set[T] = result.toSet
-        if (possibleOutputTypes.size > 1)
-          throw new TypeException(s"""|Call to ${funcName} matches ${n} prototypes with different
-                                      |output types (${possibleOutputTypes})""".stripMargin
-                                    .replaceAll("\n", " "),
-                                  text,
-                                  docSourceUrl)
-        possibleOutputTypes.toVector.head
-    }
-  }
-
-  /**
-    * Returns a Vector of all the signatures for the given function,
-    * where a signature is a tuple of (param_types, return_type),
-    * where param_types is a Vector of the parameter types.
-    * @param funcName the function name
-    * @return
-    */
-  def getSignatures(funcName: String): Vector[(Vector[T], T)] = {
-    funcProtoMap(funcName).map {
-      case T_Function0(_, output)                   => (Vector.empty, output)
-      case T_Function1(_, arg1, output)             => (Vector(arg1), output)
-      case T_Function2(_, arg1, arg2, output)       => (Vector(arg1, arg2), output)
-      case T_Function3(_, arg1, arg2, arg3, output) => (Vector(arg1, arg2, arg3), output)
+        val prototypeDescriptions = results
+          .map {
+            case (_, funcSig) =>
+              Util.typeToString(funcSig)
+          }
+          .mkString("\n")
+        val msg =
+          s"""|Call to ${funcName} matches ${n} prototypes
+              |inputTypes: ${inputTypes}
+              |prototypes:
+              |${prototypeDescriptions}
+              |""".stripMargin
+        throw new TypeException(msg, text, docSourceUrl)
     }
   }
 }

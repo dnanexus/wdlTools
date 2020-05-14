@@ -7,7 +7,7 @@ import java.nio.file.{Files, Path}
 import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
-import wdlTools.linter.{LintEvent, Linter, Rules, Severity}
+import wdlTools.linter.{LintEvent, Linter, Severity}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
@@ -21,13 +21,13 @@ case class Lint(conf: WdlToolsConf) extends Command {
     val rules =
       if (conf.lint.config.isDefined) {
         val (incl, excl) = rulesFromFile(conf.lint.config())
-        incl.getOrElse(Rules.defaultRules).removedAll(excl.getOrElse(Set.empty))
+        incl.getOrElse(Linter.defaultRules).removedAll(excl.getOrElse(Set.empty))
       } else if (conf.lint.includeRules.isDefined || conf.lint.excludeRules.isDefined) {
         val incl = conf.lint.includeRules.map(rulesFromOptions)
         val excl = conf.lint.excludeRules.map(_.toSet)
-        incl.getOrElse(Rules.defaultRules).removedAll(excl.getOrElse(Set.empty))
+        incl.getOrElse(Linter.defaultRules).removedAll(excl.getOrElse(Set.empty))
       } else {
-        Rules.defaultRules
+        Linter.defaultRules
       }
     val linter = Linter(opts, rules)
     linter.apply(url)

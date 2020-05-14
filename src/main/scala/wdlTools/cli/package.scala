@@ -152,6 +152,26 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(check)
 
+  val docgen = new ParserSubcommandWithFollowOption(
+      name = "docgen",
+      description = "Generate documentation from a WDL file and all its dependencies"
+  ) {
+    val title: ScallopOption[String] = opt[String](
+        descr = "Title for generated documentation"
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr = "Directory in which to output documentation",
+        short = 'O',
+        default = Some(Paths.get("docs"))
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+  }
+  addSubcommand(docgen)
+
   val format = new ParserSubcommandWithFollowOption(
       name = "format",
       description = "Reformat WDL file and all its dependencies according to style rules."
@@ -166,8 +186,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       case _ => Right(())
     }
     val outputDir: ScallopOption[Path] = opt[Path](
-        descr =
-          "Directory in which to output formatted WDL files; if not specified, the input files are overwritten",
+        descr = "Directory in which to output formatted WDL files",
         short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(
@@ -234,8 +253,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       case _         => Left("Source version must be earlier than destination version")
     }
     val outputDir: ScallopOption[Path] = opt[Path](
-        descr =
-          "Directory in which to output upgraded WDL file(s); if not specified, the input files are overwritten",
+        descr = "Directory in which to output upgraded WDL file(s)",
         short = 'O'
     )
     val overwrite: ScallopOption[Boolean] = toggle(

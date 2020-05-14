@@ -156,11 +156,27 @@ object Util {
     * @param overwrite whether it is okay to overwrite an existing file
     */
   def writeContentsToFiles(docs: Map[URL, String],
-                           outputDir: Option[Path] = None,
-                           overwrite: Boolean = false): Unit = {
-    docs.foreach {
+                           outputDir: Option[Path],
+                           overwrite: Boolean): Unit = {
+    writeContentsToFiles(docs.map {
       case (url, contents) =>
         val outputPath = Util.getLocalPath(url, outputDir, overwrite)
+        outputPath -> contents
+    }, overwrite)
+  }
+
+  /**
+    * Write a collection of documents, which is a map of URIs to contents, to disk by converting
+    * each URI to a local path.
+    * @param docs the documents to write
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeContentsToFiles(docs: Map[Path, String], overwrite: Boolean): Unit = {
+    docs.foreach {
+      case (outputPath, contents) =>
+        if (!overwrite && Files.exists(outputPath)) {
+          throw new Exception(s"File already exists: ${outputPath}")
+        }
         Files.createDirectories(outputPath.getParent)
         Files.write(outputPath, contents.getBytes())
     }

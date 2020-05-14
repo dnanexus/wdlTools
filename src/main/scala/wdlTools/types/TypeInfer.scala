@@ -479,8 +479,8 @@ case class TypeInfer(conf: Options) {
       //   read_int("4")
       case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], text) =>
         val eElements = elements.map(applyExpr(_, bindings, ctx))
-        val t = ctx.stdlib.apply(funcName, eElements.map(_.wdlType), expr.text)
-        TAT.ExprApply(funcName, eElements, t, text)
+        val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType), expr.text)
+        TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
 
       // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a
@@ -601,7 +601,7 @@ case class TypeInfer(conf: Options) {
                               ctx.docSourceUrl)
 
     // translate the declarations
-    val (tDecls, bindings) =
+    val (tDecls, _) =
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
@@ -623,15 +623,15 @@ case class TypeInfer(conf: Options) {
       case None => Map.empty
       case Some(TAT.InputSection(decls, _)) =>
         decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), text) =>
+          case TAT.Declaration(name, wdlType, Some(_), _) =>
             // input has a default value, caller may omit it.
             name -> (wdlType, true)
 
-          case TAT.Declaration(name, T_Optional(t), None, text) =>
+          case TAT.Declaration(name, T_Optional(t), None, _) =>
             // input is optional, caller can omit it.
             name -> (T_Optional(t), true)
 
-          case TAT.Declaration(name, t, None, text) =>
+          case TAT.Declaration(name, t, None, _) =>
             // input is compulsory
             name -> (t, false)
         }.toMap
@@ -653,6 +653,14 @@ case class TypeInfer(conf: Options) {
         name -> applyExpr(expr, Map.empty, ctx)
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
+  }
+
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
+    val m = hintsSection.kvs.map {
+      case AST.HintsKV(name, expr, _) =>
+        name -> applyExpr(expr, Map.empty, ctx)
+    }.toMap
+    TAT.HintsSection(m, hintsSection.text)
   }
 
   // convert the generic expression syntax into a specialized JSON object
@@ -692,7 +700,7 @@ case class TypeInfer(conf: Options) {
 
   private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
     kvs.map {
-      case AST.MetaKV(k, v, text) =>
+      case AST.MetaKV(k, v, _) =>
         k -> metaValueFromExpr(v, ctx)
     }.toMap
   }
@@ -735,6 +743,7 @@ case class TypeInfer(conf: Options) {
       }
     val ctxDecl = ctx.bindVarList(bindings, task.text)
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
+    val tHints = task.hints.map(applyHints(_, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section
@@ -771,6 +780,7 @@ case class TypeInfer(conf: Options) {
         meta = tMeta,
         parameterMeta = tParamMeta,
         runtime = tRuntime,
+        hints = tHints,
         text = task.text
     )
   }
@@ -1075,7 +1085,8 @@ case class TypeInfer(conf: Options) {
         case ((ctx, elems), struct: AST.TypeStruct) =>
           // Add the struct to the context
           val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
-          (ctx.bindStruct(tStruct, struct.text), elems)
+          val defStruct = TAT.StructDefinition(struct.name, tStruct.members, struct.text)
+          (ctx.bindStruct(tStruct, struct.text), elems :+ defStruct)
       }
 
     // now that we have types for everything else, we can check the workflow

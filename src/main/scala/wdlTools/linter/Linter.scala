@@ -6,7 +6,7 @@ import org.antlr.v4.runtime.tree.ParseTreeListener
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers}
-import wdlTools.types.TypeInfer
+import wdlTools.types.{TypeInfer, Unification}
 import wdlTools.util.Options
 
 import scala.collection.mutable
@@ -41,13 +41,13 @@ case class Linter(opts: Options,
     val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
     // TODO: Catch SyntaxExceptions and TypeExceptions and convert them to LintEvents
     // TODO: Ignore events generated from TypeExceptions that dupilicate events added by AST Rules
-    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (url, doc, _) =>
+    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>
       val astRules = rules.view.filterKeys(AstRules.allRules.contains)
       val tstRules = rules.view.filterKeys(TstRules.allRules.contains)
       if (astRules.nonEmpty || tstRules.nonEmpty) {
-        if (!events.contains(url)) {
+        if (!events.contains(doc.sourceUrl)) {
           val docEvents = mutable.ArrayBuffer.empty[LintEvent]
-          events(url) = docEvents
+          events(doc.sourceUrl) = docEvents
         }
         // Now execute the linter rules
         if (astRules.nonEmpty) {
@@ -68,14 +68,15 @@ case class Linter(opts: Options,
           // Run TypeInfer to infer the types of all expressions
           // We call the private applyDoc() method rather than the
           // public apply() method because we need the Context
-          val (typedDoc, ctx) = TypeInfer(opts).applyDoc(doc)
+          val (typedDoc, _) = TypeInfer(opts).apply(doc)
+          val unification = Unification(opts)
           val visitors = tstRules.map {
             case (id, severity) =>
               TstRules.allRules(id)(
                   id,
                   severity,
                   doc.version.value,
-                  ctx,
+                  unification,
                   events(url),
                   Some(url)
               )

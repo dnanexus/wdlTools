@@ -61,27 +61,27 @@ object WdlTypes {
   case class T_Call(name: String, output: Map[String, T]) extends T
 
   // A standard library function implemented by the engine.
-  sealed trait T_StdlibFunc extends T {
+  sealed trait T_Function extends T {
     val name: String
     val output: T
   }
 
   // T representation for an stdlib function.
   // For example, stdout()
-  case class T_Function0(name: String, output: T) extends T_StdlibFunc
+  case class T_Function0(name: String, output: T) extends T_Function
 
   // A function with one argument
   // Example:
   //   read_int(FILE_NAME)
   //   Array[Array[X]] transpose(Array[Array[X]])
-  case class T_Function1(name: String, input: T, output: T) extends T_StdlibFunc
+  case class T_Function1(name: String, input: T, output: T) extends T_Function
 
   // A function with two arguments. For example:
   //   Float size(File, [String])
   //   Array[Pair(X,Y)] zip(Array[X], Array[Y])
-  case class T_Function2(name: String, arg1: T, arg2: T, output: T) extends T_StdlibFunc
+  case class T_Function2(name: String, arg1: T, arg2: T, output: T) extends T_Function
 
   // A function with three arguments. For example:
   // String sub(String, String, String)
-  case class T_Function3(name: String, arg1: T, arg2: T, arg3: T, output: T) extends T_StdlibFunc
+  case class T_Function3(name: String, arg1: T, arg2: T, arg3: T, output: T) extends T_Function
 }

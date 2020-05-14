@@ -6,6 +6,7 @@ import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
   type WdlType = WdlTypes.T
+  type T_Function = WdlTypes.T_Function
 
   trait Element {
     val text: TextSource // where in the source program does this element belong
@@ -91,7 +92,11 @@ object TypedAbstractSyntax {
 
   // Apply a standard library function to arguments. For example:
   //   read_int("4")
-  case class ExprApply(funcName: String, elements: Vector[Expr], wdlType: WdlType, text: TextSource)
+  case class ExprApply(funcName: String,
+                       funcWdlType: T_Function,
+                       elements: Vector[Expr],
+                       wdlType: WdlType,
+                       text: TextSource)
       extends Expr
 
   // Access a field in a struct or an object. For example:
@@ -124,6 +129,7 @@ object TypedAbstractSyntax {
   // >>>
   case class CommandSection(parts: Vector[Expr], text: TextSource) extends Element
   case class RuntimeSection(kvs: Map[String, Expr], text: TextSource) extends Element
+  case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue
@@ -150,6 +156,10 @@ object TypedAbstractSyntax {
                        text: TextSource)
       extends DocumentElement
 
+  // a definition of a struct
+  case class StructDefinition(name: String, members: Map[String, WdlType], text: TextSource)
+      extends DocumentElement
+
   // A task
   case class Task(name: String,
                   wdlType: WdlTypes.T_Task,
@@ -160,6 +170,7 @@ object TypedAbstractSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
+                  hints: Option[HintsSection],
                   text: TextSource)
       extends DocumentElement
       with Callable
