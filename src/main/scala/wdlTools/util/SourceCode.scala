@@ -10,7 +10,7 @@ import scala.io.Source
   * @param url the source URL
   * @param lines the lines of the file
   */
-case class SourceCode(url: URL, lines: Seq[String]) {
+case class SourceCode(url: Option[URL], lines: Vector[String]) {
   lazy override val toString: String = lines.mkString(System.lineSeparator())
 }
 
@@ -42,6 +42,6 @@ object SourceCode {
       case _       => throw new Exception(s"unknown protocol in URL ${url}")
     }
 
-    SourceCode(url, lines)
+    SourceCode(Some(url), lines.toVector)
   }
 }

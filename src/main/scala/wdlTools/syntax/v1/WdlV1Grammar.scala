@@ -21,7 +21,7 @@ object WdlV1Grammar {
   def newInstance(sourceCode: SourceCode,
                   listenerFactories: Vector[ParseTreeListenerFactory],
                   opts: Options): WdlV1Grammar = {
-    newInstance(sourceCode.toString, listenerFactories, Some(sourceCode.url), opts)
+    newInstance(sourceCode.toString, listenerFactories, sourceCode.url, opts)
   }
 
   def newInstance(text: String,
