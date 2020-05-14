@@ -60,15 +60,15 @@ abstract class WdlParser(opts: Options) {
     }
 
     def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
-      val visited: mutable.Set[URL] = mutable.HashSet.empty
+      val visited: mutable.Set[Option[URL]] = mutable.HashSet.empty
 
-      def addDocument(url: URL, doc: Document): Unit = {
+      def addDocument(url: Option[URL], doc: Document): Unit = {
         if (!visited.contains(url)) {
           visited.add(url)
           visitor(doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {
-              case (uri, doc) => addDocument(uri, doc)
+              case (uri, doc) => addDocument(Some(uri), doc)
             }
           }
         }

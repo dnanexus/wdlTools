@@ -362,7 +362,7 @@ case class ParseAll(opts: Options,
     if (errorListener.hasErrors) {
       throw new SyntaxException(errorListener.getErrors)
     }
-    val translator = Translator(Some(sourceCode.url))
+    val translator = Translator(sourceCode.url)
     translator.translateDocument(top)
   }
 
