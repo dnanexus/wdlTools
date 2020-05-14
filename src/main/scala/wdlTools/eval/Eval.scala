@@ -479,7 +479,7 @@ case class Eval(opts: Options,
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case TAT.ExprApply(funcName, elements, _, text) =>
+      case TAT.ExprApply(funcName, _, elements, _, text) =>
         val funcArgs = elements.map(e => apply(e, ctx))
         stdlib.call(funcName, funcArgs, text)
 

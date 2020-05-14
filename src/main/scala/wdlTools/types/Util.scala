@@ -180,7 +180,7 @@ object Util {
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case TAT.ExprApply(funcName, elements, _, _) =>
+      case TAT.ExprApply(funcName, _, elements, _, _) =>
         val args = elements.map(exprToString).mkString(", ")
         s"${funcName}(${args})"
 
