@@ -480,8 +480,8 @@ case class TypeInfer(conf: Options) {
       //   read_int("4")
       case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], text) =>
         val eElements = elements.map(applyExpr(_, bindings, ctx))
-        val t = ctx.stdlib.apply(funcName, eElements.map(_.wdlType), expr.text)
-        TAT.ExprApply(funcName, eElements, t, text)
+        val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType), expr.text)
+        TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
 
       // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a

@@ -7,6 +7,7 @@ import wdlTools.types.WdlTypes
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
   type WdlType = WdlTypes.T
+  type T_Function = WdlTypes.T_Function
 
   trait Element {
     val text: TextSource // where in the source program does this element belong
@@ -91,7 +92,11 @@ object TypedAbstractSyntax {
 
   // Apply a standard library function to arguments. For example:
   //   read_int("4")
-  case class ExprApply(funcName: String, elements: Vector[Expr], wdlType: WdlType, text: TextSource)
+  case class ExprApply(funcName: String,
+                       funcWdlType: T_Function,
+                       elements: Vector[Expr],
+                       wdlType: WdlType,
+                       text: TextSource)
       extends Expr
 
   // Access a field in a struct or an object. For example:
