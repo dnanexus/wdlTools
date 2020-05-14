@@ -183,6 +183,7 @@ object TypedAbstractSyntax {
   //
   case class Call(fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,
+                  callee: WdlTypes.T_Callable,
                   alias: Option[String],
                   actualName: String,
                   inputs: Map[String, Expr],

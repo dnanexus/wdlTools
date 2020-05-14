@@ -36,9 +36,8 @@ object WdlTypes {
   // a user defined structure
   case class T_Struct(name: String, members: Map[String, T]) extends T
 
-  // Anything that can be called. A general group that includesw tasks
-  // and workflows
-  //
+  // Anything that can be called. Tasks and workflows implement this trait.
+  // The inputs are decorated by whether they are optional.
   sealed trait T_Callable extends T {
     val name: String
     val input: Map[String, (T, Boolean)]
