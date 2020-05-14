@@ -1028,7 +1028,7 @@ case class TypeInfer(conf: Options) {
   }
 
   // Convert from AST to TAT and maintain context
-  private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
+  private[wdlTools] def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
     val initCtx = Context(version = doc.version.value,
                           stdlib = Stdlib(conf, doc.version.value),
                           docSourceUrl = Some(doc.sourceUrl))

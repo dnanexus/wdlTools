@@ -3,6 +3,7 @@ package wdlTools.syntax
 import wdlTools.syntax.AbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Options
+import wdlTools.util.Util.getFilename
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -10,11 +11,17 @@ import scala.reflect.ClassTag
 class AbstractSyntaxTreeVisitor {
   def visitDocument(ctx: VisitorContext[Document]): Unit = {}
 
+  def visitName[P <: Element](name: String, parent: VisitorContext[P]): Unit = {}
+
   def visitIdentifier[P <: Element](identifier: String, parent: VisitorContext[P]): Unit = {}
 
   def visitVersion(ctx: VisitorContext[Version]): Unit = {}
 
-  def visitImportName(ctx: VisitorContext[ImportName]): Unit = {}
+  /**
+    * `name` is the actual import name - either the alias or the name of the WDL file
+    * without the '.wdl' extension
+    */
+  def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {}
 
   def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {}
 
@@ -65,6 +72,13 @@ class AbstractSyntaxTreeVisitor {
 
 object AbstractSyntaxTreeVisitor {
   class VisitorContext[T <: Element](val element: T, val parent: Option[VisitorContext[_]] = None) {
+
+    /**
+      * Get the immediate parent of this context, or throw an exception if this context
+      * doesn't have a parent
+      * @tparam P parent element type
+      * @return
+      */
     def getParent[P <: Element]: VisitorContext[P] = {
       if (parent.isDefined) {
         parent.get.asInstanceOf[VisitorContext[P]]
@@ -73,7 +87,11 @@ object AbstractSyntaxTreeVisitor {
       }
     }
 
-    def getParentExecutable: Option[Element] = {
+    /**
+      * Finds the first ancestor of this context that is an executable type
+      * (task or workflow).
+      */
+    def findAncestorExecutable: Option[Element] = {
       @tailrec
       def getExecutable(ctx: VisitorContext[_]): Option[Element] = {
         ctx.element match {
@@ -86,7 +104,13 @@ object AbstractSyntaxTreeVisitor {
       getExecutable(this)
     }
 
-    def findParent[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
+    /**
+      * Finds the first ancestor of this context of the specified type.
+      * @param tag class tag for P
+      * @tparam P ancestor element type to find
+      * @return
+      */
+    def findAncestor[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
       if (parent.isDefined) {
         @tailrec
         def find(ctx: VisitorContext[_]): Option[VisitorContext[P]] = {
@@ -125,19 +149,21 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
     }
   }
 
-  override def visitImportName(ctx: VisitorContext[ImportName]): Unit = {
-    visitIdentifier[ImportName](ctx.element.value, ctx)
+  override def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {
+    visitName[ImportDoc](name, ctx)
   }
 
   override def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {
-    visitIdentifier[ImportAlias](ctx.element.id1, ctx)
-    visitIdentifier[ImportAlias](ctx.element.id2, ctx)
+    visitName[ImportAlias](ctx.element.id2, ctx)
   }
 
   override def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {
-    if (ctx.element.name.isDefined) {
-      visitImportName(createContext[ImportName, ImportDoc](ctx.element.name.get, ctx))
-    }
+    val name = ctx.element.name
+      .map(_.value)
+      .getOrElse(
+          getFilename(ctx.element.addr.value).replace(".wdl", "")
+      )
+    visitImportName(name, ctx)
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(createContext[ImportAlias, ImportDoc](alias, ctx))
     }
@@ -155,6 +181,52 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
   override def visitStructMember(ctx: VisitorContext[StructMember]): Unit = {
     visitDataType(createContext[Type, StructMember](ctx.element.dataType, ctx))
     visitIdentifier[StructMember](ctx.element.name, ctx)
+  }
+
+  /**
+    * By default, visitExpression does not traverse compound expressions.
+    * This method can be called from an overriding visitExpression to do so.
+    */
+  def traverseExpression(ctx: VisitorContext[Expr]): Unit = {
+    val exprs: Vector[Expr] = ctx.element match {
+      case ExprCompoundString(value, _)              => value
+      case ExprPair(l, r, _)                         => Vector(l, r)
+      case ExprArray(value, _)                       => value
+      case ExprMap(value, _)                         => value
+      case ExprMapItem(key, value, _)                => Vector(key, value)
+      case ExprObject(value, _)                      => value
+      case ExprObjectMember(_, value, _)             => Vector(value)
+      case ExprPlaceholderEqual(t, f, value, _)      => Vector(t, f, value)
+      case ExprPlaceholderDefault(default, value, _) => Vector(default, value)
+      case ExprPlaceholderSep(sep, value, _)         => Vector(sep, value)
+      case ExprUniraryPlus(value, _)                 => Vector(value)
+      case ExprUniraryMinus(value, _)                => Vector(value)
+      case ExprNegate(value, _)                      => Vector(value)
+      case ExprLor(a, b, _)                          => Vector(a, b)
+      case ExprLand(a, b, _)                         => Vector(a, b)
+      case ExprEqeq(a, b, _)                         => Vector(a, b)
+      case ExprLt(a, b, _)                           => Vector(a, b)
+      case ExprGte(a, b, _)                          => Vector(a, b)
+      case ExprNeq(a, b, _)                          => Vector(a, b)
+      case ExprLte(a, b, _)                          => Vector(a, b)
+      case ExprGt(a, b, _)                           => Vector(a, b)
+      case ExprAdd(a, b, _)                          => Vector(a, b)
+      case ExprSub(a, b, _)                          => Vector(a, b)
+      case ExprMod(a, b, _)                          => Vector(a, b)
+      case ExprMul(a, b, _)                          => Vector(a, b)
+      case ExprDivide(a, b, _)                       => Vector(a, b)
+      case ExprAt(array, index, _)                   => Vector(array, index)
+      case ExprIfThenElse(cond, tBranch, fBranch, _) => Vector(cond, tBranch, fBranch)
+      case ExprApply(_, elements, _)                 => elements
+      case ExprGetName(e, _, _)                      => Vector(e)
+      case ExprIdentifier(id, _) =>
+        visitIdentifier(id, ctx)
+        Vector.empty
+      case _ => Vector.empty
+    }
+    exprs.foreach { e =>
+      traverseExpression(createContext[Expr, Expr](e, ctx))
+    }
   }
 
   override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {

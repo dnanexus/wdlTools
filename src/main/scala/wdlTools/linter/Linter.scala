@@ -39,6 +39,8 @@ case class Linter(opts: Options,
 
   def apply(url: URL): Unit = {
     val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
+    // TODO: Catch SyntaxExceptions and TypeExceptions and convert them to LintEvents
+    // TODO: Ignore events generated from TypeExceptions that dupilicate events added by AST Rules
     parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (url, doc, _) =>
       val astRules = rules.view.filterKeys(AstRules.allRules.contains)
       val tstRules = rules.view.filterKeys(TstRules.allRules.contains)
@@ -63,15 +65,17 @@ case class Linter(opts: Options,
           astWalker.apply(doc)
         }
         if (tstRules.nonEmpty) {
-          // Run TypeINfer to infer the types of all expressions
-          val (typedDoc, ctx) = TypeInfer(opts).apply(doc)
+          // Run TypeInfer to infer the types of all expressions
+          // We call the private applyDoc() method rather than the
+          // public apply() method because we need the Context
+          val (typedDoc, ctx) = TypeInfer(opts).applyDoc(doc)
           val visitors = tstRules.map {
             case (id, severity) =>
               TstRules.allRules(id)(
                   id,
                   severity,
                   doc.version.value,
-                  ctx.stdlib,
+                  ctx,
                   events(url),
                   Some(url)
               )

@@ -51,6 +51,13 @@ class TypedSyntaxTreeVisitor {
 
 object TypedSyntaxTreeVisitor {
   class VisitorContext[T <: Element](val element: T, val parent: Option[VisitorContext[_]] = None) {
+
+    /**
+      * Get the immediate parent of this context, or throw an exception if this context
+      * doesn't have a parent
+      * @tparam P parent element type
+      * @return
+      */
     def getParent[P <: Element]: VisitorContext[P] = {
       if (parent.isDefined) {
         parent.get.asInstanceOf[VisitorContext[P]]
@@ -59,7 +66,11 @@ object TypedSyntaxTreeVisitor {
       }
     }
 
-    def getParentExecutable: Option[Element] = {
+    /**
+      * Finds the first ancestor of this context that is an executable type
+      * (task or workflow).
+      */
+    def findAncestorExecutable: Option[Element] = {
       @tailrec
       def getExecutable(ctx: VisitorContext[_]): Option[Element] = {
         ctx.element match {
@@ -72,7 +83,13 @@ object TypedSyntaxTreeVisitor {
       getExecutable(this)
     }
 
-    def findParent[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
+    /**
+      * Finds the first ancestor of this context of the specified type.
+      * @param tag class tag for P
+      * @tparam P ancestor element type to find
+      * @return
+      */
+    def findAncestor[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
       if (parent.isDefined) {
         @tailrec
         def find(ctx: VisitorContext[_]): Option[VisitorContext[P]] = {
@@ -222,6 +239,10 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   override def visitTask(ctx: VisitorContext[Task]): Unit = {
     if (ctx.element.input.isDefined) {
       visitInputSection(createVisitorContext[InputSection, Task](ctx.element.input.get, ctx))
+    }
+
+    ctx.element.declarations.foreach { decl =>
+      visitDeclaration(createVisitorContext[Declaration, Task](decl, ctx))
     }
 
     visitCommandSection(createVisitorContext[CommandSection, Task](ctx.element.command, ctx))

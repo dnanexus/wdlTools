@@ -8,7 +8,7 @@ import wdlTools.util.Options
 import wdlTools.syntax.{TextSource, WdlVersion}
 
 case class Stdlib(conf: Options, version: WdlVersion) {
-  private val unify = Unification(conf)
+  private[wdltools] val unify = Unification(conf)
 
   private val draft2Prototypes: Vector[T_StdlibFunc] = Vector(
       T_Function0("stdout", T_File),

@@ -84,6 +84,14 @@ object Util {
     resolved
   }
 
+  def getFilename(url: String): String = {
+    getFilename(new URL(url))
+  }
+
+  def getFilename(url: URL): String = {
+    Paths.get(url.toURI).getFileName.toString
+  }
+
   /**
     * Reads the lines from a file and concatenates the lines using the system line separator.
     * @param path the path to the file
