@@ -30,12 +30,13 @@ case class TypeInfer(conf: Options) {
   private def typeEvalAdd(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
     def isPseudoString(x: WdlType): Boolean = {
       x match {
-        case T_String                => true
-        case T_Optional(T_String)    => true
-        case T_File                  => true
-        case T_Directory             => true
-        case T_Optional(T_File)      => true
-        case T_Optional(T_Directory) => true
+        case T_String             => true
+        case T_Optional(T_String) => true
+        case T_File               => true
+        case T_Optional(T_File)   => true
+        // Directory to String coercion is disallowed by the spec
+        case T_Directory             => false
+        case T_Optional(T_Directory) => false
         case _                       => false
       }
     }
@@ -701,20 +702,28 @@ case class TypeInfer(conf: Options) {
     }
   }
 
-  private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
-    kvs.map {
+  private def applyMeta(metaSection: AST.MetaSection, ctx: Context): TAT.MetaSection = {
+    TAT.MetaSection(metaSection.kvs.map {
       case AST.MetaKV(k, v, _) =>
         k -> metaValueFromExpr(v, ctx)
-    }.toMap
-  }
-
-  private def applyMeta(metaSection: AST.MetaSection, ctx: Context): TAT.MetaSection = {
-    TAT.MetaSection(applyMetaKVs(metaSection.kvs, ctx), metaSection.text)
+    }.toMap, metaSection.text)
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
                              ctx: Context): TAT.ParameterMetaSection = {
-    TAT.ParameterMetaSection(applyMetaKVs(paramMetaSection.kvs, ctx), paramMetaSection.text)
+    TAT.ParameterMetaSection(
+        paramMetaSection.kvs.map { kv: AST.MetaKV =>
+          if (!ctx.inputs.contains(kv.id) && !ctx.outputs.contains(kv.id)) {
+            throw new TypeException(
+                s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
+                kv.text,
+                ctx.docSourceUrl
+            )
+          }
+          kv.id -> metaValueFromExpr(kv.expr, ctx)
+        }.toMap,
+        paramMetaSection.text
+    )
   }
 
   // TASK
@@ -725,9 +734,6 @@ case class TypeInfer(conf: Options) {
   //
   // We can't check the validity of the command section.
   private def applyTask(task: AST.Task, ctxOuter: Context): TAT.Task = {
-    val tMeta = task.meta.map(applyMeta(_, ctxOuter))
-    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOuter))
-
     val (tInputSection, ctx) = task.input match {
       case None =>
         (None, ctxOuter)
@@ -767,8 +773,17 @@ case class TypeInfer(conf: Options) {
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.text)
 
-    // check the output section. We don't need the returned context.
-    val tOutputSection = task.output.map(applyOutputSection(_, ctxDecl))
+    val (tOutputSection, ctxOutput) = task.output match {
+      case None =>
+        (None, ctxDecl)
+      case Some(outSection) =>
+        val tOutSection = applyOutputSection(outSection, ctxDecl)
+        val ctx = ctxDecl.bindOutputSection(tOutSection)
+        (Some(tOutSection), ctx)
+    }
+
+    val tMeta = task.meta.map(applyMeta(_, ctxOutput))
+    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the task
     val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
@@ -881,10 +896,21 @@ case class TypeInfer(conf: Options) {
     }
 
     val afters = call.afters.map { after =>
-      // TODO: are forward references legal? If so, we need some way to defer creating the afters
-      //  until all the calls have been evaluated
-      // TODO: need to add calls to the context so we can pull them out here
-      T_Call(after.name, null)
+      ctx.declarations.get(after.name) match {
+        case Some(c: T_Call) => c
+        case Some(_) =>
+          throw new TypeException(
+              s"call ${actualName} after clause refers non-call declaration ${after.name}",
+              after.text,
+              ctx.docSourceUrl
+          )
+        case None =>
+          throw new TypeException(
+              s"call ${actualName} after clause refers to non-existant call ${after.name}",
+              after.text,
+              ctx.docSourceUrl
+          )
+      }
     }
 
     TAT.Call(
@@ -1013,9 +1039,6 @@ case class TypeInfer(conf: Options) {
   }
 
   private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
-    val tMeta = wf.meta.map(applyMeta(_, ctxOuter))
-    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOuter))
-
     val (tInputSection, ctx) = wf.input match {
       case None =>
         (None, ctxOuter)
@@ -1028,8 +1051,17 @@ case class TypeInfer(conf: Options) {
     val (bindings, wfElements) = applyWorkflowElements(ctx, wf.body)
     val ctxBody = ctx.bindVarList(bindings, wf.text)
 
-    // check the output section. We don't need the returned context.
-    val tOutputSection = wf.output.map(x => applyOutputSection(x, ctxBody))
+    val (tOutputSection, ctxOutput) = wf.output match {
+      case None =>
+        (None, ctxBody)
+      case Some(outSection) =>
+        val tOutSection = applyOutputSection(outSection, ctxBody)
+        val ctx = ctxBody.bindOutputSection(tOutSection)
+        (Some(tOutSection), ctx)
+    }
+
+    val tMeta = wf.meta.map(applyMeta(_, ctxOutput))
+    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the workflow
     val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
