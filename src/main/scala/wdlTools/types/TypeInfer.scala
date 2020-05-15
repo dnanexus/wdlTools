@@ -799,25 +799,18 @@ case class TypeInfer(conf: Options) {
       case None => Map.empty
     }
 
-    val (calleeInputs, calleeOutputs) = ctx.callables.get(call.name) match {
+    val callee: T_Callable = ctx.callables.get(call.name) match {
       case None =>
         throw new TypeException(s"called task/workflow ${call.name} is not defined",
                                 call.text,
                                 ctx.docSourceUrl)
-      case Some(T_Task(_, input, output)) =>
-        (input, output)
-      case Some(T_Workflow(_, input, output)) =>
-        (input, output)
-      case _ =>
-        throw new TypeException(s"callee ${call.name} is not a task or workflow",
-                                call.text,
-                                ctx.docSourceUrl)
+      case Some(x: T_Callable) => x
     }
 
     // type-check input arguments
     callerInputs.foreach {
       case (argName, tExpr) =>
-        calleeInputs.get(argName) match {
+        callee.input.get(argName) match {
           case None =>
             throw new TypeException(
                 s"call ${call} has argument ${argName} that does not exist in the callee",
@@ -843,7 +836,7 @@ case class TypeInfer(conf: Options) {
     }
 
     // check that all the compulsory arguments are provided
-    calleeInputs.foreach {
+    callee.input.foreach {
       case (argName, (_, false)) =>
         callerInputs.get(argName) match {
           case None =>
@@ -883,12 +876,15 @@ case class TypeInfer(conf: Options) {
       case None                         => None
       case Some(AST.CallAlias(name, _)) => Some(name)
     }
-    TAT.Call(fullyQualifiedName = call.name,
-             wdlType = T_Call(actualName, calleeOutputs),
-             alias = alias,
-             actualName = actualName,
-             inputs = callerInputs,
-             text = call.text)
+    TAT.Call(
+        fullyQualifiedName = call.name,
+        wdlType = T_Call(actualName, callee.output),
+        callee = callee,
+        alias = alias,
+        actualName = actualName,
+        inputs = callerInputs,
+        text = call.text
+    )
   }
 
   // Add types to a block of workflow-elements:
