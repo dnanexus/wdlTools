@@ -230,12 +230,10 @@ case class TypeInfer(conf: Options) {
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
       case AST.ExprIdentifier(id, text) =>
-        val binding = ctx.lookup(id, bindings, text)
-        binding match {
+        ctx.lookup(id, bindings, text) match {
           case None =>
             throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceUrl)
           case Some(t) =>
-            // TODO: can we get the actual binding value here, rather than just the type?
             TAT.ExprIdentifier(id, t, text)
         }
 
