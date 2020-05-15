@@ -15,7 +15,7 @@ case class Context(version: WdlVersion,
                    docSourceUrl: Option[URL] = None,
                    inputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
-                   structs: Map[String, T_Struct] = Map.empty,
+                   aliases: Map[String, T_Struct] = Map.empty,
                    callables: Map[String, T_Callable] = Map.empty,
                    namespaces: Set[String] = Set.empty) {
   type WdlType = WdlTypes.T
@@ -58,14 +58,18 @@ case class Context(version: WdlVersion,
   }
 
   def bindStruct(s: T_Struct, srcText: TextSource): Context = {
-    structs.get(s.name) match {
+    aliases.get(s.name) match {
       case None =>
-        this.copy(structs = structs + (s.name -> s))
+        this.copy(aliases = aliases + (s.name -> s))
       case Some(existingStruct: T_Struct) =>
         if (s != existingStruct)
           throw new TypeException(s"struct ${s.name} is already declared", srcText, docSourceUrl)
         // The struct is defined a second time, with the exact same definition. Ignore.
         this
+      case Some(other) =>
+        throw new TypeException(s"struct ${s.name} overrides an existing alias",
+                                srcText,
+                                docSourceUrl)
     }
   }
 
@@ -129,27 +133,29 @@ case class Context(version: WdlVersion,
     //     alias Child as Child2
     //     alias GrandChild as GrandChild2
     //
-    val aliasesMap: Map[String, String] = aliases.map {
+    val iAliasesTranslations: Map[String, String] = aliases.map {
       case AST.ImportAlias(src, dest, _) => src -> dest
     }.toMap
-    val iStructs = iCtx.structs.map {
-      case (name, iStruct) =>
-        aliasesMap.get(name) match {
+    val iAliases = iCtx.aliases.map {
+      case (name, iStruct: T_Struct) =>
+        iAliasesTranslations.get(name) match {
           case None          => name -> iStruct
           case Some(altName) => altName -> T_Struct(altName, iStruct.members)
         }
-    }
+      case (name, other) =>
+        throw new Exception(s"Expecting a struct but got ${other}")
+    }.toMap
 
     // check that the imported structs do not step over existing definitions
-    val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet
-    for (sname <- doublyDefinedStructs) {
-      if (this.structs(sname) != iStructs(sname))
-        throw new TypeException(s"Struct ${sname} is already defined in a different way",
+    val doublyDefined = this.aliases.keys.toSet intersect iAliases.keys.toSet
+    for (sname <- doublyDefined) {
+      if (this.aliases(sname) != iAliases(sname))
+        throw new TypeException(s"Type ${sname} is already defined in a different way",
                                 srcText,
                                 iCtx.docSourceUrl)
     }
 
-    this.copy(structs = structs ++ iStructs,
+    this.copy(aliases = this.aliases ++ iAliases,
               callables = callables ++ iCallables,
               namespaces = namespaces + namespace)
   }

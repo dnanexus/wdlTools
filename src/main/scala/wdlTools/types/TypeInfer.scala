@@ -168,7 +168,7 @@ case class TypeInfer(conf: Options) {
       // String name = p.name
       case T_Identifier(structName) =>
         // produce the struct definition
-        val members = ctx.structs.get(structName) match {
+        val members = ctx.aliases.get(structName) match {
           case None =>
             throw new TypeException(s"unknown struct ${structName}", expr.text, ctx.docSourceUrl)
           case Some(T_Struct(_, members)) => members
@@ -505,7 +505,7 @@ case class TypeInfer(conf: Options) {
       case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, text, ctx), typeFromAst(v, text, ctx))
       case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, text, ctx), typeFromAst(r, text, ctx))
       case AST.TypeIdentifier(id, _) =>
-        ctx.structs.get(id) match {
+        ctx.aliases.get(id) match {
           case None =>
             throw new TypeException(s"struct ${id} has not been defined", text, ctx.docSourceUrl)
           case Some(struct) => struct
