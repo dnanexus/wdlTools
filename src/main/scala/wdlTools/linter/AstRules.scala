@@ -81,6 +81,9 @@ object AstRules {
   }
 
   // rules ported from miniwdl
+  // rules not ported:
+  // * ForwardReference: this is a TypeException
+  // * IncompleteCall: this is a TypeException
 
   /**
     * Collisions between names that are allowed but confusing.
@@ -157,23 +160,6 @@ object AstRules {
     }
   }
 
-  /**
-    * Identifier preceeding the declaration/call that it references.
-    */
-  case class ForwardReferenceRule(conf: RuleConf,
-                                  version: WdlVersion,
-                                  events: mutable.Buffer[LintEvent],
-                                  docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
-    override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
-      ctx.element match {
-        case ExprIdentifier(id, text) => ()
-        // TODO: waiting for referee in ExprIdentifier
-        case _ => traverseExpression(ctx)
-      }
-    }
-  }
-
   case class UnnecessaryQuantifierRule(conf: RuleConf,
                                        version: WdlVersion,
                                        events: mutable.Buffer[LintEvent],
@@ -242,11 +228,10 @@ object AstRules {
       "A003" -> NoTaskOutputsRule.apply,
       "A004" -> NameCollisionRule.apply,
       "A005" -> UnusedImportRule.apply,
-      "A006" -> ForwardReferenceRule.apply,
-      "A007" -> UnnecessaryQuantifierRule.apply,
-      "A008" -> ShellCheckRule.apply,
-      "A009" -> SelectArrayRule.apply,
-      "A010" -> UnknownRuntimeKeyRule.apply,
-      "A011" -> MissingVersionRule.apply
+      "A006" -> UnnecessaryQuantifierRule.apply,
+      "A007" -> ShellCheckRule.apply,
+      "A008" -> SelectArrayRule.apply,
+      "A009" -> UnknownRuntimeKeyRule.apply,
+      "A010" -> MissingVersionRule.apply
   )
 }

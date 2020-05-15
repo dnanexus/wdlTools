@@ -385,26 +385,6 @@ object TstRules {
   }
 
   /**
-    * Call without all required inputs.
-    */
-  case class IncompleteCallRule(conf: RuleConf,
-                                version: WdlVersion,
-                                unification: Unification,
-                                events: mutable.Buffer[LintEvent],
-                                docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
-    override def visitCall(ctx: VisitorContext[Call]): Unit = {
-      val missingRequiredInputs = ctx.element.callee.input
-        .filter(x => !x._2._2)
-        .view
-        .filterKeys(key => !ctx.element.inputs.contains(key))
-      if (missingRequiredInputs.nonEmpty) {
-        addEvent(ctx.element, Some(missingRequiredInputs.keys.mkString(",")))
-      }
-    }
-  }
-
-  /**
     * Flag unused non-output declarations
     * heuristic exceptions:
     * 1. File whose name suggests it's an hts index file; as these commonly need to
@@ -452,8 +432,7 @@ object TstRules {
       "T003" -> ArrayCoercionRule.apply,
       "T004" -> OptionalCoercionRule.apply,
       "T005" -> NonEmptyCoercionRule.apply,
-      "T006" -> IncompleteCallRule.apply,
-      "T007" -> UnusedDeclarationRule.apply,
-      "T008" -> UnusedCallRule.apply
+      "T006" -> UnusedDeclarationRule.apply,
+      "T007" -> UnusedCallRule.apply
   )
 }
