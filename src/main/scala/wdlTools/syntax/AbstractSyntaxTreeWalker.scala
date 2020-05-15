@@ -28,7 +28,7 @@ class AbstractSyntaxTreeVisitor {
     * `name` is the actual import name - either the alias or the name of the WDL file
     * without the '.wdl' extension
     */
-  def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {}
+  def visitImportName(name: String, parent: VisitorContext[ImportDoc]): Unit = {}
 
   def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {}
 
@@ -91,7 +91,7 @@ class AbstractSyntaxTreeVisitor {
 
   def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {}
 
-  def visitCallName(name: String, alias: Option[String], ctx: VisitorContext[Call]): Unit = {}
+  def visitCallName(name: String, alias: Option[String], parent: VisitorContext[Call]): Unit = {}
 
   def visitCallInput(ctx: VisitorContext[CallInput]): Unit = {}
 
@@ -101,7 +101,7 @@ class AbstractSyntaxTreeVisitor {
 
   def visitConditional(ctx: VisitorContext[Conditional]): Unit = {}
 
-  def visitBody[P <: Element](body: Vector[WorkflowElement], ctx: VisitorContext[P]): Unit = {}
+  def visitBody[P <: Element](body: Vector[WorkflowElement], parent: VisitorContext[P]): Unit = {}
 
   def visitMetaKV(ctx: VisitorContext[MetaKV]): Unit = {}
 
@@ -206,8 +206,8 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
     }
   }
 
-  override def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {
-    visitName[ImportDoc](name, ctx)
+  override def visitImportName(name: String, parent: VisitorContext[ImportDoc]): Unit = {
+    visitName[ImportDoc](name, parent)
   }
 
   override def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {
@@ -262,8 +262,8 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
 
   override def visitCallName(name: String,
                              alias: Option[String],
-                             ctx: VisitorContext[Call]): Unit = {
-    visitName[Call](alias.getOrElse(name), ctx)
+                             parent: VisitorContext[Call]): Unit = {
+    visitName[Call](alias.getOrElse(name), parent)
   }
 
   override def visitCallInput(ctx: VisitorContext[CallInput]): Unit = {
@@ -291,13 +291,13 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
   }
 
   override def visitBody[P <: Element](body: Vector[WorkflowElement],
-                                       ctx: VisitorContext[P]): Unit = {
+                                       parent: VisitorContext[P]): Unit = {
     body.foreach {
-      case decl: Declaration => visitDeclaration(ctx.createChildContext[Declaration](decl))
-      case call: Call        => visitCall(ctx.createChildContext[Call](call))
-      case scatter: Scatter  => visitScatter(ctx.createChildContext[Scatter](scatter))
+      case decl: Declaration => visitDeclaration(parent.createChildContext[Declaration](decl))
+      case call: Call        => visitCall(parent.createChildContext[Call](call))
+      case scatter: Scatter  => visitScatter(parent.createChildContext[Scatter](scatter))
       case conditional: Conditional =>
-        visitConditional(ctx.createChildContext[Conditional](conditional))
+        visitConditional(parent.createChildContext[Conditional](conditional))
       case other => throw new Exception(s"Unexpected workflow element ${other}")
     }
   }

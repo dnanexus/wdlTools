@@ -185,12 +185,28 @@ object AstRules {
     }
   }
 
+  /**
+    * Flag unused non-output declarations
+    * heuristic exceptions:
+    * 1. File whose name suggests it's an hts index file; as these commonly need to
+    *    be localized, but not explicitly used in task command
+    * 2. dxWDL "native" task stubs, which declare inputs but leave command empty.
+    * TODO: enable configuration of heurisitics - rather than disable the rule, the
+    *  user can specify patterns to ignore
+    */
   case class UnusedDeclarationRule(id: String,
                                    severity: Severity,
                                    version: WdlVersion,
                                    events: mutable.Buffer[LintEvent],
                                    docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {}
+      extends LinterAstRule(id, severity, docSourceUrl, events) {
+    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+      if (ctx.findAncestor[OutputSection].isEmpty) {
+        // declaration is not in an OutputSection
+
+      }
+    }
+  }
 
   case class UnusedCallRule(id: String,
                             severity: Severity,

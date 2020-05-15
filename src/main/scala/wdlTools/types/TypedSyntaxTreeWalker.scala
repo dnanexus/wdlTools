@@ -26,7 +26,11 @@ class TypedSyntaxTreeVisitor {
 
   def visitVersion(ctx: VisitorContext[Version]): Unit = {}
 
-  def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {}
+  /**
+    * `name` is the actual import name - either the alias or the name of the WDL file
+    * without the '.wdl' extension
+    */
+  def visitImportName(name: String, parent: VisitorContext[ImportDoc]): Unit = {}
 
   def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {}
 
@@ -34,7 +38,7 @@ class TypedSyntaxTreeVisitor {
 
   def visitStructMember(name: String,
                         wdlType: WdlType,
-                        ctx: VisitorContext[StructDefinition]): Unit = {}
+                        parent: VisitorContext[StructDefinition]): Unit = {}
 
   def visitStruct(ctx: VisitorContext[StructDefinition]): Unit = {}
 
@@ -90,7 +94,7 @@ class TypedSyntaxTreeVisitor {
   def visitCallName(actualName: String,
                     fullyQualifiedName: String,
                     alias: Option[String],
-                    ctx: VisitorContext[Call]): Unit = {}
+                    parent: VisitorContext[Call]): Unit = {}
 
   def visitCall(ctx: VisitorContext[Call]): Unit = {}
 
@@ -98,17 +102,17 @@ class TypedSyntaxTreeVisitor {
 
   def visitConditional(ctx: VisitorContext[Conditional]): Unit = {}
 
-  def visitBody[P <: Element](body: Vector[WorkflowElement], ctx: VisitorContext[P]): Unit = {}
+  def visitBody[P <: Element](body: Vector[WorkflowElement], parent: VisitorContext[P]): Unit = {}
 
   def visitMetaValue(ctx: VisitorContext[MetaValue]): Unit = {}
 
-  def visitMetaKV(key: String, value: MetaValue, ctx: VisitorContext[MetaSection]): Unit = {}
+  def visitMetaKV(key: String, value: MetaValue, parent: VisitorContext[MetaSection]): Unit = {}
 
   def visitMetaSection(ctx: VisitorContext[MetaSection]): Unit = {}
 
   def visitParameterMetaKV(key: String,
                            value: MetaValue,
-                           ctx: VisitorContext[ParameterMetaSection]): Unit = {}
+                           parent: VisitorContext[ParameterMetaSection]): Unit = {}
 
   def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {}
 
@@ -116,11 +120,11 @@ class TypedSyntaxTreeVisitor {
 
   def visitCommandSection(ctx: VisitorContext[CommandSection]): Unit = {}
 
-  def visitRuntimeKV(key: String, value: Expr, ctx: VisitorContext[RuntimeSection]): Unit = {}
+  def visitRuntimeKV(key: String, value: Expr, parent: VisitorContext[RuntimeSection]): Unit = {}
 
   def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {}
 
-  def visitHintsKV(key: String, value: Expr, ctx: VisitorContext[HintsSection]): Unit = {}
+  def visitHintsKV(key: String, value: Expr, parent: VisitorContext[HintsSection]): Unit = {}
 
   def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {}
 
@@ -209,8 +213,8 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
     }
   }
 
-  override def visitImportName(name: String, ctx: VisitorContext[ImportDoc]): Unit = {
-    visitName[ImportDoc](name, ctx)
+  override def visitImportName(name: String, parent: VisitorContext[ImportDoc]): Unit = {
+    visitName[ImportDoc](name, parent)
   }
 
   override def visitImportAlias(ctx: VisitorContext[ImportAlias]): Unit = {
@@ -260,8 +264,8 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   override def visitCallName(actualName: String,
                              fullyQualifiedName: String,
                              alias: Option[String],
-                             ctx: VisitorContext[Call]): Unit = {
-    visitName[Call](alias.getOrElse(actualName), ctx)
+                             parent: VisitorContext[Call]): Unit = {
+    visitName[Call](alias.getOrElse(actualName), parent)
   }
 
   override def visitCall(ctx: VisitorContext[Call]): Unit = {
@@ -283,22 +287,22 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   }
 
   override def visitBody[P <: Element](body: Vector[WorkflowElement],
-                                       ctx: VisitorContext[P]): Unit = {
+                                       parent: VisitorContext[P]): Unit = {
     body.foreach {
-      case decl: Declaration => visitDeclaration(ctx.createChildContext[Declaration](decl))
-      case call: Call        => visitCall(ctx.createChildContext[Call](call))
-      case scatter: Scatter  => visitScatter(ctx.createChildContext[Scatter](scatter))
+      case decl: Declaration => visitDeclaration(parent.createChildContext[Declaration](decl))
+      case call: Call        => visitCall(parent.createChildContext[Call](call))
+      case scatter: Scatter  => visitScatter(parent.createChildContext[Scatter](scatter))
       case conditional: Conditional =>
-        visitConditional(ctx.createChildContext[Conditional](conditional))
+        visitConditional(parent.createChildContext[Conditional](conditional))
       case other => throw new Exception(s"Unexpected workflow element ${other}")
     }
   }
 
   override def visitMetaKV(key: String,
                            value: MetaValue,
-                           ctx: VisitorContext[MetaSection]): Unit = {
-    visitKey(key, ctx)
-    visitMetaValue(ctx.createChildContext[MetaValue](value))
+                           parent: VisitorContext[MetaSection]): Unit = {
+    visitKey(key, parent)
+    visitMetaValue(parent.createChildContext[MetaValue](value))
   }
 
   override def visitMetaSection(ctx: VisitorContext[MetaSection]): Unit = {
@@ -309,9 +313,9 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
 
   override def visitParameterMetaKV(key: String,
                                     value: MetaValue,
-                                    ctx: VisitorContext[ParameterMetaSection]): Unit = {
-    visitKey(key, ctx)
-    visitMetaValue(ctx.createChildContext[MetaValue](value))
+                                    parent: VisitorContext[ParameterMetaSection]): Unit = {
+    visitKey(key, parent)
+    visitMetaValue(parent.createChildContext[MetaValue](value))
   }
 
   override def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {
@@ -352,9 +356,9 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
 
   override def visitRuntimeKV(key: String,
                               value: Expr,
-                              ctx: VisitorContext[RuntimeSection]): Unit = {
-    visitName(key, ctx)
-    visitExpression(ctx.createChildContext[Expr](value))
+                              parent: VisitorContext[RuntimeSection]): Unit = {
+    visitName(key, parent)
+    visitExpression(parent.createChildContext[Expr](value))
   }
 
   override def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {
@@ -363,9 +367,11 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
     }
   }
 
-  override def visitHintsKV(key: String, value: Expr, ctx: VisitorContext[HintsSection]): Unit = {
-    visitName(key, ctx)
-    visitExpression(ctx.createChildContext[Expr](value))
+  override def visitHintsKV(key: String,
+                            value: Expr,
+                            parent: VisitorContext[HintsSection]): Unit = {
+    visitName(key, parent)
+    visitExpression(parent.createChildContext[Expr](value))
   }
 
   override def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {
