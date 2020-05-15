@@ -185,6 +185,7 @@ object TypedAbstractSyntax {
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
                   alias: Option[String],
+                  afters: Vector[Call],
                   actualName: String,
                   inputs: Map[String, Expr],
                   text: TextSource)
