@@ -30,11 +30,13 @@ case class TypeInfer(conf: Options) {
   private def typeEvalAdd(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
     def isPseudoString(x: WdlType): Boolean = {
       x match {
-        case T_String             => true
-        case T_Optional(T_String) => true
-        case T_File               => true
-        case T_Optional(T_File)   => true
-        case _                    => false
+        case T_String                => true
+        case T_Optional(T_String)    => true
+        case T_File                  => true
+        case T_Directory             => true
+        case T_Optional(T_File)      => true
+        case T_Optional(T_Directory) => true
+        case _                       => false
       }
     }
     val t = (a.wdlType, b.wdlType) match {
@@ -56,8 +58,9 @@ case class TypeInfer(conf: Options) {
       case (T_String, T_Optional(T_Int)) if regime == Lenient   => T_String
       case (T_String, T_Optional(T_Float)) if regime == Lenient => T_String
 
-      // adding files is equivalent to concatenating paths
-      case (T_File, T_String | T_File) => T_File
+      // adding files/directories is equivalent to concatenating paths
+      case (T_File, T_String | T_File)           => T_File
+      case (T_Directory, T_String | T_Directory) => T_Directory
 
       case (_, _) =>
         throw new TypeException(
@@ -227,10 +230,12 @@ case class TypeInfer(conf: Options) {
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
       case AST.ExprIdentifier(id, text) =>
-        ctx.lookup(id, bindings, text) match {
+        val binding = ctx.lookup(id, bindings, text)
+        binding match {
           case None =>
             throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceUrl)
           case Some(t) =>
+            // TODO: can we get the actual binding value here, rather than just the type?
             TAT.ExprIdentifier(id, t, text)
         }
 
@@ -286,9 +291,8 @@ case class TypeInfer(conf: Options) {
 
       case AST.ExprMap(value, text) =>
         // figure out the types from the first element
-        val m: Map[TAT.Expr, TAT.Expr] = value.map {
-          case item: AST.ExprMapItem =>
-            applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
+        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
+          applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
@@ -602,7 +606,7 @@ case class TypeInfer(conf: Options) {
                               ctx.docSourceUrl)
 
     // translate the declarations
-    val (tDecls, bindings) =
+    val (tDecls, _) =
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
@@ -624,15 +628,15 @@ case class TypeInfer(conf: Options) {
       case None => Map.empty
       case Some(TAT.InputSection(decls, _)) =>
         decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), text) =>
+          case TAT.Declaration(name, wdlType, Some(_), _) =>
             // input has a default value, caller may omit it.
             name -> (wdlType, true)
 
-          case TAT.Declaration(name, T_Optional(t), None, text) =>
+          case TAT.Declaration(name, T_Optional(t), None, _) =>
             // input is optional, caller can omit it.
             name -> (T_Optional(t), true)
 
-          case TAT.Declaration(name, t, None, text) =>
+          case TAT.Declaration(name, t, None, _) =>
             // input is compulsory
             name -> (t, false)
         }.toMap
@@ -654,6 +658,14 @@ case class TypeInfer(conf: Options) {
         name -> applyExpr(expr, Map.empty, ctx)
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
+  }
+
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
+    val m = hintsSection.kvs.map {
+      case AST.HintsKV(name, expr, _) =>
+        name -> applyExpr(expr, Map.empty, ctx)
+    }.toMap
+    TAT.HintsSection(m, hintsSection.text)
   }
 
   // convert the generic expression syntax into a specialized JSON object
@@ -693,7 +705,7 @@ case class TypeInfer(conf: Options) {
 
   private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
     kvs.map {
-      case AST.MetaKV(k, v, text) =>
+      case AST.MetaKV(k, v, _) =>
         k -> metaValueFromExpr(v, ctx)
     }.toMap
   }
@@ -736,6 +748,7 @@ case class TypeInfer(conf: Options) {
       }
     val ctxDecl = ctx.bindVarList(bindings, task.text)
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
+    val tHints = task.hints.map(applyHints(_, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section
@@ -772,6 +785,7 @@ case class TypeInfer(conf: Options) {
         meta = tMeta,
         parameterMeta = tParamMeta,
         runtime = tRuntime,
+        hints = tHints,
         text = task.text
     )
   }
@@ -867,11 +881,20 @@ case class TypeInfer(conf: Options) {
       case None                         => None
       case Some(AST.CallAlias(name, _)) => Some(name)
     }
+
+    val afters = call.afters.map { after =>
+      // TODO: are forward references legal? If so, we need some way to defer creating the afters
+      //  until all the calls have been evaluated
+      // TODO: need to add calls to the context so we can pull them out here
+      T_Call(after.name, null)
+    }
+
     TAT.Call(
         fullyQualifiedName = call.name,
         wdlType = T_Call(actualName, callee.output),
         callee = callee,
         alias = alias,
+        afters = afters,
         actualName = actualName,
         inputs = callerInputs,
         text = call.text
@@ -1061,7 +1084,8 @@ case class TypeInfer(conf: Options) {
           }
 
           val aliases = iStat.aliases.map {
-            case AST.ImportAlias(id1, id2, text) => TAT.ImportAlias(id1, id2, text)
+            case AST.ImportAlias(id1, id2, text) =>
+              TAT.ImportAlias(id1, id2, ctx.structs(id1), text)
           }
           val importDoc =
             TAT.ImportDoc(iStat.name.map(_.value), aliases, iStat.addr.value, iDoc, iStat.text)
