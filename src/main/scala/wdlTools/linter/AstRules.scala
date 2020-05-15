@@ -30,7 +30,7 @@ object AstRules {
   ) => LinterAstRule
 
   // rules ported from winstanley
-  // rules not ported:
+  // did not port:
   // * missing command section - a command section is required, so the parser throws a SyntaxException if
   //   it doesn't find one
   // * value/callable lookup - these are caught by the type-checker
@@ -91,20 +91,6 @@ object AstRules {
   // rules ported from miniwdl
 
   /**
-    * Call without all required inputs.
-    */
-  case class IncompleteCallRule(id: String,
-                                severity: Severity,
-                                version: WdlVersion,
-                                events: mutable.Buffer[LintEvent],
-                                docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
-    override def visitCall(ctx: VisitorContext[Call]): Unit = {
-      // TODO: can't implement this until callee inputs are provided by Call
-    }
-  }
-
-  /**
     * Collisions between names that are allowed but confusing.
     */
   case class NameCollisionRule(id: String,
@@ -114,45 +100,13 @@ object AstRules {
                                docSourceUrl: Option[URL])
       extends LinterAstRule(id, severity, docSourceUrl, events) {
 
-    // TODO: Can we do this with visitIdentifier instead?
-
     private val elements: mutable.Map[String, mutable.Set[Element]] = mutable.HashMap.empty
 
-    private def addElement(name: String, element: Element): Unit = {
+    override def visitName[P <: Element](name: String, parent: VisitorContext[P]): Unit = {
       if (!elements.contains(name)) {
         elements(name) = mutable.HashSet.empty[Element]
       }
-      elements(name).add(element)
-    }
-
-    override def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {
-      val name = ctx.element.name.map(_.value).getOrElse(getFilename(ctx.element.addr.value))
-      addElement(name, ctx.element)
-      ctx.element.aliases.foreach(a => addElement(a.id2, a))
-    }
-
-    override def visitStruct(ctx: VisitorContext[TypeStruct]): Unit = {
-      addElement(ctx.element.name, ctx.element)
-    }
-
-    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-      addElement(ctx.element.name, ctx.element)
-    }
-
-    override def visitCall(ctx: VisitorContext[Call]): Unit = {
-      addElement(ctx.element.alias.map(_.name).getOrElse(ctx.element.name), ctx.element)
-    }
-
-    override def visitScatter(ctx: VisitorContext[Scatter]): Unit = {
-      addElement(ctx.element.identifier, ctx.element)
-    }
-
-    override def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {
-      addElement(ctx.element.name, ctx.element)
-    }
-
-    override def visitTask(ctx: VisitorContext[Task]): Unit = {
-      addElement(ctx.element.name, ctx.element)
+      elements(name).add(parent.element)
     }
 
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
@@ -222,7 +176,13 @@ object AstRules {
                                   events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
       extends LinterAstRule(id, severity, docSourceUrl, events) {
-    override def visitExpression(ctx: VisitorContext[Expr]): Unit = {}
+    override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
+      ctx.element match {
+        case ExprIdentifier(id, text) => ()
+        // TODO: waiting for referee in ExprIdentifier
+        case _ => traverseExpression(ctx)
+      }
+    }
   }
 
   case class UnusedDeclarationRule(id: String,
@@ -309,16 +269,15 @@ object AstRules {
       "A001" -> NonPortableTaskRule.apply,
       "A002" -> NoTaskInputsRule.apply,
       "A003" -> NoTaskOutputsRule.apply,
-      "A004" -> IncompleteCallRule.apply,
-      "A005" -> NameCollisionRule.apply,
-      "A006" -> UnusedImportRule.apply,
-      "A007" -> ForwardReferenceRule.apply,
-      "A008" -> UnusedDeclarationRule.apply,
-      "A009" -> UnusedCallRule.apply,
-      "A010" -> UnnecessaryQuantifierRule.apply,
-      "A011" -> ShellCheckRule.apply,
-      "A012" -> SelectArrayRule.apply,
-      "A013" -> UnknownRuntimeKeyRule.apply,
-      "A014" -> MissingVersionRule.apply
+      "A004" -> NameCollisionRule.apply,
+      "A005" -> UnusedImportRule.apply,
+      "A006" -> ForwardReferenceRule.apply,
+      "A007" -> UnusedDeclarationRule.apply,
+      "A008" -> UnusedCallRule.apply,
+      "A009" -> UnnecessaryQuantifierRule.apply,
+      "A010" -> ShellCheckRule.apply,
+      "A011" -> SelectArrayRule.apply,
+      "A012" -> UnknownRuntimeKeyRule.apply,
+      "A013" -> MissingVersionRule.apply
   )
 }

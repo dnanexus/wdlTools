@@ -42,6 +42,49 @@ class AbstractSyntaxTreeVisitor {
 
   def visitExpression(ctx: VisitorContext[Expr]): Unit = {}
 
+  /**
+    * By default, visitExpression does not traverse compound expressions.
+    * This method can be called from an overriding visitExpression to do so.
+    */
+  def traverseExpression(ctx: VisitorContext[Expr]): Unit = {
+    val exprs: Vector[Expr] = ctx.element match {
+      case ExprCompoundString(value, _)              => value
+      case ExprPair(l, r, _)                         => Vector(l, r)
+      case ExprArray(value, _)                       => value
+      case ExprMap(value, _)                         => value
+      case ExprMapItem(key, value, _)                => Vector(key, value)
+      case ExprObject(value, _)                      => value
+      case ExprObjectMember(_, value, _)             => Vector(value)
+      case ExprPlaceholderEqual(t, f, value, _)      => Vector(t, f, value)
+      case ExprPlaceholderDefault(default, value, _) => Vector(default, value)
+      case ExprPlaceholderSep(sep, value, _)         => Vector(sep, value)
+      case ExprUniraryPlus(value, _)                 => Vector(value)
+      case ExprUniraryMinus(value, _)                => Vector(value)
+      case ExprNegate(value, _)                      => Vector(value)
+      case ExprLor(a, b, _)                          => Vector(a, b)
+      case ExprLand(a, b, _)                         => Vector(a, b)
+      case ExprEqeq(a, b, _)                         => Vector(a, b)
+      case ExprLt(a, b, _)                           => Vector(a, b)
+      case ExprGte(a, b, _)                          => Vector(a, b)
+      case ExprNeq(a, b, _)                          => Vector(a, b)
+      case ExprLte(a, b, _)                          => Vector(a, b)
+      case ExprGt(a, b, _)                           => Vector(a, b)
+      case ExprAdd(a, b, _)                          => Vector(a, b)
+      case ExprSub(a, b, _)                          => Vector(a, b)
+      case ExprMod(a, b, _)                          => Vector(a, b)
+      case ExprMul(a, b, _)                          => Vector(a, b)
+      case ExprDivide(a, b, _)                       => Vector(a, b)
+      case ExprAt(array, index, _)                   => Vector(array, index)
+      case ExprIfThenElse(cond, tBranch, fBranch, _) => Vector(cond, tBranch, fBranch)
+      case ExprApply(_, elements, _)                 => elements
+      case ExprGetName(e, _, _)                      => Vector(e)
+      case _                                         => Vector.empty
+    }
+    exprs.foreach { e =>
+      traverseExpression(ctx.createChildContext[Expr](e))
+    }
+  }
+
   def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
 
   def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {}
@@ -82,7 +125,10 @@ class AbstractSyntaxTreeVisitor {
 }
 
 object AbstractSyntaxTreeVisitor {
-  class VisitorContext[T <: Element](val element: T, val parent: Option[VisitorContext[_]] = None) {
+  case class VisitorContext[T <: Element](element: T, parent: Option[VisitorContext[_]] = None) {
+    def createChildContext[C <: Element](element: C): VisitorContext[C] = {
+      VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
+    }
 
     /**
       * Get the immediate parent of this context, or throw an exception if this context
@@ -141,22 +187,22 @@ object AbstractSyntaxTreeVisitor {
 
 class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor {
   override def visitDocument(ctx: VisitorContext[Document]): Unit = {
-    visitVersion(createVisitorContext[Version, Document](ctx.element.version, ctx))
+    visitVersion(ctx.createChildContext[Version](ctx.element.version))
 
     ctx.element.elements.collect { case imp: ImportDoc => imp }.foreach { imp =>
-      visitImportDoc(createVisitorContext[ImportDoc, Document](imp, ctx))
+      visitImportDoc(ctx.createChildContext[ImportDoc](imp))
     }
 
     ctx.element.elements.collect { case struct: TypeStruct => struct }.foreach { imp =>
-      visitStruct(createVisitorContext[TypeStruct, Document](imp, ctx))
+      visitStruct(ctx.createChildContext[TypeStruct](imp))
     }
 
     if (ctx.element.workflow.isDefined) {
-      visitWorkflow(createVisitorContext[Workflow, Document](ctx.element.workflow.get, ctx))
+      visitWorkflow(ctx.createChildContext[Workflow](ctx.element.workflow.get))
     }
 
     ctx.element.elements.collect { case task: Task => task }.foreach { task =>
-      visitTask(createVisitorContext[Task, Document](task, ctx))
+      visitTask(ctx.createChildContext[Task](task))
     }
   }
 
@@ -176,85 +222,41 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
       )
     visitImportName(name, ctx)
     ctx.element.aliases.foreach { alias =>
-      visitImportAlias(createVisitorContext[ImportAlias, ImportDoc](alias, ctx))
+      visitImportAlias(ctx.createChildContext[ImportAlias](alias))
     }
     if (opts.followImports) {
-      visitDocument(createVisitorContext[Document, ImportDoc](ctx.element.doc.get, ctx))
+      visitDocument(ctx.createChildContext[Document](ctx.element.doc.get))
     }
   }
 
   override def visitStruct(ctx: VisitorContext[TypeStruct]): Unit = {
     visitName[TypeStruct](ctx.element.name, ctx)
     ctx.element.members.foreach { member =>
-      visitStructMember(createVisitorContext[StructMember, TypeStruct](member, ctx))
+      visitStructMember(ctx.createChildContext[StructMember](member))
     }
   }
 
   override def visitStructMember(ctx: VisitorContext[StructMember]): Unit = {
-    visitDataType(createVisitorContext[Type, StructMember](ctx.element.wdlType, ctx))
-    visitName[StructMember](ctx.element.name, ctx)
-  }
-
-  /**
-    * By default, visitExpression does not traverse compound expressions.
-    * This method can be called from an overriding visitExpression to do so.
-    */
-  def traverseExpression(ctx: VisitorContext[Expr]): Unit = {
-    val exprs: Vector[Expr] = ctx.element match {
-      case ExprCompoundString(value, _)              => value
-      case ExprPair(l, r, _)                         => Vector(l, r)
-      case ExprArray(value, _)                       => value
-      case ExprMap(value, _)                         => value
-      case ExprMapItem(key, value, _)                => Vector(key, value)
-      case ExprObject(value, _)                      => value
-      case ExprObjectMember(_, value, _)             => Vector(value)
-      case ExprPlaceholderEqual(t, f, value, _)      => Vector(t, f, value)
-      case ExprPlaceholderDefault(default, value, _) => Vector(default, value)
-      case ExprPlaceholderSep(sep, value, _)         => Vector(sep, value)
-      case ExprUniraryPlus(value, _)                 => Vector(value)
-      case ExprUniraryMinus(value, _)                => Vector(value)
-      case ExprNegate(value, _)                      => Vector(value)
-      case ExprLor(a, b, _)                          => Vector(a, b)
-      case ExprLand(a, b, _)                         => Vector(a, b)
-      case ExprEqeq(a, b, _)                         => Vector(a, b)
-      case ExprLt(a, b, _)                           => Vector(a, b)
-      case ExprGte(a, b, _)                          => Vector(a, b)
-      case ExprNeq(a, b, _)                          => Vector(a, b)
-      case ExprLte(a, b, _)                          => Vector(a, b)
-      case ExprGt(a, b, _)                           => Vector(a, b)
-      case ExprAdd(a, b, _)                          => Vector(a, b)
-      case ExprSub(a, b, _)                          => Vector(a, b)
-      case ExprMod(a, b, _)                          => Vector(a, b)
-      case ExprMul(a, b, _)                          => Vector(a, b)
-      case ExprDivide(a, b, _)                       => Vector(a, b)
-      case ExprAt(array, index, _)                   => Vector(array, index)
-      case ExprIfThenElse(cond, tBranch, fBranch, _) => Vector(cond, tBranch, fBranch)
-      case ExprApply(_, elements, _)                 => elements
-      case ExprGetName(e, _, _)                      => Vector(e)
-      case _                                         => Vector.empty
-    }
-    exprs.foreach { e =>
-      traverseExpression(createVisitorContext[Expr, Expr](e, ctx))
-    }
+    visitDataType(ctx.createChildContext[Type](ctx.element.wdlType))
   }
 
   override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-    visitDataType(createVisitorContext[Type, Declaration](ctx.element.wdlType, ctx))
+    visitDataType(ctx.createChildContext[Type](ctx.element.wdlType))
     visitName[Declaration](ctx.element.name, ctx)
     if (ctx.element.expr.isDefined) {
-      visitExpression(createVisitorContext[Expr, Declaration](ctx.element.expr.get, ctx))
+      visitExpression(ctx.createChildContext[Expr](ctx.element.expr.get))
     }
   }
 
   override def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {
     ctx.element.declarations.foreach { decl =>
-      visitDeclaration(createVisitorContext[Declaration, InputSection](decl, ctx))
+      visitDeclaration(ctx.createChildContext[Declaration](decl))
     }
   }
 
   override def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {
     ctx.element.declarations.foreach { decl =>
-      visitDeclaration(createVisitorContext[Declaration, OutputSection](decl, ctx))
+      visitDeclaration(ctx.createChildContext[Declaration](decl))
     }
   }
 
@@ -265,155 +267,147 @@ class AbstractSyntaxTreeWalker(opts: Options) extends AbstractSyntaxTreeVisitor 
   }
 
   override def visitCallInput(ctx: VisitorContext[CallInput]): Unit = {
-    visitExpression(createVisitorContext[Expr, CallInput](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
   }
 
   override def visitCall(ctx: VisitorContext[Call]): Unit = {
     visitCallName(ctx.element.name, ctx.element.alias.map(_.name), ctx)
     if (ctx.element.inputs.isDefined) {
       ctx.element.inputs.get.value.foreach { inp =>
-        visitCallInput(createVisitorContext[CallInput, Call](inp, ctx))
+        visitCallInput(ctx.createChildContext[CallInput](inp))
       }
     }
   }
 
   override def visitScatter(ctx: VisitorContext[Scatter]): Unit = {
     visitName[Scatter](ctx.element.identifier, ctx)
-    visitExpression(createVisitorContext[Expr, Scatter](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
     visitBody[Scatter](ctx.element.body, ctx)
   }
 
   override def visitConditional(ctx: VisitorContext[Conditional]): Unit = {
-    visitExpression(createVisitorContext[Expr, Conditional](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
     visitBody[Conditional](ctx.element.body, ctx)
   }
 
   override def visitBody[P <: Element](body: Vector[WorkflowElement],
                                        ctx: VisitorContext[P]): Unit = {
     body.foreach {
-      case decl: Declaration => visitDeclaration(createVisitorContext[Declaration, P](decl, ctx))
-      case call: Call        => visitCall(createVisitorContext[Call, P](call, ctx))
-      case scatter: Scatter  => visitScatter(createVisitorContext[Scatter, P](scatter, ctx))
+      case decl: Declaration => visitDeclaration(ctx.createChildContext[Declaration](decl))
+      case call: Call        => visitCall(ctx.createChildContext[Call](call))
+      case scatter: Scatter  => visitScatter(ctx.createChildContext[Scatter](scatter))
       case conditional: Conditional =>
-        visitConditional(createVisitorContext[Conditional, P](conditional, ctx))
+        visitConditional(ctx.createChildContext[Conditional](conditional))
       case other => throw new Exception(s"Unexpected workflow element ${other}")
     }
   }
 
   override def visitMetaKV(ctx: VisitorContext[MetaKV]): Unit = {
     visitKey[MetaKV](ctx.element.id, ctx)
-    visitExpression(createVisitorContext[Expr, MetaKV](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
   }
 
   override def visitMetaSection(ctx: VisitorContext[MetaSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
-      visitMetaKV(createVisitorContext[MetaKV, MetaSection](kv, ctx))
+      visitMetaKV(ctx.createChildContext[MetaKV](kv))
     }
   }
 
   override def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
-      visitMetaKV(createVisitorContext[MetaKV, ParameterMetaSection](kv, ctx))
+      visitMetaKV(ctx.createChildContext[MetaKV](kv))
     }
   }
 
   override def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {
+    visitName[Workflow](ctx.element.name, ctx)
+
     if (ctx.element.input.isDefined) {
-      visitInputSection(createVisitorContext[InputSection, Workflow](ctx.element.input.get, ctx))
+      visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
     }
 
     visitBody[Workflow](ctx.element.body, ctx)
 
     if (ctx.element.output.isDefined) {
-      visitOutputSection(createVisitorContext[OutputSection, Workflow](ctx.element.output.get, ctx))
+      visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
     }
 
     if (ctx.element.meta.isDefined) {
-      visitMetaSection(createVisitorContext[MetaSection, Workflow](ctx.element.meta.get, ctx))
+      visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
     }
 
     if (ctx.element.parameterMeta.isDefined) {
       visitParameterMetaSection(
-          createVisitorContext[ParameterMetaSection, Workflow](ctx.element.parameterMeta.get, ctx)
+          ctx.createChildContext[ParameterMetaSection](ctx.element.parameterMeta.get)
       )
     }
   }
 
   override def visitCommandSection(ctx: VisitorContext[CommandSection]): Unit = {
     ctx.element.parts.foreach { expr =>
-      visitExpression(createVisitorContext[Expr, CommandSection](expr, ctx))
+      visitExpression(ctx.createChildContext[Expr](expr))
     }
   }
 
   override def visitRuntimeKV(ctx: VisitorContext[RuntimeKV]): Unit = {
     visitKey[RuntimeKV](ctx.element.id, ctx)
-    visitExpression(createVisitorContext[Expr, RuntimeKV](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
   }
 
   override def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
-      visitRuntimeKV(createVisitorContext[RuntimeKV, RuntimeSection](kv, ctx))
+      visitRuntimeKV(ctx.createChildContext[RuntimeKV](kv))
     }
   }
 
   override def visitHintsKV(ctx: VisitorContext[HintsKV]): Unit = {
     visitKey[HintsKV](ctx.element.id, ctx)
-    visitExpression(createVisitorContext[Expr, HintsKV](ctx.element.expr, ctx))
+    visitExpression(ctx.createChildContext[Expr](ctx.element.expr))
   }
 
   override def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {
     ctx.element.kvs.foreach { kv =>
-      visitHintsKV(createVisitorContext[HintsKV, HintsSection](kv, ctx))
+      visitHintsKV(ctx.createChildContext[HintsKV](kv))
     }
   }
 
   override def visitTask(ctx: VisitorContext[Task]): Unit = {
+    visitName[Task](ctx.element.name, ctx)
+
     if (ctx.element.input.isDefined) {
-      visitInputSection(createVisitorContext[InputSection, Task](ctx.element.input.get, ctx))
+      visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
     }
 
     ctx.element.declarations.foreach { decl =>
-      visitDeclaration(createVisitorContext[Declaration, Task](decl, ctx))
+      visitDeclaration(ctx.createChildContext[Declaration](decl))
     }
 
-    visitCommandSection(createVisitorContext[CommandSection, Task](ctx.element.command, ctx))
+    visitCommandSection(ctx.createChildContext[CommandSection](ctx.element.command))
 
     if (ctx.element.output.isDefined) {
-      visitOutputSection(createVisitorContext[OutputSection, Task](ctx.element.output.get, ctx))
+      visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
     }
 
     if (ctx.element.runtime.isDefined) {
-      visitRuntimeSection(createVisitorContext[RuntimeSection, Task](ctx.element.runtime.get, ctx))
+      visitRuntimeSection(ctx.createChildContext[RuntimeSection](ctx.element.runtime.get))
     }
 
     if (ctx.element.hints.isDefined) {
-      visitHintsSection(createVisitorContext[HintsSection, Task](ctx.element.hints.get, ctx))
+      visitHintsSection(ctx.createChildContext[HintsSection](ctx.element.hints.get))
     }
 
     if (ctx.element.meta.isDefined) {
-      visitMetaSection(createVisitorContext[MetaSection, Task](ctx.element.meta.get, ctx))
+      visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
     }
 
     if (ctx.element.parameterMeta.isDefined) {
       visitParameterMetaSection(
-          createVisitorContext[ParameterMetaSection, Task](ctx.element.parameterMeta.get, ctx)
+          ctx.createChildContext[ParameterMetaSection](ctx.element.parameterMeta.get)
       )
     }
   }
 
   def apply(doc: Document): Unit = {
-    val ctx = createContext[Document](doc)
-    visitDocument(ctx)
-  }
-
-  def createContext[T <: Element](element: T): VisitorContext[T] = {
-    new VisitorContext[T](element)
-  }
-
-  def createVisitorContext[T <: Element, P <: Element](
-      element: T,
-      parent: VisitorContext[P]
-  ): VisitorContext[T] = {
-    new VisitorContext[T](element, Some(parent.asInstanceOf[VisitorContext[Element]]))
+    visitDocument(VisitorContext[Document](doc))
   }
 }
