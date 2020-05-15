@@ -7,18 +7,23 @@ import java.nio.file.{Files, Path}
 import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
-import wdlTools.linter.{LintEvent, Linter, Severity}
+import wdlTools.linter.{AstRules, LintEvent, Linter, ParserRules, RuleConf, Severity, TstRules}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
 
 case class Lint(conf: WdlToolsConf) extends Command {
   private val RULES_RESOURCE = "rules/lint_rules.json"
+  private lazy val rules = readJsonSource(Source.fromResource(RULES_RESOURCE))
+
+  private def getDefaultRules: Map[String, RuleConf] = {
+    val allnames = ParserRules.allRules.keys.toVector ++ AstRules.allRules.keys.toVector ++ TstRules.allRules.keys.toVector
+  }
 
   override def apply(): Unit = {
     val url = conf.lint.url()
     val opts = conf.lint.getOptions
-    val rules =
+    val rulesConfig =
       if (conf.lint.config.isDefined) {
         val (incl, excl) = rulesFromFile(conf.lint.config())
         incl.getOrElse(Linter.defaultRules).removedAll(excl.getOrElse(Set.empty))
@@ -27,14 +32,13 @@ case class Lint(conf: WdlToolsConf) extends Command {
         val excl = conf.lint.excludeRules.map(_.toSet)
         incl.getOrElse(Linter.defaultRules).removedAll(excl.getOrElse(Set.empty))
       } else {
-        Linter.defaultRules
+        getDefaultRules
       }
-    val linter = Linter(opts, rules)
+    val linter = Linter(opts, rulesConfig)
     linter.apply(url)
 
     if (linter.hasEvents) {
       // Load rule descriptions
-      val rules = readJsonSource(Source.fromResource(RULES_RESOURCE))
       val outputFile = conf.lint.outputFile.toOption
       val toFile = outputFile.isDefined
       val printer: PrintStream = if (toFile) {
@@ -73,7 +77,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
   }
 
-  private def rulesFromFile(path: Path): (Option[Map[String, Severity]], Option[Set[String]]) = {
+  private def rulesFromFile(path: Path): (Option[Map[String, RuleConf]], Option[Set[String]]) = {
     val rules = readJsonSource(Source.fromFile(path.toFile))
 
     def rulesToSet(key: String): Option[Vector[JsValue]] = {
@@ -137,13 +141,13 @@ case class Lint(conf: WdlToolsConf) extends Command {
   private def eventsToJson(events: Map[URL, Vector[LintEvent]],
                            rules: Map[String, JsValue]): JsObject = {
     def eventToJson(err: LintEvent): JsObject = {
-      val rule = getFields(rules(err.ruleId))
+      val rule = getFields(rules(err.rule.id))
       JsObject(
           Map(
-              "ruleId" -> JsString(err.ruleId),
+              "ruleId" -> JsString(err.rule.id),
               "ruleName" -> JsString(getString(rule("name"))),
               "ruleDescription" -> JsString(getString(rule("description"))),
-              "severity" -> JsString(err.severity.toString),
+              "severity" -> JsString(err.rule.severity.toString),
               "startLine" -> JsNumber(err.textSource.line),
               "startCol" -> JsNumber(err.textSource.col),
               "endLine" -> JsNumber(err.textSource.endLine),

@@ -2,8 +2,6 @@ package wdlTools.linter
 
 import java.net.URL
 
-import wdlTools.linter.AstRules.LinterAstRule
-import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{TypedAbstractSyntax, TypedSyntaxTreeVisitor, Unification}
 import wdlTools.types.TypedSyntaxTreeVisitor.VisitorContext
@@ -14,20 +12,16 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 object TstRules {
-  class LinterTstRule(id: String,
-                      severity: Severity,
-                      docSourceUrl: Option[URL],
-                      events: mutable.Buffer[LintEvent])
+  class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends TypedSyntaxTreeVisitor {
     protected def addEvent(element: TypedAbstractSyntax.Element,
                            message: Option[String] = None): Unit = {
-      events.append(LintEvent(id, severity, element.text, docSourceUrl, message))
+      events.append(LintEvent(conf, element.text, docSourceUrl, message))
     }
   }
 
   type LinterTstRuleApplySig = (
-      String,
-      Severity,
+      RuleConf,
       WdlVersion,
       Unification,
       mutable.Buffer[LintEvent],
@@ -74,13 +68,12 @@ object TstRules {
   /**
     * Coercion from non-string-typed expression to string declaration/parameter
     */
-  case class StringCoercionRule(id: String,
-                                severity: Severity,
+  case class StringCoercionRule(conf: RuleConf,
                                 version: WdlVersion,
                                 unification: Unification,
                                 events: mutable.Buffer[LintEvent],
                                 docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
 
     private val expectedTypes: Set[T] = Set(T_String)
     private val stringTypes: Set[T] = Set(T_String, T_File, T_Directory)
@@ -149,13 +142,12 @@ object TstRules {
     * Coercion from string-typed expression to file-typed declaration/parameter
     * that occur somewhere besides task output
     */
-  case class FileCoercionRule(id: String,
-                              severity: Severity,
+  case class FileCoercionRule(conf: RuleConf,
                               version: WdlVersion,
                               unification: Unification,
                               events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
     private val expectedTypes: Set[T] = Set(T_File, T_Directory)
 
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
@@ -221,13 +213,12 @@ object TstRules {
   /**
     * Implicit promotion of T -> Array[T]
     */
-  case class ArrayCoercionRule(id: String,
-                               severity: Severity,
+  case class ArrayCoercionRule(conf: RuleConf,
                                version: WdlVersion,
                                unification: Unification,
                                events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       ctx.getParent.element match {
         case Declaration(_, wdlType, expr, _)
@@ -267,13 +258,12 @@ object TstRules {
     * These may or may not fail type-checking, depending on the strictness
     * of the type-checking regime and the WDL version.
     */
-  case class OptionalCoercionRule(id: String,
-                                  severity: Severity,
+  case class OptionalCoercionRule(conf: RuleConf,
                                   version: WdlVersion,
                                   unification: Unification,
                                   events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       ctx.getParent.element match {
         case Declaration(_, wdlType, expr, _)
@@ -344,13 +334,12 @@ object TstRules {
     * Coercing a possibly-empty array to a declaration or parameter requiring
     * a non-empty array.
     */
-  case class NonEmptyCoercionRule(id: String,
-                                  severity: Severity,
+  case class NonEmptyCoercionRule(conf: RuleConf,
                                   version: WdlVersion,
                                   unification: Unification,
                                   events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
     private val ignoreFunctions = Set("glob", "read_lines", "read_tsv", "read_array")
 
     private def isNonemtpyCoercion(toType: T, fromType: T): Boolean = {
@@ -398,13 +387,12 @@ object TstRules {
   /**
     * Call without all required inputs.
     */
-  case class IncompleteCallRule(id: String,
-                                severity: Severity,
+  case class IncompleteCallRule(conf: RuleConf,
                                 version: WdlVersion,
                                 unification: Unification,
                                 events: mutable.Buffer[LintEvent],
                                 docSourceUrl: Option[URL])
-      extends LinterTstRule(id, severity, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl, events) {
     override def visitCall(ctx: VisitorContext[Call]): Unit = {
       val missingRequiredInputs = ctx.element.callee.input
         .filter(x => !x._2._2)
@@ -416,6 +404,47 @@ object TstRules {
     }
   }
 
+  /**
+    * Flag unused non-output declarations
+    * heuristic exceptions:
+    * 1. File whose name suggests it's an hts index file; as these commonly need to
+    *    be localized, but not explicitly used in task command
+    * 2. dxWDL "native" task stubs, which declare inputs but leave command empty.
+    * TODO: enable configuration of heurisitics - rather than disable the rule, the
+    *  user can specify patterns to ignore
+    */
+  case class UnusedDeclarationRule(conf: RuleConf,
+                                   version: WdlVersion,
+                                   unification: Unification,
+                                   events: mutable.Buffer[LintEvent],
+                                   docSourceUrl: Option[URL])
+      extends LinterTstRule(conf, docSourceUrl, events) {
+    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+      if (ctx.findAncestor[OutputSection].isEmpty) {
+        // declaration is not in an OutputSection
+        // TODO: need mapping of decl name to referrers
+      }
+    }
+  }
+
+  /**
+    * The outputs of a Call are neither used nor propagated.
+    */
+  case class UnusedCallRule(conf: RuleConf,
+                            version: WdlVersion,
+                            unification: Unification,
+                            events: mutable.Buffer[LintEvent],
+                            docSourceUrl: Option[URL])
+      extends LinterTstRule(conf, docSourceUrl, events) {
+
+    override def visitCall(ctx: VisitorContext[Call]): Unit = {
+      // ignore call to callable with no outputs
+      if (ctx.element.callee.output.nonEmpty) {
+        // TODO: need mapping of call to referrers
+      }
+    }
+  }
+
   // TODO: load these dynamically from a file
   val allRules: Map[String, LinterTstRuleApplySig] = Map(
       "T001" -> StringCoercionRule.apply,
@@ -423,6 +452,8 @@ object TstRules {
       "T003" -> ArrayCoercionRule.apply,
       "T004" -> OptionalCoercionRule.apply,
       "T005" -> NonEmptyCoercionRule.apply,
-      "A006" -> IncompleteCallRule.apply
+      "T006" -> IncompleteCallRule.apply,
+      "T007" -> UnusedDeclarationRule.apply,
+      "T008" -> UnusedCallRule.apply
   )
 }

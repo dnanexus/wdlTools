@@ -2,7 +2,6 @@ package wdlTools.linter
 
 import java.net.URL
 
-import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.{AbstractSyntaxTreeVisitor, WdlVersion}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.AbstractSyntaxTreeVisitor.VisitorContext
@@ -11,19 +10,15 @@ import wdlTools.util.Util.getFilename
 import scala.collection.mutable
 
 object AstRules {
-  class LinterAstRule(id: String,
-                      severity: Severity,
-                      docSourceUrl: Option[URL],
-                      events: mutable.Buffer[LintEvent])
+  class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends AbstractSyntaxTreeVisitor {
     protected def addEvent(element: Element, message: Option[String] = None): Unit = {
-      events.append(LintEvent(id, severity, element.text, docSourceUrl, message))
+      events.append(LintEvent(conf, element.text, docSourceUrl, message))
     }
   }
 
   type LinterAstRuleApplySig = (
-      String,
-      Severity,
+      RuleConf,
       WdlVersion,
       mutable.Buffer[LintEvent],
       Option[URL]
@@ -38,12 +33,11 @@ object AstRules {
   // * wildcard outputs - the parser does not allow these even in draft-2
   // * unexpected/unsupplied inputs - the type-checker catches this
 
-  case class NonPortableTaskRule(id: String,
-                                 severity: Severity,
+  case class NonPortableTaskRule(conf: RuleConf,
                                  version: WdlVersion,
                                  events: mutable.Buffer[LintEvent],
                                  docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     private val containerKeys = Set("docker", "container")
 
     override def visitTask(
@@ -57,12 +51,11 @@ object AstRules {
     }
   }
 
-  case class NoTaskInputsRule(id: String,
-                              severity: Severity,
+  case class NoTaskInputsRule(conf: RuleConf,
                               version: WdlVersion,
                               events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     override def visitTask(
         ctx: VisitorContext[Task]
     ): Unit = {
@@ -72,12 +65,11 @@ object AstRules {
     }
   }
 
-  case class NoTaskOutputsRule(id: String,
-                               severity: Severity,
+  case class NoTaskOutputsRule(conf: RuleConf,
                                version: WdlVersion,
                                events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
 
     override def visitTask(
         ctx: VisitorContext[Task]
@@ -93,12 +85,11 @@ object AstRules {
   /**
     * Collisions between names that are allowed but confusing.
     */
-  case class NameCollisionRule(id: String,
-                               severity: Severity,
+  case class NameCollisionRule(conf: RuleConf,
                                version: WdlVersion,
                                events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
 
     private val elements: mutable.Map[String, mutable.Set[Element]] = mutable.HashMap.empty
 
@@ -120,12 +111,11 @@ object AstRules {
   /**
     * A file is imported but never used
     */
-  case class UnusedImportRule(id: String,
-                              severity: Severity,
+  case class UnusedImportRule(conf: RuleConf,
                               version: WdlVersion,
                               events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     private val dottedNameRegexp = "(.*?)\\..+".r
     private val usedImportNames: mutable.Set[String] = mutable.HashSet.empty
     private val usedTypeNames: mutable.Set[String] = mutable.HashSet.empty
@@ -170,12 +160,11 @@ object AstRules {
   /**
     * Identifier preceeding the declaration/call that it references.
     */
-  case class ForwardReferenceRule(id: String,
-                                  severity: Severity,
+  case class ForwardReferenceRule(conf: RuleConf,
                                   version: WdlVersion,
                                   events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       ctx.element match {
         case ExprIdentifier(id, text) => ()
@@ -185,42 +174,11 @@ object AstRules {
     }
   }
 
-  /**
-    * Flag unused non-output declarations
-    * heuristic exceptions:
-    * 1. File whose name suggests it's an hts index file; as these commonly need to
-    *    be localized, but not explicitly used in task command
-    * 2. dxWDL "native" task stubs, which declare inputs but leave command empty.
-    * TODO: enable configuration of heurisitics - rather than disable the rule, the
-    *  user can specify patterns to ignore
-    */
-  case class UnusedDeclarationRule(id: String,
-                                   severity: Severity,
-                                   version: WdlVersion,
-                                   events: mutable.Buffer[LintEvent],
-                                   docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
-    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-      if (ctx.findAncestor[OutputSection].isEmpty) {
-        // declaration is not in an OutputSection
-
-      }
-    }
-  }
-
-  case class UnusedCallRule(id: String,
-                            severity: Severity,
-                            version: WdlVersion,
-                            events: mutable.Buffer[LintEvent],
-                            docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {}
-
-  case class UnnecessaryQuantifierRule(id: String,
-                                       severity: Severity,
+  case class UnnecessaryQuantifierRule(conf: RuleConf,
                                        version: WdlVersion,
                                        events: mutable.Buffer[LintEvent],
                                        docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {}
+      extends LinterAstRule(conf, docSourceUrl, events) {}
 
   /**
     * If ShellCheck is installed, run it on task commands and propagate any
@@ -234,45 +192,42 @@ object AstRules {
     * which can be triggered by dummy values we substitute to write the script
     * also SC1009 and SC1072 are non-informative commentary
     *
+    * TODO: enable user to configure ShellCheck path
     */
-  case class ShellCheckRule(id: String,
-                            severity: Severity,
+  case class ShellCheckRule(conf: RuleConf,
                             version: WdlVersion,
                             events: mutable.Buffer[LintEvent],
                             docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     private val suppressions = Set(1009, 1072, 1083, 2043, 2050, 2157, 2193)
 
   }
 
-  case class SelectArrayRule(id: String,
-                             severity: Severity,
+  case class SelectArrayRule(conf: RuleConf,
                              version: WdlVersion,
                              events: mutable.Buffer[LintEvent],
                              docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {}
+      extends LinterAstRule(conf, docSourceUrl, events) {}
 
   /**
     * In Wdl2, only a specific set of runtime keys are allowed. In previous
     * versions, we check against a known set of keys and issue a warning for
     * any that don't match.
     */
-  case class UnknownRuntimeKeyRule(id: String,
-                                   severity: Severity,
+  case class UnknownRuntimeKeyRule(conf: RuleConf,
                                    version: WdlVersion,
                                    events: mutable.Buffer[LintEvent],
                                    docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {}
+      extends LinterAstRule(conf, docSourceUrl, events) {}
 
   /**
     * Issue a warning for any version < 1.0.
     */
-  case class MissingVersionRule(id: String,
-                                severity: Severity,
+  case class MissingVersionRule(conf: RuleConf,
                                 version: WdlVersion,
                                 events: mutable.Buffer[LintEvent],
                                 docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(conf, docSourceUrl, events) {
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
       if (version < WdlVersion.V1) {
         addEvent(ctx.element)
@@ -288,12 +243,10 @@ object AstRules {
       "A004" -> NameCollisionRule.apply,
       "A005" -> UnusedImportRule.apply,
       "A006" -> ForwardReferenceRule.apply,
-      "A007" -> UnusedDeclarationRule.apply,
-      "A008" -> UnusedCallRule.apply,
-      "A009" -> UnnecessaryQuantifierRule.apply,
-      "A010" -> ShellCheckRule.apply,
-      "A011" -> SelectArrayRule.apply,
-      "A012" -> UnknownRuntimeKeyRule.apply,
-      "A013" -> MissingVersionRule.apply
+      "A007" -> UnnecessaryQuantifierRule.apply,
+      "A008" -> ShellCheckRule.apply,
+      "A009" -> SelectArrayRule.apply,
+      "A010" -> UnknownRuntimeKeyRule.apply,
+      "A011" -> MissingVersionRule.apply
   )
 }

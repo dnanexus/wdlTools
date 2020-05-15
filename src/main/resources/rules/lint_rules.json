@@ -32,5 +32,11 @@
     "name": "no_task_outputs",
     "description": "Suspicious lack of task outputs (is this task really idempotent and portable?)",
     "severity": "Warning"
+  },
+  "A008": {
+    "name": "shell_check",
+    "description": "Runs ShellCheck on task commands and propagates any lint it finds",
+    "severity": "Warning",
+    "options": ["path"]
   }
 }

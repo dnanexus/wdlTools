@@ -3,7 +3,6 @@ package wdlTools.linter
 import java.net.URL
 
 import org.antlr.v4.runtime.tree.ParseTreeListener
-import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers}
 import wdlTools.types.{TypeInfer, Unification}
@@ -12,7 +11,7 @@ import wdlTools.util.Options
 import scala.collection.mutable
 
 case class LinterParserRuleFactory(
-    rules: Map[String, Severity],
+    rules: Map[String, RuleConf],
     events: mutable.Map[URL, mutable.Buffer[LintEvent]]
 ) extends ParseTreeListenerFactory {
   override def createParseTreeListeners(
@@ -21,14 +20,14 @@ case class LinterParserRuleFactory(
     val docEvents: mutable.Buffer[LintEvent] = mutable.ArrayBuffer.empty
     events(grammar.docSourceUrl.get) = docEvents
     rules.collect {
-      case (id, severity) if ParserRules.allRules.contains(id) =>
-        ParserRules.allRules(id)(id, severity, docEvents, grammar)
+      case (id, conf) if ParserRules.allRules.contains(id) =>
+        ParserRules.allRules(id)(conf, docEvents, grammar)
     }.toVector
   }
 }
 
 case class Linter(opts: Options,
-                  rules: Map[String, Severity] = Linter.defaultRules,
+                  rules: Map[String, RuleConf],
                   events: mutable.Map[URL, mutable.Buffer[LintEvent]] = mutable.HashMap.empty) {
   def hasEvents: Boolean = events.nonEmpty
 
@@ -52,10 +51,9 @@ case class Linter(opts: Options,
         // Now execute the linter rules
         if (astRules.nonEmpty) {
           val visitors = astRules.map {
-            case (id, severity) =>
+            case (id, conf) =>
               AstRules.allRules(id)(
-                  id,
-                  severity,
+                  conf,
                   doc.version.value,
                   events(url),
                   Some(url)
@@ -71,10 +69,9 @@ case class Linter(opts: Options,
           val (typedDoc, _) = TypeInfer(opts).apply(doc)
           val unification = Unification(opts)
           val visitors = tstRules.map {
-            case (id, severity) =>
+            case (id, conf) =>
               TstRules.allRules(id)(
-                  id,
-                  severity,
+                  conf,
                   doc.version.value,
                   unification,
                   events(url),
@@ -87,10 +84,4 @@ case class Linter(opts: Options,
       }
     }
   }
-}
-
-object Linter {
-  val defaultRules: Map[String, Severity] = (
-      ParserRules.allRules.keys.toVector ++ AstRules.allRules.keys.toVector ++ TstRules.allRules.keys.toVector
-  ).map(_ -> Severity.Default).toMap
 }
