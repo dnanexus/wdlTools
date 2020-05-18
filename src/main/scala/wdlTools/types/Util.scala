@@ -103,89 +103,113 @@ object Util {
     }
   }
 
-  // Utility function for writing an expression in a human readable form
-  def exprToString(expr: TAT.Expr): String = {
+  /**
+    * Utility function for writing an expression in a human readable form
+    * @param expr the expression to convert
+    * @param callback a function that optionally converts expression to string - if it returns
+    *                 Some(string), string is returned rather than the default formatting. This
+    *                 can be used to provide custom formatting for some or all parts of a nested
+    *                 expression.
+    */
+  def exprToString(expr: TAT.Expr, callback: Option[TAT.Expr => Option[String]] = None): String = {
+    if (callback.isDefined) {
+      val s = callback.get(expr)
+      if (s.isDefined) {
+        return s.get
+      }
+    }
+
     expr match {
       case TAT.ValueNull(_, _)                    => "null"
+      case TAT.ValueNone(_, _)                    => "None"
       case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
       case TAT.ValueInt(value, _, _)              => value.toString
       case TAT.ValueFloat(value, _, _)            => value.toString
       case TAT.ValueString(value, _, _)           => value
       case TAT.ValueFile(value, _, _)             => value
+      case TAT.ValueDirectory(value, _, _)        => value
       case TAT.ExprIdentifier(id: String, _, _)   => id
 
       case TAT.ExprCompoundString(value, _, _) =>
-        val vec = value.map(exprToString).mkString(", ")
+        val vec = value.map(x => exprToString(x, callback)).mkString(", ")
         s"ExprCompoundString(${vec})"
-      case TAT.ExprPair(l, r, _, _) => s"(${exprToString(l)}, ${exprToString(r)})"
+      case TAT.ExprPair(l, r, _, _) =>
+        s"(${exprToString(l, callback)}, ${exprToString(r, callback)})"
       case TAT.ExprArray(value, _, _) =>
-        "[" + value.map(exprToString).mkString(", ") + "]"
+        "[" + value.map(x => exprToString(x, callback)).mkString(", ") + "]"
       case TAT.ExprMap(value, _, _) =>
         "{" + value
           .map {
-            case (k, v) => s"${exprToString(k)} : ${exprToString(v)}"
+            case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
           }
           .mkString(", ") + "}"
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
-            case (k, v) => s"${k} : ${exprToString(v)}"
+            case (k, v) => s"${k} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
         s"object($m2)"
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
-        s"{true=${exprToString(t)} false=${exprToString(f)} ${exprToString(value)}"
+        s"{true=${exprToString(t, callback)} false=${exprToString(f, callback)} ${exprToString(value, callback)}"
 
       // ~{default="foo" optional_value}
       case TAT.ExprPlaceholderDefault(default, value, _, _) =>
-        s"{default=${exprToString(default)} ${exprToString(value)}}"
+        s"{default=${exprToString(default, callback)} ${exprToString(value, callback)}}"
 
       // ~{sep=", " array_value}
       case TAT.ExprPlaceholderSep(sep, value, _, _) =>
-        s"{sep=${exprToString(sep)} ${exprToString(value)}"
+        s"{sep=${exprToString(sep, callback)} ${exprToString(value, callback)}"
 
       // operators on one argument
       case TAT.ExprUniraryPlus(value, _, _) =>
-        s"+ ${exprToString(value)}"
+        s"+ ${exprToString(value, callback)}"
       case TAT.ExprUniraryMinus(value, _, _) =>
-        s"- ${exprToString(value)}"
+        s"- ${exprToString(value, callback)}"
       case TAT.ExprNegate(value, _, _) =>
-        s"not(${exprToString(value)})"
+        s"not(${exprToString(value, callback)})"
 
       // operators on two arguments
-      case TAT.ExprLor(a, b, _, _)    => s"${exprToString(a)} || ${exprToString(b)}"
-      case TAT.ExprLand(a, b, _, _)   => s"${exprToString(a)} && ${exprToString(b)}"
-      case TAT.ExprEqeq(a, b, _, _)   => s"${exprToString(a)} == ${exprToString(b)}"
-      case TAT.ExprLt(a, b, _, _)     => s"${exprToString(a)} < ${exprToString(b)}"
-      case TAT.ExprGte(a, b, _, _)    => s"${exprToString(a)} >= ${exprToString(b)}"
-      case TAT.ExprNeq(a, b, _, _)    => s"${exprToString(a)} != ${exprToString(b)}"
-      case TAT.ExprLte(a, b, _, _)    => s"${exprToString(a)} <= ${exprToString(b)}"
-      case TAT.ExprGt(a, b, _, _)     => s"${exprToString(a)} > ${exprToString(b)}"
-      case TAT.ExprAdd(a, b, _, _)    => s"${exprToString(a)} + ${exprToString(b)}"
-      case TAT.ExprSub(a, b, _, _)    => s"${exprToString(a)} - ${exprToString(b)}"
-      case TAT.ExprMod(a, b, _, _)    => s"${exprToString(a)} % ${exprToString(b)}"
-      case TAT.ExprMul(a, b, _, _)    => s"${exprToString(a)} * ${exprToString(b)}"
-      case TAT.ExprDivide(a, b, _, _) => s"${exprToString(a)} / ${exprToString(b)}"
+      case TAT.ExprLor(a, b, _, _) =>
+        s"${exprToString(a, callback)} || ${exprToString(b, callback)}"
+      case TAT.ExprLand(a, b, _, _) =>
+        s"${exprToString(a, callback)} && ${exprToString(b, callback)}"
+      case TAT.ExprEqeq(a, b, _, _) =>
+        s"${exprToString(a, callback)} == ${exprToString(b, callback)}"
+      case TAT.ExprLt(a, b, _, _) => s"${exprToString(a, callback)} < ${exprToString(b, callback)}"
+      case TAT.ExprGte(a, b, _, _) =>
+        s"${exprToString(a, callback)} >= ${exprToString(b, callback)}"
+      case TAT.ExprNeq(a, b, _, _) =>
+        s"${exprToString(a, callback)} != ${exprToString(b, callback)}"
+      case TAT.ExprLte(a, b, _, _) =>
+        s"${exprToString(a, callback)} <= ${exprToString(b, callback)}"
+      case TAT.ExprGt(a, b, _, _)  => s"${exprToString(a, callback)} > ${exprToString(b, callback)}"
+      case TAT.ExprAdd(a, b, _, _) => s"${exprToString(a, callback)} + ${exprToString(b, callback)}"
+      case TAT.ExprSub(a, b, _, _) => s"${exprToString(a, callback)} - ${exprToString(b, callback)}"
+      case TAT.ExprMod(a, b, _, _) => s"${exprToString(a, callback)} % ${exprToString(b, callback)}"
+      case TAT.ExprMul(a, b, _, _) => s"${exprToString(a, callback)} * ${exprToString(b, callback)}"
+      case TAT.ExprDivide(a, b, _, _) =>
+        s"${exprToString(a, callback)} / ${exprToString(b, callback)}"
 
       // Access an array element at [index]
       case TAT.ExprAt(array, index, _, _) =>
-        s"${exprToString(array)}[${index}]"
+        s"${exprToString(array, callback)}[${index}]"
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
       case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
-        s"if (${exprToString(cond)}) then ${exprToString(tBranch)} else ${exprToString(fBranch)}"
+        s"if (${exprToString(cond, callback)}) then ${exprToString(tBranch, callback)} else ${exprToString(fBranch, callback)}"
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
       case TAT.ExprApply(funcName, _, elements, _, _) =>
-        val args = elements.map(exprToString).mkString(", ")
+        val args = elements.map(x => exprToString(x, callback)).mkString(", ")
         s"${funcName}(${args})"
 
       case TAT.ExprGetName(e, id: String, _, _) =>
-        s"${exprToString(e)}.${id}"
+        s"${exprToString(e, callback)}.${id}"
     }
   }
 }

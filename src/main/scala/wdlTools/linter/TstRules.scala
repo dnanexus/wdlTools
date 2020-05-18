@@ -1,22 +1,39 @@
 package wdlTools.linter
 
 import java.net.URL
+import java.nio.file.Files
 
-import wdlTools.syntax.WdlVersion
+import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{TypedAbstractSyntax, TypedSyntaxTreeVisitor, Unification}
 import wdlTools.types.TypedSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
+import wdlTools.types.Util.exprToString
+import wdlTools.util.JsonUtil
+import wdlTools.util.Util.{stripLeadingWhitespace, writeStringToFile}
+
+import spray.json._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.sys.process._
+import scala.util.Random
 
 object TstRules {
   class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends TypedSyntaxTreeVisitor {
-    protected def addEvent(element: TypedAbstractSyntax.Element,
+    protected def addEvent(ctx: VisitorContext[_ <: Element],
                            message: Option[String] = None): Unit = {
-      events.append(LintEvent(conf, element.text, docSourceUrl, message))
+      addEventFromElement(ctx.element, message)
+    }
+
+    protected def addEventFromElement(element: Element, message: Option[String] = None): Unit = {
+      addEventFromSource(element.text, message)
+    }
+
+    protected def addEventFromSource(textSource: TextSource,
+                                     message: Option[String] = None): Unit = {
+      events.append(LintEvent(conf, textSource, docSourceUrl, message))
     }
   }
 
@@ -86,14 +103,13 @@ object TstRules {
       }
 
       // if this expression is the rhs of a declaration, check that it is coercible to the lhs type
-      ctx.getParent.element match {
+      ctx.getParent[Element].element match {
         case Declaration(_, wdlType, expr, _)
             if expr.isDefined && isQuestionableCoercion(wdlType,
                                                         expr.get.wdlType,
                                                         expectedTypes,
                                                         additionalAllowedCoercions) =>
-          addEvent(ctx.element)
-        case _ => ()
+          addEvent(ctx)
       }
       // check compatible arguments for operations that take multiple string arguments
       ctx.element match {
@@ -104,7 +120,7 @@ object TstRules {
             val wts = Vector(a, b).map(_.wdlType)
             if (wts.contains(T_String) && !wts.forall(stringTypes.contains)) {
               addEvent(
-                  ctx.element,
+                  ctx,
                   Some(
                       "string concatenation (+) has non-string argument; consider using interpolation"
                   )
@@ -117,13 +133,13 @@ object TstRules {
           argTypes.zip(elements.map(_.wdlType)).foreach {
             case (to, from)
                 if isQuestionableCoercion(to, from, expectedTypes, additionalAllowedCoercions) =>
-              addEvent(ctx.element, Some(s"${to} argument of ${funcName}() = ${from}"))
+              addEvent(ctx, Some(s"${to} argument of ${funcName}() = ${from}"))
           }
         case ExprArray(values, _, _) =>
           // mixed string and non-string types in array
           val types = values.map(_.wdlType)
           if (types.contains(T_String) && !types.forall(stringTypes.contains)) {
-            addEvent(ctx.element, Some(""))
+            addEvent(ctx, Some(""))
           }
       }
     }
@@ -133,7 +149,7 @@ object TstRules {
       ctx.element.inputs.foreach {
         case (name, fromValue)
             if isQuestionableCoercion(toTypes(name), fromValue.wdlType, expectedTypes) =>
-          addEvent(ctx.element)
+          addEvent(ctx)
       }
     }
   }
@@ -153,13 +169,12 @@ object TstRules {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       // ignore coercions in output sections
       if (ctx.findAncestor[OutputSection].isEmpty) {
-        ctx.getParent.element match {
+        ctx.getParent[Element].element match {
           case Declaration(_, wdlType, expr, _)
               if expr.isDefined && isQuestionableCoercion(wdlType,
                                                           expr.get.wdlType,
                                                           expectedTypes) =>
-            addEvent(ctx.element)
-          case _ => ()
+            addEvent(ctx)
         }
 
         ctx.element match {
@@ -168,18 +183,20 @@ object TstRules {
               case "size" =>
                 // calling size() with File?/Array[File?]
                 elements(0).wdlType match {
-                  case T_Optional(_) => addEvent(ctx.element, Some("File? argument of size()"))
+                  case T_Optional(_) => addEvent(ctx, Some("File? argument of size()"))
                   case T_Array(T_Optional(_), _) =>
-                    addEvent(ctx.element, Some("Array[File?] argument of size()"))
+                    addEvent(ctx, Some("Array[File?] argument of size()"))
+                  case _ => ()
                 }
               case _ =>
                 // using a String expression for a File-typed function parameter
                 val (argTypes, _) = getSignature(prototype)
                 argTypes.zip(elements.map(_.wdlType)).foreach {
                   case (to, from) if isQuestionableCoercion(to, from, expectedTypes) =>
-                    addEvent(ctx.element, Some(s"${to} argument of ${funcName}() = ${from}"))
+                    addEvent(ctx, Some(s"${to} argument of ${funcName}() = ${from}"))
                 }
             }
+          case _ => ()
         }
       }
     }
@@ -190,7 +207,7 @@ object TstRules {
       ctx.element.inputs.foreach {
         case (name, fromValue)
             if isQuestionableCoercion(toTypes(name), fromValue.wdlType, expectedTypes) =>
-          addEvent(ctx.element)
+          addEvent(ctx)
       }
     }
   }
@@ -220,10 +237,10 @@ object TstRules {
                                docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl, events) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
-      ctx.getParent.element match {
+      ctx.getParent[Element].element match {
         case Declaration(_, wdlType, expr, _)
             if expr.isDefined && isArrayCoercion(wdlType, expr.get.wdlType) =>
-          addEvent(ctx.element)
+          addEvent(ctx)
         case _ => ()
       }
 
@@ -232,8 +249,9 @@ object TstRules {
           val (argTypes, _) = getSignature(prototype)
           argTypes.zip(elements.map(_.wdlType)).foreach {
             case (to, from) if isArrayCoercion(to, from) =>
-              addEvent(ctx.element, Some(s"${to} argument of ${funcName}() = ${from}"))
+              addEvent(ctx, Some(s"${to} argument of ${funcName}() = ${from}"))
           }
+        case _ => ()
       }
     }
 
@@ -241,7 +259,7 @@ object TstRules {
       val toTypes: Map[String, T] = ctx.element.callee.input.map(x => x._1 -> x._2._1)
       ctx.element.inputs.foreach {
         case (name, fromValue) if isArrayCoercion(toTypes(name), fromValue.wdlType) =>
-          addEvent(ctx.element)
+          addEvent(ctx)
       }
     }
   }
@@ -265,14 +283,13 @@ object TstRules {
                                   docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl, events) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
-      ctx.getParent.element match {
+      ctx.getParent[Element].element match {
         case Declaration(_, wdlType, expr, _)
             if expr.isDefined && !(
                 unification.isCoercibleTo(wdlType, expr.get.wdlType) ||
                   isArrayCoercion(wdlType, expr.get.wdlType)
             ) =>
-          addEvent(ctx.element)
-        case _ => ()
+          addEvent(ctx)
       }
 
       // ignore when within `if (defined(x))`
@@ -289,14 +306,14 @@ object TstRules {
             argTypes.zip(elements.map(_.wdlType)).foreach {
               case (to, from)
                   if !(unification.isCoercibleTo(to, from) || isArrayCoercion(to, from)) =>
-                addEvent(ctx.element, Some(s"${to} argument of ${funcName}() = ${from}"))
+                addEvent(ctx, Some(s"${to} argument of ${funcName}() = ${from}"))
             }
           case ExprAdd(a, b, _, _) =>
             val aOpt = isOptional(a.wdlType)
             val bOpt = isOptional(b.wdlType)
             val inPlaceholder = ctx.findAncestor[ExprCompoundString].isDefined
             if ((aOpt || bOpt) && !inPlaceholder && !(aOpt && a.wdlType == T_String) && !(bOpt && b.wdlType == T_String)) {
-              addEvent(ctx.element, Some(s"infix operator has operands ${a} and ${b}"))
+              addEvent(ctx, Some(s"infix operator has operands ${a} and ${b}"))
             }
           case other =>
             val args = other match {
@@ -310,7 +327,7 @@ object TstRules {
             if (args.isDefined) {
               val (a, b) = args.get
               if (isOptional(a.wdlType) || isOptional(b.wdlType)) {
-                addEvent(ctx.element, Some(s"infix operator has operands ${a} and ${b}"))
+                addEvent(ctx, Some(s"infix operator has operands ${a} and ${b}"))
               }
             }
         }
@@ -324,7 +341,7 @@ object TstRules {
           val to = toTypes(name)
           val from = fromValue.wdlType
           if (!(unification.isCoercibleTo(to, from) || isArrayCoercion(to, from))) {
-            addEvent(ctx.element)
+            addEvent(ctx)
           }
       }
     }
@@ -342,14 +359,14 @@ object TstRules {
       extends LinterTstRule(conf, docSourceUrl, events) {
     private val ignoreFunctions = Set("glob", "read_lines", "read_tsv", "read_array")
 
-    private def isNonemtpyCoercion(toType: T, fromType: T): Boolean = {
+    private def isNonemptyCoercion(toType: T, fromType: T): Boolean = {
       (toType, fromType) match {
         case (T_Array(_, toNonEmpty), T_Array(_, fromNonEmpty)) if toNonEmpty && !fromNonEmpty =>
           true
         case (T_Map(toKey, toValue), T_Map(fromKey, fromValue)) =>
-          isNonemtpyCoercion(toKey, fromKey) || isNonemtpyCoercion(toValue, fromValue)
+          isNonemptyCoercion(toKey, fromKey) || isNonemptyCoercion(toValue, fromValue)
         case (T_Pair(toLeft, toRight), T_Pair(fromLeft, fromRight)) =>
-          isNonemtpyCoercion(toLeft, fromLeft) || isNonemtpyCoercion(toRight, fromRight)
+          isNonemptyCoercion(toLeft, fromLeft) || isNonemptyCoercion(toRight, fromRight)
         case _ => false
       }
     }
@@ -359,18 +376,17 @@ object TstRules {
         case ExprApply(funcName, prototype, elements, _, _) =>
           val (argTypes, _) = getSignature(prototype)
           argTypes.zip(elements.map(_.wdlType)).foreach {
-            case (to, from) if isNonemtpyCoercion(to, from) => addEvent(ctx.element)
+            case (to, from) if isNonemptyCoercion(to, from) => addEvent(ctx)
           }
           ignoreFunctions.contains(funcName)
         case _ => false
       }
 
       if (!ignoreDecl) {
-        ctx.getParent.element match {
+        ctx.getParent[Element].element match {
           case Declaration(_, wdlType, expr, _)
-              if expr.isDefined && isNonemtpyCoercion(wdlType, expr.get.wdlType) =>
-            addEvent(ctx.element)
-          case _ => ()
+              if expr.isDefined && isNonemptyCoercion(wdlType, expr.get.wdlType) =>
+            addEvent(ctx)
         }
       }
     }
@@ -378,18 +394,15 @@ object TstRules {
     override def visitCall(ctx: VisitorContext[Call]): Unit = {
       val toTypes: Map[String, T] = ctx.element.callee.input.map(x => x._1 -> x._2._1)
       ctx.element.inputs.foreach {
-        case (name, fromValue) if isNonemtpyCoercion(toTypes(name), fromValue.wdlType) =>
-          addEvent(ctx.element)
+        case (name, fromValue) if isNonemptyCoercion(toTypes(name), fromValue.wdlType) =>
+          addEvent(ctx)
       }
     }
   }
 
   /**
     * Flag unused non-output declarations
-    * heuristic exceptions:
-    * 1. File whose name suggests it's an hts index file; as these commonly need to
-    *    be localized, but not explicitly used in task command
-    * 2. dxWDL "native" task stubs, which declare inputs but leave command empty.
+    *
     * TODO: enable configuration of heurisitics - rather than disable the rule, the
     *  user can specify patterns to ignore
     */
@@ -399,28 +412,263 @@ object TstRules {
                                    events: mutable.Buffer[LintEvent],
                                    docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl, events) {
+    // map of callables to declarations
+    private val declarations: mutable.Map[Callable, mutable.Buffer[Element]] = mutable.HashMap.empty
+    // map of callables to references
+    private val referrers: mutable.Map[String, mutable.Set[String]] = mutable.HashMap.empty
+    private val indexSuffixes = Set(
+        "index",
+        "indexes",
+        "indices",
+        "idx",
+        "tbi",
+        "bai",
+        "crai",
+        "csi",
+        "fai",
+        "dict"
+    )
+
     override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+      super.visitDeclaration(ctx)
+
       if (ctx.findAncestor[OutputSection].isEmpty) {
         // declaration is not in an OutputSection
-        // TODO: need mapping of decl name to referrers
+        val parent = ctx.findAncestorExecutable.get
+        if (!declarations.contains(parent)) {
+          declarations(parent) = mutable.ArrayBuffer.empty
+        }
+        declarations(parent).append(ctx.element)
+      }
+    }
+
+    override def visitCall(ctx: VisitorContext[Call]): Unit = {
+      super.visitCall(ctx)
+
+      if (ctx.element.callee.output.nonEmpty) {
+        // ignore call to callable with no outputs
+        val parent = ctx.findAncestorExecutable.get
+        if (!declarations.contains(parent)) {
+          declarations(parent) = mutable.ArrayBuffer.empty
+        }
+        declarations(parent).append(ctx.element)
+      }
+    }
+
+    override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
+      ctx.element match {
+        case ExprIdentifier(id, _, _) =>
+          val parentName = ctx.findAncestorExecutable.get.name
+          if (!referrers.contains(parentName)) {
+            referrers(parentName) = mutable.HashSet.empty
+          }
+          referrers(parentName).add(id)
+        case _ => super.traverseExpression(ctx)
+      }
+    }
+
+    override def visitDocument(ctx: VisitorContext[Document]): Unit = {
+      super.visitDocument(ctx)
+
+      // heuristics to ignore certain declarations
+      def ignoreDeclaration(declaration: TypedAbstractSyntax.Declaration,
+                            parent: Callable): Boolean = {
+        // File whose name suggests it's an hts index file; as these commonly need to
+        // be localized, but not explicitly used in task command
+        val isFileType = declaration.wdlType match {
+          case T_File                       => true
+          case T_Array(t, _) if t == T_File => true
+          case _                            => false
+        }
+        if (isFileType && indexSuffixes.exists(suf => declaration.name.endsWith(suf))) {
+          return true
+        }
+        // dxWDL "native" task stubs, which declare inputs but leave command empty
+        parent match {
+          case t: Task =>
+            t.meta.exists(meta => meta.kvs.contains("type") && meta.kvs.contains("id"))
+          case _ => false
+        }
+      }
+
+      // check all declarations within each parent callable to see if they have any referrers
+      val wf = ctx.element.workflow
+      val wfHasOutputs = wf.forall(_.output.isDefined)
+      declarations.foreach {
+        case (parent, decls) =>
+          val refs = referrers.get(parent.name)
+          decls.foreach {
+            case d: Declaration
+                if refs.isEmpty || !(refs.get.contains(d.name) || ignoreDeclaration(d, parent)) =>
+              addEventFromElement(d, Some("declaration"))
+            case c: Call if refs.isEmpty || (!wf.contains(parent) || wfHasOutputs) =>
+              addEventFromElement(c, Some("call"))
+          }
       }
     }
   }
 
   /**
-    * The outputs of a Call are neither used nor propagated.
+    * Flags declarations like T? x = :T: where the right-hand side can't be null.
+    * The optional quantifier is unnecessary except within a task/workflow
+    * input section (where it denotes that the default value can be overridden
+    * by expressly passing null). Another exception is File? outputs of tasks,
+    * e.g. File? optional_file_output = "filename.txt"
     */
-  case class UnusedCallRule(conf: RuleConf,
+  case class UnnecessaryQuantifierRule(conf: RuleConf,
+                                       version: WdlVersion,
+                                       unification: Unification,
+                                       events: mutable.Buffer[LintEvent],
+                                       docSourceUrl: Option[URL])
+      extends LinterTstRule(conf, docSourceUrl, events) {
+    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+      ctx.element match {
+        case Declaration(_, T_Optional(declType), Some(expr), _)
+            if ctx.findAncestor[InputSection].isEmpty && (expr.wdlType match {
+              case T_Optional(_) => false
+              case _             => true
+            }) && (declType match {
+              case T_File | T_Directory =>
+                val parent = ctx.findAncestor[OutputSection]
+                parent.isDefined && parent.get.findAncestor[Task].nonEmpty
+              case _ => false
+            }) =>
+          addEvent(ctx)
+      }
+    }
+  }
+
+  /**
+    * If ShellCheck is installed, run it on task commands and propagate any
+    * lint it finds.
+    * we suppress
+    *   SC1083 This {/} is literal
+    *   SC2043 This loop will only ever run once for a constant value
+    *   SC2050 This expression is constant
+    *   SC2157 Argument to -n is always true due to literal strings
+    *   SC2193 The arguments to this comparison can never be equal
+    * which can be triggered by dummy values we substitute to write the script
+    * also SC1009 and SC1072 are non-informative commentary
+    *
+    * TODO: enable user to configure ShellCheck path
+    */
+  case class ShellCheckRule(conf: RuleConf,
                             version: WdlVersion,
                             unification: Unification,
                             events: mutable.Buffer[LintEvent],
                             docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl, events) {
+    private val suppressions = Set(1009, 1072, 1083, 2043, 2050, 2157, 2193)
+    private val suppressionsStr = suppressions.mkString(",")
+    private val shellCheckPath =
+      conf.options.get("path").map(JsonUtil.getString).getOrElse("shellcheck")
 
-    override def visitCall(ctx: VisitorContext[Call]): Unit = {
-      // ignore call to callable with no outputs
-      if (ctx.element.callee.output.nonEmpty) {
-        // TODO: need mapping of call to referrers
+    if (ShellCheckRule.shellCheckAvailable.isEmpty) {
+      ShellCheckRule.shellCheckAvailable = Some(Seq("which", shellCheckPath).! == 0)
+    }
+
+    override def visitCommandSection(ctx: VisitorContext[CommandSection]): Unit = {
+      if (ctx.element.parts.isEmpty) {
+        return
+      }
+      if (ShellCheckRule.shellCheckAvailable.get) {
+        // convert the command block to a String, substituting dummy variables for placeholders
+        def callback(expr: Expr): Option[String] = {
+          @tailrec
+          def getDummyVal(t: T, textSource: TextSource): Option[String] = {
+            t match {
+              case T_Array(itemType, _) => getDummyVal(itemType, textSource)
+              case T_Boolean            => Some("false")
+              case other                =>
+                // estimate the length of the interpolation in the original source, so that
+                // shellcheck will see the same column numbers. + 3 accounts for "~{" and "}"
+                val desiredLength = math.max(1, textSource.endCol - textSource.col) + 3
+                Some(other match {
+                  case T_Int | T_Float => "1" * desiredLength
+                  case _               => Random.nextString(desiredLength)
+                })
+            }
+          }
+          expr match {
+            case ExprPlaceholderEqual(_, _, _, wdlType, text) => getDummyVal(wdlType, text)
+            case ExprPlaceholderDefault(_, _, wdlType, text)  => getDummyVal(wdlType, text)
+            case ExprPlaceholderSep(_, _, wdlType, text)      => getDummyVal(wdlType, text)
+            case ExprIdentifier(_, wdlType, text)             => getDummyVal(wdlType, text)
+            case _                                            => None
+          }
+        }
+        val (offsetLine, offsetCol, script) = stripLeadingWhitespace(
+            ctx.element.parts.map(x => exprToString(x, Some(callback))).mkString("")
+        )
+        val tempFile = Files.createTempFile("shellcheck", ".sh")
+        val shellCheckCommand = Seq(
+            shellCheckPath,
+            "-s",
+            "bash",
+            "-f",
+            "json1",
+            "-e",
+            suppressionsStr,
+            tempFile.toString
+        )
+        try {
+          writeStringToFile(script, tempFile, overwrite = true)
+          val commandStart = ctx.element.parts.head.text
+          shellCheckCommand.!!.parseJson match {
+            case JsArray(elements) =>
+              elements.foreach { lint =>
+                val fields = JsonUtil.getFields(lint)
+                val line = JsonUtil.getInt(fields("line"))
+                val col = JsonUtil.getInt(fields("column"))
+                val code = JsonUtil.getString(fields("code"))
+                val msg = JsonUtil.getString(fields("message"))
+                val docLine = commandStart.line + offsetLine + line - 1
+                val lineOffsetCol = if (line == 1) {
+                  commandStart.col + offsetCol
+                } else {
+                  offsetCol
+                }
+                val docCol = lineOffsetCol + col - 1
+                addEventFromSource(TextSource(
+                                       docLine,
+                                       docCol,
+                                       docLine,
+                                       docCol
+                                   ),
+                                   Some(s"SC${code} ${msg}"))
+              }
+            case other => throw new Exception(s"Unexpected ShellCheck output ${other}")
+          }
+        } finally {
+          tempFile.toFile.delete()
+        }
+      }
+    }
+  }
+
+  object ShellCheckRule {
+    var shellCheckAvailable: Option[Boolean] = None
+  }
+
+  /**
+    * Application of select_first or select_all on a non-optional array.
+    */
+  case class SelectArrayRule(conf: RuleConf,
+                             version: WdlVersion,
+                             unification: Unification,
+                             events: mutable.Buffer[LintEvent],
+                             docSourceUrl: Option[URL])
+      extends LinterTstRule(conf, docSourceUrl, events) {
+    private val selectFuncNames = Set("select_first", "select_all")
+
+    override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
+      ctx.element match {
+        case ExprApply(funcName, _, elements, _, _) if selectFuncNames.contains(funcName) =>
+          elements.head.wdlType match {
+            case T_Array(T_Optional(_), _) => ()
+            case _                         => addEvent(ctx, Some(funcName))
+          }
+        case _ => traverseExpression(ctx)
       }
     }
   }
@@ -433,6 +681,8 @@ object TstRules {
       "T004" -> OptionalCoercionRule.apply,
       "T005" -> NonEmptyCoercionRule.apply,
       "T006" -> UnusedDeclarationRule.apply,
-      "T007" -> UnusedCallRule.apply
+      "T007" -> UnnecessaryQuantifierRule.apply,
+      "T008" -> ShellCheckRule.apply,
+      "T009" -> SelectArrayRule.apply
   )
 }

@@ -12,7 +12,12 @@ import scala.collection.mutable
 object AstRules {
   class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends AbstractSyntaxTreeVisitor {
-    protected def addEvent(element: Element, message: Option[String] = None): Unit = {
+    protected def addEvent(ctx: VisitorContext[_ <: Element],
+                           message: Option[String] = None): Unit = {
+      addEventFromElement(ctx.element, message)
+    }
+
+    protected def addEventFromElement(element: Element, message: Option[String] = None): Unit = {
       events.append(LintEvent(conf, element.text, docSourceUrl, message))
     }
   }
@@ -44,9 +49,9 @@ object AstRules {
         ctx: VisitorContext[Task]
     ): Unit = {
       if (ctx.element.runtime.isEmpty) {
-        addEvent(ctx.element, Some("add a runtime section specifying a container"))
+        addEvent(ctx, Some("add a runtime section specifying a container"))
       } else if (!ctx.element.runtime.get.kvs.exists(kv => containerKeys.contains(kv.id))) {
-        addEvent(ctx.element, Some("add a container to the runtime section"))
+        addEvent(ctx, Some("add a container to the runtime section"))
       }
     }
   }
@@ -60,7 +65,7 @@ object AstRules {
         ctx: VisitorContext[Task]
     ): Unit = {
       if (ctx.element.input.isEmpty || ctx.element.input.get.declarations.isEmpty) {
-        addEvent(ctx.element)
+        addEvent(ctx)
       }
     }
   }
@@ -75,7 +80,7 @@ object AstRules {
         ctx: VisitorContext[Task]
     ): Unit = {
       if (ctx.element.output.isEmpty || ctx.element.output.get.declarations.isEmpty) {
-        addEvent(ctx.element)
+        addEvent(ctx)
       }
     }
   }
@@ -107,7 +112,7 @@ object AstRules {
       // Collect all names
       super.visitDocument(ctx)
       // Add events for any collisions
-      elements.values.filter(_.size > 1).flatten.foreach(e => addEvent(e))
+      elements.values.filter(_.size > 1).flatten.foreach(e => addEventFromElement(e))
     }
   }
 
@@ -139,10 +144,10 @@ object AstRules {
         .filterKeys(usedImportNames.toSet ++ usedAliases.map(_._2._1).toSet)
         .values
         .foreach { imp =>
-          addEvent(imp, Some("import"))
+          addEventFromElement(imp, Some("import"))
         }
       unusedAliases.map(_._2._2).foreach { alias =>
-        addEvent(alias, Some("alias"))
+        addEventFromElement(alias, Some("alias"))
       }
     }
 
@@ -150,6 +155,7 @@ object AstRules {
       ctx.element match {
         case TypeIdentifier(id, _)  => usedTypeNames.add(id)
         case TypeStruct(name, _, _) => usedTypeNames.add(name)
+        case _                      => ()
       }
     }
 
@@ -160,41 +166,6 @@ object AstRules {
     }
   }
 
-  case class UnnecessaryQuantifierRule(conf: RuleConf,
-                                       version: WdlVersion,
-                                       events: mutable.Buffer[LintEvent],
-                                       docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {}
-
-  /**
-    * If ShellCheck is installed, run it on task commands and propagate any
-    * lint it finds.
-    * we suppress
-    *   SC1083 This {/} is literal
-    *   SC2043 This loop will only ever run once for a constant value
-    *   SC2050 This expression is constant
-    *   SC2157 Argument to -n is always true due to literal strings
-    *   SC2193 The arguments to this comparison can never be equal
-    * which can be triggered by dummy values we substitute to write the script
-    * also SC1009 and SC1072 are non-informative commentary
-    *
-    * TODO: enable user to configure ShellCheck path
-    */
-  case class ShellCheckRule(conf: RuleConf,
-                            version: WdlVersion,
-                            events: mutable.Buffer[LintEvent],
-                            docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
-    private val suppressions = Set(1009, 1072, 1083, 2043, 2050, 2157, 2193)
-
-  }
-
-  case class SelectArrayRule(conf: RuleConf,
-                             version: WdlVersion,
-                             events: mutable.Buffer[LintEvent],
-                             docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {}
-
   /**
     * In Wdl2, only a specific set of runtime keys are allowed. In previous
     * versions, we check against a known set of keys and issue a warning for
@@ -204,7 +175,47 @@ object AstRules {
                                    version: WdlVersion,
                                    events: mutable.Buffer[LintEvent],
                                    docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {}
+      extends LinterAstRule(if (version >= WdlVersion.V2) {
+        // Invalid runtime key is always an error for WDL 2+
+        // TODO: If this ends up being a parse error then we don't have to check for it here
+        conf.copy(severity = Severity.Error)
+      } else {
+        conf
+      }, docSourceUrl, events) {
+
+    private val keys = Set(
+        "container",
+        "cpu",
+        "memory",
+        "gpu",
+        "disks",
+        "maxRetries",
+        "returnCodes"
+    ) ++ (if (version <= WdlVersion.V1) {
+            Set(
+                "bootDiskSizeGb",
+                "continueOnReturnCode",
+                "cpuPlatform",
+                "disk",
+                "docker",
+                "dockerWorkingDir",
+                "dx_instance_type",
+                "gpuCount",
+                "gpuType",
+                "noAddress",
+                "preemptible",
+                "queueArn",
+                "time",
+                "zones"
+            )
+          } else None)
+
+    override def visitRuntimeKV(ctx: VisitorContext[RuntimeKV]): Unit = {
+      if (!keys.contains(ctx.element.id)) {
+        addEvent(ctx)
+      }
+    }
+  }
 
   /**
     * Issue a warning for any version < 1.0.
@@ -216,7 +227,7 @@ object AstRules {
       extends LinterAstRule(conf, docSourceUrl, events) {
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
       if (version < WdlVersion.V1) {
-        addEvent(ctx.element)
+        addEvent(ctx)
       }
     }
   }
@@ -228,10 +239,7 @@ object AstRules {
       "A003" -> NoTaskOutputsRule.apply,
       "A004" -> NameCollisionRule.apply,
       "A005" -> UnusedImportRule.apply,
-      "A006" -> UnnecessaryQuantifierRule.apply,
-      "A007" -> ShellCheckRule.apply,
-      "A008" -> SelectArrayRule.apply,
-      "A009" -> UnknownRuntimeKeyRule.apply,
-      "A010" -> MissingVersionRule.apply
+      "A006" -> UnknownRuntimeKeyRule.apply,
+      "A007" -> MissingVersionRule.apply
   )
 }

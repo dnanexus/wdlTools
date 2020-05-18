@@ -132,14 +132,14 @@ object TypedAbstractSyntax {
   case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
-  sealed trait MetaValue
-  case object MetaNull extends MetaValue
-  case class MetaBoolean(value: Boolean) extends MetaValue
-  case class MetaInt(value: Int) extends MetaValue
-  case class MetaFloat(value: Double) extends MetaValue
-  case class MetaString(value: String) extends MetaValue
-  case class MetaObject(value: Map[String, MetaValue]) extends MetaValue
-  case class MetaArray(value: Vector[MetaValue]) extends MetaValue
+  sealed trait MetaValue extends Element
+  case class MetaNull(text: TextSource) extends MetaValue
+  case class MetaBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaString(value: String, text: TextSource) extends MetaValue
+  case class MetaObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
+  case class MetaArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element

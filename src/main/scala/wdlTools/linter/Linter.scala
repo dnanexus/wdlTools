@@ -41,6 +41,7 @@ case class Linter(opts: Options,
     // TODO: Catch SyntaxExceptions and TypeExceptions and convert them to LintEvents
     // TODO: Ignore events generated from TypeExceptions that dupilicate events added by AST Rules
     parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>
+      val wdlVersion = doc.version.value
       val astRules = rules.view.filterKeys(AstRules.allRules.contains)
       val tstRules = rules.view.filterKeys(TstRules.allRules.contains)
       if (astRules.nonEmpty || tstRules.nonEmpty) {
@@ -48,37 +49,36 @@ case class Linter(opts: Options,
           val docEvents = mutable.ArrayBuffer.empty[LintEvent]
           events(doc.sourceUrl) = docEvents
         }
+        val docEvents = events(url)
         // Now execute the linter rules
         if (astRules.nonEmpty) {
-          val visitors = astRules.map {
+          val astVisitors = astRules.map {
             case (id, conf) =>
               AstRules.allRules(id)(
                   conf,
-                  doc.version.value,
-                  events(url),
+                  wdlVersion,
+                  docEvents,
                   Some(url)
               )
           }.toVector
-          val astWalker = LinterAstWalker(opts, visitors)
+          val astWalker = LinterAstWalker(opts, astVisitors)
           astWalker.apply(doc)
         }
         if (tstRules.nonEmpty) {
           // Run TypeInfer to infer the types of all expressions
-          // We call the private applyDoc() method rather than the
-          // public apply() method because we need the Context
           val (typedDoc, _) = TypeInfer(opts).apply(doc)
           val unification = Unification(opts)
-          val visitors = tstRules.map {
+          val tstVisitors = tstRules.map {
             case (id, conf) =>
               TstRules.allRules(id)(
                   conf,
-                  doc.version.value,
+                  wdlVersion,
                   unification,
-                  events(url),
+                  docEvents,
                   Some(url)
               )
           }.toVector
-          val tstWalker = LinterTstWalker(opts, visitors)
+          val tstWalker = LinterTstWalker(opts, tstVisitors)
           tstWalker.apply(typedDoc)
         }
       }

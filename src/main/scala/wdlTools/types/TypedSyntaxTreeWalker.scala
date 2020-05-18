@@ -155,9 +155,9 @@ object TypedSyntaxTreeVisitor {
       * Finds the first ancestor of this context that is an executable type
       * (task or workflow).
       */
-    def findAncestorExecutable: Option[Element] = {
+    def findAncestorExecutable: Option[Callable] = {
       @tailrec
-      def getExecutable(ctx: VisitorContext[_]): Option[Element] = {
+      def getExecutable(ctx: VisitorContext[_]): Option[Callable] = {
         ctx.element match {
           case t: Task                   => Some(t)
           case w: Workflow               => Some(w)

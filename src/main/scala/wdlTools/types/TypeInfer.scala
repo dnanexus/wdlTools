@@ -667,30 +667,36 @@ case class TypeInfer(conf: Options) {
   // language for meta values only.
   private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(_)                          => TAT.MetaNull
-      case AST.ValueBoolean(value, _)                => TAT.MetaBoolean(value)
-      case AST.ValueInt(value, _)                    => TAT.MetaInt(value)
-      case AST.ValueFloat(value, _)                  => TAT.MetaFloat(value)
-      case AST.ValueString(value, _)                 => TAT.MetaString(value)
-      case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaNull
-      case AST.ExprIdentifier(id, _)                 => TAT.MetaString(id)
-      case AST.ExprArray(vec, _)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
-      case AST.ExprMap(members, _) =>
-        TAT.MetaObject(members.map {
-          case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case other =>
-            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-        }.toMap)
-      case AST.ExprObject(members, _) =>
-        TAT.MetaObject(members.map {
-          case AST.ExprObjectMember(key, value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case other =>
-            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-        }.toMap)
+      case AST.ValueNull(text)                          => TAT.MetaNull(text)
+      case AST.ValueBoolean(value, text)                => TAT.MetaBoolean(value, text)
+      case AST.ValueInt(value, text)                    => TAT.MetaInt(value, text)
+      case AST.ValueFloat(value, text)                  => TAT.MetaFloat(value, text)
+      case AST.ValueString(value, text)                 => TAT.MetaString(value, text)
+      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaNull(text)
+      case AST.ExprIdentifier(id, text)                 => TAT.MetaString(id, text)
+      case AST.ExprArray(vec, text)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)), text)
+      case AST.ExprMap(members, text) =>
+        TAT.MetaObject(
+            members.map {
+              case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case other =>
+                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+            }.toMap,
+            text
+        )
+      case AST.ExprObject(members, text) =>
+        TAT.MetaObject(
+            members.map {
+              case AST.ExprObjectMember(key, value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case other =>
+                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+            }.toMap,
+            text
+        )
       case other =>
         throw new TypeException(s"${SUtil.exprToString(other)} is an invalid meta value",
                                 expr.text,
