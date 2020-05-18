@@ -5,7 +5,8 @@ import wdlTools.syntax.{AbstractSyntaxTreeVisitor, AbstractSyntaxTreeWalker}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Options
 
-case class LinterAstWalker(opts: Options, visitors: Vector[AbstractSyntaxTreeVisitor])
+case class LinterAbstractSyntaxTreeWalker(opts: Options,
+                                          visitors: Vector[AbstractSyntaxTreeVisitor])
     extends AbstractSyntaxTreeWalker(opts) {
   def visitEveryContext(ctx: VisitorContext[Element]): Unit = {}
 

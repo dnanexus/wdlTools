@@ -19,7 +19,7 @@ import scala.collection.mutable
 import scala.sys.process._
 import scala.util.Random
 
-object TstRules {
+object TypedAbstractSyntaxTreeRules {
   class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends TypedSyntaxTreeVisitor {
     protected def addEvent(ctx: VisitorContext[_ <: Element],

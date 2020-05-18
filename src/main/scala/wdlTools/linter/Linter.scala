@@ -42,8 +42,8 @@ case class Linter(opts: Options,
     // TODO: Ignore events generated from TypeExceptions that dupilicate events added by AST Rules
     parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>
       val wdlVersion = doc.version.value
-      val astRules = rules.view.filterKeys(AstRules.allRules.contains)
-      val tstRules = rules.view.filterKeys(TstRules.allRules.contains)
+      val astRules = rules.view.filterKeys(AbstractSyntaxTreeRules.allRules.contains)
+      val tstRules = rules.view.filterKeys(TypedAbstractSyntaxTreeRules.allRules.contains)
       if (astRules.nonEmpty || tstRules.nonEmpty) {
         if (!events.contains(doc.sourceUrl)) {
           val docEvents = mutable.ArrayBuffer.empty[LintEvent]
@@ -54,14 +54,14 @@ case class Linter(opts: Options,
         if (astRules.nonEmpty) {
           val astVisitors = astRules.map {
             case (id, conf) =>
-              AstRules.allRules(id)(
+              AbstractSyntaxTreeRules.allRules(id)(
                   conf,
                   wdlVersion,
                   docEvents,
                   Some(url)
               )
           }.toVector
-          val astWalker = LinterAstWalker(opts, astVisitors)
+          val astWalker = LinterAbstractSyntaxTreeWalker(opts, astVisitors)
           astWalker.apply(doc)
         }
         if (tstRules.nonEmpty) {
@@ -70,7 +70,7 @@ case class Linter(opts: Options,
           val unification = Unification(opts)
           val tstVisitors = tstRules.map {
             case (id, conf) =>
-              TstRules.allRules(id)(
+              TypedAbstractSyntaxTreeRules.allRules(id)(
                   conf,
                   wdlVersion,
                   unification,
@@ -78,7 +78,7 @@ case class Linter(opts: Options,
                   Some(url)
               )
           }.toVector
-          val tstWalker = LinterTstWalker(opts, tstVisitors)
+          val tstWalker = LinterTypedAbstractSyntaxTreeWalker(opts, tstVisitors)
           tstWalker.apply(typedDoc)
         }
       }

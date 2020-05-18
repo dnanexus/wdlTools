@@ -9,7 +9,7 @@ import wdlTools.util.Util.getFilename
 
 import scala.collection.mutable
 
-object AstRules {
+object AbstractSyntaxTreeRules {
   class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
       extends AbstractSyntaxTreeVisitor {
     protected def addEvent(ctx: VisitorContext[_ <: Element],

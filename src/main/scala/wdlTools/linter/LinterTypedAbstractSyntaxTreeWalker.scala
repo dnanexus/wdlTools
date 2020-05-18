@@ -5,7 +5,8 @@ import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{TypedSyntaxTreeVisitor, TypedSyntaxTreeWalker}
 import wdlTools.util.Options
 
-case class LinterTstWalker(opts: Options, visitors: Vector[TypedSyntaxTreeVisitor])
+case class LinterTypedAbstractSyntaxTreeWalker(opts: Options,
+                                               visitors: Vector[TypedSyntaxTreeVisitor])
     extends TypedSyntaxTreeWalker(opts) {
   def visitEveryContext(ctx: VisitorContext[Element]): Unit = {}
 
