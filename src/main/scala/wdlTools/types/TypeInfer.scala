@@ -900,7 +900,7 @@ case class TypeInfer(conf: Options) {
         case Some(c: T_Call) => c
         case Some(_) =>
           throw new TypeException(
-              s"call ${actualName} after clause refers non-call declaration ${after.name}",
+              s"call ${actualName} after clause refers to non-call declaration ${after.name}",
               after.text,
               ctx.docSourceUrl
           )
