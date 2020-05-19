@@ -12,6 +12,7 @@ import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Options, Util => UUtil}
 
 case class TypeInfer(conf: Options) {
+  private val unify = Unification(conf)
   private val regime = conf.typeChecking
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -202,7 +203,7 @@ case class TypeInfer(conf: Options) {
                          textSource: TextSource,
                          ctx: Context): WdlType = {
     try {
-      val (t, _) = ctx.unify.unifyCollection(vec, Map.empty, textSource)
+      val (t, _) = unify.unifyCollection(vec, Map.empty)
       t
     } catch {
       case _: TypeUnificationException =>
@@ -237,7 +238,7 @@ case class TypeInfer(conf: Options) {
       case AST.ExprCompoundString(vec, text) =>
         val vec2 = vec.map { subExpr =>
           val e2 = applyExpr(subExpr, bindings, ctx)
-          if (!ctx.unify.isCoercibleTo(T_String, e2.wdlType, expr.text))
+          if (!unify.isCoercibleTo(T_String, e2.wdlType))
             throw new TypeException(
                 s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
                 expr.text,
@@ -261,7 +262,7 @@ case class TypeInfer(conf: Options) {
         val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
         val (t, _) =
           try {
-            ctx.unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty, expr.text)
+            unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)
           } catch {
             case _: TypeUnificationException =>
               throw new TypeException(
@@ -322,8 +323,8 @@ case class TypeInfer(conf: Options) {
         val de = applyExpr(default, bindings, ctx)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
-          case T_Optional(vt2) if ctx.unify.isCoercibleTo(de.wdlType, vt2, expr.text) => de.wdlType
-          case vt2 if ctx.unify.isCoercibleTo(de.wdlType, vt2, expr.text)             =>
+          case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
+          case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
             // another unsavory case. The optional_value is NOT optional.
             de.wdlType
           case _ =>
@@ -347,7 +348,7 @@ case class TypeInfer(conf: Options) {
                                   ctx.docSourceUrl)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
-          case T_Array(x, _) if ctx.unify.isCoercibleTo(T_String, x, expr.text) =>
+          case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
             T_String
           case other =>
             throw new TypeException(
@@ -459,7 +460,7 @@ case class TypeInfer(conf: Options) {
         val t =
           try {
             val (t, _) =
-              ctx.unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty, expr.text)
+              unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)
             t
           } catch {
             case _: TypeUnificationException =>
@@ -549,7 +550,7 @@ case class TypeInfer(conf: Options) {
       case (_, Some(expr)) =>
         val e = applyExpr(expr, bindings, ctx)
         val rhsType = e.wdlType
-        if (!ctx.unify.isCoercibleTo(lhsType, rhsType, e.text)) {
+        if (!unify.isCoercibleTo(lhsType, rhsType)) {
           throw new TypeException(s"""|${decl.name} is of type ${typeToString(lhsType)}
                                       |but is assigned ${typeToString(rhsType)}
                                       |${exprToString(e)}
@@ -815,7 +816,7 @@ case class TypeInfer(conf: Options) {
                   ctx.docSourceUrl
               )
           case Some((calleeType, _)) if regime >= Moderate =>
-            if (!ctx.unify.isCoercibleTo(calleeType, tExpr.wdlType, call.text))
+            if (!unify.isCoercibleTo(calleeType, tExpr.wdlType))
               throw new TypeException(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}",
                   call.text,
@@ -1032,7 +1033,6 @@ case class TypeInfer(conf: Options) {
     val initCtx = Context(
         version = doc.version.value,
         stdlib = Stdlib(conf, doc.version.value, Some(doc.sourceUrl)),
-        unify = Unification(conf, Some(doc.sourceUrl)),
         docSourceUrl = Some(doc.sourceUrl)
     )
 

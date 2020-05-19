@@ -7,7 +7,7 @@ import wdlTools.util.Options
 import wdlTools.syntax.{TextSource, WdlVersion}
 
 case class Stdlib(conf: Options, version: WdlVersion, docSourceUrl: Option[URL]) {
-  private val unify = Unification(conf, docSourceUrl)
+  private val unify = Unification(conf)
 
   // Some functions are overloaded and can take several kinds of arguments.
   // A particulary problematic one is size.
@@ -171,8 +171,8 @@ case class Stdlib(conf: Options, version: WdlVersion, docSourceUrl: Option[URL])
         return None
     }
     try {
-      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty, textSource)
-      val t = unify.substitute(funcDesc.output, ctx, textSource)
+      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
+      val t = unify.substitute(funcDesc.output, ctx, textSource, docSourceUrl)
       Some((t, funcDesc))
     } catch {
       case _: TypeUnificationException =>

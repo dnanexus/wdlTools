@@ -12,7 +12,6 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 // An additional variable holds a list of all imported namespaces.
 case class Context(version: WdlVersion,
                    stdlib: Stdlib,
-                   unify: Unification,
                    docSourceUrl: Option[URL] = None,
                    inputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
