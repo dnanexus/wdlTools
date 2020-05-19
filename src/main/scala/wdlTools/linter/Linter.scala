@@ -36,8 +36,22 @@ case class Linter(opts: Options,
       case (url, docEvents) => url -> docEvents.toVector.sortWith(_ < _)
     }.toMap
 
+  def handleParserError(docSourceUrl: Option[URL], e: Exception): Boolean = {
+    // convert parser exception to LintEvent
+    require(docSourceUrl.isDefined)
+    val url = docSourceUrl.get
+    if (!events.contains(url)) {
+      val docEvents = mutable.ArrayBuffer.empty[LintEvent]
+      events(url) = docEvents
+    }
+    events(url)
+    true
+  }
+
   def apply(url: URL): Unit = {
-    val parsers = Parsers(opts, listenerFactories = Vector(LinterParserRuleFactory(rules, events)))
+    val parsers = Parsers(opts,
+                          listenerFactories = Vector(LinterParserRuleFactory(rules, events)),
+                          errorHandler = Some(handleParserError))
     // TODO: Catch SyntaxExceptions and TypeExceptions and convert them to LintEvents
     // TODO: Ignore events generated from TypeExceptions that dupilicate events added by AST Rules
     parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>

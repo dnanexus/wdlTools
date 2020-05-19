@@ -10,11 +10,12 @@ import wdlTools.util.{Options, SourceCode, Util}
 import scala.collection.mutable
 
 case class Parsers(opts: Options = Options(),
-                   listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty) {
+                   listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
+                   errorHandler: Option[(Option[URL], Exception) => Boolean] = None) {
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories),
-      WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories),
-      WdlVersion.V2 -> v2.ParseAll(opts, listenerFactories)
+      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories, errorHandler),
+      WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories, errorHandler),
+      WdlVersion.V2 -> v2.ParseAll(opts, listenerFactories, errorHandler)
   )
 
   def getParser(url: URL): WdlParser = {

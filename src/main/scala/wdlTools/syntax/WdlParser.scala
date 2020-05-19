@@ -11,14 +11,21 @@ trait DocumentWalker[T] {
   def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
 }
 
-abstract class WdlParser(opts: Options) {
+abstract class WdlParser(opts: Options,
+                         errorHandler: Option[(Option[URL], Exception) => Boolean] = None) {
   // cache of documents that have already been fetched and parsed.
-  private val docCache: mutable.Map[URL, AbstractSyntax.Document] = mutable.Map.empty
+  private val docCache: mutable.Map[URL, Option[AbstractSyntax.Document]] = mutable.Map.empty
 
-  protected def followImport(url: URL): AbstractSyntax.Document = {
+  protected def followImport(url: URL): Option[AbstractSyntax.Document] = {
     docCache.get(url) match {
       case None =>
-        val aDoc = parseDocument(SourceCode.loadFrom(url))
+        val aDoc =
+          try {
+            Some(parseDocument(SourceCode.loadFrom(url)))
+          } catch {
+            case e: Exception if errorHandler.isDefined && errorHandler.get(Some(url), e) => None
+            case e                                                                        => throw e
+          }
         docCache(url) = aDoc
         aDoc
       case Some(aDoc) => aDoc
@@ -74,8 +81,13 @@ abstract class WdlParser(opts: Options) {
         }
       }
 
-      val document = parseDocument(sourceCode)
-      addDocument(sourceCode.url, document)
+      try {
+        val document = parseDocument(sourceCode)
+        addDocument(sourceCode.url, document)
+      } catch {
+        case e: Exception if errorHandler.isDefined && errorHandler.get(sourceCode.url, e) => ()
+        case e                                                                             => throw e
+      }
       results.toMap
     }
   }
