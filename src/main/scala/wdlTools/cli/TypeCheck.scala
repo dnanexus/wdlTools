@@ -1,21 +1,20 @@
 package wdlTools.cli
 
-import wdlTools.syntax.Parsers
-import wdlTools.types.{Context, TypeInfer}
+import wdlTools.syntax.{Parsers, SyntaxException}
+import wdlTools.types.{TypeException, TypeInfer}
 
-// TODO: nicely format errors, including JSON output
 case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.check.url()
     val opts = conf.check.getOptions
-    require(opts.followImports)
     val parsers = Parsers(opts)
     val checker = TypeInfer(opts)
-
-    parsers.getDocumentWalker[Context](url).walk { (doc, _) =>
-      // TODO: rather than throw an exception as soon as a type error is encountered, accumulate all errors
-      // and print them out at the end
-      checker.apply(doc)
+    try {
+      checker.apply(parsers.parseDocument(url))
+    } catch {
+      case e: SyntaxException => println(s"Failed to parse WDL document: ${e.getMessage}")
+      // TODO: accumulate all errors
+      case e: TypeException => println(s"Failed to type-check WDL document: ${e.getMessage}")
     }
   }
 }

@@ -12,7 +12,6 @@ import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Options, Util => UUtil}
 
 case class TypeInfer(conf: Options) {
-  private val unify = Unification(conf)
   private val regime = conf.typeChecking
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -200,15 +199,15 @@ case class TypeInfer(conf: Options) {
   // unify a vector of types
   private def unifyTypes(vec: Iterable[WdlType],
                          errMsg: String,
-                         text: TextSource,
+                         textSource: TextSource,
                          ctx: Context): WdlType = {
     try {
-      val (t, _) = unify.unifyCollection(vec, Map.empty)
+      val (t, _) = ctx.unify.unifyCollection(vec, Map.empty, textSource)
       t
     } catch {
       case _: TypeUnificationException =>
         throw new TypeException(errMsg + " must have the same type, or be coercible to one",
-                                text,
+                                textSource,
                                 ctx.docSourceUrl)
     }
   }
@@ -238,7 +237,7 @@ case class TypeInfer(conf: Options) {
       case AST.ExprCompoundString(vec, text) =>
         val vec2 = vec.map { subExpr =>
           val e2 = applyExpr(subExpr, bindings, ctx)
-          if (!unify.isCoercibleTo(T_String, e2.wdlType))
+          if (!ctx.unify.isCoercibleTo(T_String, e2.wdlType, expr.text))
             throw new TypeException(
                 s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
                 expr.text,
@@ -262,7 +261,7 @@ case class TypeInfer(conf: Options) {
         val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
         val (t, _) =
           try {
-            unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)
+            ctx.unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty, expr.text)
           } catch {
             case _: TypeUnificationException =>
               throw new TypeException(
@@ -286,9 +285,8 @@ case class TypeInfer(conf: Options) {
 
       case AST.ExprMap(value, text) =>
         // figure out the types from the first element
-        val m: Map[TAT.Expr, TAT.Expr] = value.map {
-          case item: AST.ExprMapItem =>
-            applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
+        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
+          applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
@@ -324,8 +322,8 @@ case class TypeInfer(conf: Options) {
         val de = applyExpr(default, bindings, ctx)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
-          case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
-          case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
+          case T_Optional(vt2) if ctx.unify.isCoercibleTo(de.wdlType, vt2, expr.text) => de.wdlType
+          case vt2 if ctx.unify.isCoercibleTo(de.wdlType, vt2, expr.text)             =>
             // another unsavory case. The optional_value is NOT optional.
             de.wdlType
           case _ =>
@@ -349,7 +347,7 @@ case class TypeInfer(conf: Options) {
                                   ctx.docSourceUrl)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
-          case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
+          case T_Array(x, _) if ctx.unify.isCoercibleTo(T_String, x, expr.text) =>
             T_String
           case other =>
             throw new TypeException(
@@ -460,7 +458,8 @@ case class TypeInfer(conf: Options) {
         val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
         val t =
           try {
-            val (t, _) = unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)
+            val (t, _) =
+              ctx.unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty, expr.text)
             t
           } catch {
             case _: TypeUnificationException =>
@@ -550,7 +549,7 @@ case class TypeInfer(conf: Options) {
       case (_, Some(expr)) =>
         val e = applyExpr(expr, bindings, ctx)
         val rhsType = e.wdlType
-        if (!unify.isCoercibleTo(lhsType, rhsType)) {
+        if (!ctx.unify.isCoercibleTo(lhsType, rhsType, e.text)) {
           throw new TypeException(s"""|${decl.name} is of type ${typeToString(lhsType)}
                                       |but is assigned ${typeToString(rhsType)}
                                       |${exprToString(e)}
@@ -602,7 +601,7 @@ case class TypeInfer(conf: Options) {
                               ctx.docSourceUrl)
 
     // translate the declarations
-    val (tDecls, bindings) =
+    val (tDecls, _) =
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
@@ -624,15 +623,15 @@ case class TypeInfer(conf: Options) {
       case None => Map.empty
       case Some(TAT.InputSection(decls, _)) =>
         decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), text) =>
+          case TAT.Declaration(name, wdlType, Some(_), _) =>
             // input has a default value, caller may omit it.
             name -> (wdlType, true)
 
-          case TAT.Declaration(name, T_Optional(t), None, text) =>
+          case TAT.Declaration(name, T_Optional(t), None, _) =>
             // input is optional, caller can omit it.
             name -> (T_Optional(t), true)
 
-          case TAT.Declaration(name, t, None, text) =>
+          case TAT.Declaration(name, t, None, _) =>
             // input is compulsory
             name -> (t, false)
         }.toMap
@@ -693,7 +692,7 @@ case class TypeInfer(conf: Options) {
 
   private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
     kvs.map {
-      case AST.MetaKV(k, v, text) =>
+      case AST.MetaKV(k, v, _) =>
         k -> metaValueFromExpr(v, ctx)
     }.toMap
   }
@@ -816,7 +815,7 @@ case class TypeInfer(conf: Options) {
                   ctx.docSourceUrl
               )
           case Some((calleeType, _)) if regime >= Moderate =>
-            if (!unify.isCoercibleTo(calleeType, tExpr.wdlType))
+            if (!ctx.unify.isCoercibleTo(calleeType, tExpr.wdlType, call.text))
               throw new TypeException(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}",
                   call.text,
@@ -927,7 +926,9 @@ case class TypeInfer(conf: Options) {
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case _ =>
-        throw new Exception(s"Collection in scatter (${scatter}) is not an array type")
+        throw new TypeException(s"Collection in scatter (${scatter}) is not an array type",
+                                scatter.text,
+                                ctxOuter.docSourceUrl)
     }
     // add a binding for the iteration variable
     //
@@ -971,7 +972,9 @@ case class TypeInfer(conf: Options) {
                                ctxOuter: Context): (TAT.Conditional, Bindings) = {
     val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter)
     if (condExpr.wdlType != T_Boolean)
-      throw new Exception(s"Expression ${exprToString(condExpr)} must have boolean type")
+      throw new TypeException(s"Expression ${exprToString(condExpr)} must have boolean type",
+                              cond.text,
+                              ctxOuter.docSourceUrl)
 
     // keep track of the inner/outer bindings. Within the block we need [inner],
     // [outer] is what we produce, which has the optional modifier applied to
@@ -1026,9 +1029,12 @@ case class TypeInfer(conf: Options) {
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
-    val initCtx = Context(version = doc.version.value,
-                          stdlib = Stdlib(conf, doc.version.value),
-                          docSourceUrl = Some(doc.sourceUrl))
+    val initCtx = Context(
+        version = doc.version.value,
+        stdlib = Stdlib(conf, doc.version.value, Some(doc.sourceUrl)),
+        unify = Unification(conf, Some(doc.sourceUrl)),
+        docSourceUrl = Some(doc.sourceUrl)
+    )
 
     // translate each of the elements in the document
     val (context, elements) =

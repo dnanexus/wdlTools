@@ -6,8 +6,8 @@ import WdlTypes._
 import wdlTools.util.Options
 import wdlTools.syntax.{TextSource, WdlVersion}
 
-case class Stdlib(conf: Options, version: WdlVersion) {
-  private val unify = Unification(conf)
+case class Stdlib(conf: Options, version: WdlVersion, docSourceUrl: Option[URL]) {
+  private val unify = Unification(conf, docSourceUrl)
 
   // Some functions are overloaded and can take several kinds of arguments.
   // A particulary problematic one is size.
@@ -160,8 +160,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
   // some functions are polymorphic in their inputs.
   private def evalOnePrototype(funcDesc: T_Function,
                                inputTypes: Vector[T],
-                               text: TextSource,
-                               docSourceUrl: Option[URL]): Option[(T, T_Function)] = {
+                               textSource: TextSource): Option[(T, T_Function)] = {
     val arity = inputTypes.size
     val args = (arity, funcDesc) match {
       case (0, T_Function0(_, _))                   => Vector.empty
@@ -172,8 +171,8 @@ case class Stdlib(conf: Options, version: WdlVersion) {
         return None
     }
     try {
-      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
-      val t = unify.substitute(funcDesc.output, ctx, text)
+      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty, textSource)
+      val t = unify.substitute(funcDesc.output, ctx, textSource)
       Some((t, funcDesc))
     } catch {
       case _: TypeUnificationException =>
@@ -181,14 +180,11 @@ case class Stdlib(conf: Options, version: WdlVersion) {
     }
   }
 
-  def apply(funcName: String,
-            inputTypes: Vector[T],
-            text: TextSource,
-            docSourceUrl: Option[URL] = None): (T, T_Function) = {
+  def apply(funcName: String, inputTypes: Vector[T], textSource: TextSource): (T, T_Function) = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
         throw new TypeException(s"No function named ${funcName} in the standard library",
-                                text,
+                                textSource,
                                 docSourceUrl)
       case Some(protoVec) =>
         protoVec
@@ -197,7 +193,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[(T, T_Function)]] = candidates.map {
-      evalOnePrototype(_, inputTypes, text, docSourceUrl)
+      evalOnePrototype(_, inputTypes, textSource)
     }
     val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
     results.size match {
@@ -207,7 +203,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
         throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
                                     |${candidatesStr}
                                     |inputs: ${inputsStr}
-                                    |""".stripMargin, text, docSourceUrl)
+                                    |""".stripMargin, textSource, docSourceUrl)
       case 1 =>
         results.head
       case n =>
@@ -225,7 +221,7 @@ case class Stdlib(conf: Options, version: WdlVersion) {
               |prototypes:
               |${prototypeDescriptions}
               |""".stripMargin
-        throw new TypeException(msg, text, docSourceUrl)
+        throw new TypeException(msg, textSource, docSourceUrl)
     }
   }
 }

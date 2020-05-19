@@ -8,7 +8,7 @@ import wdlTools.types.WdlTypes._
 import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
 
-case class Unification(conf: Options) {
+case class Unification(conf: Options, docSourceUrl: Option[URL]) {
   // Type checking rules. Are we lenient or strict in checking coercions?
   private val regime = conf.typeChecking
 
@@ -60,11 +60,12 @@ case class Unification(conf: Options) {
     }
   }
 
-  def isCoercibleTo(left: T, right: T): Boolean = {
+  @throws(classOf[TypeException])
+  def isCoercibleTo(left: T, right: T, textSource: TextSource): Boolean = {
     if (left.isInstanceOf[T_Identifier])
-      throw new Exception(s"${left} should not appear here")
+      throw new TypeException(s"${left} should not appear here", textSource, docSourceUrl)
     if (right.isInstanceOf[T_Identifier])
-      throw new Exception(s"${right} should not appear here")
+      throw new TypeException(s"${right} should not appear here", textSource, docSourceUrl)
 
     (left, right) match {
       // List of special cases goes here
@@ -97,77 +98,84 @@ case class Unification(conf: Options) {
   // we need to figure out that X is Int.
   //
   //
-  def unify(x: T, y: T, ctx: TypeUnificationContext): (T, TypeUnificationContext) = {
-    (x, y) match {
-      // base case, primitive types
-      case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
-        (x, ctx)
-      case (T_Any, T_Any) => (T_Any, ctx)
-      case (x, T_Any)     => (x, ctx)
-      case (T_Any, x)     => (x, ctx)
+  @throws(classOf[TypeUnificationException])
+  def unify(x: T,
+            y: T,
+            ctx: TypeUnificationContext,
+            textSource: TextSource): (T, TypeUnificationContext) = {
+    def unifyRecursive(x: T, y: T, ctx: TypeUnificationContext): (T, TypeUnificationContext) = {
+      (x, y) match {
+        // base case, primitive types
+        case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y, textSource) =>
+          (x, ctx)
+        case (T_Any, T_Any) => (T_Any, ctx)
+        case (x, T_Any)     => (x, ctx)
+        case (T_Any, x)     => (x, ctx)
 
-      case (T_Object, T_Object)    => (T_Object, ctx)
-      case (T_Object, _: T_Struct) => (T_Object, ctx)
+        case (T_Object, T_Object)    => (T_Object, ctx)
+        case (T_Object, _: T_Struct) => (T_Object, ctx)
 
-      case (T_Optional(l), T_Optional(r)) =>
-        val (t, ctx2) = unify(l, r, ctx)
-        (T_Optional(t), ctx2)
+        case (T_Optional(l), T_Optional(r)) =>
+          val (t, ctx2) = unifyRecursive(l, r, ctx)
+          (T_Optional(t), ctx2)
 
-      // These two cases are really questionable to me. We are allowing an X to
-      // become an X?
-      case (T_Optional(l), r) =>
-        val (t, ctx2) = unify(l, r, ctx)
-        (T_Optional(t), ctx2)
-      case (l, T_Optional(r)) =>
-        val (t, ctx2) = unify(l, r, ctx)
-        (T_Optional(t), ctx2)
+        // These two cases are really questionable to me. We are allowing an X to
+        // become an X?
+        case (T_Optional(l), r) =>
+          val (t, ctx2) = unifyRecursive(l, r, ctx)
+          (T_Optional(t), ctx2)
+        case (l, T_Optional(r)) =>
+          val (t, ctx2) = unifyRecursive(l, r, ctx)
+          (T_Optional(t), ctx2)
 
-      case (T_Array(l, _), T_Array(r, _)) =>
-        val (t, ctx2) = unify(l, r, ctx)
-        (T_Array(t), ctx2)
-      case (T_Map(k1, v1), T_Map(k2, v2)) =>
-        val (kt, ctx2) = unify(k1, k2, ctx)
-        val (vt, ctx3) = unify(v1, v2, ctx2)
-        (T_Map(kt, vt), ctx3)
-      case (T_Pair(l1, r1), T_Pair(l2, r2)) =>
-        val (lt, ctx2) = unify(l1, l2, ctx)
-        val (rt, ctx3) = unify(r1, r2, ctx2)
-        (T_Pair(lt, rt), ctx3)
-      case (T_Identifier(l), T_Identifier(r)) if l == r =>
-        // a user defined type
-        (T_Identifier(l), ctx)
-      case (T_Var(i), T_Var(j)) if i == j =>
-        (T_Var(i), ctx)
+        case (T_Array(l, _), T_Array(r, _)) =>
+          val (t, ctx2) = unifyRecursive(l, r, ctx)
+          (T_Array(t), ctx2)
+        case (T_Map(k1, v1), T_Map(k2, v2)) =>
+          val (kt, ctx2) = unifyRecursive(k1, k2, ctx)
+          val (vt, ctx3) = unifyRecursive(v1, v2, ctx2)
+          (T_Map(kt, vt), ctx3)
+        case (T_Pair(l1, r1), T_Pair(l2, r2)) =>
+          val (lt, ctx2) = unifyRecursive(l1, l2, ctx)
+          val (rt, ctx3) = unifyRecursive(r1, r2, ctx2)
+          (T_Pair(lt, rt), ctx3)
+        case (T_Identifier(l), T_Identifier(r)) if l == r =>
+          // a user defined type
+          (T_Identifier(l), ctx)
+        case (T_Var(i), T_Var(j)) if i == j =>
+          (T_Var(i), ctx)
 
-      case (a: T_Var, b: T_Var) =>
-        // found a type equality between two variables
-        val ctx3: TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
-          case (None, None) =>
-            ctx + (a -> b)
-          case (None, Some(z)) =>
-            ctx + (a -> z)
-          case (Some(z), None) =>
-            ctx + (b -> z)
-          case (Some(z), Some(w)) =>
-            val (_, ctx2) = unify(z, w, ctx)
-            ctx2
-        }
-        (ctx3(a), ctx3)
+        case (a: T_Var, b: T_Var) =>
+          // found a type equality between two variables
+          val ctx3: TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
+            case (None, None) =>
+              ctx + (a -> b)
+            case (None, Some(z)) =>
+              ctx + (a -> z)
+            case (Some(z), None) =>
+              ctx + (b -> z)
+            case (Some(z), Some(w)) =>
+              val (_, ctx2) = unifyRecursive(z, w, ctx)
+              ctx2
+          }
+          (ctx3(a), ctx3)
 
-      case (a: T_Var, z) =>
-        if (!(ctx contains a)) {
-          // found a binding for a type variable
-          (z, ctx + (a -> z))
-        } else {
-          // a binding already exists, choose the more general
-          // type
-          val w = ctx(a)
-          unify(w, z, ctx)
-        }
+        case (a: T_Var, z) =>
+          if (!(ctx contains a)) {
+            // found a binding for a type variable
+            (z, ctx + (a -> z))
+          } else {
+            // a binding already exists, choose the more general
+            // type
+            val w = ctx(a)
+            unifyRecursive(w, z, ctx)
+          }
 
-      case _ =>
-        throw new TypeUnificationException(s"Types $x and $y do not match")
+        case _ =>
+          throw new TypeUnificationException(s"Types $x and $y do not match")
+      }
     }
+    unifyRecursive(x, y, ctx)
   }
 
   // Unify a set of type pairs, and return a solution for the type
@@ -188,37 +196,39 @@ case class Unification(conf: Options) {
   //    T_Var(0) -> T_Int
   //    T_Var(1) -> T_String
   //
+  @throws(classOf[TypeUnificationException])
   def unifyFunctionArguments(x: Vector[T],
                              y: Vector[T],
-                             ctx: TypeUnificationContext): (Vector[T], TypeUnificationContext) = {
+                             ctx: TypeUnificationContext,
+                             textSource: TextSource): (Vector[T], TypeUnificationContext) = {
     (x zip y).foldLeft((Vector.empty[T], ctx)) {
       case ((tVec, ctx), (lt, rt)) =>
-        val (t, ctx2) = unify(lt, rt, ctx)
+        val (t, ctx2) = unify(lt, rt, ctx, textSource)
         (tVec :+ t, ctx2)
     }
   }
 
   // Unify elements in a collection. For example, a vector of values.
+  @throws(classOf[TypeUnificationException])
   def unifyCollection(tVec: Iterable[T],
-                      ctx: TypeUnificationContext): (T, TypeUnificationContext) = {
+                      ctx: TypeUnificationContext,
+                      textSource: TextSource): (T, TypeUnificationContext) = {
     assert(tVec.nonEmpty)
     tVec.tail.foldLeft((tVec.head, ctx)) {
       case ((t, ctx), t2) =>
-        unify(t, t2, ctx)
+        unify(t, t2, ctx, textSource)
     }
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: T,
-                 typeBindings: Map[T_Var, T],
-                 srcText: TextSource,
-                 docSourceUrl: Option[URL] = None): T = {
+  @throws(classOf[TypeException])
+  def substitute(t: T, typeBindings: Map[T_Var, T], textSource: TextSource): T = {
     def sub(t: T): T = {
       t match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
         case a: T_Var if !(typeBindings contains a) =>
           throw new TypeException(s"type variable ${typeToString(a)} does not have a binding",
-                                  srcText,
+                                  textSource,
                                   docSourceUrl)
         case a: T_Var       => typeBindings(a)
         case x: T_Struct    => x
@@ -230,7 +240,7 @@ case class Unification(conf: Options) {
         case T_Any          => T_Any
         case other =>
           throw new TypeException(s"Type ${typeToString(other)} should not appear in this context",
-                                  srcText,
+                                  textSource,
                                   docSourceUrl)
       }
     }
