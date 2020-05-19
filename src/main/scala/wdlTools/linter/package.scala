@@ -8,7 +8,7 @@ import wdlTools.syntax.TextSource
 
 object Severity extends Enumeration {
   type Severity = Value
-  val Error, Warning, Ignore = Value
+  val Error, Warning, Suggestion, Ignore = Value
   val Default: Severity = Error
 }
 

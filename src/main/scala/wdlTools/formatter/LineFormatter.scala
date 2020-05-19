@@ -19,7 +19,7 @@ class LineFormatter(
     private val lines: mutable.Buffer[String],
     private val currentLine: mutable.StringBuilder,
     private val currentLineComments: mutable.Map[Int, String] = mutable.HashMap.empty,
-    private var currentIndentSteps: Int = 0, // TODO: should this be a MutableHolder?
+    private var currentIndentSteps: Int = 0,
     private var currentSpacing: Spacing = Spacing.On,
     private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
     private val sections: mutable.Buffer[Multiline] = mutable.ArrayBuffer.empty,

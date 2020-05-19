@@ -33,10 +33,70 @@
     "description": "Suspicious lack of task outputs (is this task really idempotent and portable?)",
     "severity": "Warning"
   },
-  "A008": {
+  "A004": {
+    "name": "name_collision",
+    "description": "Multiple elements defined with the same name",
+    "severity": "Warning"
+  },
+  "A005": {
+    "name": "unused_import",
+    "description": "Import is never used",
+    "severity": "Warning"
+  },
+  "A006": {
+    "name": "unknown_runtime_key",
+    "description": "Runtime key not recognized (or not allowed)",
+    "severity": "Warning"
+  },
+  "A007": {
+    "name": "missing_version",
+    "description": "This WDL file is an older version; upgrading to WDL 1.0 is recommended",
+    "severity":  "Suggestion"
+  },
+  "T001": {
+    "name": "string_coercion",
+    "description": "Questionable coercion from non-String value to String declaration/parameter",
+    "severity": "Warning"
+  },
+  "T002": {
+    "name": "file_coercion",
+    "description": "Questionable coercion from String value to File declaration/parameter",
+    "severity": "Warning"
+  },
+  "T003": {
+    "name": "array_coercion",
+    "description": "Questionable coercion from X -> Array[X]",
+    "severity": "Warning"
+  },
+  "T004": {
+    "name": "optional_coercion",
+    "description": "Questionable coercion from optional value to non-optional declaration/parameter",
+    "severity": "Warning"
+  },
+  "T005": {
+    "name": "non_empty_coercion",
+    "description": "Questionable coercion from possibly-empty Array to non-empty Array declaration/parameter",
+    "severity": "Warning"
+  },
+  "T006": {
+    "name": "unused_declaration",
+    "description": "Declaration is never used",
+    "severity": "Warning"
+  },
+  "T007": {
+    "name": "unnecessary_quantifier",
+    "description": "Unnecessary use of optional type for value that can't be null",
+    "severity": "Warning"
+  },
+  "T008": {
     "name": "shell_check",
     "description": "Runs ShellCheck on task commands and propagates any lint it finds",
     "severity": "Warning",
     "options": ["path"]
+  },
+  "T009": {
+    "name": "select_array",
+    "description": "select_first or select_all applied to a non-optional array",
+    "severity": "Warning"
   }
 }

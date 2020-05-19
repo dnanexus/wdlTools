@@ -7,24 +7,15 @@ import java.nio.file.{Files, Path}
 import spray.json._
 import wdlTools.linter.Severity.Severity
 import wdlTools.linter.{LintEvent, Linter, RuleConf, Severity}
-import wdlTools.util.JsonUtil.{getFields, getString}
+import wdlTools.util.JsonUtil.{getFields, getString, readJsonSource}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
 
 case class Lint(conf: WdlToolsConf) extends Command {
-  private def readJsonSource(src: Source): Map[String, JsValue] = {
-    try {
-      getFields(src.getLines.mkString(System.lineSeparator).parseJson)
-    } catch {
-      case _: NullPointerException =>
-        throw new Exception(s"Could not open resource ${RULES_RESOURCE}")
-    }
-  }
-
   private val RULES_RESOURCE = "rules/lint_rules.json"
   private val rulePrototypes = {
-    readJsonSource(Source.fromResource(RULES_RESOURCE)).map {
+    readJsonSource(Source.fromResource(RULES_RESOURCE), RULES_RESOURCE).map {
       case (ruleId, value) =>
         val fields = getFields(value)
         ruleId -> RuleConf(

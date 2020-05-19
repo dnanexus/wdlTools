@@ -549,8 +549,6 @@ object TypedAbstractSyntaxTreeRules {
     *   SC2193 The arguments to this comparison can never be equal
     * which can be triggered by dummy values we substitute to write the script
     * also SC1009 and SC1072 are non-informative commentary
-    *
-    * TODO: enable user to configure ShellCheck path
     */
   case class ShellCheckRule(conf: RuleConf,
                             version: WdlVersion,
