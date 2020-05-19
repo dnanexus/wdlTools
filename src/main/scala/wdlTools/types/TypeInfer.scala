@@ -9,11 +9,14 @@ import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{isPrimitive, typeToString, exprToString}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.util.TypeCheckingRegime._
-import wdlTools.util.{Options, Util => UUtil}
+import wdlTools.util.{Util => UUtil}
 
-case class TypeInfer(conf: Options) {
+case class TypeInfer(conf: TypeOptions) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
+  // whether to throw an Exception when encountering a type error (true) or
+  // to generate a T_Error type (false)
+  //private val errorAsException = conf.errorAsException
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.

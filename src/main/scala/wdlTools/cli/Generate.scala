@@ -13,13 +13,12 @@ import scala.language.reflectiveCalls
 case class Generate(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty
-    val opts = conf.getOptions
     val args = conf.generate
     val name = args.name()
     val outputDir: Path = args.outputDir.getOrElse(Paths.get(name))
 
     val generator = ProjectGenerator(
-        opts,
+        conf.generate.getOptions,
         name,
         outputDir,
         wdlVersion = args.wdlVersion(),

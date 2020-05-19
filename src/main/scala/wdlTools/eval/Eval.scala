@@ -5,7 +5,7 @@ import java.net.URL
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{EvalConfig, Options}
+import wdlTools.util.Options
 
 case class Eval(opts: Options,
                 evalCfg: EvalConfig,

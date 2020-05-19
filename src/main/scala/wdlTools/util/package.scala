@@ -20,28 +20,24 @@ object TypeCheckingRegime extends Enumeration {
 
 /**
   * Common configuration options.
+  *
   * @param localDirectories local directories to search for imports.
   * @param followImports whether to follow imports when parsing.
   * @param verbosity verbosity level.
-  * @param antlr4Trace whether to turn on tracing in the ANTLR4 parser.
-  * @param typeChecking strictness of type-checking
+  * @param antlr4Trace  whether to turn on tracing in the ANTLR4 parser.
   */
-case class Options(localDirectories: Vector[Path] = Vector.empty,
-                   followImports: Boolean = false,
-                   verbosity: Verbosity.Verbosity = Verbosity.Normal,
-                   antlr4Trace: Boolean = false,
-                   typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate) {
+class Options(val localDirectories: Vector[Path] = Vector.empty,
+              val followImports: Boolean = false,
+              val verbosity: Verbosity.Verbosity = Verbosity.Normal,
+              val antlr4Trace: Boolean = false) {
 
   def getUrl(pathOrUrl: String, mustExist: Boolean = true): URL = {
     Util.getUrl(pathOrUrl, localDirectories, mustExist)
   }
 }
 
-/** Configuration for expression evaluation. Some operations perform file IO.
-  *
-  * @param homeDir  the root directory for relative paths, and the root directory for search (glob).
-  * @param tmpDir   directory for placing temporary files.
-  * @param stdout   the file that has a copy of standard output. This is used in the command section.
-  * @param stderr   as above for standard error.
-  */
-case class EvalConfig(homeDir: Path, tmpDir: Path, stdout: Path, stderr: Path)
+case class BasicOptions(override val localDirectories: Vector[Path] = Vector.empty,
+                        override val followImports: Boolean = false,
+                        override val verbosity: Verbosity.Verbosity = Verbosity.Normal,
+                        override val antlr4Trace: Boolean = false)
+    extends Options(localDirectories, followImports, verbosity, antlr4Trace)

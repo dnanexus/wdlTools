@@ -1,8 +1,13 @@
 package wdlTools.types
 
+import wdlTools.syntax.TextSource
+
 // This is the WDL typesystem
 object WdlTypes {
   sealed trait T
+
+  // represents an error that occured during type inference
+  case class T_Error(textSource: TextSource, reason: Option[String]) extends T
 
   // primitive types
   case object T_Boolean extends T

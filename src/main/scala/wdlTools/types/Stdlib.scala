@@ -3,10 +3,9 @@ package wdlTools.types
 import java.net.URL
 
 import WdlTypes._
-import wdlTools.util.Options
 import wdlTools.syntax.{TextSource, WdlVersion}
 
-case class Stdlib(conf: Options, version: WdlVersion, docSourceUrl: Option[URL]) {
+case class Stdlib(conf: TypeOptions, version: WdlVersion, docSourceUrl: Option[URL]) {
   private val unify = Unification(conf)
 
   // Some functions are overloaded and can take several kinds of arguments.

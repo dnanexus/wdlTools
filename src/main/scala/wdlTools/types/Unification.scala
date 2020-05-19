@@ -5,10 +5,9 @@ import java.net.URL
 import wdlTools.syntax.TextSource
 import wdlTools.types.Util.{typeToString, isPrimitive}
 import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
 
-case class Unification(conf: Options) {
+case class Unification(conf: TypeOptions) {
   // Type checking rules. Are we lenient or strict in checking coercions?
   private val regime = conf.typeChecking
 

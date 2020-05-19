@@ -5,10 +5,10 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
+import wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
+import wdlTools.util.{Options, TypeCheckingRegime, Verbosity, Util => UUtil}
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
@@ -39,7 +39,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig(homeDir, tmpDir, stdout, stderr)
+    eval.EvalConfig(homeDir, tmpDir, stdout, stderr)
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {

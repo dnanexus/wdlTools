@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths}
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
-import wdlTools.util.{EvalConfig, Options}
+import wdlTools.util.Options
 import wdlTools.types.WdlTypes._
 
 case class StdlibV1(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])

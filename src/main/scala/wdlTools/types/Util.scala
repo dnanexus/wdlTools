@@ -24,6 +24,8 @@ object Util {
 
   def typeToString(t: T): String = {
     t match {
+      case T_Error(textSource, reason) =>
+        s"Error at ${textSource}: ${reason.getOrElse("unknown error")}"
       case T_Boolean        => "Boolean"
       case T_Int            => "Int"
       case T_Float          => "Float"

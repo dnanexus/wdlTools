@@ -12,9 +12,10 @@ import org.rogach.scallop.{
   singleArgConverter
 }
 import wdlTools.syntax.WdlVersion
+import wdlTools.types.TypeOptions
 import wdlTools.util.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.Verbosity._
-import wdlTools.util.{Options, TypeCheckingRegime, Util}
+import wdlTools.util.{BasicOptions, Options, TypeCheckingRegime, Util}
 
 import scala.util.Try
 
@@ -59,26 +60,48 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName,
                                            exceptionHandler[TypeCheckingRegime])
 
-  class ParserSubcommand(name: String, description: String) extends Subcommand(name) {
+  class WdlToolsSubcommand(name: String, description: String) extends Subcommand(name) {
     // there is a compiler bug that prevents accessing name directly
     banner(s"""Usage: wdlTools ${commandNameAndAliases.head} [OPTIONS] <path|uri>
               |${description}
               |
               |Options:
               |""".stripMargin)
+
+    val verbose: ScallopOption[Boolean] = toggle(descrYes = "use more verbose output")
+    val quiet: ScallopOption[Boolean] = toggle(descrYes = "use less verbose output")
+
+    /**
+      * The verbosity level
+      * @return
+      */
+    def verbosity: Verbosity = {
+      if (this.verbose.getOrElse(default = false)) {
+        Verbose
+      } else if (this.quiet.getOrElse(default = false)) {
+        Quiet
+      } else {
+        Normal
+      }
+    }
+  }
+
+  class ParserSubcommand(name: String, description: String)
+      extends WdlToolsSubcommand(name, description) {
+    val antlr4Trace: ScallopOption[Boolean] = toggle(
+        descrYes = "enable trace logging of the ANTLR4 parser",
+        descrNo = "disable trace logging of the ANTLR4 parser",
+        default = Some(false)
+    )
     val url: ScallopOption[URL] =
       trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
 
-    /**
-      * Gets a syntax.Util.Options object based on the command line options.
-      * @return
-      */
     def getOptions: Options = {
-      val wdlDir: Path = Util.getLocalPath(url()).getParent
-      parentConfig
-        .asInstanceOf[WdlToolsConf]
-        .getOptions
-        .copy(localDirectories = Vector(wdlDir))
+      BasicOptions(
+          Vector(Util.getLocalPath(url()).getParent),
+          verbosity = verbosity,
+          antlr4Trace = antlr4Trace()
+      )
     }
   }
 
@@ -103,14 +126,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
 
     override def getOptions: Options = {
-      val wdlDir: Path = Util.getLocalPath(url()).getParent
-      parentConfig
-        .asInstanceOf[WdlToolsConf]
-        .getOptions
-        .copy(
-            localDirectories = this.localDirectories(Set(wdlDir)),
-            followImports = true
-        )
+      BasicOptions(
+          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          followImports = true,
+          verbosity = verbosity,
+          antlr4Trace = antlr4Trace()
+      )
     }
   }
 
@@ -123,13 +144,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
 
     override def getOptions: Options = {
-      val opts = super.getOptions
-      val followImports = this.followImports()
-      if (followImports != opts.followImports) {
-        opts.copy(followImports = followImports)
-      } else {
-        opts
-      }
+      BasicOptions(
+          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          followImports = this.followImports(),
+          verbosity = verbosity,
+          antlr4Trace = antlr4Trace()
+      )
     }
   }
 
@@ -137,11 +157,6 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   banner("""Usage: wdlTools <COMMAND> [OPTIONS]
            |Options:
            |""".stripMargin)
-
-  val verbose: ScallopOption[Boolean] = toggle(descrYes = "use more verbose output")
-  val quiet: ScallopOption[Boolean] = toggle(descrYes = "use less verbose output")
-  val antlr4Trace: ScallopOption[Boolean] =
-    toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
   val check = new ParserSubcommandWithFollow(
       name = "check",
@@ -152,14 +167,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         default = Some(TypeCheckingRegime.Moderate)
     )
 
-    override def getOptions: Options = {
+    override def getOptions: TypeOptions = {
       val opts = super.getOptions
-      val typeChecking = regime()
-      if (opts.typeChecking != typeChecking) {
-        opts.copy(typeChecking = typeChecking)
-      } else {
-        opts
-      }
+      TypeOptions(opts.localDirectories, opts.verbosity, opts.antlr4Trace, regime())
     }
   }
   addSubcommand(check)
@@ -288,13 +298,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(printTree)
 
-  val generate = new Subcommand(commandNameAndAliases = "new") {
-    banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
-             |Generate a new WDL task, workflow, or project.
-             |
-             |Options:
-             |""".stripMargin)
-
+  val generate = new WdlToolsSubcommand(
+      name = "new",
+      description = "Generate a new WDL task, workflow, or project."
+  ) {
     val wdlVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
         descr = "WDL version to generate; currently only v1.0 is supported",
         default = Some(WdlVersion.V1)
@@ -346,6 +353,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
     val name: ScallopOption[String] =
       trailArg[String](descr = "The project name - this will also be the name of the workflow")
+
+    def getOptions: Options = {
+      BasicOptions(verbosity = verbosity)
+    }
   }
   addSubcommand(generate)
 
@@ -369,25 +380,4 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   addSubcommand(readmes)
 
   verify()
-
-  /**
-    * The verbosity level
-    * @return
-    */
-  def verbosity: Verbosity = {
-    if (this.verbose.getOrElse(default = false)) {
-      Verbose
-    } else if (this.quiet.getOrElse(default = false)) {
-      Quiet
-    } else {
-      Normal
-    }
-  }
-
-  def getOptions: Options = {
-    Options(
-        verbosity = verbosity,
-        antlr4Trace = antlr4Trace.getOrElse(default = false)
-    )
-  }
 }
