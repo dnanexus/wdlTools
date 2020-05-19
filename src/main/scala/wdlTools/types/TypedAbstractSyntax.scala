@@ -1,8 +1,8 @@
 package wdlTools.types
 
 import java.net.URL
+
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
-import wdlTools.types.WdlTypes
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
@@ -18,7 +18,7 @@ object TypedAbstractSyntax {
   // This is based on Cromwell wom.callable.Callable.InputDefinition. We need
   // it for backward compatibility reasons.
   //
-/*  sealed trait InputDefinition
+  /*  sealed trait InputDefinition
   case class RequiredInputDefinition(iName : String, wdlType : WdlTypes.T)
   case class OverridableInputDefinitionWithDefault(iName : String, wdlType : WdlTypes.T, defaultExpr : Expr)
 
@@ -41,12 +41,13 @@ object TypedAbstractSyntax {
 
   // values
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
+  case class ValueNone(wdlType: WdlType, text: TextSource) extends Expr
   case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueFloat(value: Double, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueString(value: String, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueFile(value: String, wdlType: WdlType, text: TextSource) extends Expr
-
+  case class ValueDirectory(value: String, wdlType: WdlType, text: TextSource) extends Expr
   case class ExprIdentifier(id: String, wdlType: WdlType, text: TextSource) extends Expr
 
   // represents strings with interpolation. These occur only in command blocks.
@@ -144,6 +145,7 @@ object TypedAbstractSyntax {
   // >>>
   case class CommandSection(parts: Vector[Expr], text: TextSource) extends Element
   case class RuntimeSection(kvs: Map[String, Expr], text: TextSource) extends Element
+  case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue
@@ -159,10 +161,11 @@ object TypedAbstractSyntax {
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
   case class MetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
 
-  case class Version(value: WdlVersion, text: TextSource) extends DocumentElement
+  case class Version(value: WdlVersion, text: TextSource) extends Element
 
   // import statement with the typed-AST for the referenced document
-  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
+  case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
+      extends Element
   case class ImportDoc(name: Option[String],
                        aliases: Vector[ImportAlias],
                        addr: String,
@@ -184,9 +187,12 @@ object TypedAbstractSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
+                  hints: Option[HintsSection],
                   text: TextSource)
       extends DocumentElement
       with Callable
+
+  case class CallAfter(name: String, text: TextSource) extends Element
 
   // The name of the call may not contain dots. Examples:
   //
@@ -200,6 +206,7 @@ object TypedAbstractSyntax {
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
                   alias: Option[String],
+                  afters: Vector[WdlTypes.T_Call],
                   actualName: String,
                   inputs: Map[String, Expr],
                   text: TextSource)

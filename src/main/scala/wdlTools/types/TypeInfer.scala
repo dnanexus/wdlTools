@@ -34,7 +34,10 @@ case class TypeInfer(conf: Options) {
         case T_Optional(T_String) => true
         case T_File               => true
         case T_Optional(T_File)   => true
-        case _                    => false
+        // Directory to String coercion is disallowed by the spec
+        case T_Directory             => false
+        case T_Optional(T_Directory) => false
+        case _                       => false
       }
     }
     val t = (a.wdlType, b.wdlType) match {
@@ -56,8 +59,9 @@ case class TypeInfer(conf: Options) {
       case (T_String, T_Optional(T_Int)) if regime == Lenient   => T_String
       case (T_String, T_Optional(T_Float)) if regime == Lenient => T_String
 
-      // adding files is equivalent to concatenating paths
-      case (T_File, T_String | T_File) => T_File
+      // adding files/directories is equivalent to concatenating paths
+      case (T_File, T_String | T_File)           => T_File
+      case (T_Directory, T_String | T_Directory) => T_Directory
 
       case (_, _) =>
         throw new TypeException(
@@ -286,9 +290,8 @@ case class TypeInfer(conf: Options) {
 
       case AST.ExprMap(value, text) =>
         // figure out the types from the first element
-        val m: Map[TAT.Expr, TAT.Expr] = value.map {
-          case item: AST.ExprMapItem =>
-            applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
+        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
+          applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
@@ -602,7 +605,7 @@ case class TypeInfer(conf: Options) {
                               ctx.docSourceUrl)
 
     // translate the declarations
-    val (tDecls, bindings) =
+    val (tDecls, _) =
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
@@ -624,15 +627,15 @@ case class TypeInfer(conf: Options) {
       case None => Map.empty
       case Some(TAT.InputSection(decls, _)) =>
         decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), text) =>
+          case TAT.Declaration(name, wdlType, Some(_), _) =>
             // input has a default value, caller may omit it.
             name -> (wdlType, true)
 
-          case TAT.Declaration(name, T_Optional(t), None, text) =>
+          case TAT.Declaration(name, T_Optional(t), None, _) =>
             // input is optional, caller can omit it.
             name -> (T_Optional(t), true)
 
-          case TAT.Declaration(name, t, None, text) =>
+          case TAT.Declaration(name, t, None, _) =>
             // input is compulsory
             name -> (t, false)
         }.toMap
@@ -654,6 +657,14 @@ case class TypeInfer(conf: Options) {
         name -> applyExpr(expr, Map.empty, ctx)
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
+  }
+
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
+    val m = hintsSection.kvs.map {
+      case AST.HintsKV(name, expr, _) =>
+        name -> applyExpr(expr, Map.empty, ctx)
+    }.toMap
+    TAT.HintsSection(m, hintsSection.text)
   }
 
   // convert the generic expression syntax into a specialized JSON object
@@ -691,20 +702,28 @@ case class TypeInfer(conf: Options) {
     }
   }
 
-  private def applyMetaKVs(kvs: Vector[AST.MetaKV], ctx: Context): Map[String, TAT.MetaValue] = {
-    kvs.map {
-      case AST.MetaKV(k, v, text) =>
-        k -> metaValueFromExpr(v, ctx)
-    }.toMap
-  }
-
   private def applyMeta(metaSection: AST.MetaSection, ctx: Context): TAT.MetaSection = {
-    TAT.MetaSection(applyMetaKVs(metaSection.kvs, ctx), metaSection.text)
+    TAT.MetaSection(metaSection.kvs.map {
+      case AST.MetaKV(k, v, _) =>
+        k -> metaValueFromExpr(v, ctx)
+    }.toMap, metaSection.text)
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
                              ctx: Context): TAT.ParameterMetaSection = {
-    TAT.ParameterMetaSection(applyMetaKVs(paramMetaSection.kvs, ctx), paramMetaSection.text)
+    TAT.ParameterMetaSection(
+        paramMetaSection.kvs.map { kv: AST.MetaKV =>
+          if (!ctx.inputs.contains(kv.id) && !ctx.outputs.contains(kv.id)) {
+            throw new TypeException(
+                s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
+                kv.text,
+                ctx.docSourceUrl
+            )
+          }
+          kv.id -> metaValueFromExpr(kv.expr, ctx)
+        }.toMap,
+        paramMetaSection.text
+    )
   }
 
   // TASK
@@ -715,9 +734,6 @@ case class TypeInfer(conf: Options) {
   //
   // We can't check the validity of the command section.
   private def applyTask(task: AST.Task, ctxOuter: Context): TAT.Task = {
-    val tMeta = task.meta.map(applyMeta(_, ctxOuter))
-    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOuter))
-
     val (tInputSection, ctx) = task.input match {
       case None =>
         (None, ctxOuter)
@@ -736,6 +752,7 @@ case class TypeInfer(conf: Options) {
       }
     val ctxDecl = ctx.bindVarList(bindings, task.text)
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
+    val tHints = task.hints.map(applyHints(_, ctxDecl))
 
     // check that all expressions can be coereced to a string inside
     // the command section
@@ -756,8 +773,17 @@ case class TypeInfer(conf: Options) {
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.text)
 
-    // check the output section. We don't need the returned context.
-    val tOutputSection = task.output.map(applyOutputSection(_, ctxDecl))
+    val (tOutputSection, ctxOutput) = task.output match {
+      case None =>
+        (None, ctxDecl)
+      case Some(outSection) =>
+        val tOutSection = applyOutputSection(outSection, ctxDecl)
+        val ctx = ctxDecl.bindOutputSection(tOutSection)
+        (Some(tOutSection), ctx)
+    }
+
+    val tMeta = task.meta.map(applyMeta(_, ctxOutput))
+    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the task
     val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
@@ -772,6 +798,7 @@ case class TypeInfer(conf: Options) {
         meta = tMeta,
         parameterMeta = tParamMeta,
         runtime = tRuntime,
+        hints = tHints,
         text = task.text
     )
   }
@@ -867,11 +894,31 @@ case class TypeInfer(conf: Options) {
       case None                         => None
       case Some(AST.CallAlias(name, _)) => Some(name)
     }
+
+    val afters = call.afters.map { after =>
+      ctx.declarations.get(after.name) match {
+        case Some(c: T_Call) => c
+        case Some(_) =>
+          throw new TypeException(
+              s"call ${actualName} after clause refers to non-call declaration ${after.name}",
+              after.text,
+              ctx.docSourceUrl
+          )
+        case None =>
+          throw new TypeException(
+              s"call ${actualName} after clause refers to non-existant call ${after.name}",
+              after.text,
+              ctx.docSourceUrl
+          )
+      }
+    }
+
     TAT.Call(
         fullyQualifiedName = call.name,
         wdlType = T_Call(actualName, callee.output),
         callee = callee,
         alias = alias,
+        afters = afters,
         actualName = actualName,
         inputs = callerInputs,
         text = call.text
@@ -992,9 +1039,6 @@ case class TypeInfer(conf: Options) {
   }
 
   private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
-    val tMeta = wf.meta.map(applyMeta(_, ctxOuter))
-    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOuter))
-
     val (tInputSection, ctx) = wf.input match {
       case None =>
         (None, ctxOuter)
@@ -1007,8 +1051,17 @@ case class TypeInfer(conf: Options) {
     val (bindings, wfElements) = applyWorkflowElements(ctx, wf.body)
     val ctxBody = ctx.bindVarList(bindings, wf.text)
 
-    // check the output section. We don't need the returned context.
-    val tOutputSection = wf.output.map(x => applyOutputSection(x, ctxBody))
+    val (tOutputSection, ctxOutput) = wf.output match {
+      case None =>
+        (None, ctxBody)
+      case Some(outSection) =>
+        val tOutSection = applyOutputSection(outSection, ctxBody)
+        val ctx = ctxBody.bindOutputSection(tOutSection)
+        (Some(tOutSection), ctx)
+    }
+
+    val tMeta = wf.meta.map(applyMeta(_, ctxOutput))
+    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the workflow
     val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
@@ -1061,7 +1114,8 @@ case class TypeInfer(conf: Options) {
           }
 
           val aliases = iStat.aliases.map {
-            case AST.ImportAlias(id1, id2, text) => TAT.ImportAlias(id1, id2, text)
+            case AST.ImportAlias(id1, id2, text) =>
+              TAT.ImportAlias(id1, id2, ctx.aliases(id1), text)
           }
           val importDoc =
             TAT.ImportDoc(iStat.name.map(_.value), aliases, iStat.addr.value, iDoc, iStat.text)

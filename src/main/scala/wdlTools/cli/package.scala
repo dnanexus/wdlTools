@@ -66,12 +66,28 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
               |
               |Options:
               |""".stripMargin)
+    val url: ScallopOption[URL] =
+      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
+
+    /**
+      * Gets a syntax.Util.Options object based on the command line options.
+      * @return
+      */
+    def getOptions: Options = {
+      val wdlDir: Path = Util.getLocalPath(url()).getParent
+      parentConfig
+        .asInstanceOf[WdlToolsConf]
+        .getOptions
+        .copy(localDirectories = Vector(wdlDir))
+    }
+  }
+
+  class ParserSubcommandWithFollow(name: String, description: String)
+      extends ParserSubcommand(name, description) {
     val localDir: ScallopOption[List[Path]] =
       opt[List[Path]](descr =
         "directory in which to search for imports; ignored if --nofollow-imports is specified"
       )
-    val url: ScallopOption[URL] =
-      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
 
     /**
       * The local directories to search for WDL imports.
@@ -86,11 +102,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       }.toVector
     }
 
-    /**
-      * Gets a syntax.Util.Options object based on the command line options.
-      * @return
-      */
-    def getOptions: Options = {
+    override def getOptions: Options = {
       val wdlDir: Path = Util.getLocalPath(url()).getParent
       parentConfig
         .asInstanceOf[WdlToolsConf]
@@ -103,7 +115,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
 
   class ParserSubcommandWithFollowOption(name: String, description: String)
-      extends ParserSubcommand(name, description) {
+      extends ParserSubcommandWithFollow(name, description) {
     val followImports: ScallopOption[Boolean] = toggle(
         descrYes = "(Default) format imported files in addition to the main file",
         descrNo = "only format the main file",
@@ -131,7 +143,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val antlr4Trace: ScallopOption[Boolean] =
     toggle(descrYes = "enable trace logging of the ANTLR4 parser")
 
-  val check = new ParserSubcommand(
+  val check = new ParserSubcommandWithFollow(
       name = "check",
       description = "Type check WDL file."
   ) {
@@ -264,11 +276,17 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(upgrade)
 
-  val printAST = new ParserSubcommandWithFollowOption(
-      name = "printAST",
+  val printTree = new ParserSubcommand(
+      name = "printTree",
       description = "Print the Abstract Syntax Tree for a WDL file."
-  )
-  addSubcommand(printAST)
+  ) {
+    val typed: ScallopOption[Boolean] = toggle(
+        descrYes = "Print the typed AST (document must pass type-checking)",
+        descrNo = "Print the raw AST",
+        default = Some(false)
+    )
+  }
+  addSubcommand(printTree)
 
   val generate = new Subcommand(commandNameAndAliases = "new") {
     banner("""Usage: wdlTools new <task|workflow|project> [OPTIONS]
