@@ -14,9 +14,24 @@ object TypedAbstractSyntax {
   }
   sealed trait WorkflowElement extends Element
   sealed trait DocumentElement extends Element
+
+  // This is based on Cromwell wom.callable.Callable.InputDefinition. We need
+  // it for backward compatibility reasons.
+  //
+/*  sealed trait InputDefinition
+  case class RequiredInputDefinition(iName : String, wdlType : WdlTypes.T)
+  case class OverridableInputDefinitionWithDefault(iName : String, wdlType : WdlTypes.T, defaultExpr : Expr)
+
+  // An input whose value should always be calculated from the default, and is
+  // not allowed to be overridden.
+  case class FixedInputDefinitionWithDefault(iName : String , wdlType : WdlTypes.T, defaultExpr : Expr)
+  case class OptionalInputDefinition(iName : String, wdlType : WdlTypes.T_Optional)*/
+
+  // A workflow or a task.
   sealed trait Callable {
     val name: String
     val wdlType: WdlTypes.T_Callable
+//    val inputs : Vector[InputDefinition]
   }
 
   // expressions

@@ -23,11 +23,4 @@ object WdlValues {
 
   // results from calling a task or workflow
   case class V_Call(name: String, members: Map[String, V]) extends V
-
-  type WomType = V
-  type WomBooleanType = V_Boolean
-  type WomIntegerType = V_Int
-  type WomFloatType = V_Float
-  type WomStringType = V_String
-  type WomSingleFileType = V_File
 }
