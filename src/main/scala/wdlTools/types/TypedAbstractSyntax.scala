@@ -1,8 +1,9 @@
 package wdlTools.types
 
 import java.net.URL
+
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
-import wdlTools.types.WdlTypes
+import wdlTools.types.WdlTypes.T_Error
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
@@ -25,6 +26,7 @@ object TypedAbstractSyntax {
   }
 
   // values
+  case class ValueError(wdlType: T_Error, text: TextSource) extends Expr
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
   case class ValueBoolean(value: Boolean, wdlType: WdlType, text: TextSource) extends Expr
   case class ValueInt(value: Int, wdlType: WdlType, text: TextSource) extends Expr

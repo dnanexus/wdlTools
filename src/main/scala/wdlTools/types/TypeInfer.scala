@@ -16,7 +16,7 @@ case class TypeInfer(conf: TypeOptions) {
   private val regime = conf.typeChecking
   // whether to throw an Exception when encountering a type error (true) or
   // to generate a T_Error type (false)
-  //private val errorAsException = conf.errorAsException
+  private val errorAsException = conf.errorAsException
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -63,11 +63,12 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_File, T_String | T_File) => T_File
 
       case (_, _) =>
-        throw new TypeException(
-            s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
-            a.text,
-            ctx.docSourceUrl
-        )
+        val msg = s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added"
+        if (errorAsException) {
+          throw new TypeException(msg, a.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
     t
   }
@@ -78,9 +79,12 @@ case class TypeInfer(conf: TypeOptions) {
       case T_Int   => T_Int
       case T_Float => T_Float
       case _ =>
-        throw new TypeException(s"${exprToString(expr)} must be an integer or a float",
-                                expr.text,
-                                ctx.docSourceUrl)
+        val msg = s"${exprToString(expr)} must be an integer or a float"
+        if (errorAsException) {
+          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -91,11 +95,13 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_Int, T_Float)   => T_Float
       case (T_Float, T_Float) => T_Float
       case (_, _) =>
-        throw new TypeException(
-            s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
-            a.text,
-            ctx.docSourceUrl
-        )
+        val msg =
+          s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats"
+        if (errorAsException) {
+          throw new TypeException(msg, a.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -103,11 +109,12 @@ case class TypeInfer(conf: TypeOptions) {
     expr.wdlType match {
       case T_Boolean => T_Boolean
       case other =>
-        throw new TypeException(
-            s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}",
-            expr.text,
-            ctx.docSourceUrl
-        )
+        val msg = s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}"
+        if (errorAsException) {
+          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -115,9 +122,12 @@ case class TypeInfer(conf: TypeOptions) {
     (a.wdlType, b.wdlType) match {
       case (T_Boolean, T_Boolean) => T_Boolean
       case (_, _) =>
-        throw new TypeException(s"${exprToString(a)} and ${exprToString(b)} must have boolean type",
-                                a.text,
-                                ctx.docSourceUrl)
+        val msg = s"${exprToString(a)} and ${exprToString(b)} must have boolean type"
+        if (errorAsException) {
+          throw new TypeException(msg, a.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -133,11 +143,12 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_Int, T_Float) => T_Boolean
       case (T_Float, T_Int) => T_Boolean
       case (_, _) =>
-        throw new TypeException(
-            s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
-            a.text,
-            ctx.docSourceUrl
-        )
+        val msg = s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type"
+        if (errorAsException) {
+          throw new TypeException(msg, a.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -146,22 +157,24 @@ case class TypeInfer(conf: TypeOptions) {
       case T_Struct(name, members) =>
         members.get(id) match {
           case None =>
-            throw new TypeException(
-                s"Struct ${name} does not have member ${id} in expression",
-                expr.text,
-                ctx.docSourceUrl
-            )
+            val msg = s"Struct ${name} does not have member ${id} in expression"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
           case Some(t) =>
             t
         }
       case T_Call(name, members) =>
         members.get(id) match {
           case None =>
-            throw new TypeException(
-                s"Call object ${name} does not have member ${id} in expression",
-                expr.text,
-                ctx.docSourceUrl
-            )
+            val msg = s"Call object ${name} does not have member ${id} in expression"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
           case Some(t) =>
             t
         }
@@ -171,32 +184,52 @@ case class TypeInfer(conf: TypeOptions) {
       // String name = p.name
       case T_Identifier(structName) =>
         // produce the struct definition
-        val members = ctx.structs.get(structName) match {
+        ctx.structs.get(structName) match {
           case None =>
-            throw new TypeException(s"unknown struct ${structName}", expr.text, ctx.docSourceUrl)
-          case Some(T_Struct(_, members)) => members
+            val msg = s"unknown struct ${structName}"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
+          case Some(T_Struct(_, members)) =>
+            members.get(id) match {
+              case None =>
+                val msg = s"Struct ${structName} does not have member ${id}"
+                if (errorAsException) {
+                  throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+                } else {
+                  T_Error(msg)
+                }
+              case Some(t) => t
+            }
           case other =>
-            throw new TypeException(s"not a struct ${other}", expr.text, ctx.docSourceUrl)
-        }
-        members.get(id) match {
-          case None =>
-            throw new TypeException(s"Struct ${structName} does not have member ${id}",
-                                    expr.text,
-                                    ctx.docSourceUrl)
-          case Some(t) => t
+            val msg = s"not a struct ${other}"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
         }
 
       // accessing a pair element
       case T_Pair(l, _) if id.toLowerCase() == "left"  => l
       case T_Pair(_, r) if id.toLowerCase() == "right" => r
       case T_Pair(_, _) =>
-        throw new TypeException(s"accessing a pair with (${id}) is illegal",
-                                expr.text,
-                                ctx.docSourceUrl)
+        val msg = s"accessing a pair with (${id}) is illegal"
+        if (errorAsException) {
+          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
+
       case _ =>
-        throw new TypeException(s"member access (${id}) in expression is illegal",
-                                expr.text,
-                                ctx.docSourceUrl)
+        val msg = s"member access (${id}) in expression is illegal"
+        if (errorAsException) {
+          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -210,9 +243,12 @@ case class TypeInfer(conf: TypeOptions) {
       t
     } catch {
       case _: TypeUnificationException =>
-        throw new TypeException(errMsg + " must have the same type, or be coercible to one",
-                                textSource,
-                                ctx.docSourceUrl)
+        val msg = errMsg + " must have the same type, or be coercible to one"
+        if (errorAsException) {
+          throw new TypeException(msg, textSource, ctx.docSourceUrl)
+        } else {
+          T_Error(msg)
+        }
     }
   }
 
@@ -230,25 +266,36 @@ case class TypeInfer(conf: TypeOptions) {
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
       case AST.ExprIdentifier(id, text) =>
-        ctx.lookup(id, bindings, text) match {
+        val t = ctx.lookup(id, bindings, text) match {
           case None =>
-            throw new TypeException(s"Identifier ${id} is not defined", expr.text, ctx.docSourceUrl)
+            val msg = s"Identifier ${id} is not defined"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
           case Some(t) =>
-            TAT.ExprIdentifier(id, t, text)
+            t
         }
+        TAT.ExprIdentifier(id, t, text)
 
       // All the sub-exressions have to be strings, or coercible to strings
       case AST.ExprCompoundString(vec, text) =>
         val vec2 = vec.map { subExpr =>
           val e2 = applyExpr(subExpr, bindings, ctx)
-          if (!unify.isCoercibleTo(T_String, e2.wdlType))
-            throw new TypeException(
-                s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
-                expr.text,
-                ctx.docSourceUrl
-            )
-          e2
+          if (unify.isCoercibleTo(T_String, e2.wdlType)) {
+            e2
+          } else {
+            val msg =
+              s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string"
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              TAT.ValueError(T_Error(msg), expr.text)
+            }
+          }
         }
+        // TODO: make the type T_Error if any component expression is invalid?
         TAT.ExprCompoundString(vec2, T_String, text)
 
       case AST.ExprPair(l, r, text) =>
@@ -263,18 +310,19 @@ case class TypeInfer(conf: TypeOptions) {
 
       case AST.ExprArray(vec, text) =>
         val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
-        val (t, _) =
+        val t =
           try {
-            unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)
+            T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
           } catch {
             case _: TypeUnificationException =>
-              throw new TypeException(
-                  "array elements must have the same type, or be coercible to one",
-                  expr.text,
-                  ctx.docSourceUrl
-              )
+              val msg = "array elements must have the same type, or be coercible to one"
+              if (errorAsException) {
+                throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+              } else {
+                T_Error(msg)
+              }
           }
-        TAT.ExprArray(tVecExprs, T_Array(t), text)
+        TAT.ExprArray(tVecExprs, t, text)
 
       case AST.ExprObject(members, text) =>
         val members2 = members.map {
@@ -303,22 +351,27 @@ case class TypeInfer(conf: TypeOptions) {
       case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, text) =>
         val te = applyExpr(t, bindings, ctx)
         val fe = applyExpr(f, bindings, ctx)
-        if (te.wdlType != fe.wdlType)
-          throw new TypeException(s"""|subexpressions ${exprToString(te)} and ${exprToString(fe)}
-                                      |must have the same type""".stripMargin
-                                    .replaceAll("\n", " "),
-                                  text,
-                                  ctx.docSourceUrl)
         val ve = applyExpr(value, bindings, ctx)
-        if (ve.wdlType != T_Boolean)
-          throw new TypeException(
-              s"""|condition ${exprToString(ve)} should have boolean type,
-                  |it has type ${typeToString(ve.wdlType)} instead
-                  |""".stripMargin.replaceAll("\n", " "),
-              expr.text,
-              ctx.docSourceUrl
-          )
-        TAT.ExprPlaceholderEqual(te, fe, ve, te.wdlType, text)
+        val wdlType = if (te.wdlType != fe.wdlType) {
+          val msg =
+            s"subexpressions ${exprToString(te)} and ${exprToString(fe)} must have the same type"
+          if (errorAsException) {
+            throw new TypeException(msg, text, ctx.docSourceUrl)
+          } else {
+            T_Error(msg)
+          }
+        } else if (ve.wdlType != T_Boolean) {
+          val msg =
+            s"condition ${exprToString(ve)} should have boolean type, it has type ${typeToString(ve.wdlType)} instead"
+          if (errorAsException) {
+            throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+          } else {
+            T_Error(msg)
+          }
+        } else {
+          te.wdlType
+        }
+        TAT.ExprPlaceholderEqual(te, fe, ve, wdlType, text)
 
       // An expression like:
       // ${default="foo" optional_value}
@@ -331,13 +384,14 @@ case class TypeInfer(conf: TypeOptions) {
             // another unsavory case. The optional_value is NOT optional.
             de.wdlType
           case _ =>
-            throw new TypeException(
-                s"""|Expression (${exprToString(ve)}) must have type coercible to
-                    |(${typeToString(de.wdlType)}), it has type (${typeToString(ve.wdlType)}) instead
-                    |""".stripMargin.replaceAll("\n", " "),
-                expr.text,
-                ctx.docSourceUrl
-            )
+            val msg = s"""|Expression (${exprToString(ve)}) must have type coercible to
+                          |(${typeToString(de.wdlType)}), it has type (${typeToString(ve.wdlType)}) instead
+                          |""".stripMargin.replaceAll("\n", " ")
+            if (errorAsException) {
+              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
+            } else {
+              T_Error(msg)
+            }
         }
         TAT.ExprPlaceholderDefault(de, ve, t, text)
 
