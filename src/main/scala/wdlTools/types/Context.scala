@@ -14,6 +14,7 @@ case class Context(version: WdlVersion,
                    stdlib: Stdlib,
                    docSourceUrl: Option[URL] = None,
                    inputs: Map[String, WdlTypes.T] = Map.empty,
+                   outputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
                    structs: Map[String, T_Struct] = Map.empty,
                    callables: Map[String, T_Callable] = Map.empty,
@@ -31,6 +32,10 @@ case class Context(version: WdlVersion,
       case None    => ()
       case Some(t) => return Some(t)
     }
+    outputs.get(varName) match {
+      case None    => ()
+      case Some(t) => return Some(t)
+    }
     bindings.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -44,6 +49,14 @@ case class Context(version: WdlVersion,
       tDecl.name -> tDecl.wdlType
     }.toMap
     this.copy(inputs = bindings)
+  }
+
+  def bindOutputSection(oututSection: TAT.OutputSection): Context = {
+    // building bindings
+    val bindings = oututSection.declarations.map { tDecl =>
+      tDecl.name -> tDecl.wdlType
+    }.toMap
+    this.copy(outputs = bindings)
   }
 
   def bindVar(varName: String, wdlType: WdlType, textSource: TextSource): Context = {
