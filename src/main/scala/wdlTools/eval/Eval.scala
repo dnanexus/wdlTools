@@ -494,6 +494,23 @@ case class Eval(opts: Options,
     }
   }
 
+  // public entry points
+  //
+  def applyExpr(expr: TAT.Expr, ctx: Context): WdlValues.V = {
+    apply(expr, ctx)
+  }
+
+  // cast the result value to the correct type
+  // For example, an expression like:
+  //   Float x = "3.2"
+  // requires casting from string to float
+  def applyExprAndCoerce(expr: TAT.Expr,
+                        wdlType : WdlTypes.T,
+                         ctx: Context): WdlValues.V = {
+    val value = apply(expr, ctx)
+    coercion.coerceTo(wdlType, value, expr.text)
+  }
+
   // Evaluate all the declarations and return a context
   def applyDeclarations(decls: Vector[TAT.Declaration], ctx: Context): Context = {
     decls.foldLeft(ctx) {
