@@ -68,156 +68,156 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bindings = ctxEnd.bindings
-    bindings("k0") shouldBe WV_Int(-1)
-    bindings("k1") shouldBe WV_Int(1)
+    bindings("k0") shouldBe V_Int(-1)
+    bindings("k1") shouldBe V_Int(1)
 
-    bindings("b1") shouldBe WV_Boolean(true || false)
-    bindings("b2") shouldBe WV_Boolean(true && false)
-    bindings("b3") shouldBe WV_Boolean(10 == 3)
-    bindings("b4") shouldBe WV_Boolean(4 < 8)
-    bindings("b5") shouldBe WV_Boolean(4 >= 8)
-    bindings("b6") shouldBe WV_Boolean(4 != 8)
-    bindings("b7") shouldBe WV_Boolean(4 <= 8)
-    bindings("b8") shouldBe WV_Boolean(11 > 8)
+    bindings("b1") shouldBe V_Boolean(true || false)
+    bindings("b2") shouldBe V_Boolean(true && false)
+    bindings("b3") shouldBe V_Boolean(10 == 3)
+    bindings("b4") shouldBe V_Boolean(4 < 8)
+    bindings("b5") shouldBe V_Boolean(4 >= 8)
+    bindings("b6") shouldBe V_Boolean(4 != 8)
+    bindings("b7") shouldBe V_Boolean(4 <= 8)
+    bindings("b8") shouldBe V_Boolean(11 > 8)
 
     // Arithmetic
-    bindings("i1") shouldBe WV_Int(3 + 4)
-    bindings("i2") shouldBe WV_Int(3 - 4)
-    bindings("i3") shouldBe WV_Int(3 % 4)
-    bindings("i4") shouldBe WV_Int(3 * 4)
-    bindings("i5") shouldBe WV_Int(3 / 4)
+    bindings("i1") shouldBe V_Int(3 + 4)
+    bindings("i2") shouldBe V_Int(3 - 4)
+    bindings("i3") shouldBe V_Int(3 % 4)
+    bindings("i4") shouldBe V_Int(3 * 4)
+    bindings("i5") shouldBe V_Int(3 / 4)
 
-    bindings("l0") shouldBe WV_String("a")
-    bindings("l1") shouldBe WV_String("b")
+    bindings("l0") shouldBe V_String("a")
+    bindings("l1") shouldBe V_String("b")
 
     // pairs
-    bindings("l") shouldBe WV_String("hello")
-    bindings("r") shouldBe WV_Boolean(true)
+    bindings("l") shouldBe V_String("hello")
+    bindings("r") shouldBe V_Boolean(true)
 
     // structs
-    bindings("pr1") shouldBe WV_Struct("Person",
-                                       Map(
-                                           "name" -> WV_String("Jay"),
-                                           "city" -> WV_String("SF"),
-                                           "age" -> WV_Int(31)
-                                       ))
-    bindings("name") shouldBe WV_String("Jay")
+    bindings("pr1") shouldBe V_Struct("Person",
+                                      Map(
+                                          "name" -> V_String("Jay"),
+                                          "city" -> V_String("SF"),
+                                          "age" -> V_Int(31)
+                                      ))
+    bindings("name") shouldBe V_String("Jay")
   }
 
   it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val ctx = Context(Map.empty).addBinding("empty_string", WV_Null)
+    val ctx = Context(Map.empty).addBinding("empty_string", V_Null)
     val ctxEnd = evaluator.applyDeclarations(decls, ctx)
     val bd = ctxEnd.bindings
 
-    bd("x") shouldBe WV_Float(1.4)
-    bd("n1") shouldBe WV_Int(1)
-    bd("n2") shouldBe WV_Int(2)
-    bd("n3") shouldBe WV_Int(1)
-    bd("cities2") shouldBe WV_Array(
-        Vector(WV_String("LA"), WV_String("Seattle"), WV_String("San Francisco"))
+    bd("x") shouldBe V_Float(1.4)
+    bd("n1") shouldBe V_Int(1)
+    bd("n2") shouldBe V_Int(2)
+    bd("n3") shouldBe V_Int(1)
+    bd("cities2") shouldBe V_Array(
+        Vector(V_String("LA"), V_String("Seattle"), V_String("San Francisco"))
     )
 
-    bd("table2") shouldBe WV_Array(
+    bd("table2") shouldBe V_Array(
         Vector(
-            WV_Array(Vector(WV_String("A"), WV_String("allow"))),
-            WV_Array(Vector(WV_String("B"), WV_String("big"))),
-            WV_Array(Vector(WV_String("C"), WV_String("clam")))
+            V_Array(Vector(V_String("A"), V_String("allow"))),
+            V_Array(Vector(V_String("B"), V_String("big"))),
+            V_Array(Vector(V_String("C"), V_String("clam")))
         )
     )
-    bd("m2") shouldBe WV_Map(
-        Map(WV_String("name") -> WV_String("hawk"), WV_String("kind") -> WV_String("bird"))
+    bd("m2") shouldBe V_Map(
+        Map(V_String("name") -> V_String("hawk"), V_String("kind") -> V_String("bird"))
     )
 
     // sub
-    bd("sentence1") shouldBe WV_String(
+    bd("sentence1") shouldBe V_String(
         "She visited three places on his trip: Aa, Ab, C, D, and E"
     )
-    bd("sentence2") shouldBe WV_String(
+    bd("sentence2") shouldBe V_String(
         "He visited three places on his trip: Berlin, Berlin, C, D, and E"
     )
-    bd("sentence3") shouldBe WV_String("H      : A, A, C, D,  E")
+    bd("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
 
     // transpose
-    bd("ar3") shouldBe WV_Array(Vector(WV_Int(0), WV_Int(1), WV_Int(2)))
-    bd("ar_ar2") shouldBe WV_Array(
+    bd("ar3") shouldBe V_Array(Vector(V_Int(0), V_Int(1), V_Int(2)))
+    bd("ar_ar2") shouldBe V_Array(
         Vector(
-            WV_Array(Vector(WV_Int(1), WV_Int(4))),
-            WV_Array(Vector(WV_Int(2), WV_Int(5))),
-            WV_Array(Vector(WV_Int(3), WV_Int(6)))
+            V_Array(Vector(V_Int(1), V_Int(4))),
+            V_Array(Vector(V_Int(2), V_Int(5))),
+            V_Array(Vector(V_Int(3), V_Int(6)))
         )
     )
 
     // zip
-    bd("zlf") shouldBe WV_Array(
+    bd("zlf") shouldBe V_Array(
         Vector(
-            WV_Pair(WV_String("A"), WV_Boolean(true)),
-            WV_Pair(WV_String("B"), WV_Boolean(false)),
-            WV_Pair(WV_String("C"), WV_Boolean(true))
+            V_Pair(V_String("A"), V_Boolean(true)),
+            V_Pair(V_String("B"), V_Boolean(false)),
+            V_Pair(V_String("C"), V_Boolean(true))
         )
     )
 
     // cross
     inside(bd("cln")) {
-      case WV_Array(vec) =>
+      case V_Array(vec) =>
         // the order of the cross product is unspecified
         Vector(
-            WV_Pair(WV_String("A"), WV_Int(1)),
-            WV_Pair(WV_String("B"), WV_Int(1)),
-            WV_Pair(WV_String("C"), WV_Int(1)),
-            WV_Pair(WV_String("A"), WV_Int(13)),
-            WV_Pair(WV_String("B"), WV_Int(13)),
-            WV_Pair(WV_String("C"), WV_Int(13))
+            V_Pair(V_String("A"), V_Int(1)),
+            V_Pair(V_String("B"), V_Int(1)),
+            V_Pair(V_String("C"), V_Int(1)),
+            V_Pair(V_String("A"), V_Int(13)),
+            V_Pair(V_String("B"), V_Int(13)),
+            V_Pair(V_String("C"), V_Int(13))
         ).foreach(pair => vec contains pair)
     }
 
-    bd("l1") shouldBe WV_Int(2)
-    bd("l2") shouldBe WV_Int(6)
+    bd("l1") shouldBe V_Int(2)
+    bd("l2") shouldBe V_Int(6)
 
-    bd("files2") shouldBe WV_Array(
-        Vector(WV_File("A"), WV_File("B"), WV_File("C"), WV_File("G"), WV_File("J"), WV_File("K"))
+    bd("files2") shouldBe V_Array(
+        Vector(V_File("A"), V_File("B"), V_File("C"), V_File("G"), V_File("J"), V_File("K"))
     )
 
-    bd("pref2") shouldBe WV_Array(
-        Vector(WV_String("i_1"), WV_String("i_3"), WV_String("i_5"), WV_String("i_7"))
+    bd("pref2") shouldBe V_Array(
+        Vector(V_String("i_1"), V_String("i_3"), V_String("i_5"), V_String("i_7"))
     )
-    bd("pref3") shouldBe WV_Array(
-        Vector(WV_String("sub_1.0"), WV_String("sub_3.4"), WV_String("sub_5.1"))
+    bd("pref3") shouldBe V_Array(
+        Vector(V_String("sub_1.0"), V_String("sub_3.4"), V_String("sub_5.1"))
     )
 
-    bd("sel1") shouldBe WV_String("A")
-    bd("sel2") shouldBe WV_String("Henry")
-    bd("sel3") shouldBe WV_Array(Vector(WV_String("Henry"), WV_String("bear"), WV_String("tree")))
+    bd("sel1") shouldBe V_String("A")
+    bd("sel2") shouldBe V_String("Henry")
+    bd("sel3") shouldBe V_Array(Vector(V_String("Henry"), V_String("bear"), V_String("tree")))
 
-    bd("d1") shouldBe WV_Boolean(true)
-    bd("d2") shouldBe WV_Boolean(false)
-    bd("d3") shouldBe WV_Boolean(true)
+    bd("d1") shouldBe V_Boolean(true)
+    bd("d2") shouldBe V_Boolean(false)
+    bd("d3") shouldBe V_Boolean(true)
 
     // basename
-    bd("path1") shouldBe WV_String("C.txt")
-    bd("path2") shouldBe WV_String("nuts_and_bolts.txt")
-    bd("path3") shouldBe WV_String("docs.md")
-    bd("path4") shouldBe WV_String("C")
-    bd("path5") shouldBe WV_String("C.txt")
+    bd("path1") shouldBe V_String("C.txt")
+    bd("path2") shouldBe V_String("nuts_and_bolts.txt")
+    bd("path3") shouldBe V_String("docs.md")
+    bd("path4") shouldBe V_String("C")
+    bd("path5") shouldBe V_String("C.txt")
 
     // read/write object
-    val obj1 = WV_Object(
-        Map("author" -> WV_String("Benjamin"),
-            "year" -> WV_String("1973"),
-            "title" -> WV_String("Color the sky green"))
+    val obj1 = V_Object(
+        Map("author" -> V_String("Benjamin"),
+            "year" -> V_String("1973"),
+            "title" -> V_String("Color the sky green"))
     )
-    val obj2 = WV_Object(
-        Map("author" -> WV_String("Primo Levy"),
-            "year" -> WV_String("1975"),
-            "title" -> WV_String("The Periodic Table"))
+    val obj2 = V_Object(
+        Map("author" -> V_String("Primo Levy"),
+            "year" -> V_String("1975"),
+            "title" -> V_String("The Periodic Table"))
     )
     bd("o2") shouldBe obj1
-    bd("arObj") shouldBe WV_Array(Vector(obj1, obj2))
-    bd("houseObj") shouldBe WV_Object(
-        Map("city" -> WV_String("Seattle"),
-            "team" -> WV_String("Trail Blazers"),
-            "zipcode" -> WV_Int(98109))
+    bd("arObj") shouldBe V_Array(Vector(obj1, obj2))
+    bd("houseObj") shouldBe V_Object(
+        Map("city" -> V_String("Seattle"),
+            "team" -> V_String("Trail Blazers"),
+            "zipcode" -> V_Int(98109))
     )
 
   }
@@ -228,21 +228,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
     val bd = ctxEnd.bindings
 
-    bd("i1") shouldBe WV_Int(13)
-    bd("i2") shouldBe WV_Int(13)
-    bd("i3") shouldBe WV_Int(8)
+    bd("i1") shouldBe V_Int(13)
+    bd("i2") shouldBe V_Int(13)
+    bd("i3") shouldBe V_Int(8)
 
-    bd("x1") shouldBe WV_Float(3)
-    bd("x2") shouldBe WV_Float(13)
-    bd("x3") shouldBe WV_Float(44.3)
-    bd("x4") shouldBe WV_Float(44.3)
-    bd("x5") shouldBe WV_Float(4.5)
+    bd("x1") shouldBe V_Float(3)
+    bd("x2") shouldBe V_Float(13)
+    bd("x3") shouldBe V_Float(44.3)
+    bd("x4") shouldBe V_Float(44.3)
+    bd("x5") shouldBe V_Float(4.5)
 
-    bd("s1") shouldBe WV_String("true")
-    bd("s2") shouldBe WV_String("3")
-    bd("s3") shouldBe WV_String("4.3")
-    bd("s4") shouldBe WV_String("hello")
-    bd("s5") shouldBe WV_Optional(WV_String("hello"))
+    bd("s1") shouldBe V_String("true")
+    bd("s2") shouldBe V_String("3")
+    bd("s3") shouldBe V_String("4.3")
+    bd("s4") shouldBe V_String("hello")
+    bd("s5") shouldBe V_Optional(V_String("hello"))
   }
 
   private def evalCommand(wdlSourceFileName: String): String = {
