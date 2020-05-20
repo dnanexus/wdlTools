@@ -566,9 +566,10 @@ case class TypeInfer(conf: Options) {
   }
 
   // type check the input section, and see that there are no double definitions.
-  // return a new typed input section
+  // return input definitions
   //
-  private def applyInputSection(inputSection: AST.InputSection, ctx: Context): TAT.InputSection = {
+  private def applyInputSection(inputSection: AST.InputSection,
+                                ctx: Context): Vector[TAT.InputDefinition] = {
     // check there are no duplicates
     val varNames = inputSection.declarations.map(_.name)
     if (varNames.size > varNames.toSet.size)
@@ -583,12 +584,29 @@ case class TypeInfer(conf: Options) {
           val tDecl = applyDecl(decl, bindings, ctx)
           (tDecls :+ tDecl, bindings + (tDecl.name -> tDecl.wdlType))
       }
-    TAT.InputSection(tDecls, inputSection.text)
+
+    // convert the typed declarations into input definitions
+    tDecls.map { tDecl =>
+      // What kind of input is this?
+      // compulsory, optional, one with a default
+      tDecl.expr match {
+        case None => {
+          tDecl.wdlType match {
+            case t: WdlTypes.T_Optional =>
+              TAT.OptionalInputDefinition(tDecl.name, t, tDecl.text)
+            case _ =>
+              TAT.RequiredInputDefinition(tDecl.name, tDecl.wdlType, tDecl.text)
+          }
+        }
+        case Some(expr) =>
+          TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+      }
+    }
   }
 
   // Calculate types for the outputs, and return a new typed output section
   private def applyOutputSection(outputSection: AST.OutputSection,
-                                 ctx: Context): TAT.OutputSection = {
+                                 ctx: Context): Vector[TAT.OutputDefinition] = {
     val text = outputSection.text
 
     // check there are no duplicates
@@ -609,44 +627,45 @@ case class TypeInfer(conf: Options) {
       outputSection.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
           // check the declaration and add a binding for its (variable -> wdlType)
+          //
+          // Do we really want to support the shadowing option?
           val tDecl = applyDecl(decl, bindings, ctx, canShadow = true)
           val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
           (tDecls :+ tDecl, bindings2)
       }
 
-    TAT.OutputSection(tDecls, text)
+    // convert the declarations into output definitions
+    tDecls.map { tDecl =>
+      tDecl.expr match {
+        case None =>
+          throw new TypeException("Outputs must have expressions", tDecl.text, ctx.docSourceUrl)
+        case Some(expr) =>
+          TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+      }
+    }
   }
 
   // calculate the type signature of a workflow or a task
   private def calcSignature(
-      inputSection: Option[TAT.InputSection],
-      outputSection: Option[TAT.OutputSection]
+      inputSection: Vector[TAT.InputDefinition],
+      outputSection: Vector[TAT.OutputDefinition]
   ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
+    val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
+      case d: TAT.RequiredInputDefinition =>
+        // input is compulsory
+        d.name -> (d.wdlType, false)
+      case d: TAT.OverridableInputDefinitionWithDefault =>
+        // input has a default value, caller may omit it.
+        d.name -> (d.wdlType, true)
+      case d: TAT.OptionalInputDefinition =>
+        // input is optional, caller can omit it.
+        d.name -> (d.wdlType, true)
+    }.toMap
 
-    val inputType: Map[String, (WdlType, Boolean)] = inputSection match {
-      case None => Map.empty
-      case Some(TAT.InputSection(decls, _)) =>
-        decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), _) =>
-            // input has a default value, caller may omit it.
-            name -> (wdlType, true)
+    val outputType: Map[String, WdlType] = outputSection.map { tDecl =>
+      tDecl.name -> tDecl.wdlType
+    }.toMap
 
-          case TAT.Declaration(name, T_Optional(t), None, _) =>
-            // input is optional, caller can omit it.
-            name -> (T_Optional(t), true)
-
-          case TAT.Declaration(name, t, None, _) =>
-            // input is compulsory
-            name -> (t, false)
-        }.toMap
-    }
-    val outputType: Map[String, WdlType] = outputSection match {
-      case None => Map.empty
-      case Some(TAT.OutputSection(decls, _)) =>
-        decls.map { tDecl =>
-          tDecl.name -> tDecl.wdlType
-        }.toMap
-    }
     (inputType, outputType)
   }
 
@@ -734,13 +753,13 @@ case class TypeInfer(conf: Options) {
   //
   // We can't check the validity of the command section.
   private def applyTask(task: AST.Task, ctxOuter: Context): TAT.Task = {
-    val (tInputSection, ctx) = task.input match {
+    val (inputDefs, ctx) = task.input match {
       case None =>
-        (None, ctxOuter)
+        (Vector.empty, ctxOuter)
       case Some(inpSection) =>
         val tInpSection = applyInputSection(inpSection, ctxOuter)
         val ctx = ctxOuter.bindInputSection(tInpSection)
-        (Some(tInpSection), ctx)
+        (tInpSection, ctx)
     }
 
     // add types to the declarations, and accumulate context
@@ -773,26 +792,26 @@ case class TypeInfer(conf: Options) {
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.text)
 
-    val (tOutputSection, ctxOutput) = task.output match {
+    val (outputDefs, ctxOutput) = task.output match {
       case None =>
-        (None, ctxDecl)
+        (Vector.empty, ctxDecl)
       case Some(outSection) =>
         val tOutSection = applyOutputSection(outSection, ctxDecl)
         val ctx = ctxDecl.bindOutputSection(tOutSection)
-        (Some(tOutSection), ctx)
+        (tOutSection, ctx)
     }
 
     val tMeta = task.meta.map(applyMeta(_, ctxOutput))
     val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the task
-    val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
+    val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
 
     TAT.Task(
         name = task.name,
         wdlType = T_Task(task.name, inputType, outputType),
-        input = tInputSection,
-        output = tOutputSection,
+        inputs = inputDefs,
+        outputs = outputDefs,
         command = tCommand,
         declarations = tDeclarations,
         meta = tMeta,
@@ -1039,37 +1058,37 @@ case class TypeInfer(conf: Options) {
   }
 
   private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
-    val (tInputSection, ctx) = wf.input match {
+    val (inputDefs, ctx) = wf.input match {
       case None =>
-        (None, ctxOuter)
+        (Vector.empty, ctxOuter)
       case Some(inpSection) =>
         val tInpSection = applyInputSection(inpSection, ctxOuter)
         val ctx = ctxOuter.bindInputSection(tInpSection)
-        (Some(tInpSection), ctx)
+        (tInpSection, ctx)
     }
 
     val (bindings, wfElements) = applyWorkflowElements(ctx, wf.body)
     val ctxBody = ctx.bindVarList(bindings, wf.text)
 
-    val (tOutputSection, ctxOutput) = wf.output match {
+    val (outputDefs, ctxOutput) = wf.output match {
       case None =>
-        (None, ctxBody)
+        (Vector.empty, ctxBody)
       case Some(outSection) =>
         val tOutSection = applyOutputSection(outSection, ctxBody)
         val ctx = ctxBody.bindOutputSection(tOutSection)
-        (Some(tOutSection), ctx)
+        (tOutSection, ctx)
     }
 
     val tMeta = wf.meta.map(applyMeta(_, ctxOutput))
     val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the workflow
-    val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
+    val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
     TAT.Workflow(
         name = wf.name,
         wdlType = T_Workflow(wf.name, inputType, outputType),
-        input = tInputSection,
-        output = tOutputSection,
+        inputs = inputDefs,
+        outputs = outputDefs,
         meta = tMeta,
         parameterMeta = tParamMeta,
         body = wfElements,

@@ -43,17 +43,17 @@ case class Context(version: WdlVersion,
     None
   }
 
-  def bindInputSection(inputSection: TAT.InputSection): Context = {
+  def bindInputSection(inputSection: Vector[TAT.InputDefinition]): Context = {
     // building bindings
-    val bindings = inputSection.declarations.map { tDecl =>
+    val bindings = inputSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
     this.copy(inputs = bindings)
   }
 
-  def bindOutputSection(oututSection: TAT.OutputSection): Context = {
+  def bindOutputSection(oututSection: Vector[TAT.OutputDefinition]): Context = {
     // building bindings
-    val bindings = oututSection.declarations.map { tDecl =>
+    val bindings = oututSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
     this.copy(outputs = bindings)
