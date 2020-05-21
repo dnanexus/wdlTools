@@ -86,7 +86,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
       case (WdlTypes.T_Pair(lt, rt), WV_Pair(l, r)) =>
         WV_Pair(coerceTo(lt, l, text), coerceTo(rt, r, text))
 
-      case (WdlTypes.T_Struct(name1, _), WV_Struct(name2, _)) =>
+      case (WdlTypes.T_StructDef(name1, _), WV_Struct(name2, _)) =>
         if (name1 != name2)
           throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}",
                                   text,
@@ -94,10 +94,10 @@ case class Coercion(docSourceUrl: Option[URL]) {
         value
 
       // cast of an object to a struct. I think this is legal.
-      case (WdlTypes.T_Struct(name, memberDefs), WV_Object(members)) =>
+      case (WdlTypes.T_StructDef(name, memberDefs), WV_Object(members)) =>
         coerceToStruct(name, memberDefs, members, text)
 
-      case (WdlTypes.T_Struct(name, memberDefs), WV_Map(members)) =>
+      case (WdlTypes.T_StructDef(name, memberDefs), WV_Map(members)) =>
         // convert into a mapping from string to WdlValue
         val members2: Map[String, WV] = members.map {
           case (WV_String(k), v) => k -> v

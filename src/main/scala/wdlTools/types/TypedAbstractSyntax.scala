@@ -7,6 +7,7 @@ import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
   type WdlType = WdlTypes.T
+  type T_Invalid = WdlTypes.T_Invalid
   type T_Function = WdlTypes.T_Function
 
   trait Element {
@@ -23,6 +24,10 @@ object TypedAbstractSyntax {
   sealed trait Expr extends Element {
     val wdlType: WdlType
   }
+
+  // wrapper around an expression to indicate it is invalid
+  case class ExprInvalid(wdlType: T_Invalid, originalExpr: Option[Expr], text: TextSource)
+      extends Expr
 
   // values
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
@@ -141,6 +146,8 @@ object TypedAbstractSyntax {
   case class MetaString(value: String) extends MetaValue
   case class MetaObject(value: Map[String, MetaValue]) extends MetaValue
   case class MetaArray(value: Vector[MetaValue]) extends MetaValue
+  // indicates the original meta value is invalid
+  // this is only used when it not possible to generate a "real" Expr with a T_Error wdlType
   case class MetaError(message: String) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
@@ -153,6 +160,7 @@ object TypedAbstractSyntax {
   case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
       extends Element
   case class ImportDoc(name: Option[String],
+                       wdlType: WdlTypes.T_Document,
                        aliases: Vector[ImportAlias],
                        addr: String,
                        doc: Document,
@@ -160,7 +168,10 @@ object TypedAbstractSyntax {
       extends DocumentElement
 
   // a definition of a struct
-  case class StructDefinition(name: String, members: Map[String, WdlType], text: TextSource)
+  case class StructDefinition(name: String,
+                              wdlType: WdlTypes.T_Struct,
+                              members: Map[String, WdlType],
+                              text: TextSource)
       extends DocumentElement
 
   // A task
@@ -188,6 +199,7 @@ object TypedAbstractSyntax {
   // call add                      add
   // call a.b.c                    c
   //
+
   case class Call(fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
@@ -199,6 +211,7 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   case class Scatter(identifier: String,
+                     wdlType: WdlTypes.T,
                      expr: Expr,
                      body: Vector[WorkflowElement],
                      text: TextSource)
@@ -208,6 +221,7 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   // A workflow
+
   case class Workflow(name: String,
                       wdlType: WdlTypes.T_Workflow,
                       input: Option[InputSection],
