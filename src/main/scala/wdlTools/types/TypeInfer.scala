@@ -690,16 +690,16 @@ case class TypeInfer(conf: Options) {
   // language for meta values only.
   private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(_)                          => TAT.MetaNull
-      case AST.ValueBoolean(value, _)                => TAT.MetaBoolean(value)
-      case AST.ValueInt(value, _)                    => TAT.MetaInt(value)
-      case AST.ValueFloat(value, _)                  => TAT.MetaFloat(value)
-      case AST.ValueString(value, _)                 => TAT.MetaString(value)
-      case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaNull
-      case AST.ExprIdentifier(id, _)                 => TAT.MetaString(id)
-      case AST.ExprArray(vec, _)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
+      case AST.ValueNull(_)                          => TAT.MetaValueNull
+      case AST.ValueBoolean(value, _)                => TAT.MetaValueBoolean(value)
+      case AST.ValueInt(value, _)                    => TAT.MetaValueInt(value)
+      case AST.ValueFloat(value, _)                  => TAT.MetaValueFloat(value)
+      case AST.ValueString(value, _)                 => TAT.MetaValueString(value)
+      case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaValueNull
+      case AST.ExprIdentifier(id, _)                 => TAT.MetaValueString(id)
+      case AST.ExprArray(vec, _)                     => TAT.MetaValueArray(vec.map(metaValueFromExpr(_, ctx)))
       case AST.ExprMap(members, _) =>
-        TAT.MetaObject(members.map {
+        TAT.MetaValueObject(members.map {
           case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
             key -> metaValueFromExpr(value, ctx)
           case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
@@ -708,7 +708,7 @@ case class TypeInfer(conf: Options) {
             throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
         }.toMap)
       case AST.ExprObject(members, _) =>
-        TAT.MetaObject(members.map {
+        TAT.MetaValueObject(members.map {
           case AST.ExprObjectMember(key, value, _) =>
             key -> metaValueFromExpr(value, ctx)
           case other =>

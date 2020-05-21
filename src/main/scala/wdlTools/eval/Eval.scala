@@ -4,7 +4,7 @@ import java.net.URL
 
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
-import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.types.{TypedAbstractSyntax => TAT, WdlTypes}
 import wdlTools.util.{EvalConfig, Options}
 
 case class Eval(opts: Options,
@@ -504,9 +504,7 @@ case class Eval(opts: Options,
   // For example, an expression like:
   //   Float x = "3.2"
   // requires casting from string to float
-  def applyExprAndCoerce(expr: TAT.Expr,
-                        wdlType : WdlTypes.T,
-                         ctx: Context): WdlValues.V = {
+  def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, ctx: Context): WdlValues.V = {
     val value = apply(expr, ctx)
     coercion.coerceTo(wdlType, value, expr.text)
   }
