@@ -736,8 +736,6 @@ task_input
       case other                         => Vector(other)
     }
 
-    // TODO: do the above until reaching a fixed point
-
     CommandSection(cleanedParts, getTextSource(ctx))
   }
 

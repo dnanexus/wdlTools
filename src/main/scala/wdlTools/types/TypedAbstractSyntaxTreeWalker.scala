@@ -60,11 +60,9 @@ class TypedAbstractSyntaxTreeVisitor {
         visitInvalid(reason, originalType, ctx)
         Vector.empty
       case e: Expr if e.wdlType.isInstanceOf[Invalid] =>
-        e.wdlType match {
-          case inv: Invalid =>
-            visitInvalid(inv.reason, inv.originalType, ctx)
-            Vector.empty
-        }
+        val inv = e.wdlType.asInstanceOf[Invalid]
+        visitInvalid(inv.reason, inv.originalType, ctx)
+        Vector.empty
       case ExprCompoundString(value, _, _)              => value
       case ExprPair(l, r, _, _)                         => Vector(l, r)
       case ExprArray(value, _, _)                       => value
@@ -102,9 +100,9 @@ class TypedAbstractSyntaxTreeVisitor {
 
   def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
 
-  def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {}
+  def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {}
 
-  def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {}
+  def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {}
 
   def visitCallName(actualName: String,
                     fullyQualifiedName: String,
@@ -147,7 +145,7 @@ class TypedAbstractSyntaxTreeVisitor {
 }
 
 object TypedAbstractSyntaxTreeVisitor {
-  case class VisitorContext[T <: Element](element: T, parent: Option[VisitorContext[_]] = None) {
+  case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
     lazy val docSourceUrl: URL = element match {
       case d: Document => d.docSourceUrl
       case _           => findAncestor[Document].get.element.docSourceUrl
@@ -277,34 +275,41 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
       case ExprInvalid(T_Invalid(reason, originalType), _, _) =>
         visitInvalid(reason, originalType, ctx)
       case e: Expr if e.wdlType.isInstanceOf[Invalid] =>
-        e.wdlType match {
-          case inv: Invalid => visitInvalid(inv.reason, inv.originalType, ctx)
-        }
+        val inv = e.wdlType.asInstanceOf[Invalid]
+        visitInvalid(inv.reason, inv.originalType, ctx)
       case _ => ()
     }
   }
 
-  override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-    ctx.element.wdlType match {
-      case inv: Invalid => visitInvalid(inv.reason, inv.originalType, ctx)
+  def visitDefinition[P <: Element](name: String,
+                                    wdlType: T,
+                                    expr: Option[Expr],
+                                    parent: VisitorContext[P]): Unit = {
+    wdlType match {
+      case inv: Invalid => visitInvalid(inv.reason, inv.originalType, parent)
       case _ =>
-        visitName[Declaration](ctx.element.name, ctx)
-        if (ctx.element.expr.isDefined) {
-          visitExpression(ctx.createChildContext[Expr](ctx.element.expr.get))
+        visitName(name, parent)
+        if (expr.isDefined) {
+          visitExpression(parent.createChildContext[Expr](expr.get))
         }
     }
   }
 
-  override def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
-      visitDeclaration(ctx.createChildContext[Declaration](decl))
+  override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+    visitDefinition(ctx.element.name, ctx.element.wdlType, ctx.element.expr, ctx)
+  }
+
+  override def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {
+    ctx.element match {
+      case RequiredInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OptionalInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+        visitDefinition(name, wdlType, Some(defaultExpr), ctx)
     }
   }
 
-  override def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
-      visitDeclaration(ctx.createChildContext[Declaration](decl))
-    }
+  override def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {
+    visitDefinition(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
   }
 
   override def visitCallName(actualName: String,
@@ -327,6 +332,7 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
         }
         ctx.element.afters.foreach {
           case T_CallInvalid(_, reason, originalType, _) => visitInvalid(reason, originalType, ctx)
+          case _                                         => ()
         }
     }
   }
@@ -360,8 +366,8 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
 
   override def visitMetaValue(ctx: VisitorContext[MetaValue]): Unit = {
     ctx.element match {
-      case MetaInvalid(reason) => visitInvalid(reason, None, ctx)
-      case _                   => ()
+      case MetaInvalid(reason, _) => visitInvalid(reason, None, ctx)
+      case _                      => ()
     }
   }
 
@@ -397,12 +403,12 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
         visitInvalid(reason, Some(originalWorkflowType), ctx)
       case _ =>
         visitName[Workflow](ctx.element.name, ctx)
-        if (ctx.element.input.isDefined) {
-          visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
+        ctx.element.inputs.foreach { inp =>
+          visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
         }
         visitBody[Workflow](ctx.element.body, ctx)
-        if (ctx.element.output.isDefined) {
-          visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
+        ctx.element.outputs.foreach { out =>
+          visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
         }
         if (ctx.element.meta.isDefined) {
           visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
@@ -453,15 +459,15 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
         visitInvalid(reason, Some(originalTaskType), ctx)
       case _ =>
         visitName[Task](ctx.element.name, ctx)
-        if (ctx.element.input.isDefined) {
-          visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
+        ctx.element.inputs.foreach { inp =>
+          visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
         }
         ctx.element.declarations.foreach { decl =>
           visitDeclaration(ctx.createChildContext[Declaration](decl))
         }
         visitCommandSection(ctx.createChildContext[CommandSection](ctx.element.command))
-        if (ctx.element.output.isDefined) {
-          visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
+        ctx.element.outputs.foreach { out =>
+          visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
         }
         if (ctx.element.runtime.isDefined) {
           visitRuntimeSection(ctx.createChildContext[RuntimeSection](ctx.element.runtime.get))

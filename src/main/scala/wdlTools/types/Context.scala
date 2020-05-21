@@ -15,7 +15,7 @@ case class Context(version: WdlVersion,
                    inputs: Map[String, WdlTypes.T] = Map.empty,
                    outputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,
-                   structs: Map[String, T_Struct] = Map.empty,
+                   aliases: Map[String, T_Struct] = Map.empty,
                    callables: Map[String, T_Callable] = Map.empty,
                    namespaces: Set[String] = Set.empty) {
   type WdlType = WdlTypes.T
@@ -40,17 +40,17 @@ case class Context(version: WdlVersion,
     None
   }
 
-  def bindInputSection(inputSection: TAT.InputSection): Context = {
+  def bindInputSection(inputSection: Vector[TAT.InputDefinition]): Context = {
     // building bindings
-    val bindings = inputSection.declarations.map { tDecl =>
+    val bindings = inputSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
     this.copy(inputs = bindings)
   }
 
-  def bindOutputSection(oututSection: TAT.OutputSection): Context = {
+  def bindOutputSection(oututSection: Vector[TAT.OutputDefinition]): Context = {
     // building bindings
-    val bindings = oututSection.declarations.map { tDecl =>
+    val bindings = oututSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
     this.copy(outputs = bindings)
@@ -84,14 +84,16 @@ case class Context(version: WdlVersion,
   }
 
   def bindStruct(s: T_Struct): Either[Context, String] = {
-    structs.get(s.name) match {
+    aliases.get(s.name) match {
       case None =>
-        Left(this.copy(structs = structs + (s.name -> s)))
+        Left(this.copy(aliases = aliases + (s.name -> s)))
       case Some(existingStruct: T_Struct) if s != existingStruct =>
         Right(s"struct ${s.name} is already declared")
-      case _ =>
+      case Some(_: T_Struct) =>
         // The struct is defined a second time, with the exact same definition. Ignore.
         Left(this)
+      case Some(_) =>
+        Right(s"struct ${s.name} overrides an existing alias")
     }
   }
 
@@ -143,26 +145,28 @@ case class Context(version: WdlVersion,
     //     alias Child as Child2
     //     alias GrandChild as GrandChild2
     //
-    val aliasesMap: Map[String, String] = aliases.map {
+    val iAliasesTranslations: Map[String, String] = aliases.map {
       case AST.ImportAlias(src, dest, _) => src -> dest
     }.toMap
-    val iStructs = iCtx.structs.map {
-      case (name, iStruct) =>
-        aliasesMap.get(name) match {
+    val iAliases: Map[String, T_Struct] = iCtx.aliases.map {
+      case (name, iStruct: T_Struct) =>
+        iAliasesTranslations.get(name) match {
           case None          => name -> iStruct
           case Some(altName) => altName -> T_StructDef(altName, iStruct.members)
         }
+      case (_, other) =>
+        throw new Exception(s"Expecting a struct but got ${other}")
     }
 
     // check that the imported structs do not step over existing definitions
-    val doublyDefinedStructs = this.structs.keys.toSet intersect iStructs.keys.toSet.filter(sname =>
-      this.structs(sname) != iStructs(sname)
+    val doublyDefinedStructs = this.aliases.keys.toSet intersect iAliases.keys.toSet.filter(sname =>
+      this.aliases(sname) != iAliases(sname)
     )
     if (doublyDefinedStructs.nonEmpty) {
       Right(s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way")
     } else {
       Left(
-          this.copy(structs = structs ++ iStructs,
+          this.copy(aliases = this.aliases ++ iAliases,
                     callables = callables ++ iCallables,
                     namespaces = namespaces + namespace)
       )

@@ -5,8 +5,8 @@ import java.nio.file.Path
 
 import wdlTools.syntax.TextSource
 
-case class Context(bindings: Map[String, WdlValues.WV]) {
-  def addBinding(name: String, value: WdlValues.WV): Context = {
+case class Context(bindings: Map[String, WdlValues.V]) {
+  def addBinding(name: String, value: WdlValues.V): Context = {
     assert(!(bindings contains name))
     this.copy(bindings = bindings + (name -> value))
   }
@@ -14,7 +14,7 @@ case class Context(bindings: Map[String, WdlValues.WV]) {
 
 // There is a standard library implementation for each WDL version.
 trait StandardLibraryImpl {
-  def call(funcName: String, args: Vector[WdlValues.WV], text: TextSource): WdlValues.WV
+  def call(funcName: String, args: Vector[WdlValues.V], text: TextSource): WdlValues.V
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.

@@ -15,10 +15,6 @@ object TypedAbstractSyntax {
   }
   sealed trait WorkflowElement extends Element
   sealed trait DocumentElement extends Element
-  sealed trait Callable {
-    val name: String
-    val wdlType: WdlTypes.T_Callable
-  }
 
   // expressions
   sealed trait Expr extends Element {
@@ -113,12 +109,52 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   // sections
+
   /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
-    * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
-    * `InputSection` `TextSource` may overlap with other elements.
+    * and bound declarations that require evaluation cannot be treated as inputs.
+    *
+    * This definition based on Cromwell wom.callable.Callable.InputDefinition. It
+    * is easier to use a variant of this interface for backward compatibility with dxWDL.
     */
-  case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
-  case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
+  sealed trait InputDefinition extends Element {
+    val name: String
+    val wdlType: WdlTypes.T
+    val text: TextSource
+  }
+
+  // A compulsory input that has no default, and must be provided by the caller
+  case class RequiredInputDefinition(name: String, wdlType: WdlTypes.T, text: TextSource)
+      extends InputDefinition
+
+  // An input that has a default and may be skipped by the caller
+  case class OverridableInputDefinitionWithDefault(name: String,
+                                                   wdlType: WdlTypes.T,
+                                                   defaultExpr: Expr,
+                                                   text: TextSource)
+      extends InputDefinition
+
+  // An input whose value should always be calculated from the default, and is
+  // not allowed to be overridden.
+  /*  case class FixedInputDefinitionWithDefault(name : String,
+                                             wdlType : WdlTypes.T,
+                                             defaultExpr : Expr,
+                                             text : TextSource) */
+
+  // an input that may be omitted by the caller. In that case the value will
+  // be null (or None).
+  case class OptionalInputDefinition(name: String, wdlType: WdlTypes.T_Optional, text: TextSource)
+      extends InputDefinition
+
+  case class OutputDefinition(name: String, wdlType: WdlTypes.T, expr: Expr, text: TextSource)
+      extends Element
+
+  // A workflow or a task.
+  sealed trait Callable {
+    val name: String
+    val wdlType: WdlTypes.T_Callable
+    val inputs: Vector[InputDefinition]
+    val outputs: Vector[OutputDefinition]
+  }
 
   // A command can be simple, with just one continuous string:
   //
@@ -138,17 +174,17 @@ object TypedAbstractSyntax {
   case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
-  sealed trait MetaValue
-  case object MetaNull extends MetaValue
-  case class MetaBoolean(value: Boolean) extends MetaValue
-  case class MetaInt(value: Int) extends MetaValue
-  case class MetaFloat(value: Double) extends MetaValue
-  case class MetaString(value: String) extends MetaValue
-  case class MetaObject(value: Map[String, MetaValue]) extends MetaValue
-  case class MetaArray(value: Vector[MetaValue]) extends MetaValue
+  sealed trait MetaValue extends Element
+  case class MetaNull(text: TextSource) extends MetaValue
+  case class MetaBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaString(value: String, text: TextSource) extends MetaValue
+  case class MetaObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
+  case class MetaArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
   // indicates the original meta value is invalid
   // this is only used when it not possible to generate a "real" Expr with a T_Error wdlType
-  case class MetaInvalid(message: String) extends MetaValue
+  case class MetaInvalid(message: String, text: TextSource) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
@@ -177,8 +213,8 @@ object TypedAbstractSyntax {
   // A task
   case class Task(name: String,
                   wdlType: WdlTypes.T_Task,
-                  input: Option[InputSection],
-                  output: Option[OutputSection],
+                  inputs: Vector[InputDefinition],
+                  outputs: Vector[OutputDefinition],
                   command: CommandSection, // the command section is required
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
@@ -224,8 +260,8 @@ object TypedAbstractSyntax {
 
   case class Workflow(name: String,
                       wdlType: WdlTypes.T_Workflow,
-                      input: Option[InputSection],
-                      output: Option[OutputSection],
+                      inputs: Vector[InputDefinition],
+                      outputs: Vector[OutputDefinition],
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement],

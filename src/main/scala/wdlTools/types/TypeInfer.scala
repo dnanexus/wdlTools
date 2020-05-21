@@ -189,7 +189,7 @@ case class TypeInfer(conf: TypeOptions) {
       // String name = p.name
       case T_Identifier(structName) =>
         // produce the struct definition
-        ctx.structs.get(structName) match {
+        ctx.aliases.get(structName) match {
           case None =>
             val msg = s"unknown struct ${structName}"
             if (errorAsException) {
@@ -590,7 +590,7 @@ case class TypeInfer(conf: TypeOptions) {
       case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, text, ctx), typeFromAst(v, text, ctx))
       case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, text, ctx), typeFromAst(r, text, ctx))
       case AST.TypeIdentifier(id, _) =>
-        ctx.structs.get(id) match {
+        ctx.aliases.get(id) match {
           case None =>
             val msg = s"struct ${id} has not been defined"
             if (errorAsException) {
@@ -663,9 +663,10 @@ case class TypeInfer(conf: TypeOptions) {
   }
 
   // type check the input section, and see that there are no double definitions.
-  // return a new typed input section
+  // return input definitions
   //
-  private def applyInputSection(inputSection: AST.InputSection, ctx: Context): TAT.InputSection = {
+  private def applyInputSection(inputSection: AST.InputSection,
+                                ctx: Context): Vector[TAT.InputDefinition] = {
     // translate each declaration
     val (tDecls, _, _) =
       inputSection.declarations
@@ -683,12 +684,29 @@ case class TypeInfer(conf: TypeOptions) {
             }
             (tDecls :+ tDecl, names + decl.name, bindings + (tDecl.name -> tDecl.wdlType))
         }
-    TAT.InputSection(tDecls, inputSection.text)
+
+    // convert the typed declarations into input definitions
+    tDecls.map { tDecl =>
+      // What kind of input is this?
+      // compulsory, optional, one with a default
+      tDecl.expr match {
+        case None => {
+          tDecl.wdlType match {
+            case t: WdlTypes.T_Optional =>
+              TAT.OptionalInputDefinition(tDecl.name, t, tDecl.text)
+            case _ =>
+              TAT.RequiredInputDefinition(tDecl.name, tDecl.wdlType, tDecl.text)
+          }
+        }
+        case Some(expr) =>
+          TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+      }
+    }
   }
 
   // Calculate types for the outputs, and return a new typed output section
   private def applyOutputSection(outputSection: AST.OutputSection,
-                                 ctx: Context): TAT.OutputSection = {
+                                 ctx: Context): Vector[TAT.OutputDefinition] = {
     // output variables can shadow input definitions, but not intermediate
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
@@ -721,39 +739,38 @@ case class TypeInfer(conf: TypeOptions) {
             (tDecls :+ tDecl, names + tDecl.name, bindings2)
         }
 
-    TAT.OutputSection(tDecls, outputSection.text)
+    // convert the declarations into output definitions
+    tDecls.map { tDecl =>
+      tDecl.expr match {
+        case None =>
+          throw new TypeException("Outputs must have expressions", tDecl.text, ctx.docSourceUrl)
+        case Some(expr) =>
+          TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+      }
+    }
   }
 
   // calculate the type signature of a workflow or a task
   private def calcSignature(
-      inputSection: Option[TAT.InputSection],
-      outputSection: Option[TAT.OutputSection]
+      inputSection: Vector[TAT.InputDefinition],
+      outputSection: Vector[TAT.OutputDefinition]
   ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
+    val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
+      case d: TAT.RequiredInputDefinition =>
+        // input is compulsory
+        d.name -> (d.wdlType, false)
+      case d: TAT.OverridableInputDefinitionWithDefault =>
+        // input has a default value, caller may omit it.
+        d.name -> (d.wdlType, true)
+      case d: TAT.OptionalInputDefinition =>
+        // input is optional, caller can omit it.
+        d.name -> (d.wdlType, true)
+    }.toMap
 
-    val inputType: Map[String, (WdlType, Boolean)] = inputSection match {
-      case None => Map.empty
-      case Some(TAT.InputSection(decls, _)) =>
-        decls.map {
-          case TAT.Declaration(name, wdlType, Some(_), _) =>
-            // input has a default value, caller may omit it.
-            name -> (wdlType, true)
+    val outputType: Map[String, WdlType] = outputSection.map { tDecl =>
+      tDecl.name -> tDecl.wdlType
+    }.toMap
 
-          case TAT.Declaration(name, T_Optional(t), None, _) =>
-            // input is optional, caller can omit it.
-            name -> (T_Optional(t), true)
-
-          case TAT.Declaration(name, t, None, _) =>
-            // input is compulsory
-            name -> (t, false)
-        }.toMap
-    }
-    val outputType: Map[String, WdlType] = outputSection match {
-      case None => Map.empty
-      case Some(TAT.OutputSection(decls, _)) =>
-        decls.map { tDecl =>
-          tDecl.name -> tDecl.wdlType
-        }.toMap
-    }
     (inputType, outputType)
   }
 
@@ -778,36 +795,42 @@ case class TypeInfer(conf: TypeOptions) {
   // language for meta values only.
   private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(_)                          => TAT.MetaNull
-      case AST.ValueBoolean(value, _)                => TAT.MetaBoolean(value)
-      case AST.ValueInt(value, _)                    => TAT.MetaInt(value)
-      case AST.ValueFloat(value, _)                  => TAT.MetaFloat(value)
-      case AST.ValueString(value, _)                 => TAT.MetaString(value)
-      case AST.ExprIdentifier(id, _) if id == "null" => TAT.MetaNull
-      case AST.ExprIdentifier(id, _)                 => TAT.MetaString(id)
-      case AST.ExprArray(vec, _)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)))
-      case AST.ExprMap(members, _) =>
-        TAT.MetaObject(members.map {
-          case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case other =>
-            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-        }.toMap)
-      case AST.ExprObject(members, _) =>
-        TAT.MetaObject(members.map {
-          case AST.ExprObjectMember(key, value, _) =>
-            key -> metaValueFromExpr(value, ctx)
-          case other =>
-            throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-        }.toMap)
+      case AST.ValueNull(text)                          => TAT.MetaNull(text)
+      case AST.ValueBoolean(value, text)                => TAT.MetaBoolean(value, text)
+      case AST.ValueInt(value, text)                    => TAT.MetaInt(value, text)
+      case AST.ValueFloat(value, text)                  => TAT.MetaFloat(value, text)
+      case AST.ValueString(value, text)                 => TAT.MetaString(value, text)
+      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaNull(text)
+      case AST.ExprIdentifier(id, text)                 => TAT.MetaString(id, text)
+      case AST.ExprArray(vec, text)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)), text)
+      case AST.ExprMap(members, text) =>
+        TAT.MetaObject(
+            members.map {
+              case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case other =>
+                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+            }.toMap,
+            text
+        )
+      case AST.ExprObject(members, text) =>
+        TAT.MetaObject(
+            members.map {
+              case AST.ExprObjectMember(key, value, _) =>
+                key -> metaValueFromExpr(value, ctx)
+              case other =>
+                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+            }.toMap,
+            text
+        )
       case other =>
         val msg = s"${SUtil.exprToString(other)} is an invalid meta value"
         if (errorAsException) {
           throw new TypeException(msg, expr.text, ctx.docSourceUrl)
         } else {
-          TAT.MetaInvalid(msg)
+          TAT.MetaInvalid(msg, other.text)
         }
     }
   }
@@ -831,7 +854,7 @@ case class TypeInfer(conf: TypeOptions) {
             if (errorAsException) {
               throw new TypeException(msg, kv.text, ctx.docSourceUrl)
             } else {
-              TAT.MetaInvalid(msg)
+              TAT.MetaInvalid(msg, kv.expr.text)
             }
           }
           kv.id -> metaValue
@@ -848,13 +871,13 @@ case class TypeInfer(conf: TypeOptions) {
   //
   // We can't check the validity of the command section.
   private def applyTask(task: AST.Task, ctxOuter: Context): TAT.Task = {
-    val (tInputSection, ctx) = task.input match {
+    val (inputDefs, ctx) = task.input match {
       case None =>
-        (None, ctxOuter)
+        (Vector.empty, ctxOuter)
       case Some(inpSection) =>
         val tInpSection = applyInputSection(inpSection, ctxOuter)
         val ctx = ctxOuter.bindInputSection(tInpSection)
-        (Some(tInpSection), ctx)
+        (tInpSection, ctx)
     }
 
     // add types to the declarations, and accumulate context
@@ -902,26 +925,26 @@ case class TypeInfer(conf: TypeOptions) {
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.text)
 
-    val (tOutputSection, ctxOutput) = task.output match {
+    val (outputDefs, ctxOutput) = task.output match {
       case None =>
-        (None, ctxDecl)
+        (Vector.empty, ctxDecl)
       case Some(outSection) =>
         val tOutSection = applyOutputSection(outSection, ctxDecl)
         val ctx = ctxDecl.bindOutputSection(tOutSection)
-        (Some(tOutSection), ctx)
+        (tOutSection, ctx)
     }
 
     val tMeta = task.meta.map(applyMeta(_, ctxOutput))
     val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the task
-    val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
+    val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
 
     TAT.Task(
         name = task.name,
         wdlType = T_TaskDef(task.name, inputType, outputType),
-        input = tInputSection,
-        output = tOutputSection,
+        inputs = inputDefs,
+        outputs = outputDefs,
         command = tCommand,
         declarations = tDeclarations,
         meta = tMeta,
@@ -1201,37 +1224,37 @@ case class TypeInfer(conf: TypeOptions) {
   }
 
   private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
-    val (tInputSection, ctx) = wf.input match {
+    val (inputDefs, ctx) = wf.input match {
       case None =>
-        (None, ctxOuter)
+        (Vector.empty, ctxOuter)
       case Some(inpSection) =>
         val tInpSection = applyInputSection(inpSection, ctxOuter)
         val ctx = ctxOuter.bindInputSection(tInpSection)
-        (Some(tInpSection), ctx)
+        (tInpSection, ctx)
     }
 
     val (bindings, wfElements) = applyWorkflowElements(ctx, wf.body)
     val ctxBody = ctx.bindVarList(bindings)
 
-    val (tOutputSection, ctxOutput) = wf.output match {
+    val (outputDefs, ctxOutput) = wf.output match {
       case None =>
-        (None, ctxBody)
+        (Vector.empty, ctxBody)
       case Some(outSection) =>
         val tOutSection = applyOutputSection(outSection, ctxBody)
         val ctx = ctxBody.bindOutputSection(tOutSection)
-        (Some(tOutSection), ctx)
+        (tOutSection, ctx)
     }
 
     val tMeta = wf.meta.map(applyMeta(_, ctxOutput))
     val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOutput))
 
     // calculate the type signature of the workflow
-    val (inputType, outputType) = calcSignature(tInputSection, tOutputSection)
+    val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
     TAT.Workflow(
         name = wf.name,
         wdlType = T_WorkflowDef(wf.name, inputType, outputType),
-        input = tInputSection,
-        output = tOutputSection,
+        inputs = inputDefs,
+        outputs = outputDefs,
         meta = tMeta,
         parameterMeta = tParamMeta,
         body = wfElements,
@@ -1287,7 +1310,7 @@ case class TypeInfer(conf: TypeOptions) {
 
           val aliases = iStat.aliases.map {
             case AST.ImportAlias(id1, id2, text) =>
-              TAT.ImportAlias(id1, id2, ctx.structs(id1), text)
+              TAT.ImportAlias(id1, id2, ctx.aliases(id1), text)
           }
           val name = iStat.name.map(_.value)
           val addr = iStat.addr.value

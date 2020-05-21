@@ -49,10 +49,10 @@ case class Linter(opts: Options,
         // First run the TypeChecker to infer the types of all expressions
         val typeChecker = TypeInfer(
             TypeOptions(
-                opts.localDirectories,
-                opts.verbosity,
-                opts.antlr4Trace,
-                TypeCheckingRegime.Strict
+                localDirectories = opts.localDirectories,
+                verbosity = opts.verbosity,
+                antlr4Trace = opts.antlr4Trace,
+                typeChecking = TypeCheckingRegime.Strict
             )
         )
         val (_, typesContext) = typeChecker.apply(doc)

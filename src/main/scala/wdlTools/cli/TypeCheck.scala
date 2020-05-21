@@ -13,6 +13,7 @@ import wdlTools.types.{TypeException, TypeInfer, TypedAbstractSyntax, TypedAbstr
 
 import scala.collection.mutable
 import scala.io.AnsiColor
+import scala.language.reflectiveCalls
 
 case class TypeCheck(conf: WdlToolsConf) extends Command {
   private def errorsToJson(errors: Map[URL, Vector[(String, TextSource)]]): JsObject = {

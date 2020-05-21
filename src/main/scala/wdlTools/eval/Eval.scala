@@ -19,37 +19,37 @@ case class Eval(opts: Options,
   }
   private val coercion = Coercion(docSourceUrl)
 
-  private def getStringVal(value: WV, text: TextSource): String = {
+  private def getStringVal(value: V, text: TextSource): String = {
     value match {
-      case WV_String(s) => s
-      case WV_File(s)   => s
-      case other        => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
+      case V_String(s) => s
+      case V_File(s)   => s
+      case other       => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
     }
   }
 
-  private def compareEqeq(a: WV, b: WV, text: TextSource): Boolean = {
+  private def compareEqeq(a: V, b: V, text: TextSource): Boolean = {
     (a, b) match {
-      case (WV_Null, WV_Null)               => true
-      case (WV_Boolean(b1), WV_Boolean(b2)) => b1 == b2
-      case (WV_Int(i1), WV_Int(i2))         => i1 == i2
-      case (WV_Float(x1), WV_Float(x2))     => x1 == x2
-      case (WV_String(s1), WV_String(s2))   => s1 == s2
-      case (WV_File(p1), WV_File(p2))       => p1 == p2
+      case (V_Null, V_Null)               => true
+      case (V_Boolean(b1), V_Boolean(b2)) => b1 == b2
+      case (V_Int(i1), V_Int(i2))         => i1 == i2
+      case (V_Float(x1), V_Float(x2))     => x1 == x2
+      case (V_String(s1), V_String(s2))   => s1 == s2
+      case (V_File(p1), V_File(p2))       => p1 == p2
 
-      case (WV_Pair(l1, r1), WV_Pair(l2, r2)) =>
+      case (V_Pair(l1, r1), V_Pair(l2, r2)) =>
         compareEqeq(l1, l2, text) && compareEqeq(r1, r2, text)
 
       // arrays
-      case (WV_Array(a1), WV_Array(a2)) if a1.size != a2.size => false
-      case (WV_Array(a1), WV_Array(a2))                       =>
+      case (V_Array(a1), V_Array(a2)) if a1.size != a2.size => false
+      case (V_Array(a1), V_Array(a2))                       =>
         // All array elements must be equal
         (a1 zip a2).forall {
           case (x, y) => compareEqeq(x, y, text)
         }
 
       // maps
-      case (WV_Map(m1), WV_Map(m2)) if m1.size != m2.size => false
-      case (WV_Map(m1), WV_Map(m2)) =>
+      case (V_Map(m1), V_Map(m2)) if m1.size != m2.size => false
+      case (V_Map(m1), V_Map(m2)) =>
         val keysEqual = (m1.keys.toSet zip m2.keys.toSet).forall {
           case (k1, k2) => compareEqeq(k1, k2, text)
         }
@@ -61,159 +61,159 @@ case class Eval(opts: Options,
         }
 
       // optionals
-      case (WV_Optional(v1), WV_Optional(v2)) =>
+      case (V_Optional(v1), V_Optional(v2)) =>
         compareEqeq(v1, v2, text)
-      case (WV_Optional(v1), v2) =>
+      case (V_Optional(v1), v2) =>
         compareEqeq(v1, v2, text)
-      case (v1, WV_Optional(v2)) =>
+      case (v1, V_Optional(v2)) =>
         compareEqeq(v1, v2, text)
 
       // structs
-      case (WV_Struct(name1, _), WV_Struct(name2, _)) if name1 != name2 => false
-      case (WV_Struct(name, members1), WV_Struct(_, members2))
+      case (V_Struct(name1, _), V_Struct(name2, _)) if name1 != name2 => false
+      case (V_Struct(name, members1), V_Struct(_, members2))
           if members1.keys.toSet != members2.keys.toSet =>
         // We need the type definition here. The other option is to assume it has already
         // been cleared at compile time.
         throw new Exception(s"error: struct ${name} does not have the corrent number of members")
-      case (WV_Struct(_, members1), WV_Struct(_, members2)) =>
+      case (V_Struct(_, members1), V_Struct(_, members2)) =>
         members1.keys.forall(k => compareEqeq(members1(k), members2(k), text))
 
-      case (_: WV_Object, _: WV_Object) =>
+      case (_: V_Object, _: V_Object) =>
         throw new Exception("objects not implemented")
     }
   }
 
-  private def compareLt(a: WV, b: WV, text: TextSource): Boolean = {
+  private def compareLt(a: V, b: V, text: TextSource): Boolean = {
     (a, b) match {
-      case (WV_Null, WV_Null)             => false
-      case (WV_Int(n1), WV_Int(n2))       => n1 < n2
-      case (WV_Float(x1), WV_Int(n2))     => x1 < n2
-      case (WV_Int(n1), WV_Float(x2))     => n1 < x2
-      case (WV_Float(x1), WV_Float(x2))   => x1 < x2
-      case (WV_String(s1), WV_String(s2)) => s1 < s2
-      case (WV_File(p1), WV_File(p2))     => p1 < p2
+      case (V_Null, V_Null)             => false
+      case (V_Int(n1), V_Int(n2))       => n1 < n2
+      case (V_Float(x1), V_Int(n2))     => x1 < n2
+      case (V_Int(n1), V_Float(x2))     => n1 < x2
+      case (V_Float(x1), V_Float(x2))   => x1 < x2
+      case (V_String(s1), V_String(s2)) => s1 < s2
+      case (V_File(p1), V_File(p2))     => p1 < p2
       case (_, _) =>
         throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
-  private def compareLte(a: WV, b: WV, text: TextSource): Boolean = {
+  private def compareLte(a: V, b: V, text: TextSource): Boolean = {
     (a, b) match {
-      case (WV_Null, WV_Null)             => true
-      case (WV_Int(n1), WV_Int(n2))       => n1 <= n2
-      case (WV_Float(x1), WV_Int(n2))     => x1 <= n2
-      case (WV_Int(n1), WV_Float(x2))     => n1 <= x2
-      case (WV_Float(x1), WV_Float(x2))   => x1 <= x2
-      case (WV_String(s1), WV_String(s2)) => s1 <= s2
-      case (WV_File(p1), WV_File(p2))     => p1 <= p2
+      case (V_Null, V_Null)             => true
+      case (V_Int(n1), V_Int(n2))       => n1 <= n2
+      case (V_Float(x1), V_Int(n2))     => x1 <= n2
+      case (V_Int(n1), V_Float(x2))     => n1 <= x2
+      case (V_Float(x1), V_Float(x2))   => x1 <= x2
+      case (V_String(s1), V_String(s2)) => s1 <= s2
+      case (V_File(p1), V_File(p2))     => p1 <= p2
       case (_, _) =>
         throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
-  private def compareGt(a: WV, b: WV, text: TextSource): Boolean = {
+  private def compareGt(a: V, b: V, text: TextSource): Boolean = {
     (a, b) match {
-      case (WV_Null, WV_Null)             => false
-      case (WV_Int(n1), WV_Int(n2))       => n1 > n2
-      case (WV_Float(x), WV_Int(i))       => x > i
-      case (WV_Int(i), WV_Float(x))       => i > x
-      case (WV_Float(x1), WV_Float(x2))   => x1 > x2
-      case (WV_String(s1), WV_String(s2)) => s1 > s2
-      case (WV_File(p1), WV_File(p2))     => p1 > p2
+      case (V_Null, V_Null)             => false
+      case (V_Int(n1), V_Int(n2))       => n1 > n2
+      case (V_Float(x), V_Int(i))       => x > i
+      case (V_Int(i), V_Float(x))       => i > x
+      case (V_Float(x1), V_Float(x2))   => x1 > x2
+      case (V_String(s1), V_String(s2)) => s1 > s2
+      case (V_File(p1), V_File(p2))     => p1 > p2
       case (_, _) =>
         throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
-  private def compareGte(a: WV, b: WV, text: TextSource): Boolean = {
+  private def compareGte(a: V, b: V, text: TextSource): Boolean = {
     (a, b) match {
-      case (WV_Null, WV_Null)             => true
-      case (WV_Int(n1), WV_Int(n2))       => n1 >= n2
-      case (WV_Float(x), WV_Int(i))       => x >= i
-      case (WV_Int(i), WV_Float(x))       => i >= x
-      case (WV_Float(x1), WV_Float(x2))   => x1 >= x2
-      case (WV_String(s1), WV_String(s2)) => s1 >= s2
-      case (WV_File(p1), WV_File(p2))     => p1 >= p2
+      case (V_Null, V_Null)             => true
+      case (V_Int(n1), V_Int(n2))       => n1 >= n2
+      case (V_Float(x), V_Int(i))       => x >= i
+      case (V_Int(i), V_Float(x))       => i >= x
+      case (V_Float(x1), V_Float(x2))   => x1 >= x2
+      case (V_String(s1), V_String(s2)) => s1 >= s2
+      case (V_File(p1), V_File(p2))     => p1 >= p2
       case (_, _) =>
         throw new EvalException("bad value should be a boolean", text, docSourceUrl)
     }
   }
 
-  private def add(a: WV, b: WV, text: TextSource): WV = {
+  private def add(a: V, b: V, text: TextSource): V = {
     (a, b) match {
-      case (WV_Int(n1), WV_Int(n2))     => WV_Int(n1 + n2)
-      case (WV_Float(x1), WV_Int(n2))   => WV_Float(x1 + n2)
-      case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 + x2)
-      case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 + x2)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 + n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 + n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 + x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 + x2)
 
       // if we are adding strings, the result is a string
-      case (WV_String(s1), WV_String(s2)) => WV_String(s1 + s2)
-      case (WV_String(s1), WV_Int(n2))    => WV_String(s1 + n2.toString)
-      case (WV_String(s1), WV_Float(x2))  => WV_String(s1 + x2.toString)
-      case (WV_Int(n1), WV_String(s2))    => WV_String(n1.toString + s2)
-      case (WV_Float(x1), WV_String(s2))  => WV_String(x1.toString + s2)
-      case (WV_String(s), WV_Null)        => WV_String(s)
+      case (V_String(s1), V_String(s2)) => V_String(s1 + s2)
+      case (V_String(s1), V_Int(n2))    => V_String(s1 + n2.toString)
+      case (V_String(s1), V_Float(x2))  => V_String(s1 + x2.toString)
+      case (V_Int(n1), V_String(s2))    => V_String(n1.toString + s2)
+      case (V_Float(x1), V_String(s2))  => V_String(x1.toString + s2)
+      case (V_String(s), V_Null)        => V_String(s)
 
       // files
-      case (WV_File(s1), WV_String(s2)) => WV_File(s1 + s2)
-      case (WV_File(s1), WV_File(s2))   => WV_File(s1 + s2)
+      case (V_File(s1), V_String(s2)) => V_File(s1 + s2)
+      case (V_File(s1), V_File(s2))   => V_File(s1 + s2)
 
       case (_, _) =>
         throw new EvalException("cannot add these values", text, docSourceUrl)
     }
   }
 
-  private def sub(a: WV, b: WV, text: TextSource): WV = {
+  private def sub(a: V, b: V, text: TextSource): V = {
     (a, b) match {
-      case (WV_Int(n1), WV_Int(n2))     => WV_Int(n1 - n2)
-      case (WV_Float(x1), WV_Int(n2))   => WV_Float(x1 - n2)
-      case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 - x2)
-      case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 - x2)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 - n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 - n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 - x2)
       case (_, _) =>
         throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
-  private def mod(a: WV, b: WV, text: TextSource): WV = {
+  private def mod(a: V, b: V, text: TextSource): V = {
     (a, b) match {
-      case (WV_Int(n1), WV_Int(n2))     => WV_Int(n1 % n2)
-      case (WV_Float(x1), WV_Int(n2))   => WV_Float(x1 % n2)
-      case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 % x2)
-      case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 % x2)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 % n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 % n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 % x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 % x2)
       case (_, _) =>
         throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
-  private def multiply(a: WV, b: WV, text: TextSource): WV = {
+  private def multiply(a: V, b: V, text: TextSource): V = {
     (a, b) match {
-      case (WV_Int(n1), WV_Int(n2))     => WV_Int(n1 * n2)
-      case (WV_Float(x1), WV_Int(n2))   => WV_Float(x1 * n2)
-      case (WV_Int(n1), WV_Float(x2))   => WV_Float(n1 * x2)
-      case (WV_Float(x1), WV_Float(x2)) => WV_Float(x1 * x2)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 * n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 * n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 * x2)
       case (_, _) =>
         throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
   }
 
-  private def divide(a: WV, b: WV, text: TextSource): WV = {
+  private def divide(a: V, b: V, text: TextSource): V = {
     (a, b) match {
-      case (WV_Int(n1), WV_Int(n2)) =>
+      case (V_Int(n1), V_Int(n2)) =>
         if (n2 == 0)
           throw new EvalException("DivisionByZero", text, docSourceUrl)
-        WV_Int(n1 / n2)
-      case (WV_Float(x1), WV_Int(n2)) =>
+        V_Int(n1 / n2)
+      case (V_Float(x1), V_Int(n2)) =>
         if (n2 == 0)
           throw new EvalException("DivisionByZero", text, docSourceUrl)
-        WV_Float(x1 / n2)
-      case (WV_Int(n1), WV_Float(x2)) =>
+        V_Float(x1 / n2)
+      case (V_Int(n1), V_Float(x2)) =>
         if (x2 == 0)
           throw new EvalException("DivisionByZero", text, docSourceUrl)
-        WV_Float(n1 / x2)
-      case (WV_Float(x1), WV_Float(x2)) =>
+        V_Float(n1 / x2)
+      case (V_Float(x1), V_Float(x2)) =>
         if (x2 == 0)
           throw new EvalException("DivisionByZero", text, docSourceUrl)
-        WV_Float(x1 / x2)
+        V_Float(x1 / x2)
       case (_, _) =>
         throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
     }
@@ -221,9 +221,9 @@ case class Eval(opts: Options,
 
   // Access a field in a struct or an object. For example:
   //   Int z = x.a
-  private def exprGetName(value: WV, id: String, ctx: Context, text: TextSource): WV = {
+  private def exprGetName(value: V, id: String, ctx: Context, text: TextSource): V = {
     value match {
-      case WV_Struct(name, members) =>
+      case V_Struct(name, members) =>
         members.get(id) match {
           case None =>
             throw new EvalException(s"Struct ${name} does not have member ${id}",
@@ -232,14 +232,14 @@ case class Eval(opts: Options,
           case Some(t) => t
         }
 
-      case WV_Object(members) =>
+      case V_Object(members) =>
         members.get(id) match {
           case None =>
             throw new EvalException(s"Object does not have member ${id}", text, docSourceUrl)
           case Some(t) => t
         }
 
-      case WV_Call(name, members) =>
+      case V_Call(name, members) =>
         members.get(id) match {
           case None =>
             throw new EvalException(s"Call object ${name} does not have member ${id}",
@@ -249,9 +249,9 @@ case class Eval(opts: Options,
         }
 
       // accessing a pair element
-      case WV_Pair(l, _) if id.toLowerCase() == "left"  => l
-      case WV_Pair(_, r) if id.toLowerCase() == "right" => r
-      case WV_Pair(_, _) =>
+      case V_Pair(l, _) if id.toLowerCase() == "left"  => l
+      case V_Pair(_, r) if id.toLowerCase() == "right" => r
+      case V_Pair(_, _) =>
         throw new EvalException(s"accessing a pair with (${id}) is illegal", text, docSourceUrl)
 
       case _ =>
@@ -261,14 +261,14 @@ case class Eval(opts: Options,
     }
   }
 
-  private def apply(expr: TAT.Expr, ctx: Context): WdlValues.WV = {
+  private def apply(expr: TAT.Expr, ctx: Context): WdlValues.V = {
     expr match {
-      case _: TAT.ValueNull    => WV_Null
-      case x: TAT.ValueBoolean => WV_Boolean(x.value)
-      case x: TAT.ValueInt     => WV_Int(x.value)
-      case x: TAT.ValueFloat   => WV_Float(x.value)
-      case x: TAT.ValueString  => WV_String(x.value)
-      case x: TAT.ValueFile    => WV_File(x.value)
+      case _: TAT.ValueNull    => V_Null
+      case x: TAT.ValueBoolean => V_Boolean(x.value)
+      case x: TAT.ValueInt     => V_Int(x.value)
+      case x: TAT.ValueFloat   => V_Float(x.value)
+      case x: TAT.ValueString  => V_String(x.value)
+      case x: TAT.ValueFile    => V_File(x.value)
 
       // accessing a variable
       case eid: TAT.ExprIdentifier if !(ctx.bindings contains eid.id) =>
@@ -282,28 +282,28 @@ case class Eval(opts: Options,
           val xv = apply(x, ctx)
           getStringVal(xv, x.text)
         }
-        WV_String(strArray.mkString(""))
+        V_String(strArray.mkString(""))
 
-      case ep: TAT.ExprPair => WV_Pair(apply(ep.l, ctx), apply(ep.r, ctx))
+      case ep: TAT.ExprPair => V_Pair(apply(ep.l, ctx), apply(ep.r, ctx))
       case ea: TAT.ExprArray =>
-        WV_Array(ea.value.map { x =>
+        V_Array(ea.value.map { x =>
           apply(x, ctx)
         })
       case em: TAT.ExprMap =>
-        WV_Map(em.value.map {
+        V_Map(em.value.map {
           case (k, v) => apply(k, ctx) -> apply(v, ctx)
         })
 
       case eObj: TAT.ExprObject =>
-        WV_Object(eObj.value.map {
+        V_Object(eObj.value.map {
           case (k, v) => k -> apply(v, ctx)
         }.toMap)
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, boolExpr, _, _) =>
         apply(boolExpr, ctx) match {
-          case WV_Boolean(true)  => apply(t, ctx)
-          case WV_Boolean(false) => apply(f, ctx)
+          case V_Boolean(true)  => apply(t, ctx)
+          case V_Boolean(false) => apply(f, ctx)
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
@@ -313,19 +313,19 @@ case class Eval(opts: Options,
       // ~{default="foo" optional_value}
       case TAT.ExprPlaceholderDefault(defaultVal, optVal, _, _) =>
         apply(optVal, ctx) match {
-          case WV_Null => apply(defaultVal, ctx)
-          case other   => other
+          case V_Null => apply(defaultVal, ctx)
+          case other  => other
         }
 
       // ~{sep=", " array_value}
       case TAT.ExprPlaceholderSep(sep: TAT.Expr, arrayVal: TAT.Expr, _, _) =>
         val sep2 = getStringVal(apply(sep, ctx), sep.text)
         apply(arrayVal, ctx) match {
-          case WV_Array(ar) =>
+          case V_Array(ar) =>
             val elements: Vector[String] = ar.map { x =>
               getStringVal(x, expr.text)
             }
-            WV_String(elements.mkString(sep2))
+            V_String(elements.mkString(sep2))
           case other =>
             throw new EvalException(s"bad value ${other}, should be a string",
                                     expr.text,
@@ -335,8 +335,8 @@ case class Eval(opts: Options,
       // operators on one argument
       case e: TAT.ExprUniraryPlus =>
         apply(e.value, ctx) match {
-          case WV_Float(f) => WV_Float(f)
-          case WV_Int(k)   => WV_Int(k)
+          case V_Float(f) => V_Float(f)
+          case V_Int(k)   => V_Int(k)
           case other =>
             throw new EvalException(s"bad value ${other}, should be a number",
                                     expr.text,
@@ -345,8 +345,8 @@ case class Eval(opts: Options,
 
       case e: TAT.ExprUniraryMinus =>
         apply(e.value, ctx) match {
-          case WV_Float(f) => WV_Float(-1 * f)
-          case WV_Int(k)   => WV_Int(-1 * k)
+          case V_Float(f) => V_Float(-1 * f)
+          case V_Int(k)   => V_Int(-1 * k)
           case other =>
             throw new EvalException(s"bad value ${other}, should be a number",
                                     expr.text,
@@ -355,7 +355,7 @@ case class Eval(opts: Options,
 
       case e: TAT.ExprNegate =>
         apply(e.value, ctx) match {
-          case WV_Boolean(b) => WV_Boolean(!b)
+          case V_Boolean(b) => V_Boolean(!b)
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
@@ -367,9 +367,9 @@ case class Eval(opts: Options,
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
         (av, bv) match {
-          case (WV_Boolean(a1), WV_Boolean(b1)) =>
-            WV_Boolean(a1 || b1)
-          case (WV_Boolean(_), other) =>
+          case (V_Boolean(a1), V_Boolean(b1)) =>
+            V_Boolean(a1 || b1)
+          case (V_Boolean(_), other) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     b.text,
                                     docSourceUrl)
@@ -383,9 +383,9 @@ case class Eval(opts: Options,
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
         (av, bv) match {
-          case (WV_Boolean(a1), WV_Boolean(b1)) =>
-            WV_Boolean(a1 && b1)
-          case (WV_Boolean(_), other) =>
+          case (V_Boolean(a1), V_Boolean(b1)) =>
+            V_Boolean(a1 && b1)
+          case (V_Boolean(_), other) =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     b.text,
                                     docSourceUrl)
@@ -399,28 +399,28 @@ case class Eval(opts: Options,
       case TAT.ExprEqeq(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(compareEqeq(av, bv, text))
+        V_Boolean(compareEqeq(av, bv, text))
       case TAT.ExprNeq(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(!compareEqeq(av, bv, text))
+        V_Boolean(!compareEqeq(av, bv, text))
 
       case TAT.ExprLt(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(compareLt(av, bv, text))
+        V_Boolean(compareLt(av, bv, text))
       case TAT.ExprLte(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(compareLte(av, bv, text))
+        V_Boolean(compareLte(av, bv, text))
       case TAT.ExprGt(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(compareGt(av, bv, text))
+        V_Boolean(compareGt(av, bv, text))
       case TAT.ExprGte(a, b, _, text) =>
         val av = apply(a, ctx)
         val bv = apply(b, ctx)
-        WV_Boolean(compareGte(av, bv, text))
+        V_Boolean(compareGte(av, bv, text))
 
       // Add is overloaded, can be used to add numbers or concatenate strings
       case TAT.ExprAdd(a, b, _, text) =>
@@ -451,9 +451,9 @@ case class Eval(opts: Options,
         val array_v = apply(array, ctx)
         val index_v = apply(index, ctx)
         (array_v, index_v) match {
-          case (WV_Array(av), WV_Int(n)) if n < av.size =>
+          case (V_Array(av), V_Int(n)) if n < av.size =>
             av(n)
-          case (WV_Array(av), WV_Int(n)) =>
+          case (V_Array(av), V_Int(n)) =>
             val arraySize = av.size
             throw new EvalException(
                 s"array access out of bounds (size=${arraySize}, element accessed=${n})",
@@ -471,8 +471,8 @@ case class Eval(opts: Options,
       case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, text) =>
         val cond_v = apply(cond, ctx)
         cond_v match {
-          case WV_Boolean(true)  => apply(tBranch, ctx)
-          case WV_Boolean(false) => apply(fBranch, ctx)
+          case V_Boolean(true)  => apply(tBranch, ctx)
+          case V_Boolean(false) => apply(fBranch, ctx)
           case _ =>
             throw new EvalException(s"condition is not boolean", text, docSourceUrl)
         }
