@@ -20,7 +20,9 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
         }
       }
       val typeChecker = TypeInfer(
-          TypeOptions(opts.localDirectories, opts.verbosity, opts.antlr4Trace)
+          TypeOptions(localDirectories = opts.localDirectories,
+                      verbosity = opts.verbosity,
+                      antlr4Trace = opts.antlr4Trace)
       )
       println(Util.prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports)))
     } else {

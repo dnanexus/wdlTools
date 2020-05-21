@@ -21,23 +21,24 @@ object TypeCheckingRegime extends Enumeration {
 /**
   * Common configuration options.
   *
-  * @param localDirectories local directories to search for imports.
-  * @param followImports whether to follow imports when parsing.
-  * @param verbosity verbosity level.
-  * @param antlr4Trace  whether to turn on tracing in the ANTLR4 parser.
+  * localDirectories local directories to search for imports.
+  * followImports whether to follow imports when parsing.
+  * verbosity verbosity level.
+  * antlr4Trace  whether to turn on tracing in the ANTLR4 parser.
   */
-class Options(val localDirectories: Vector[Path] = Vector.empty,
-              val followImports: Boolean = false,
-              val verbosity: Verbosity.Verbosity = Verbosity.Normal,
-              val antlr4Trace: Boolean = false) {
+trait Options {
+  val localDirectories: Vector[Path]
+  val followImports: Boolean
+  val verbosity: Verbosity.Verbosity
+  val antlr4Trace: Boolean
 
   def getUrl(pathOrUrl: String, mustExist: Boolean = true): URL = {
     Util.getUrl(pathOrUrl, localDirectories, mustExist)
   }
 }
 
-case class BasicOptions(override val localDirectories: Vector[Path] = Vector.empty,
-                        override val followImports: Boolean = false,
-                        override val verbosity: Verbosity.Verbosity = Verbosity.Normal,
-                        override val antlr4Trace: Boolean = false)
-    extends Options(localDirectories, followImports, verbosity, antlr4Trace)
+case class BasicOptions(localDirectories: Vector[Path] = Vector.empty,
+                        followImports: Boolean = false,
+                        verbosity: Verbosity.Verbosity = Verbosity.Normal,
+                        antlr4Trace: Boolean = false)
+    extends Options

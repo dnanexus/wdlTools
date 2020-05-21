@@ -9,12 +9,13 @@ import wdlTools.util.{Options, TypeCheckingRegime, Verbosity}
 /**
   * @param typeChecking strictness of type-checking
   */
-case class TypeOptions(override val localDirectories: Vector[Path] = Vector.empty,
-                       override val verbosity: Verbosity.Verbosity = Verbosity.Normal,
-                       override val antlr4Trace: Boolean = false,
+case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
+                       followImports: Boolean = true,
+                       verbosity: Verbosity.Verbosity = Verbosity.Normal,
+                       antlr4Trace: Boolean = false,
                        typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate,
                        errorAsException: Boolean = false)
-    extends Options(localDirectories, followImports = true, verbosity, antlr4Trace)
+    extends Options
 
 // Type error exception
 final class TypeException(message: String) extends Exception(message) {
