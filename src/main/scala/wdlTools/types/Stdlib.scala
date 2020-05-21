@@ -156,32 +156,29 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
   // evaluate the output type of a function. This may require calculation because
   // some functions are polymorphic in their inputs.
   private def evalOnePrototype(funcDesc: T_Function,
-                               inputTypes: Vector[T]): Either[Option[(T, T_Function)], String] = {
+                               inputTypes: Vector[T]): Option[(T, T_Function)] = {
     val arity = inputTypes.size
     val args = (arity, funcDesc) match {
       case (0, T_Function0(_, _))                   => Vector.empty
       case (1, T_Function1(_, arg1, _))             => Vector(arg1)
       case (2, T_Function2(_, arg1, arg2, _))       => Vector(arg1, arg2)
       case (3, T_Function3(_, arg1, arg2, arg3, _)) => Vector(arg1, arg2, arg3)
-      case (_, _) =>
-        return Left(None)
+      case (_, _)                                   => return None
     }
     try {
       val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
-      unify.substitute(funcDesc.output, ctx) match {
-        case Left(t)         => Left(Some((t, funcDesc)))
-        case Right(errorMsg) => Right(errorMsg)
-      }
+      val t = unify.substitute(funcDesc.output, ctx)
+      Some((t, funcDesc))
     } catch {
       case _: TypeUnificationException =>
-        Left(None)
+        None
     }
   }
 
-  def apply(funcName: String, inputTypes: Vector[T]): Either[(T, T_Function), String] = {
+  def apply(funcName: String, inputTypes: Vector[T]): (T, T_Function) = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
-        return Right(s"No function named ${funcName} in the standard library")
+        throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
       case Some(protoVec) =>
         protoVec
     }
@@ -189,9 +186,11 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[(T, T_Function)]] = candidates.map {
-      evalOnePrototype(_, inputTypes) match {
-        case Left(result)    => result
-        case Right(errorMsg) => return Right(errorMsg)
+      try {
+        evalOnePrototype(_, inputTypes)
+      } catch {
+        case e: SubstitutionException =>
+          throw new StdlibFunctionException(e.getMessage)
       }
     }
     val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
@@ -199,12 +198,13 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
       case 0 =>
         val inputsStr = inputTypes.map(Util.typeToString).mkString("\n")
         val candidatesStr = candidates.map(Util.typeToString(_)).mkString("\n")
-        Right(s"""|Invoking stdlib function ${funcName} with badly typed arguments
-                  |${candidatesStr}
-                  |inputs: ${inputsStr}
-                  |""".stripMargin)
+        val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
+                      |${candidatesStr}
+                      |inputs: ${inputsStr}
+                      |""".stripMargin
+        throw new StdlibFunctionException(msg)
       case 1 =>
-        Left(results.head)
+        results.head
       case n =>
         // Match more than one prototype. If they all have the same output type, then it doesn't matter
         // though.
@@ -214,11 +214,12 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
               Util.typeToString(funcSig)
           }
           .mkString("\n")
-        Right(s"""|Call to ${funcName} matches ${n} prototypes
-                  |inputTypes: ${inputTypes}
-                  |prototypes:
-                  |${prototypeDescriptions}
-                  |""".stripMargin)
+        val msg = s"""|Call to ${funcName} matches ${n} prototypes
+                      |inputTypes: ${inputTypes}
+                      |prototypes:
+                      |${prototypeDescriptions}
+                      |""".stripMargin
+        throw new StdlibFunctionException(msg)
     }
   }
 }

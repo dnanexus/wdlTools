@@ -207,8 +207,7 @@ case class Unification(conf: TypeOptions) {
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: T, typeBindings: Map[T_Var, T]): Either[T, String] = {
-    class SubstitutionException(msg: String) extends Exception(msg)
+  def substitute(t: T, typeBindings: Map[T_Var, T]): T = {
     def sub(t: T): T = {
       t match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
@@ -230,10 +229,6 @@ case class Unification(conf: TypeOptions) {
           )
       }
     }
-    try {
-      Left(sub(t))
-    } catch {
-      case e: SubstitutionException => Right(e.getMessage)
-    }
+    sub(t)
   }
 }

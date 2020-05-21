@@ -56,12 +56,12 @@ case class Context(version: WdlVersion,
     this.copy(outputs = bindings)
   }
 
-  def bindVar(varName: String, wdlType: WdlType): Either[Context, String] = {
+  def bindVar(varName: String, wdlType: WdlType): Context = {
     declarations.get(varName) match {
       case None =>
-        Left(this.copy(declarations = declarations + (varName -> wdlType)))
+        this.copy(declarations = declarations + (varName -> wdlType))
       case Some(_) =>
-        Right(s"variable ${varName} shadows an existing variable")
+        throw new DuplicateDeclarationException(s"variable ${varName} shadows an existing variable")
     }
   }
 
@@ -83,27 +83,29 @@ case class Context(version: WdlVersion,
     this.copy(declarations = declarations ++ keep)
   }
 
-  def bindStruct(s: T_Struct): Either[Context, String] = {
+  def bindStruct(s: T_Struct): Context = {
     aliases.get(s.name) match {
       case None =>
-        Left(this.copy(aliases = aliases + (s.name -> s)))
+        this.copy(aliases = aliases + (s.name -> s))
       case Some(existingStruct: T_Struct) if s != existingStruct =>
-        Right(s"struct ${s.name} is already declared")
+        throw new DuplicateDeclarationException(s"struct ${s.name} is already declared")
       case Some(_: T_Struct) =>
         // The struct is defined a second time, with the exact same definition. Ignore.
-        Left(this)
+        this
       case Some(_) =>
-        Right(s"struct ${s.name} overrides an existing alias")
+        throw new DuplicateDeclarationException(s"struct ${s.name} overrides an existing alias")
     }
   }
 
   // add a callable (task/workflow)
-  def bindCallable(callable: T_Callable): Either[Context, String] = {
+  def bindCallable(callable: T_Callable): Context = {
     callables.get(callable.name) match {
       case None =>
-        Left(this.copy(callables = callables + (callable.name -> callable)))
+        this.copy(callables = callables + (callable.name -> callable))
       case Some(_) =>
-        Right(s"a callable named ${callable.name} is already declared")
+        throw new DuplicateDeclarationException(
+            s"a callable named ${callable.name} is already declared"
+        )
     }
   }
 
@@ -121,9 +123,9 @@ case class Context(version: WdlVersion,
   // }
   def bindImportedDoc(namespace: String,
                       iCtx: Context,
-                      aliases: Vector[AST.ImportAlias]): Either[Context, String] = {
+                      aliases: Vector[AST.ImportAlias]): Context = {
     if (this.namespaces contains namespace) {
-      return Right(s"namespace ${namespace} already exists")
+      throw new DuplicateDeclarationException(s"namespace ${namespace} already exists")
     }
 
     // There cannot be any collisions because this is a new namespace
@@ -155,7 +157,7 @@ case class Context(version: WdlVersion,
           case Some(altName) => altName -> T_StructDef(altName, iStruct.members)
         }
       case (_, other) =>
-        throw new Exception(s"Expecting a struct but got ${other}")
+        throw new RuntimeException(s"Expecting a struct but got ${other}")
     }
 
     // check that the imported structs do not step over existing definitions
@@ -164,13 +166,13 @@ case class Context(version: WdlVersion,
         this.aliases(sname) != iAliases(sname)
       )
     if (doublyDefinedStructs.nonEmpty) {
-      Right(s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way")
-    } else {
-      Left(
-          this.copy(aliases = this.aliases ++ iAliases,
-                    callables = callables ++ iCallables,
-                    namespaces = namespaces + namespace)
+      throw new DuplicateDeclarationException(
+          s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way"
       )
+    } else {
+      this.copy(aliases = this.aliases ++ iAliases,
+                callables = callables ++ iCallables,
+                namespaces = namespaces + namespace)
     }
   }
 }

@@ -31,4 +31,10 @@ object TypeException {
   }
 }
 
+final class SubstitutionException(message: String) extends Exception(message)
+
 final class TypeUnificationException(message: String) extends Exception(message)
+
+final class StdlibFunctionException(message: String) extends Exception(message)
+
+final class DuplicateDeclarationException(message: String) extends Exception(message)

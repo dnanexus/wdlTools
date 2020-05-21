@@ -560,12 +560,14 @@ case class TypeInfer(conf: TypeOptions) {
       //   read_int("4")
       case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], text) =>
         val eElements = elements.map(applyExpr(_, bindings, ctx))
-        ctx.stdlib.apply(funcName, eElements.map(_.wdlType)) match {
-          case Left((outputType, funcSig)) =>
-            TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
-          case Right(errorMsg) if errorAsException =>
-            throw new TypeException(errorMsg, expr.text, ctx.docSourceUrl)
-          case Right(errorMsg) => TAT.ExprInvalid(T_Invalid(errorMsg), None, expr.text)
+        try {
+          val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType))
+          TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
+        } catch {
+          case e: StdlibFunctionException if errorAsException =>
+            throw new TypeException(e.getMessage, expr.text, ctx.docSourceUrl)
+          case e: StdlibFunctionException =>
+            TAT.ExprInvalid(T_Invalid(e.getMessage), None, expr.text)
         }
 
       // Access a field in a struct or an object. For example "x.a" in:
@@ -889,14 +891,14 @@ case class TypeInfer(conf: TypeOptions) {
       }
     val (tDeclarations, ctxDecl) = tRawDecl.foldLeft((Vector.empty[TAT.Declaration], ctx)) {
       case ((tDecls, curCtx), tDecl) =>
-        curCtx.bindVar(tDecl.name, tDecl.wdlType) match {
-          case Left(newCtx) =>
-            (tDecls :+ tDecl, newCtx)
-          case Right(errorMsg) if errorAsException =>
-            throw new TypeException(errorMsg, tDecl.text, ctx.docSourceUrl)
-          case Right(errorMsg) =>
+        try {
+          (tDecls :+ tDecl, curCtx.bindVar(tDecl.name, tDecl.wdlType))
+        } catch {
+          case e: DuplicateDeclarationException if errorAsException =>
+            throw new TypeException(e.getMessage, tDecl.text, ctx.docSourceUrl)
+          case e: DuplicateDeclarationException =>
             val errDecl = TAT.Declaration(tDecl.name,
-                                          T_Invalid(errorMsg, Some(tDecl.wdlType)),
+                                          T_Invalid(e.getMessage, Some(tDecl.wdlType)),
                                           tDecl.expr,
                                           tDecl.text)
             (tDecls :+ errDecl, curCtx)
@@ -1149,13 +1151,15 @@ case class TypeInfer(conf: TypeOptions) {
     //
     // The iterator identifier is not exported outside the scatter
     val (ctxInner, wdlType) =
-      ctxOuter.bindVar(scatter.identifier, elementType) match {
-        case Left(ctxInner) => (ctxInner, elementType)
-        case Right(errorMsg) if errorAsException =>
-          throw new TypeException(errorMsg, scatter.text, ctxOuter.docSourceUrl)
-        case Right(errorMsg) =>
-          (ctxOuter, T_Invalid(errorMsg, Some(elementType)))
+      try {
+        (ctxOuter.bindVar(scatter.identifier, elementType), elementType)
+      } catch {
+        case e: DuplicateDeclarationException if errorAsException =>
+          throw new TypeException(e.getMessage, scatter.text, ctxOuter.docSourceUrl)
+        case e: DuplicateDeclarationException =>
+          (ctxOuter, T_Invalid(e.getMessage, Some(elementType)))
       }
+
     val (bindings, tElements) = applyWorkflowElements(ctxInner, scatter.body)
     assert(!(bindings contains scatter.identifier))
 
@@ -1275,13 +1279,14 @@ case class TypeInfer(conf: TypeOptions) {
       doc.elements.foldLeft((initCtx, Vector.empty[TAT.DocumentElement])) {
         case ((ctx, elems), task: AST.Task) =>
           val task2 = applyTask(task, ctx)
-          ctx.bindCallable(task2.wdlType) match {
-            case Left(newCtx) => (newCtx, elems :+ task2)
-            case Right(errorMsg) if errorAsException =>
-              throw new TypeException(errorMsg, task.text, ctx.docSourceUrl)
-            case Right(errorMsg) =>
+          try {
+            (ctx.bindCallable(task2.wdlType), elems :+ task2)
+          } catch {
+            case e: DuplicateDeclarationException if errorAsException =>
+              throw new TypeException(e.getMessage, task.text, ctx.docSourceUrl)
+            case e: DuplicateDeclarationException =>
               val errTask =
-                task2.copy(wdlType = T_TaskInvalid(errorMsg, task2.wdlType))
+                task2.copy(wdlType = T_TaskInvalid(e.getMessage, task2.wdlType))
               (ctx, elems :+ errTask)
           }
 
@@ -1319,12 +1324,14 @@ case class TypeInfer(conf: TypeOptions) {
             TAT.ImportDoc(name, T_DocumentDef(actualName), aliases, addr, iDoc, iStat.text)
 
           // add the externally visible definitions to the context
-          ctx.bindImportedDoc(namespace, iCtx, iStat.aliases) match {
-            case Left(newCtx) => (newCtx, elems :+ importDoc)
-            case Right(errorMsg) if errorAsException =>
-              throw new TypeException(errorMsg, importDoc.text, ctx.docSourceUrl)
-            case Right(errorMsg) =>
-              val errDoc = importDoc.copy(wdlType = T_DocumentInvalid(errorMsg, importDoc.wdlType))
+          try {
+            (ctx.bindImportedDoc(namespace, iCtx, iStat.aliases), elems :+ importDoc)
+          } catch {
+            case e: DuplicateDeclarationException if errorAsException =>
+              throw new TypeException(e.getMessage, importDoc.text, ctx.docSourceUrl)
+            case e: DuplicateDeclarationException =>
+              val errDoc =
+                importDoc.copy(wdlType = T_DocumentInvalid(e.getMessage, importDoc.wdlType))
               (ctx, elems :+ errDoc)
           }
 
@@ -1332,12 +1339,14 @@ case class TypeInfer(conf: TypeOptions) {
           // Add the struct to the context
           val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
           val defStruct = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.text)
-          ctx.bindStruct(tStruct) match {
-            case Left(newCtx) => (newCtx, elems :+ defStruct)
-            case Right(errorMsg) if errorAsException =>
-              throw new TypeException(errorMsg, struct.text, ctx.docSourceUrl)
-            case Right(errorMsg) =>
-              val errStruct = defStruct.copy(wdlType = T_StructInvalid(errorMsg, defStruct.wdlType))
+          try {
+            (ctx.bindStruct(tStruct), elems :+ defStruct)
+          } catch {
+            case e: DuplicateDeclarationException if errorAsException =>
+              throw new TypeException(e.getMessage, struct.text, ctx.docSourceUrl)
+            case e: DuplicateDeclarationException =>
+              val errStruct =
+                defStruct.copy(wdlType = T_StructInvalid(e.getMessage, defStruct.wdlType))
               (ctx, elems :+ errStruct)
           }
       }
@@ -1347,14 +1356,17 @@ case class TypeInfer(conf: TypeOptions) {
       case None => (None, context)
       case Some(wf) =>
         val tWf = applyWorkflow(wf, context)
-        val (tWfFinal, ctxFinal) = context.bindCallable(tWf.wdlType) match {
-          case Left(newCtx) => (tWf, newCtx)
-          case Right(errorMsg) if errorAsException =>
-            throw new TypeException(errorMsg, wf.text, context.docSourceUrl)
-          case Right(errorMsg) =>
-            val errWf = tWf.copy(wdlType = T_WorkflowInvalid(errorMsg, tWf.wdlType))
-            (errWf, context)
-        }
+        val (tWfFinal, ctxFinal) =
+          try {
+            (tWf, context.bindCallable(tWf.wdlType))
+          } catch {
+            case e: DuplicateDeclarationException if errorAsException =>
+              throw new TypeException(e.getMessage, wf.text, context.docSourceUrl)
+            case e: DuplicateDeclarationException =>
+              val errWf = tWf.copy(wdlType = T_WorkflowInvalid(e.getMessage, tWf.wdlType))
+              (errWf, context)
+          }
+
         (Some(tWfFinal), ctxFinal)
     }
 
