@@ -5,18 +5,17 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{Options, SourceCode, Util, Verbosity}
+import wdlTools.util.{BasicOptions, SourceCode, Util, Verbosity}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/wdlTools/syntax/v1/tasks").getPath)
   private val workflowsDir =
     Paths.get(getClass.getResource("/wdlTools/syntax/v1/workflows").getPath)
   private val opts =
-    Options(antlr4Trace = false,
-            localDirectories = Vector(tasksDir, workflowsDir),
-            verbosity = Verbosity.Quiet)
+    BasicOptions(antlr4Trace = false,
+                 localDirectories = Vector(tasksDir, workflowsDir),
+                 verbosity = Verbosity.Quiet)
   private val parser = ParseAll(opts)
 
   private def getTaskSource(fname: String): SourceCode = {

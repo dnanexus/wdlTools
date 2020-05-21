@@ -159,9 +159,10 @@ case class Context(version: WdlVersion,
     }
 
     // check that the imported structs do not step over existing definitions
-    val doublyDefinedStructs = this.aliases.keys.toSet intersect iAliases.keys.toSet.filter(sname =>
-      this.aliases(sname) != iAliases(sname)
-    )
+    val doublyDefinedStructs =
+      (this.aliases.keys.toSet intersect iAliases.keys.toSet).filter(sname =>
+        this.aliases(sname) != iAliases(sname)
+      )
     if (doublyDefinedStructs.nonEmpty) {
       Right(s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way")
     } else {

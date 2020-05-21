@@ -12,7 +12,7 @@ trait DocumentWalker[T] {
 }
 
 abstract class WdlParser(opts: Options,
-                         errorHandler: Option[(Option[URL], Exception) => Boolean] = None) {
+                         errorHandler: Option[(Option[URL], Throwable) => Boolean] = None) {
   // cache of documents that have already been fetched and parsed.
   private val docCache: mutable.Map[URL, Option[AbstractSyntax.Document]] = mutable.Map.empty
 
@@ -23,7 +23,7 @@ abstract class WdlParser(opts: Options,
           try {
             Some(parseDocument(SourceCode.loadFrom(url)))
           } catch {
-            case e: Exception if errorHandler.isDefined && errorHandler.get(Some(url), e) => None
+            case e: Throwable if errorHandler.isDefined && errorHandler.get(Some(url), e) => None
             case e: Throwable                                                             => throw e
           }
         docCache(url) = aDoc
@@ -85,7 +85,7 @@ abstract class WdlParser(opts: Options,
         val document = parseDocument(sourceCode)
         addDocument(sourceCode.url, document)
       } catch {
-        case e: Exception if errorHandler.isDefined && errorHandler.get(sourceCode.url, e) => ()
+        case e: Throwable if errorHandler.isDefined && errorHandler.get(sourceCode.url, e) => ()
         case e: Throwable                                                                  => throw e
       }
       results.toMap

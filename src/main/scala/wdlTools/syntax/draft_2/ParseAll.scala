@@ -10,7 +10,7 @@ import wdlTools.util.{Options, SourceCode}
 // parse and follow imports
 case class ParseAll(opts: Options,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-                    errorHandler: Option[(Option[URL], Exception) => Boolean] = None)
+                    errorHandler: Option[(Option[URL], Throwable) => Boolean] = None)
     extends WdlParser(opts, errorHandler) {
 
   private case class Translator(docSourceUrl: Option[URL] = None) {
