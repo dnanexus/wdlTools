@@ -166,10 +166,28 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descr = "Strictness of type checking",
         default = Some(TypeCheckingRegime.Moderate)
     )
+    val json: ScallopOption[Boolean] = toggle(
+        descrYes = "Output type-check errors as JSON",
+        descrNo = "Output type-check errors as plain text",
+        default = Some(false)
+    )
+    val outputFile: ScallopOption[Path] = opt[Path](
+        descr =
+          "File in which to write type-check errors; if not specified, errors are written to stdout"
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
 
     override def getOptions: TypeOptions = {
       val opts = super.getOptions
-      TypeOptions(opts.localDirectories, opts.verbosity, opts.antlr4Trace, regime())
+      TypeOptions(opts.localDirectories,
+                  opts.verbosity,
+                  opts.antlr4Trace,
+                  regime(),
+                  errorAsException = false)
     }
   }
   addSubcommand(check)

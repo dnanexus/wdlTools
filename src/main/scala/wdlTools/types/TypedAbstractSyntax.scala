@@ -148,7 +148,7 @@ object TypedAbstractSyntax {
   case class MetaArray(value: Vector[MetaValue]) extends MetaValue
   // indicates the original meta value is invalid
   // this is only used when it not possible to generate a "real" Expr with a T_Error wdlType
-  case class MetaError(message: String) extends MetaValue
+  case class MetaInvalid(message: String) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element

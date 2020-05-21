@@ -807,7 +807,7 @@ case class TypeInfer(conf: TypeOptions) {
         if (errorAsException) {
           throw new TypeException(msg, expr.text, ctx.docSourceUrl)
         } else {
-          TAT.MetaError(msg)
+          TAT.MetaInvalid(msg)
         }
     }
   }
@@ -831,7 +831,7 @@ case class TypeInfer(conf: TypeOptions) {
             if (errorAsException) {
               throw new TypeException(msg, kv.text, ctx.docSourceUrl)
             } else {
-              TAT.MetaError(msg)
+              TAT.MetaInvalid(msg)
             }
           }
           kv.id -> metaValue
@@ -1291,7 +1291,7 @@ case class TypeInfer(conf: TypeOptions) {
           }
           val name = iStat.name.map(_.value)
           val addr = iStat.addr.value
-          val actualName = name.getOrElse(UUtil.getUrlFileName(addr).replace(".wdl", ""))
+          val actualName = name.getOrElse(UUtil.getFilename(addr).replace(".wdl", ""))
           val importDoc =
             TAT.ImportDoc(name, T_DocumentDef(actualName), aliases, addr, iDoc, iStat.text)
 

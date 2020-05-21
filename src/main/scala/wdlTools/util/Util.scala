@@ -84,7 +84,7 @@ object Util {
     resolved
   }
 
-  def getUrlFileName(addr: String): String = {
+  def getFilename(addr: String): String = {
     Paths.get(new URL(addr).getPath).getFileName.toString
   }
 
