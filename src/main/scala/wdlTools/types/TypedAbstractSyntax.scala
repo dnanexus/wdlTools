@@ -7,7 +7,6 @@ import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
   type WdlType = WdlTypes.T
-  type T_Invalid = WdlTypes.T_Invalid
   type T_Function = WdlTypes.T_Function
 
   trait Element {
@@ -20,10 +19,6 @@ object TypedAbstractSyntax {
   sealed trait Expr extends Element {
     val wdlType: WdlType
   }
-
-  // wrapper around an expression to indicate it is invalid
-  case class ExprInvalid(wdlType: T_Invalid, originalExpr: Option[Expr], text: TextSource)
-      extends Expr
 
   // values
   case class ValueNull(wdlType: WdlType, text: TextSource) extends Expr
@@ -182,9 +177,6 @@ object TypedAbstractSyntax {
   case class MetaString(value: String, text: TextSource) extends MetaValue
   case class MetaObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
   case class MetaArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
-  // indicates the original meta value is invalid
-  // this is only used when it not possible to generate a "real" Expr with a T_Error wdlType
-  case class MetaInvalid(message: String, text: TextSource) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
@@ -196,7 +188,6 @@ object TypedAbstractSyntax {
   case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
       extends Element
   case class ImportDoc(name: Option[String],
-                       wdlType: WdlTypes.T_Document,
                        aliases: Vector[ImportAlias],
                        addr: String,
                        doc: Document,

@@ -5,19 +5,24 @@ import java.nio.file.Paths
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
 import wdlTools.syntax.{Util => SUtil}
-import wdlTools.types.TypedAbstractSyntax.ExprInvalid
+import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
-import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.util.TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
 
-case class TypeInfer(conf: TypeOptions) {
+/**
+  * Type inference
+  * @param conf options
+  * @param errorHandler optional error handler function. If defined, it is called every time a type-checking
+  *                     error is encountered. If it returns false, type inference will proceed even if it
+  *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
+  *                     a TypeException is thrown.
+  */
+case class TypeInfer(conf: TypeOptions,
+                     errorHandler: Option[(String, TextSource, Context) => Boolean]) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
-  // whether to throw an Exception when encountering a type error (true) or
-  // to generate a T_Error type (false)
-  private val errorAsException = conf.errorAsException
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -25,6 +30,12 @@ case class TypeInfer(conf: TypeOptions) {
   type Bindings = Map[String, WdlType]
   object Bindings {
     val empty = Map.empty[String, WdlType]
+  }
+
+  private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
+    if (errorHandler.forall(eh => eh(reason, textSource, ctx))) {
+      throw new TypeException(reason, textSource, ctx.docSourceUrl)
+    }
   }
 
   // The add operation is overloaded.
@@ -68,12 +79,10 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_Directory, T_String | T_Directory) => T_Directory
 
       case (t, _) =>
-        val msg = s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added"
-        if (errorAsException) {
-          throw new TypeException(msg, a.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(t))
-        }
+        handleError(s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
+                    a.text,
+                    ctx)
+        t
     }
     t
   }
@@ -84,12 +93,8 @@ case class TypeInfer(conf: TypeOptions) {
       case T_Int   => T_Int
       case T_Float => T_Float
       case other =>
-        val msg = s"${exprToString(expr)} must be an integer or a float"
-        if (errorAsException) {
-          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(other))
-        }
+        handleError(s"${exprToString(expr)} must be an integer or a float", expr.text, ctx)
+        other
     }
   }
 
@@ -100,13 +105,12 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_Int, T_Float)   => T_Float
       case (T_Float, T_Float) => T_Float
       case (t, _) =>
-        val msg =
-          s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats"
-        if (errorAsException) {
-          throw new TypeException(msg, a.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(t))
-        }
+        handleError(
+            s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
+            a.text,
+            ctx
+        )
+        t
     }
   }
 
@@ -114,12 +118,10 @@ case class TypeInfer(conf: TypeOptions) {
     expr.wdlType match {
       case T_Boolean => T_Boolean
       case other =>
-        val msg = s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}"
-        if (errorAsException) {
-          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(other))
-        }
+        handleError(s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}",
+                    expr.text,
+                    ctx)
+        other
     }
   }
 
@@ -127,12 +129,10 @@ case class TypeInfer(conf: TypeOptions) {
     (a.wdlType, b.wdlType) match {
       case (T_Boolean, T_Boolean) => T_Boolean
       case (t, _) =>
-        val msg = s"${exprToString(a)} and ${exprToString(b)} must have boolean type"
-        if (errorAsException) {
-          throw new TypeException(msg, a.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(t))
-        }
+        handleError(s"${exprToString(a)} and ${exprToString(b)} must have boolean type",
+                    a.text,
+                    ctx)
+        t
     }
   }
 
@@ -148,12 +148,12 @@ case class TypeInfer(conf: TypeOptions) {
       case (T_Int, T_Float) => T_Boolean
       case (T_Float, T_Int) => T_Boolean
       case (t, _) =>
-        val msg = s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type"
-        if (errorAsException) {
-          throw new TypeException(msg, a.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(t))
-        }
+        handleError(
+            s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
+            a.text,
+            ctx
+        )
+        t
     }
   }
 
@@ -162,24 +162,20 @@ case class TypeInfer(conf: TypeOptions) {
       case struct: T_Struct =>
         struct.members.get(id) match {
           case None =>
-            val msg = s"Struct ${struct.name} does not have member ${id} in expression"
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(expr.wdlType))
-            }
+            handleError(s"Struct ${struct.name} does not have member ${id} in expression",
+                        expr.text,
+                        ctx)
+            expr.wdlType
           case Some(t) =>
             t
         }
       case call: T_Call =>
         call.output.get(id) match {
           case None =>
-            val msg = s"Call object ${call.name} does not have output ${id} in expression"
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(expr.wdlType))
-            }
+            handleError(s"Call object ${call.name} does not have output ${id} in expression",
+                        expr.text,
+                        ctx)
+            expr.wdlType
           case Some(t) =>
             t
         }
@@ -191,50 +187,30 @@ case class TypeInfer(conf: TypeOptions) {
         // produce the struct definition
         ctx.aliases.get(structName) match {
           case None =>
-            val msg = s"unknown struct ${structName}"
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(expr.wdlType))
-            }
+            handleError(s"unknown struct ${structName}", expr.text, ctx)
+            expr.wdlType
           case Some(struct: T_Struct) =>
             struct.members.get(id) match {
               case None =>
-                val msg = s"Struct ${structName} does not have member ${id}"
-                if (errorAsException) {
-                  throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-                } else {
-                  T_Invalid(msg, Some(expr.wdlType))
-                }
+                handleError(s"Struct ${structName} does not have member ${id}", expr.text, ctx)
+                expr.wdlType
               case Some(t) => t
             }
           case other =>
-            val msg = s"not a struct ${other}"
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(expr.wdlType))
-            }
+            handleError(s"not a struct ${other}", expr.text, ctx)
+            expr.wdlType
         }
 
       // accessing a pair element
       case T_Pair(l, _) if id.toLowerCase() == "left"  => l
       case T_Pair(_, r) if id.toLowerCase() == "right" => r
       case T_Pair(_, _) =>
-        val msg = s"accessing a pair with (${id}) is illegal"
-        if (errorAsException) {
-          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(expr.wdlType))
-        }
+        handleError(s"accessing a pair with (${id}) is illegal", expr.text, ctx)
+        expr.wdlType
 
       case _ =>
-        val msg = s"member access (${id}) in expression is illegal"
-        if (errorAsException) {
-          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(expr.wdlType))
-        }
+        handleError(s"member access (${id}) in expression is illegal", expr.text, ctx)
+        expr.wdlType
     }
   }
 
@@ -248,12 +224,8 @@ case class TypeInfer(conf: TypeOptions) {
       t
     } catch {
       case _: TypeUnificationException =>
-        val msg = errMsg + " must have the same type, or be coercible to one"
-        if (errorAsException) {
-          throw new TypeException(msg, textSource, ctx.docSourceUrl)
-        } else {
-          T_Invalid(msg, vec.headOption)
-        }
+        handleError(errMsg + " must have the same type, or be coercible to one", textSource, ctx)
+        vec.head
     }
   }
 
@@ -273,12 +245,8 @@ case class TypeInfer(conf: TypeOptions) {
       case AST.ExprIdentifier(id, text) =>
         val t = ctx.lookup(id, bindings) match {
           case None =>
-            val msg = s"Identifier ${id} is not defined"
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg)
-            }
+            handleError(s"Identifier ${id} is not defined", expr.text, ctx)
+            T_Any
           case Some(t) =>
             t
         }
@@ -293,12 +261,13 @@ case class TypeInfer(conf: TypeOptions) {
             val t2: T = if (unify.isCoercibleTo(T_String, e2.wdlType)) {
               t
             } else {
-              val msg =
-                s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string"
-              if (errorAsException) {
-                throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-              } else if (t == initialType) {
-                T_Invalid(msg, Some(e2.wdlType))
+              handleError(
+                  s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
+                  expr.text,
+                  ctx
+              )
+              if (t == initialType) {
+                e2.wdlType
               } else {
                 t
               }
@@ -324,12 +293,10 @@ case class TypeInfer(conf: TypeOptions) {
             T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
           } catch {
             case _: TypeUnificationException =>
-              val msg = "array elements must have the same type, or be coercible to one"
-              if (errorAsException) {
-                throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-              } else {
-                T_Invalid(msg, tVecExprs.headOption.map(_.wdlType))
-              }
+              handleError("array elements must have the same type, or be coercible to one",
+                          expr.text,
+                          ctx)
+              tVecExprs.head.wdlType
           }
         TAT.ExprArray(tVecExprs, t, text)
 
@@ -362,21 +329,17 @@ case class TypeInfer(conf: TypeOptions) {
         val fe = applyExpr(f, bindings, ctx)
         val ve = applyExpr(value, bindings, ctx)
         val wdlType = if (te.wdlType != fe.wdlType) {
-          val msg =
-            s"subexpressions ${exprToString(te)} and ${exprToString(fe)} must have the same type"
-          if (errorAsException) {
-            throw new TypeException(msg, text, ctx.docSourceUrl)
-          } else {
-            T_Invalid(msg, Some(te.wdlType))
-          }
+          handleError(
+              s"subexpressions ${exprToString(te)} and ${exprToString(fe)} must have the same type",
+              text,
+              ctx
+          )
+          te.wdlType
         } else if (ve.wdlType != T_Boolean) {
           val msg =
             s"condition ${exprToString(ve)} should have boolean type, it has type ${typeToString(ve.wdlType)} instead"
-          if (errorAsException) {
-            throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-          } else {
-            T_Invalid(msg, Some(ve.wdlType))
-          }
+          handleError(msg, expr.text, ctx)
+          ve.wdlType
         } else {
           te.wdlType
         }
@@ -396,11 +359,8 @@ case class TypeInfer(conf: TypeOptions) {
             val msg = s"""|Expression (${exprToString(ve)}) must have type coercible to
                           |(${typeToString(de.wdlType)}), it has type (${typeToString(ve.wdlType)}) instead
                           |""".stripMargin.replaceAll("\n", " ")
-            if (errorAsException) {
-              throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(ve.wdlType))
-            }
+            handleError(msg, expr.text, ctx)
+            ve.wdlType
         }
         TAT.ExprPlaceholderDefault(de, ve, t, text)
 
@@ -419,11 +379,8 @@ case class TypeInfer(conf: TypeOptions) {
           case other =>
             val msg =
               s"expression ${exprToString(ve)} should be coercible to Array[String], but it is ${typeToString(other)}"
-            if (errorAsException) {
-              throw new TypeException(msg, ve.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(other))
-            }
+            handleError(msg, ve.text, ctx)
+            other
         }
         TAT.ExprPlaceholderSep(se, ve, t, text)
 
@@ -505,19 +462,11 @@ case class TypeInfer(conf: TypeOptions) {
         val t = (eIndex.wdlType, eArray.wdlType) match {
           case (T_Int, T_Array(elementType, _)) => elementType
           case (T_Int, _) =>
-            val msg = s"${exprToString(eIndex)} must be an integer"
-            if (errorAsException) {
-              throw new TypeException(msg, text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(eIndex.wdlType))
-            }
+            handleError(s"${exprToString(eIndex)} must be an integer", text, ctx)
+            eIndex.wdlType
           case (_, _) =>
-            val msg = s"expression ${exprToString(eArray)} must be an array"
-            if (errorAsException) {
-              throw new TypeException(msg, eArray.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(eArray.wdlType))
-            }
+            handleError(s"expression ${exprToString(eArray)} must be an array", eArray.text, ctx)
+            eArray.wdlType
         }
         TAT.ExprAt(eArray, eIndex, t, text)
 
@@ -529,12 +478,8 @@ case class TypeInfer(conf: TypeOptions) {
         val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
         val t = {
           if (eCond.wdlType != T_Boolean) {
-            val msg = s"condition ${exprToString(eCond)} must be a boolean"
-            if (errorAsException) {
-              throw new TypeException(msg, eCond.text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg, Some(eCond.wdlType))
-            }
+            handleError(s"condition ${exprToString(eCond)} must be a boolean", eCond.text, ctx)
+            eCond.wdlType
           } else {
             try {
               unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)._1
@@ -546,11 +491,8 @@ case class TypeInfer(conf: TypeOptions) {
                       |  true branch: ${typeToString(eTrueBranch.wdlType)}
                       |  flase branch: ${typeToString(eFalseBranch.wdlType)}
                       |""".stripMargin
-                if (errorAsException) {
-                  throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-                } else {
-                  T_Invalid(msg, Some(eTrueBranch.wdlType))
-                }
+                handleError(msg, expr.text, ctx)
+                eTrueBranch.wdlType
             }
           }
         }
@@ -564,10 +506,9 @@ case class TypeInfer(conf: TypeOptions) {
           val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType))
           TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
         } catch {
-          case e: StdlibFunctionException if errorAsException =>
-            throw new TypeException(e.getMessage, expr.text, ctx.docSourceUrl)
           case e: StdlibFunctionException =>
-            TAT.ExprInvalid(T_Invalid(e.getMessage), None, expr.text)
+            handleError(e.getMessage, expr.text, ctx)
+            TAT.ValueNone(T_Any, expr.text)
         }
 
       // Access a field in a struct or an object. For example "x.a" in:
@@ -594,17 +535,13 @@ case class TypeInfer(conf: TypeOptions) {
       case AST.TypeIdentifier(id, _) =>
         ctx.aliases.get(id) match {
           case None =>
-            val msg = s"struct ${id} has not been defined"
-            if (errorAsException) {
-              throw new TypeException(msg, text, ctx.docSourceUrl)
-            } else {
-              T_Invalid(msg)
-            }
+            handleError(s"struct ${id} has not been defined", text, ctx)
+            T_Any
           case Some(struct) => struct
         }
       case _: AST.TypeObject => T_Object
       case AST.TypeStruct(name, members, _) =>
-        T_StructDef(name, members.map {
+        T_Struct(name, members.map {
           case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, text, ctx)
         }.toMap)
     }
@@ -640,11 +577,8 @@ case class TypeInfer(conf: TypeOptions) {
                 |but is assigned ${typeToString(rhsType)}
                 |${exprToString(e)}
                 |""".stripMargin.replaceAll("\n", " ")
-          if (errorAsException) {
-            throw new TypeException(msg, decl.text, ctx.docSourceUrl)
-          } else {
-            T_Invalid(msg, Some(lhsType))
-          }
+          handleError(msg, decl.text, ctx)
+          lhsType
         }
         TAT.Declaration(decl.name, wdlType, Some(e), decl.text)
     }
@@ -652,16 +586,10 @@ case class TypeInfer(conf: TypeOptions) {
     // There are cases where we want to allow shadowing. For example, it
     // is legal to have an output variable with the same name as an input variable.
     if (!canShadow && ctx.lookup(decl.name, bindings).isDefined) {
-      val msg = s"variable ${decl.name} shadows an existing variable"
-      val wdlType = if (errorAsException) {
-        throw new TypeException(msg, decl.text, ctx.docSourceUrl)
-      } else {
-        T_Invalid(msg, Some(tDecl.wdlType))
-      }
-      TAT.Declaration(tDecl.name, wdlType, tDecl.expr, tDecl.text)
-    } else {
-      tDecl
+      handleError(s"variable ${decl.name} shadows an existing variable", decl.text, ctx)
     }
+
+    tDecl
   }
 
   // type check the input section, and see that there are no double definitions.
@@ -674,16 +602,12 @@ case class TypeInfer(conf: TypeOptions) {
       inputSection.declarations
         .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings.empty)) {
           case ((tDecls, names, bindings), decl) =>
-            val tDecl = applyDecl(decl, bindings, ctx) match {
-              case d if names.contains(d.name) =>
-                val msg = s"Input section has duplicate definition ${d.name}"
-                if (errorAsException) {
-                  throw new TypeException(msg, inputSection.text, ctx.docSourceUrl)
-                } else {
-                  TAT.Declaration(d.name, T_Invalid(msg, Some(d.wdlType)), d.expr, d.text)
-                }
-              case d => d
+            if (names.contains(decl.name)) {
+              handleError(s"Input section has duplicate definition ${decl.name}",
+                          inputSection.text,
+                          ctx)
             }
+            val tDecl = applyDecl(decl, bindings, ctx)
             (tDecls :+ tDecl, names + decl.name, bindings + (tDecl.name -> tDecl.wdlType))
         }
 
@@ -720,23 +644,13 @@ case class TypeInfer(conf: TypeOptions) {
         .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings.empty)) {
           case ((tDecls, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
-            val tDecl = applyDecl(decl, bindings, ctx, canShadow = true) match {
-              case d if names.contains(d.name) =>
-                val msg = s"Output section has duplicate definition ${d.name}"
-                if (errorAsException) {
-                  throw new TypeException(msg, d.text, ctx.docSourceUrl)
-                } else {
-                  TAT.Declaration(d.name, T_Invalid(msg, Some(d.wdlType)), d.expr, d.text)
-                }
-              case d if both.contains(d.name) =>
-                val msg = s"Definition ${d.name} shadows exisiting declarations"
-                if (errorAsException) {
-                  throw new TypeException(msg, d.text, ctx.docSourceUrl)
-                } else {
-                  TAT.Declaration(d.name, T_Invalid(msg, Some(d.wdlType)), d.expr, d.text)
-                }
-              case d => d
+            if (names.contains(decl.name)) {
+              handleError(s"Output section has duplicate definition ${decl.name}", decl.text, ctx)
             }
+            if (both.contains(decl.name)) {
+              handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.text, ctx)
+            }
+            val tDecl = applyDecl(decl, bindings, ctx, canShadow = true)
             val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
             (tDecls :+ tDecl, names + tDecl.name, bindings2)
         }
@@ -828,12 +742,8 @@ case class TypeInfer(conf: TypeOptions) {
             text
         )
       case other =>
-        val msg = s"${SUtil.exprToString(other)} is an invalid meta value"
-        if (errorAsException) {
-          throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-        } else {
-          TAT.MetaInvalid(msg, other.text)
-        }
+        handleError(s"${SUtil.exprToString(other)} is an invalid meta value", expr.text, ctx)
+        TAT.MetaNull(other.text)
     }
   }
 
@@ -851,13 +761,12 @@ case class TypeInfer(conf: TypeOptions) {
           val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
             metaValueFromExpr(kv.expr, ctx)
           } else {
-            val msg =
-              s"parameter_meta key ${kv.id} does not refer to an input or output declaration"
-            if (errorAsException) {
-              throw new TypeException(msg, kv.text, ctx.docSourceUrl)
-            } else {
-              TAT.MetaInvalid(msg, kv.expr.text)
-            }
+            handleError(
+                s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
+                kv.text,
+                ctx
+            )
+            TAT.MetaNull(kv.expr.text)
           }
           kv.id -> metaValue
         }.toMap,
@@ -891,18 +800,15 @@ case class TypeInfer(conf: TypeOptions) {
       }
     val (tDeclarations, ctxDecl) = tRawDecl.foldLeft((Vector.empty[TAT.Declaration], ctx)) {
       case ((tDecls, curCtx), tDecl) =>
-        try {
-          (tDecls :+ tDecl, curCtx.bindVar(tDecl.name, tDecl.wdlType))
-        } catch {
-          case e: DuplicateDeclarationException if errorAsException =>
-            throw new TypeException(e.getMessage, tDecl.text, ctx.docSourceUrl)
-          case e: DuplicateDeclarationException =>
-            val errDecl = TAT.Declaration(tDecl.name,
-                                          T_Invalid(e.getMessage, Some(tDecl.wdlType)),
-                                          tDecl.expr,
-                                          tDecl.text)
-            (tDecls :+ errDecl, curCtx)
-        }
+        val newCtx =
+          try {
+            curCtx.bindVar(tDecl.name, tDecl.wdlType)
+          } catch {
+            case e: DuplicateDeclarationException =>
+              handleError(e.getMessage, tDecl.text, ctx)
+              curCtx
+          }
+        (tDecls :+ tDecl, newCtx)
     }
 
     val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
@@ -916,13 +822,12 @@ case class TypeInfer(conf: TypeOptions) {
         case x if isPrimitive(x)             => e
         case T_Optional(x) if isPrimitive(x) => e
         case _ =>
-          val msg =
-            s"Expression ${exprToString(e)} in the command section is not coercible to a string"
-          if (errorAsException) {
-            throw new TypeException(msg, expr.text, ctx.docSourceUrl)
-          } else {
-            TAT.ExprInvalid(T_Invalid(msg, Some(e.wdlType)), Some(e), e.text)
-          }
+          handleError(
+              s"Expression ${exprToString(e)} in the command section is not coercible to a string",
+              expr.text,
+              ctx
+          )
+          TAT.ValueString(exprToString(e), T_String, e.text)
       }
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.text)
@@ -944,7 +849,7 @@ case class TypeInfer(conf: TypeOptions) {
 
     TAT.Task(
         name = task.name,
-        wdlType = T_TaskDef(task.name, inputType, outputType),
+        wdlType = T_Task(task.name, inputType, outputType),
         inputs = inputDefs,
         outputs = outputDefs,
         command = tCommand,
@@ -980,24 +885,16 @@ case class TypeInfer(conf: TypeOptions) {
     // check that the call refers to a valid callee
     val callee: T_Callable = ctx.callables.get(call.name) match {
       case None =>
-        val msg = s"called task/workflow ${call.name} is not defined"
-        if (errorAsException) {
-          throw new TypeException(msg, call.text, ctx.docSourceUrl)
-        } else {
-          T_CallableInvalid(call.name, msg, None)
-        }
+        handleError(s"called task/workflow ${call.name} is not defined", call.text, ctx)
+        WdlTypes.T_Task(call.name, Map.empty, Map.empty)
       case Some(x: T_Callable) => x
     }
 
     // check if the call shadows an existing call
-    val callType = T_CallDef(actualName, callee.output)
+    val callType = T_Call(actualName, callee.output)
     val wdlType = if (ctx.declarations contains actualName) {
-      val msg = s"call ${actualName} shadows an existing definition"
-      if (errorAsException) {
-        throw new TypeException(msg, call.text, ctx.docSourceUrl)
-      } else {
-        T_CallInvalid(call.name, msg, Some(callType))
-      }
+      handleError(s"call ${actualName} shadows an existing definition", call.text, ctx)
+      T_Call(actualName, Map.empty)
     } else {
       callType
     }
@@ -1007,19 +904,17 @@ case class TypeInfer(conf: TypeOptions) {
       ctx.declarations.get(after.name) match {
         case Some(c: T_Call) => c
         case Some(_) =>
-          val msg = s"call ${actualName} after clause refers to non-call declaration ${after.name}"
-          if (errorAsException) {
-            throw new TypeException(msg, after.text, ctx.docSourceUrl)
-          } else {
-            T_CallInvalid(after.name, msg, None)
-          }
+          handleError(
+              s"call ${actualName} after clause refers to non-call declaration ${after.name}",
+              after.text,
+              ctx
+          )
+          T_Call(after.name, Map.empty)
         case None =>
-          val msg = s"call ${actualName} after clause refers to non-existant call ${after.name}"
-          if (errorAsException) {
-            throw new TypeException(msg, after.text, ctx.docSourceUrl)
-          } else {
-            T_CallInvalid(after.name, msg, None)
-          }
+          handleError(s"call ${actualName} after clause refers to non-existant call ${after.name}",
+                      after.text,
+                      ctx)
+          T_Call(after.name, Map.empty)
       }
     }
 
@@ -1042,15 +937,10 @@ case class TypeInfer(conf: TypeOptions) {
               )
             case _ => None
           }
-          if (errorMsg.isEmpty) {
-            argName -> tExpr
-          } else if (errorAsException) {
-            throw new TypeException(errorMsg.get, call.text, ctx.docSourceUrl)
-          } else {
-            argName -> TAT.ExprInvalid(T_Invalid(errorMsg.get, Some(tExpr.wdlType)),
-                                       Some(tExpr),
-                                       tExpr.text)
+          if (errorMsg.nonEmpty) {
+            handleError(errorMsg.get, call.text, ctx)
           }
+          argName -> tExpr
         }.toMap
       case None => Map.empty
     }
@@ -1060,12 +950,10 @@ case class TypeInfer(conf: TypeOptions) {
       case (argName, (_, false)) =>
         callerInputs.get(argName) match {
           case None =>
-            val msg = s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
-            if (errorAsException) {
-              throw new TypeException(msg, call.text, ctx.docSourceUrl)
-            } else {
-              Some(argName -> TAT.ExprInvalid(T_Invalid(msg), None, call.text))
-            }
+            handleError(s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
+                        call.text,
+                        ctx)
+            Some(argName -> TAT.ValueNone(T_Any, call.text))
           case Some(_) => None
         }
       case (_, (_, _)) =>
@@ -1140,12 +1028,10 @@ case class TypeInfer(conf: TypeOptions) {
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case other =>
-        val msg = s"Collection in scatter (${scatter}) is not an array type"
-        if (errorAsException) {
-          throw new TypeException(msg, scatter.text, ctxOuter.docSourceUrl)
-        } else {
-          T_Invalid(msg, Some(other))
-        }
+        handleError(s"Collection in scatter (${scatter}) is not an array type",
+                    scatter.text,
+                    ctxOuter)
+        other
     }
     // add a binding for the iteration variable
     //
@@ -1154,10 +1040,9 @@ case class TypeInfer(conf: TypeOptions) {
       try {
         (ctxOuter.bindVar(scatter.identifier, elementType), elementType)
       } catch {
-        case e: DuplicateDeclarationException if errorAsException =>
-          throw new TypeException(e.getMessage, scatter.text, ctxOuter.docSourceUrl)
         case e: DuplicateDeclarationException =>
-          (ctxOuter, T_Invalid(e.getMessage, Some(elementType)))
+          handleError(e.getMessage, scatter.text, ctxOuter)
+          (ctxOuter, elementType)
       }
 
     val (bindings, tElements) = applyWorkflowElements(ctxInner, scatter.body)
@@ -1170,7 +1055,7 @@ case class TypeInfer(conf: TypeOptions) {
           val callOutput = callType.output.map {
             case (name, t) => name -> T_Array(t)
           }
-          callName -> T_CallDef(callType.name, callOutput)
+          callName -> T_Call(callType.name, callOutput)
         case (varName, typ: T) =>
           varName -> T_Array(typ)
       }
@@ -1201,12 +1086,8 @@ case class TypeInfer(conf: TypeOptions) {
     val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter) match {
       case e if e.wdlType == T_Boolean => e
       case e =>
-        val msg = s"Expression ${exprToString(e)} must have boolean type"
-        if (errorAsException) {
-          throw new TypeException(msg, cond.text, ctxOuter.docSourceUrl)
-        } else {
-          ExprInvalid(T_Invalid(msg, Some(e.wdlType)), Some(e), e.text)
-        }
+        handleError(s"Expression ${exprToString(e)} must have boolean type", cond.text, ctxOuter)
+        TAT.ValueBoolean(value = false, T_Boolean, e.text)
     }
 
     // keep track of the inner/outer bindings. Within the block we need [inner],
@@ -1220,7 +1101,7 @@ case class TypeInfer(conf: TypeOptions) {
           val callOutput = callType.output.map {
             case (name, t) => name -> makeOptional(t)
           }
-          callName -> T_CallDef(callType.name, callOutput)
+          callName -> T_Call(callType.name, callOutput)
         case (varName, typ: WdlType) =>
           varName -> makeOptional(typ)
       }
@@ -1256,7 +1137,7 @@ case class TypeInfer(conf: TypeOptions) {
     val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
     TAT.Workflow(
         name = wf.name,
-        wdlType = T_WorkflowDef(wf.name, inputType, outputType),
+        wdlType = T_Workflow(wf.name, inputType, outputType),
         inputs = inputDefs,
         outputs = outputDefs,
         meta = tMeta,
@@ -1279,16 +1160,15 @@ case class TypeInfer(conf: TypeOptions) {
       doc.elements.foldLeft((initCtx, Vector.empty[TAT.DocumentElement])) {
         case ((ctx, elems), task: AST.Task) =>
           val task2 = applyTask(task, ctx)
-          try {
-            (ctx.bindCallable(task2.wdlType), elems :+ task2)
-          } catch {
-            case e: DuplicateDeclarationException if errorAsException =>
-              throw new TypeException(e.getMessage, task.text, ctx.docSourceUrl)
-            case e: DuplicateDeclarationException =>
-              val errTask =
-                task2.copy(wdlType = T_TaskInvalid(e.getMessage, task2.wdlType))
-              (ctx, elems :+ errTask)
-          }
+          val newCtx =
+            try {
+              ctx.bindCallable(task2.wdlType)
+            } catch {
+              case e: DuplicateDeclarationException =>
+                handleError(e.getMessage, task.text, ctx)
+                ctx
+            }
+          (newCtx, elems :+ task2)
 
         case ((ctx, elems), iStat: AST.ImportDoc) =>
           // recurse into the imported document, add types
@@ -1319,36 +1199,33 @@ case class TypeInfer(conf: TypeOptions) {
           }
           val name = iStat.name.map(_.value)
           val addr = iStat.addr.value
-          val actualName = name.getOrElse(UUtil.getFilename(addr).replace(".wdl", ""))
           val importDoc =
-            TAT.ImportDoc(name, T_DocumentDef(actualName), aliases, addr, iDoc, iStat.text)
+            TAT.ImportDoc(name, aliases, addr, iDoc, iStat.text)
 
           // add the externally visible definitions to the context
-          try {
-            (ctx.bindImportedDoc(namespace, iCtx, iStat.aliases), elems :+ importDoc)
-          } catch {
-            case e: DuplicateDeclarationException if errorAsException =>
-              throw new TypeException(e.getMessage, importDoc.text, ctx.docSourceUrl)
-            case e: DuplicateDeclarationException =>
-              val errDoc =
-                importDoc.copy(wdlType = T_DocumentInvalid(e.getMessage, importDoc.wdlType))
-              (ctx, elems :+ errDoc)
-          }
+          val newCtx =
+            try {
+              ctx.bindImportedDoc(namespace, iCtx, iStat.aliases)
+            } catch {
+              case e: DuplicateDeclarationException =>
+                handleError(e.getMessage, importDoc.text, ctx)
+                ctx
+            }
+          (newCtx, elems :+ importDoc)
 
         case ((ctx, elems), struct: AST.TypeStruct) =>
           // Add the struct to the context
           val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
           val defStruct = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.text)
-          try {
-            (ctx.bindStruct(tStruct), elems :+ defStruct)
-          } catch {
-            case e: DuplicateDeclarationException if errorAsException =>
-              throw new TypeException(e.getMessage, struct.text, ctx.docSourceUrl)
-            case e: DuplicateDeclarationException =>
-              val errStruct =
-                defStruct.copy(wdlType = T_StructInvalid(e.getMessage, defStruct.wdlType))
-              (ctx, elems :+ errStruct)
-          }
+          val newCtx =
+            try {
+              ctx.bindStruct(tStruct)
+            } catch {
+              case e: DuplicateDeclarationException =>
+                handleError(e.getMessage, struct.text, ctx)
+                ctx
+            }
+          (newCtx, elems :+ defStruct)
       }
 
     // now that we have types for everything else, we can check the workflow
@@ -1356,18 +1233,15 @@ case class TypeInfer(conf: TypeOptions) {
       case None => (None, context)
       case Some(wf) =>
         val tWf = applyWorkflow(wf, context)
-        val (tWfFinal, ctxFinal) =
+        val ctxFinal =
           try {
-            (tWf, context.bindCallable(tWf.wdlType))
+            context.bindCallable(tWf.wdlType)
           } catch {
-            case e: DuplicateDeclarationException if errorAsException =>
-              throw new TypeException(e.getMessage, wf.text, context.docSourceUrl)
             case e: DuplicateDeclarationException =>
-              val errWf = tWf.copy(wdlType = T_WorkflowInvalid(e.getMessage, tWf.wdlType))
-              (errWf, context)
+              handleError(e.getMessage, wf.text, context)
+              context
           }
-
-        (Some(tWfFinal), ctxFinal)
+        (Some(tWf), ctxFinal)
     }
 
     val tDoc = TAT.Document(doc.sourceUrl,
