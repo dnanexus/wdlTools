@@ -184,7 +184,6 @@ case class Unification(conf: TypeOptions) {
   //    T_Var(0) -> T_Int
   //    T_Var(1) -> T_String
   //
-  @throws(classOf[TypeUnificationException])
   def unifyFunctionArguments(x: Vector[T],
                              y: Vector[T],
                              ctx: TypeUnificationContext): (Vector[T], TypeUnificationContext) = {
@@ -196,7 +195,6 @@ case class Unification(conf: TypeOptions) {
   }
 
   // Unify elements in a collection. For example, a vector of values.
-  @throws(classOf[TypeUnificationException])
   def unifyCollection(tVec: Iterable[T],
                       ctx: TypeUnificationContext): (T, TypeUnificationContext) = {
     assert(tVec.nonEmpty)
