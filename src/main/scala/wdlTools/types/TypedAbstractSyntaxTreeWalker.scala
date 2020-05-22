@@ -229,7 +229,7 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
   }
 
   override def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {
-    visitImportName(ctx.element.name, ctx)
+    visitImportName(ctx.element.namespace, ctx)
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(ctx.createChildContext[ImportAlias](alias))
     }
