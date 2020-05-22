@@ -144,11 +144,15 @@ sbt keeps the cache of downloaded jar files in `${HOME}/.ivy2/cache`. For exampl
 - Make sure the version number in `src/main/resources/application.conf` is correct. It is used when building the release.
 - Merge onto master branch, and make sure CI tests pass
 - Tag release with new version:
-```
-git tag $version
-git push origin $version
-```
-- Update [releases](https://github.com/dnanexus-rnd/wdlTools/releases) github page, use the `Draft a new release` button, and upload a wdlTools.jar file.
+    ```
+    $ git tag $version
+    $ git push origin $version
+    ```
+- Build the JAR file and rename it with the correct version:
+    ```
+    $ sbt assembly && cp target/scala-2.13/wdlTools.jar wdlTools-<version>.jar
+    ```
+- Update [releases](https://github.com/dnanexus-rnd/wdlTools/releases) github page, use the `Draft a new release` button, and upload the JAR file.
 
 ### Post release
 
