@@ -82,6 +82,13 @@ If there are errors in your code, the compiler will fail with (hopefully useful)
 
 You should always run the unit tests after every successful compile. Generally, you want to run `sbt testQuick`, which only runs the tests that failed previously, as well as the tests for any code you've modified since the last time you ran the tests. However, the first time you checkout the code (to make sure your development environment is set up correctly) and then right before you push any changes to the repository, you should run the full test suite using `sbt test`.
 
+### Generating a stand-alone JAR file
+
+```
+$ sbt assembly
+$ java -jar target/scala-2.13/wdlTools.jar ...
+```
+
 ### Other sbt tips
 
 #### Cache
@@ -106,13 +113,13 @@ sbt keeps the cache of downloaded jar files in `${HOME}/.ivy2/cache`. For exampl
     ```
 2. In `package`, add a new subcommand definition:
     ```scala
-    val mycommand = new Subcommand("mycommand") {
-        banner("""Usage: wdlTools mycommand [OPTIONS] <path|uri>
-                 |Does some cool stuff.
-                 |
-                 |Options:
-                 |""".stripMargin)
-        ...
+    val mycommand = new WdlToolsSubcommand("mycommand", "description") {
+        // add options, for example
+        val outputDir: ScallopOption[Path] = opt[Path](
+            descr = "Directory in which to output files",
+            short = 'O'
+        )
+    }
     ```
 3. In `Main`, add your command to the pattern matcher:
     ```scala

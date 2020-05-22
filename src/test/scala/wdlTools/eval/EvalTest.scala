@@ -5,19 +5,19 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
+import wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
+import wdlTools.util.{TypeCheckingRegime, Verbosity, Util => UUtil}
+import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
   private val opts =
-    Options(typeChecking = TypeCheckingRegime.Lenient,
-            antlr4Trace = false,
-            localDirectories = Vector(srcDir),
-            verbosity = Verbosity.Normal)
+    TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
+                antlr4Trace = false,
+                localDirectories = Vector(srcDir),
+                verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val typeInfer = TypeInfer(opts)
 
@@ -39,7 +39,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig(homeDir, tmpDir, stdout, stderr)
+    eval.EvalConfig(homeDir, tmpDir, stdout, stderr)
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {

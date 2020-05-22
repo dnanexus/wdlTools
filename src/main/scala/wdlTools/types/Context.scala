@@ -2,7 +2,6 @@ package wdlTools.types
 
 import java.net.URL
 import wdlTools.syntax.{AbstractSyntax => AST, WdlVersion}
-import wdlTools.syntax.TextSource
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
@@ -21,9 +20,7 @@ case class Context(version: WdlVersion,
                    namespaces: Set[String] = Set.empty) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName: String,
-             bindings: Map[String, WdlType],
-             textSource: TextSource): Option[WdlType] = {
+  def lookup(varName: String, bindings: Map[String, WdlType]): Option[WdlType] = {
     inputs.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -59,53 +56,54 @@ case class Context(version: WdlVersion,
     this.copy(outputs = bindings)
   }
 
-  def bindVar(varName: String, wdlType: WdlType, textSource: TextSource): Context = {
+  def bindVar(varName: String, wdlType: WdlType): Context = {
     declarations.get(varName) match {
       case None =>
         this.copy(declarations = declarations + (varName -> wdlType))
       case Some(_) =>
-        throw new TypeException(s"variable ${varName} shadows an existing variable",
-                                textSource,
-                                docSourceUrl)
-    }
-  }
-
-  def bindStruct(s: T_Struct, textSource: TextSource): Context = {
-    aliases.get(s.name) match {
-      case None =>
-        this.copy(aliases = aliases + (s.name -> s))
-      case Some(existingStruct: T_Struct) =>
-        if (s != existingStruct)
-          throw new TypeException(s"struct ${s.name} is already declared", textSource, docSourceUrl)
-        // The struct is defined a second time, with the exact same definition. Ignore.
-        this
-      case Some(other) =>
-        throw new TypeException(s"struct ${s.name} overrides an existing alias",
-                                textSource,
-                                docSourceUrl)
-    }
-  }
-
-  // add a callable (task/workflow)
-  def bindCallable(callable: T_Callable, textSource: TextSource): Context = {
-    callables.get(callable.name) match {
-      case None =>
-        this.copy(callables = callables + (callable.name -> callable))
-      case Some(_) =>
-        throw new TypeException(s"a callable named ${callable.name} is already declared",
-                                textSource,
-                                docSourceUrl)
+        throw new DuplicateDeclarationException(s"variable ${varName} shadows an existing variable")
     }
   }
 
   // add a bunch of bindings
-  def bindVarList(bindings: Map[String, WdlType], textSource: TextSource): Context = {
-    val existingVarNames = declarations.keys.toSet
-    val newVarNames = bindings.keys.toSet
-    val both = existingVarNames intersect newVarNames
-    if (both.nonEmpty)
-      throw new TypeException(s"Variables ${both} are being redeclared", textSource, docSourceUrl)
+  // the caller is responsible for ensuring that each binding is either
+  // not a duplicate of an existing variables or that its type extends Invalid
+  def bindVarList(bindings: Map[String, WdlType]): Context = {
+    val both = declarations.keys.toSet intersect bindings.keys.toSet
+    bindings.foreach {
+      case (name, _) if both.contains(name) =>
+        throw new DuplicateDeclarationException(
+            s"Trying to bind variable ${name} that has already been declared"
+        )
+      case _ => ()
+    }
     this.copy(declarations = declarations ++ bindings)
+  }
+
+  def bindStruct(s: T_Struct): Context = {
+    aliases.get(s.name) match {
+      case None =>
+        this.copy(aliases = aliases + (s.name -> s))
+      case Some(existingStruct: T_Struct) if s != existingStruct =>
+        throw new DuplicateDeclarationException(s"struct ${s.name} is already declared")
+      case Some(_: T_Struct) =>
+        // The struct is defined a second time, with the exact same definition. Ignore.
+        this
+      case Some(_) =>
+        throw new DuplicateDeclarationException(s"struct ${s.name} overrides an existing alias")
+    }
+  }
+
+  // add a callable (task/workflow)
+  def bindCallable(callable: T_Callable): Context = {
+    callables.get(callable.name) match {
+      case None =>
+        this.copy(callables = callables + (callable.name -> callable))
+      case Some(_) =>
+        throw new DuplicateDeclarationException(
+            s"a callable named ${callable.name} is already declared"
+        )
+    }
   }
 
   // When we import another document all of its definitions are prefixed with the
@@ -122,12 +120,10 @@ case class Context(version: WdlVersion,
   // }
   def bindImportedDoc(namespace: String,
                       iCtx: Context,
-                      aliases: Vector[AST.ImportAlias],
-                      textSource: TextSource): Context = {
-    if (this.namespaces contains namespace)
-      throw new TypeException(s"namespace ${namespace} already exists",
-                              textSource,
-                              iCtx.docSourceUrl)
+                      aliases: Vector[AST.ImportAlias]): Context = {
+    if (this.namespaces contains namespace) {
+      throw new DuplicateDeclarationException(s"namespace ${namespace} already exists")
+    }
 
     // There cannot be any collisions because this is a new namespace
     val iCallables = iCtx.callables.map {
@@ -138,7 +134,7 @@ case class Context(version: WdlVersion,
         val fqn = namespace + "." + name
         fqn -> wfSig.copy(name = fqn)
       case other =>
-        throw new Exception(s"sanity: ${other.getClass}")
+        throw new RuntimeException(s"sanity: ${other.getClass}")
     }
 
     // rename the imported structs according to the aliases
@@ -151,27 +147,29 @@ case class Context(version: WdlVersion,
     val iAliasesTranslations: Map[String, String] = aliases.map {
       case AST.ImportAlias(src, dest, _) => src -> dest
     }.toMap
-    val iAliases = iCtx.aliases.map {
+    val iAliases: Map[String, T_Struct] = iCtx.aliases.map {
       case (name, iStruct: T_Struct) =>
         iAliasesTranslations.get(name) match {
           case None          => name -> iStruct
           case Some(altName) => altName -> T_Struct(altName, iStruct.members)
         }
-      case (name, other) =>
-        throw new Exception(s"Expecting a struct but got ${other}")
-    }.toMap
-
-    // check that the imported structs do not step over existing definitions
-    val doublyDefined = this.aliases.keys.toSet intersect iAliases.keys.toSet
-    for (sname <- doublyDefined) {
-      if (this.aliases(sname) != iAliases(sname))
-        throw new TypeException(s"Type ${sname} is already defined in a different way",
-                                textSource,
-                                docSourceUrl)
+      case (_, other) =>
+        throw new RuntimeException(s"Expecting a struct but got ${other}")
     }
 
-    this.copy(aliases = this.aliases ++ iAliases,
-              callables = callables ++ iCallables,
-              namespaces = namespaces + namespace)
+    // check that the imported structs do not step over existing definitions
+    val doublyDefinedStructs =
+      (this.aliases.keys.toSet intersect iAliases.keys.toSet).filter(sname =>
+        this.aliases(sname) != iAliases(sname)
+      )
+    if (doublyDefinedStructs.nonEmpty) {
+      throw new DuplicateDeclarationException(
+          s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way"
+      )
+    } else {
+      this.copy(aliases = this.aliases ++ iAliases,
+                callables = callables ++ iCallables,
+                namespaces = namespaces + namespace)
+    }
   }
 }

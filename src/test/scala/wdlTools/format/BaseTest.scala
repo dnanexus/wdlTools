@@ -5,13 +5,12 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import wdlTools.formatter.WdlV1Formatter
 import wdlTools.syntax.{WdlVersion, v1}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{BasicOptions, Util}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private lazy val opts = Options()
+  private lazy val opts = BasicOptions()
   private lazy val parser = v1.ParseAll(opts)
 
   def getWdlPath(fname: String, subdir: String): Path = {

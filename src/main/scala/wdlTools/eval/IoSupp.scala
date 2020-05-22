@@ -7,7 +7,7 @@ import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
-import wdlTools.util.{EvalConfig, Options, Util}
+import wdlTools.util.{Options, Util}
 import wdlTools.util.Verbosity._
 
 case class IoSupp(opts: Options, evalCfg: EvalConfig) {

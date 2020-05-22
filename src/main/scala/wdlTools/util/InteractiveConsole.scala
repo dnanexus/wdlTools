@@ -265,7 +265,6 @@ object InteractiveConsole {
     /**
       * Read a value from StdIn.
       * @return The value converted to the specified type, or None if no value was entered.
-      * @throws InputException if the entered value was invalid
       */
     def read: Option[T]
   }
