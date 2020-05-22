@@ -14,8 +14,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
           Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
-      followImports = true,
-      errorAsException = true
+      followImports = true
   )
   private val parser = Parsers(opts)
 

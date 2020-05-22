@@ -187,7 +187,7 @@ object TypedAbstractSyntax {
   // import statement with the typed-AST for the referenced document
   case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
       extends Element
-  case class ImportDoc(name: Option[String],
+  case class ImportDoc(name: String,
                        aliases: Vector[ImportAlias],
                        addr: String,
                        doc: Document,

@@ -188,7 +188,7 @@ case class DocumentationGenerator(
               imp.addr.value,
               imp.name
                 .map(_.value)
-                .getOrElse(Util.getFilename(imp.addr.value).replace(".wdl", "")),
+                .getOrElse(Util.getFilename(imp.addr.value, ".wdl")),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
               getDocumentationComment(imp)
           )
@@ -285,7 +285,7 @@ case class DocumentationGenerator(
     val renderer: Renderer = Renderer()
     docs.foreach {
       case (url, doc) =>
-        documentation(Util.getFilename(url.getPath).replace(".wdl", ".md")) =
+        documentation(Util.getFilename(url.getPath, ".wdl", ".md")) =
           renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
     }
     // All structs share the same namespace so we put them on a separate page

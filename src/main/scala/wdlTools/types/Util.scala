@@ -24,8 +24,6 @@ object Util {
 
   def typeToString(t: T): String = {
     t match {
-      case T_Invalid(textSource, reason) =>
-        s"Error at ${textSource}: ${reason.getOrElse("unknown error")}"
       case T_Boolean        => "Boolean"
       case T_Int            => "Int"
       case T_Float          => "Float"
@@ -42,9 +40,9 @@ object Util {
       case T_Optional(t)    => s"Optional[${typeToString(t)}]"
 
       // a user defined structure
-      case T_StructDef(name, _) => s"Struct($name)"
+      case T_Struct(name, _) => s"Struct($name)"
 
-      case T_TaskDef(name, input, output) =>
+      case T_Task(name, input, output) =>
         val inputs = input
           .map {
             case (name, (t, _)) =>
@@ -59,7 +57,7 @@ object Util {
           .mkString(", ")
         s"TaskSig($name, input=$inputs, outputs=${outputs})"
 
-      case T_WorkflowDef(name, input, output) =>
+      case T_Workflow(name, input, output) =>
         val inputs = input
           .map {
             case (name, (t, _)) =>
@@ -75,7 +73,7 @@ object Util {
         s"WorkflowSig($name, input={$inputs}, outputs={$outputs})"
 
       // The type of a call to a task or a workflow.
-      case T_CallDef(name, output: Map[String, T]) =>
+      case T_Call(name, output: Map[String, T]) =>
         val outputs = output
           .map {
             case (name, t) =>
@@ -102,12 +100,6 @@ object Util {
       // String sub(String, String, String)
       case T_Function3(name, arg1, arg2, arg3, output) =>
         s"${name}(${typeToString(arg1)}, ${typeToString(arg2)}, ${typeToString(arg3)}) -> ${typeToString(output)}"
-
-      case T_DocumentDef(name) => s"Document ${name}"
-
-      case invalid: Invalid =>
-        val origTypeStr = invalid.originalType.map(typeToString).getOrElse("unknown")
-        s"Invalid due to ${invalid.reason}; original type = ${origTypeStr}"
     }
   }
 
@@ -196,10 +188,6 @@ object Util {
 
       case TAT.ExprGetName(e, id: String, _, _) =>
         s"${exprToString(e)}.${id}"
-
-      case TAT.ExprInvalid(wdlType, originalExpr, _) =>
-        val origExprStr = originalExpr.map(exprToString).getOrElse("unknown")
-        s"Invalid expression of type ${wdlType}; original expression = ${origExprStr}"
     }
   }
 }

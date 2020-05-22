@@ -6,10 +6,7 @@ import java.nio.file.Files
 
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException, TextSource}
-import wdlTools.types.TypedAbstractSyntax.Element
-import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
-import wdlTools.types.WdlTypes.T
-import wdlTools.types.{TypeException, TypeInfer, TypedAbstractSyntax, TypedAbstractSyntaxTreeWalker}
+import wdlTools.types.{Context, TypeException, TypeInfer}
 
 import scala.collection.mutable
 import scala.io.AnsiColor
@@ -69,56 +66,50 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     val url = conf.check.url()
     val opts = conf.check.getOptions
     val parsers = Parsers(opts)
-    val checker = TypeInfer(opts)
-    try {
-      val tDoc = checker.apply(parsers.parseDocument(url))._1
-      if (!opts.errorAsException) {
-        // traverse the tree to collect invalid nodes and display to the user
-        val errors: mutable.Map[URL, mutable.Buffer[(String, TextSource)]] = mutable.HashMap.empty
-        val walker = new TypedAbstractSyntaxTreeWalker(opts) {
-          override def visitDocument(ctx: VisitorContext[TypedAbstractSyntax.Document]): Unit = {
-            if (!errors.contains(ctx.docSourceUrl)) {
-              errors(ctx.docSourceUrl) = mutable.Buffer.empty
-            }
-            super.visitDocument(ctx)
-          }
+    val errors: mutable.Map[URL, mutable.Buffer[(String, TextSource)]] = mutable.HashMap.empty
 
-          override def visitInvalid[P <: Element](reason: String,
-                                                  originalType: Option[T],
-                                                  ctx: VisitorContext[P]): Unit = {
-            errors(ctx.docSourceUrl).append((reason, ctx.element.text))
-          }
-        }
-        walker.apply(tDoc)
-        if (errors.nonEmpty) {
-          // format as json or text and write to file or stdout
-          val outputFile = conf.check.outputFile.toOption
-          val toFile = outputFile.isDefined
-          val printer: PrintStream = if (toFile) {
-            val resolved = outputFile.get
-            if (!conf.check.overwrite() && Files.exists(resolved)) {
-              throw new Exception(s"File already exists: ${resolved}")
-            }
-            val fos = new FileOutputStream(outputFile.get.toFile)
-            new PrintStream(fos, true)
-          } else {
-            System.out
-          }
-          val finalErrors = errors.view.mapValues(_.toVector).toMap
-          if (conf.check.json()) {
-            val js = errorsToJson(finalErrors).prettyPrint
-            printer.println(js)
-          } else {
-            printErrors(finalErrors, printer, effects = !toFile)
-          }
-          if (toFile) {
-            printer.close()
-          }
-        }
+    def errorHandler(reason: String, textSource: TextSource, ctx: Context): Boolean = {
+      val url = ctx.docSourceUrl.get
+      if (!errors.contains(url)) {
+        errors(url) = mutable.ArrayBuffer.empty
       }
+      errors(url).append((reason, textSource))
+      false
+    }
+
+    val checker = TypeInfer(opts, Some(errorHandler))
+
+    try {
+      checker.apply(parsers.parseDocument(url))
     } catch {
       case e: SyntaxException => println(s"Failed to parse WDL document: ${e.getMessage}")
       case e: TypeException   => println(s"Failed to type-check WDL document: ${e.getMessage}")
+    }
+
+    if (errors.nonEmpty) {
+      // format as json or text and write to file or stdout
+      val outputFile = conf.check.outputFile.toOption
+      val toFile = outputFile.isDefined
+      val printer: PrintStream = if (toFile) {
+        val resolved = outputFile.get
+        if (!conf.check.overwrite() && Files.exists(resolved)) {
+          throw new Exception(s"File already exists: ${resolved}")
+        }
+        val fos = new FileOutputStream(outputFile.get.toFile)
+        new PrintStream(fos, true)
+      } else {
+        System.out
+      }
+      val finalErrors = errors.view.mapValues(_.toVector).toMap
+      if (conf.check.json()) {
+        val js = errorsToJson(finalErrors).prettyPrint
+        printer.println(js)
+      } else {
+        printErrors(finalErrors, printer, effects = !toFile)
+      }
+      if (toFile) {
+        printer.close()
+      }
     }
   }
 }

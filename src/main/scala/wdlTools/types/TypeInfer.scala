@@ -1,7 +1,5 @@
 package wdlTools.types
 
-import java.nio.file.Paths
-
 import wdlTools.syntax.{AbstractSyntax => AST}
 import wdlTools.syntax.TextSource
 import wdlTools.syntax.{Util => SUtil}
@@ -20,7 +18,7 @@ import wdlTools.util.{Util => UUtil}
   *                     a TypeException is thrown.
   */
 case class TypeInfer(conf: TypeOptions,
-                     errorHandler: Option[(String, TextSource, Context) => Boolean]) {
+                     errorHandler: Option[(String, TextSource, Context) => Boolean] = None) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
 
@@ -998,19 +996,32 @@ case class TypeInfer(conf: TypeOptions,
         val tDecl = applyDecl(decl, bindings, ctx)
         (bindings + (tDecl.name -> tDecl.wdlType), wElements :+ tDecl)
 
-      case ((bindings, wElements), call: AST.Call) =>
-        val tCall = applyCall(call, ctx.bindVarList(bindings))
-        (bindings + (tCall.actualName -> tCall.wdlType), wElements :+ tCall)
+      case ((bindings, wElements), wElt) =>
+        val newCtx =
+          try {
+            ctx.bindVarList(bindings)
+          } catch {
+            case e: DuplicateDeclarationException =>
+              handleError(e.getMessage, wElt.text, ctx)
+              ctx
+          }
+        wElt match {
+          case call: AST.Call =>
+            val tCall = applyCall(call, newCtx)
+            (bindings + (tCall.actualName -> tCall.wdlType), wElements :+ tCall)
 
-      case ((bindings, wElements), subSct: AST.Scatter) =>
-        // a nested scatter
-        val (tScatter, sctBindings) = applyScatter(subSct, ctx.bindVarList(bindings))
-        (bindings ++ sctBindings, wElements :+ tScatter)
+          case subSct: AST.Scatter =>
+            // a nested scatter
+            val (tScatter, sctBindings) = applyScatter(subSct, newCtx)
+            (bindings ++ sctBindings, wElements :+ tScatter)
 
-      case ((bindings, wElements), cond: AST.Conditional) =>
-        // a nested conditional
-        val (tCond, condBindings) = applyConditional(cond, ctx.bindVarList(bindings))
-        (bindings ++ condBindings, wElements :+ tCond)
+          case cond: AST.Conditional =>
+            // a nested conditional
+            val (tCond, condBindings) = applyConditional(cond, newCtx)
+            (bindings ++ condBindings, wElements :+ tCond)
+
+          case other => throw new RuntimeException(s"Unexpected workflow element ${other}")
+        }
     }
   }
 
@@ -1173,9 +1184,11 @@ case class TypeInfer(conf: TypeOptions,
         case ((ctx, elems), iStat: AST.ImportDoc) =>
           // recurse into the imported document, add types
           val (iDoc, iCtx) = applyDoc(iStat.doc.get)
+          val name = iStat.name.map(_.value)
+          val addr = iStat.addr.value
 
           // Figure out what to name the sub-document
-          val namespace = iStat.name match {
+          val namespace = name match {
             case None =>
               // Something like
               //    import "http://example.com/lib/stdlib"
@@ -1184,23 +1197,16 @@ case class TypeInfer(conf: TypeOptions,
               // will be named:
               //    stdlib
               //    C
-              val url = UUtil.getUrl(iStat.addr.value, conf.localDirectories)
-              val nsName = Paths.get(url.getFile).getFileName.toString
-              if (nsName.endsWith(".wdl"))
-                nsName.dropRight(".wdl".length)
-              else
-                nsName
-            case Some(x) => x.value
+              UUtil.getFilename(addr, ".wdl")
+            case Some(x) => x
           }
 
           val aliases = iStat.aliases.map {
             case AST.ImportAlias(id1, id2, text) =>
               TAT.ImportAlias(id1, id2, ctx.aliases(id1), text)
           }
-          val name = iStat.name.map(_.value)
-          val addr = iStat.addr.value
-          val importDoc =
-            TAT.ImportDoc(name, aliases, addr, iDoc, iStat.text)
+
+          val importDoc = TAT.ImportDoc(namespace, aliases, addr, iDoc, iStat.text)
 
           // add the externally visible definitions to the context
           val newCtx =

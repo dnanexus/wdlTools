@@ -84,8 +84,11 @@ object Util {
     resolved
   }
 
-  def getFilename(addr: String): String = {
-    Paths.get(new URL(addr).getPath).getFileName.toString
+  def getFilename(addr: String, dropExt: String = "", addExt: String = ""): String = {
+    ((Paths.get(new URL(addr).getPath).getFileName.toString, dropExt) match {
+      case (fn, ext) if fn.length > 0 && fn.endsWith(ext) => fn.dropRight(dropExt.length)
+      case (fn, _)                                        => fn
+    }) + addExt
   }
 
   /**

@@ -70,17 +70,14 @@ case class Context(version: WdlVersion,
   // not a duplicate of an existing variables or that its type extends Invalid
   def bindVarList(bindings: Map[String, WdlType]): Context = {
     val both = declarations.keys.toSet intersect bindings.keys.toSet
-    val keep = bindings.filter {
-      case (name, _: Invalid) if both.contains(name) =>
-        // ignore duplicate var if it is Invalid
-        false
+    bindings.foreach {
       case (name, _) if both.contains(name) =>
-        throw new RuntimeException(
-            "Trying to bind variables that have already been declared with non-error types"
+        throw new DuplicateDeclarationException(
+            s"Trying to bind variable ${name} that has already been declared"
         )
-      case _ => true
+      case _ => ()
     }
-    this.copy(declarations = declarations ++ keep)
+    this.copy(declarations = declarations ++ bindings)
   }
 
   def bindStruct(s: T_Struct): Context = {
@@ -130,10 +127,10 @@ case class Context(version: WdlVersion,
 
     // There cannot be any collisions because this is a new namespace
     val iCallables = iCtx.callables.map {
-      case (name, taskSig: T_TaskDef) =>
+      case (name, taskSig: T_Task) =>
         val fqn = namespace + "." + name
         fqn -> taskSig.copy(name = fqn)
-      case (name, wfSig: T_WorkflowDef) =>
+      case (name, wfSig: T_Workflow) =>
         val fqn = namespace + "." + name
         fqn -> wfSig.copy(name = fqn)
       case other =>
@@ -154,7 +151,7 @@ case class Context(version: WdlVersion,
       case (name, iStruct: T_Struct) =>
         iAliasesTranslations.get(name) match {
           case None          => name -> iStruct
-          case Some(altName) => altName -> T_StructDef(altName, iStruct.members)
+          case Some(altName) => altName -> T_Struct(altName, iStruct.members)
         }
       case (_, other) =>
         throw new RuntimeException(s"Expecting a struct but got ${other}")

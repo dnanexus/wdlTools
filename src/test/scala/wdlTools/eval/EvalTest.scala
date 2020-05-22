@@ -17,8 +17,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
                 antlr4Trace = false,
                 localDirectories = Vector(srcDir),
-                verbosity = Verbosity.Normal,
-                errorAsException = true)
+                verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val typeInfer = TypeInfer(opts)
 
