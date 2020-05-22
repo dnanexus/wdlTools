@@ -33,6 +33,7 @@ object WdlTypes {
   case object T_Object extends T
   case class T_Optional(t: T) extends T
 
+  // a user defined structure
   case class T_Struct(name: String, members: Map[String, T]) extends T
 
   // Anything that can be called. Tasks and workflows implement this trait.
