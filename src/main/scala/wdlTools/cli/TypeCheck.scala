@@ -57,7 +57,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       printer.println(border2)
       docErrors.sortWith(_._2 < _._2).foreach {
         case (reason, textSource) =>
-          printer.println(f"${textSource}%-9s| ${reason} |")
+          printer.println(f"${textSource}%-9s| ${reason}")
       }
     }
   }
