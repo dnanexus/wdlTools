@@ -64,7 +64,10 @@ object Antlr4Util {
           case _ =>
             offendingSymbol.toString
         }
-      val err = SyntaxError(docSourceUrl, symbolText, line, charPositionInLine, msg)
+      val err = SyntaxError(docSourceUrl,
+                            symbolText,
+                            TextSource(line, charPositionInLine, line, charPositionInLine),
+                            msg)
       errors = errors :+ err
     }
 

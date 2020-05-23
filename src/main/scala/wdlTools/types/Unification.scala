@@ -1,14 +1,10 @@
 package wdlTools.types
 
-import java.net.URL
-
-import wdlTools.syntax.TextSource
 import wdlTools.types.Util.{typeToString, isPrimitive}
 import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
 import wdlTools.util.TypeCheckingRegime._
 
-case class Unification(conf: Options) {
+case class Unification(conf: TypeOptions) {
   // Type checking rules. Are we lenient or strict in checking coercions?
   private val regime = conf.typeChecking
 
@@ -44,8 +40,8 @@ case class Unification(conf: Options) {
 
       // structures are equivalent iff they have the same name
       //
-      case (T_Struct(sname1, _), T_Struct(sname2, _)) =>
-        sname1 == sname2
+      case (struct1: T_Struct, struct2: T_Struct) =>
+        struct1.name == struct2.name
 
       // coercions to objects and structs can fail at runtime. We
       // are not thoroughly checking them here.
@@ -62,9 +58,9 @@ case class Unification(conf: Options) {
 
   def isCoercibleTo(left: T, right: T): Boolean = {
     if (left.isInstanceOf[T_Identifier])
-      throw new Exception(s"${left} should not appear here")
+      throw new RuntimeException(s"${left} should not appear here")
     if (right.isInstanceOf[T_Identifier])
-      throw new Exception(s"${right} should not appear here")
+      throw new RuntimeException(s"${right} should not appear here")
 
     (left, right) match {
       // List of special cases goes here
@@ -209,17 +205,14 @@ case class Unification(conf: Options) {
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: T,
-                 typeBindings: Map[T_Var, T],
-                 srcText: TextSource,
-                 docSourceUrl: Option[URL] = None): T = {
+  def substitute(t: T, typeBindings: Map[T_Var, T]): T = {
     def sub(t: T): T = {
       t match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
         case a: T_Var if !(typeBindings contains a) =>
-          throw new TypeException(s"type variable ${typeToString(a)} does not have a binding",
-                                  srcText,
-                                  docSourceUrl)
+          throw new SubstitutionException(
+              s"type variable ${typeToString(a)} does not have a binding"
+          )
         case a: T_Var       => typeBindings(a)
         case x: T_Struct    => x
         case T_Pair(l, r)   => T_Pair(sub(l), sub(r))
@@ -229,9 +222,9 @@ case class Unification(conf: Options) {
         case T_Optional(t1) => T_Optional(sub(t1))
         case T_Any          => T_Any
         case other =>
-          throw new TypeException(s"Type ${typeToString(other)} should not appear in this context",
-                                  srcText,
-                                  docSourceUrl)
+          throw new SubstitutionException(
+              s"Type ${typeToString(other)} should not appear in this context"
+          )
       }
     }
     sub(t)

@@ -5,13 +5,14 @@ import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
 
 import scala.collection.mutable
 
-case class Parsers(opts: Options = Options(),
+case class Parsers(opts: Options = BasicOptions(),
                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-                   errorHandler: Option[(Option[URL], Exception) => Boolean] = None) {
+                   errorHandler: Option[Vector[SyntaxError] => Boolean] = None) {
+
   private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories, errorHandler),
       WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories, errorHandler),

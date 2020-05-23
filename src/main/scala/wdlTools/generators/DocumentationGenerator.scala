@@ -1,13 +1,12 @@
 package wdlTools.generators
 
 import java.net.URL
-import java.nio.file.Paths
 
 import wdlTools.generators.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.Options
+import wdlTools.util.{Options, Util}
 
 import scala.collection.mutable
 
@@ -189,13 +188,7 @@ case class DocumentationGenerator(
               imp.addr.value,
               imp.name
                 .map(_.value)
-                .getOrElse(
-                    Paths
-                      .get(new URL(imp.addr.value).getPath)
-                      .getFileName
-                      .toString
-                      .replace(".wdl", "")
-                ),
+                .getOrElse(Util.getFilename(imp.addr.value, ".wdl")),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
               getDocumentationComment(imp)
           )
@@ -292,7 +285,7 @@ case class DocumentationGenerator(
     val renderer: Renderer = Renderer()
     docs.foreach {
       case (url, doc) =>
-        documentation(Paths.get(url.getPath).getFileName.toString.replace(".wdl", ".md")) =
+        documentation(Util.getFilename(url.getPath, ".wdl", ".md")) =
           renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
     }
     // All structs share the same namespace so we put them on a separate page

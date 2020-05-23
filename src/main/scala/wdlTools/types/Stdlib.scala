@@ -1,12 +1,9 @@
 package wdlTools.types
 
-import java.net.URL
-
 import WdlTypes._
-import wdlTools.util.Options
-import wdlTools.syntax.{TextSource, WdlVersion}
+import wdlTools.syntax.WdlVersion
 
-case class Stdlib(conf: Options, version: WdlVersion) {
+case class Stdlib(conf: TypeOptions, version: WdlVersion) {
   private val unify = Unification(conf)
 
   // Some functions are overloaded and can take several kinds of arguments.
@@ -159,21 +156,18 @@ case class Stdlib(conf: Options, version: WdlVersion) {
   // evaluate the output type of a function. This may require calculation because
   // some functions are polymorphic in their inputs.
   private def evalOnePrototype(funcDesc: T_Function,
-                               inputTypes: Vector[T],
-                               text: TextSource,
-                               docSourceUrl: Option[URL]): Option[(T, T_Function)] = {
+                               inputTypes: Vector[T]): Option[(T, T_Function)] = {
     val arity = inputTypes.size
     val args = (arity, funcDesc) match {
       case (0, T_Function0(_, _))                   => Vector.empty
       case (1, T_Function1(_, arg1, _))             => Vector(arg1)
       case (2, T_Function2(_, arg1, arg2, _))       => Vector(arg1, arg2)
       case (3, T_Function3(_, arg1, arg2, arg3, _)) => Vector(arg1, arg2, arg3)
-      case (_, _) =>
-        return None
+      case (_, _)                                   => return None
     }
     try {
       val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
-      val t = unify.substitute(funcDesc.output, ctx, text)
+      val t = unify.substitute(funcDesc.output, ctx)
       Some((t, funcDesc))
     } catch {
       case _: TypeUnificationException =>
@@ -181,15 +175,10 @@ case class Stdlib(conf: Options, version: WdlVersion) {
     }
   }
 
-  def apply(funcName: String,
-            inputTypes: Vector[T],
-            text: TextSource,
-            docSourceUrl: Option[URL] = None): (T, T_Function) = {
+  def apply(funcName: String, inputTypes: Vector[T]): (T, T_Function) = {
     val candidates = funcProtoMap.get(funcName) match {
       case None =>
-        throw new TypeException(s"No function named ${funcName} in the standard library",
-                                text,
-                                docSourceUrl)
+        throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
       case Some(protoVec) =>
         protoVec
     }
@@ -197,17 +186,23 @@ case class Stdlib(conf: Options, version: WdlVersion) {
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
     val allCandidatePrototypes: Vector[Option[(T, T_Function)]] = candidates.map {
-      evalOnePrototype(_, inputTypes, text, docSourceUrl)
+      try {
+        evalOnePrototype(_, inputTypes)
+      } catch {
+        case e: SubstitutionException =>
+          throw new StdlibFunctionException(e.getMessage)
+      }
     }
     val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
     results.size match {
       case 0 =>
         val inputsStr = inputTypes.map(Util.typeToString).mkString("\n")
         val candidatesStr = candidates.map(Util.typeToString(_)).mkString("\n")
-        throw new TypeException(s"""|Invoking stdlib function ${funcName} with badly typed arguments
-                                    |${candidatesStr}
-                                    |inputs: ${inputsStr}
-                                    |""".stripMargin, text, docSourceUrl)
+        val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
+                      |${candidatesStr}
+                      |inputs: ${inputsStr}
+                      |""".stripMargin
+        throw new StdlibFunctionException(msg)
       case 1 =>
         results.head
       case n =>
@@ -219,13 +214,12 @@ case class Stdlib(conf: Options, version: WdlVersion) {
               Util.typeToString(funcSig)
           }
           .mkString("\n")
-        val msg =
-          s"""|Call to ${funcName} matches ${n} prototypes
-              |inputTypes: ${inputTypes}
-              |prototypes:
-              |${prototypeDescriptions}
-              |""".stripMargin
-        throw new TypeException(msg, text, docSourceUrl)
+        val msg = s"""|Call to ${funcName} matches ${n} prototypes
+                      |inputTypes: ${inputTypes}
+                      |prototypes:
+                      |${prototypeDescriptions}
+                      |""".stripMargin
+        throw new StdlibFunctionException(msg)
     }
   }
 }

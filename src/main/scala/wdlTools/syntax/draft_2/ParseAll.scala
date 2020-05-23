@@ -3,15 +3,22 @@ package wdlTools.syntax.draft_2
 import java.net.URL
 
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.syntax.{SyntaxException, TextSource, WdlParser, WdlVersion, AbstractSyntax => AST}
+import wdlTools.syntax.{
+  SyntaxError,
+  SyntaxException,
+  TextSource,
+  WdlParser,
+  WdlVersion,
+  AbstractSyntax => AST
+}
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
 import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-                    errorHandler: Option[(Option[URL], Exception) => Boolean] = None)
-    extends WdlParser(opts, errorHandler) {
+                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None)
+    extends WdlParser(opts) {
 
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
@@ -294,7 +301,8 @@ case class ParseAll(opts: Options,
     val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
-    if (errorListener.hasErrors) {
+    if (errorListener.hasErrors && errorHandler
+          .forall(eh => eh(errorListener.getErrors))) {
       throw new SyntaxException(errorListener.getErrors)
     }
     val translator = Translator(sourceCode.url)

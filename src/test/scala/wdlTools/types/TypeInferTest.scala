@@ -5,10 +5,10 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
+import wdlTools.util.{TypeCheckingRegime, Util => UUtil, Verbosity}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
-  private val opts = Options(
+  private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
           Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
@@ -65,6 +65,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       // metadata
       "meta_null_value.wdl" -> TResult(correct = true),
       "meta_section_compound.wdl" -> TResult(correct = true),
+      "invalid_param_meta.wdl" -> TResult(correct = false),
       // runtime section
       "runtime_section_I.wdl" -> TResult(correct = true),
       "runtime_section_bad.wdl" -> TResult(correct = false)
@@ -130,7 +131,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     )
 
     // check that all results have a corresponding file
-    val fileNames = testFiles.map(_.getFileName().toString).toSet
+    val fileNames = testFiles.map(_.getFileName.toString).toSet
     val controlNames = controlTable.keys.toSet
     val diff1 = fileNames.diff(controlNames)
     if (diff1.nonEmpty)

@@ -1,6 +1,7 @@
 package wdlTools.types
 
 import java.net.URL
+
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
 
 // A tree representing a WDL program with all of the types in place.
@@ -13,10 +14,6 @@ object TypedAbstractSyntax {
   }
   sealed trait WorkflowElement extends Element
   sealed trait DocumentElement extends Element
-  sealed trait Callable {
-    val name: String
-    val wdlType: WdlTypes.T_Callable
-  }
 
   // expressions
   sealed trait Expr extends Element {
@@ -107,12 +104,52 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   // sections
+
   /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
-    * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
-    * `InputSection` `TextSource` may overlap with other elements.
+    * and bound declarations that require evaluation cannot be treated as inputs.
+    *
+    * This definition based on Cromwell wom.callable.Callable.InputDefinition. It
+    * is easier to use a variant of this interface for backward compatibility with dxWDL.
     */
-  case class InputSection(declarations: Vector[Declaration], text: TextSource) extends Element
-  case class OutputSection(declarations: Vector[Declaration], text: TextSource) extends Element
+  sealed trait InputDefinition extends Element {
+    val name: String
+    val wdlType: WdlTypes.T
+    val text: TextSource
+  }
+
+  // A compulsory input that has no default, and must be provided by the caller
+  case class RequiredInputDefinition(name: String, wdlType: WdlTypes.T, text: TextSource)
+      extends InputDefinition
+
+  // An input that has a default and may be skipped by the caller
+  case class OverridableInputDefinitionWithDefault(name: String,
+                                                   wdlType: WdlTypes.T,
+                                                   defaultExpr: Expr,
+                                                   text: TextSource)
+      extends InputDefinition
+
+  // An input whose value should always be calculated from the default, and is
+  // not allowed to be overridden.
+  /*  case class FixedInputDefinitionWithDefault(name : String,
+                                             wdlType : WdlTypes.T,
+                                             defaultExpr : Expr,
+                                             text : TextSource) */
+
+  // an input that may be omitted by the caller. In that case the value will
+  // be null (or None).
+  case class OptionalInputDefinition(name: String, wdlType: WdlTypes.T_Optional, text: TextSource)
+      extends InputDefinition
+
+  case class OutputDefinition(name: String, wdlType: WdlTypes.T, expr: Expr, text: TextSource)
+      extends Element
+
+  // A workflow or a task.
+  sealed trait Callable {
+    val name: String
+    val wdlType: WdlTypes.T_Callable
+    val inputs: Vector[InputDefinition]
+    val outputs: Vector[OutputDefinition]
+  }
 
   // A command can be simple, with just one continuous string:
   //
@@ -148,8 +185,9 @@ object TypedAbstractSyntax {
   case class Version(value: WdlVersion, text: TextSource) extends Element
 
   // import statement with the typed-AST for the referenced document
-  case class ImportAlias(id1: String, id2: String, text: TextSource) extends Element
-  case class ImportDoc(name: Option[String],
+  case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
+      extends Element
+  case class ImportDoc(namespace: String,
                        aliases: Vector[ImportAlias],
                        addr: String,
                        doc: Document,
@@ -157,14 +195,17 @@ object TypedAbstractSyntax {
       extends DocumentElement
 
   // a definition of a struct
-  case class StructDefinition(name: String, members: Map[String, WdlType], text: TextSource)
+  case class StructDefinition(name: String,
+                              wdlType: WdlTypes.T_Struct,
+                              members: Map[String, WdlType],
+                              text: TextSource)
       extends DocumentElement
 
   // A task
   case class Task(name: String,
                   wdlType: WdlTypes.T_Task,
-                  input: Option[InputSection],
-                  output: Option[OutputSection],
+                  inputs: Vector[InputDefinition],
+                  outputs: Vector[OutputDefinition],
                   command: CommandSection, // the command section is required
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
@@ -175,6 +216,8 @@ object TypedAbstractSyntax {
       extends DocumentElement
       with Callable
 
+  case class CallAfter(name: String, text: TextSource) extends Element
+
   // The name of the call may not contain dots. Examples:
   //
   // fully-qualified-name          actual-name
@@ -183,16 +226,19 @@ object TypedAbstractSyntax {
   // call add                      add
   // call a.b.c                    c
   //
+
   case class Call(fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
                   alias: Option[String],
+                  afters: Vector[WdlTypes.T_Call],
                   actualName: String,
                   inputs: Map[String, Expr],
                   text: TextSource)
       extends WorkflowElement
 
   case class Scatter(identifier: String,
+                     wdlType: WdlTypes.T,
                      expr: Expr,
                      body: Vector[WorkflowElement],
                      text: TextSource)
@@ -202,10 +248,11 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   // A workflow
+
   case class Workflow(name: String,
                       wdlType: WdlTypes.T_Workflow,
-                      input: Option[InputSection],
-                      output: Option[OutputSection],
+                      inputs: Vector[InputDefinition],
+                      outputs: Vector[OutputDefinition],
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement],

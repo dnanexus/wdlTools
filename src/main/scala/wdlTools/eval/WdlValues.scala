@@ -3,24 +3,24 @@ package wdlTools.eval
 // This is the WDL typesystem
 object WdlValues {
   // any WDL value
-  sealed trait WV
+  sealed trait V
 
   // primitive values
-  case object WV_Null extends WV
-  case class WV_Boolean(value: Boolean) extends WV
-  case class WV_Int(value: Int) extends WV
-  case class WV_Float(value: Double) extends WV
-  case class WV_String(value: String) extends WV
-  case class WV_File(value: String) extends WV
+  case object V_Null extends V
+  case class V_Boolean(value: Boolean) extends V
+  case class V_Int(value: Int) extends V
+  case class V_Float(value: Double) extends V
+  case class V_String(value: String) extends V
+  case class V_File(value: String) extends V
 
   // compound values
-  case class WV_Pair(l: WV, r: WV) extends WV
-  case class WV_Array(value: Vector[WV]) extends WV
-  case class WV_Map(value: Map[WV, WV]) extends WV
-  case class WV_Optional(value: WV) extends WV
-  case class WV_Struct(name: String, members: Map[String, WV]) extends WV
-  case class WV_Object(members: Map[String, WV]) extends WV
+  case class V_Pair(l: V, r: V) extends V
+  case class V_Array(value: Vector[V]) extends V
+  case class V_Map(value: Map[V, V]) extends V
+  case class V_Optional(value: V) extends V
+  case class V_Struct(name: String, members: Map[String, V]) extends V
+  case class V_Object(members: Map[String, V]) extends V
 
   // results from calling a task or workflow
-  case class WV_Call(name: String, members: Map[String, WV]) extends WV
+  case class V_Call(name: String, members: Map[String, V]) extends V
 }

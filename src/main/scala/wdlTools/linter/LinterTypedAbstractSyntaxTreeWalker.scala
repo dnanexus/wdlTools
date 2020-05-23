@@ -1,13 +1,13 @@
 package wdlTools.linter
 
-import wdlTools.types.TypedSyntaxTreeVisitor.VisitorContext
+import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.{TypedSyntaxTreeVisitor, TypedSyntaxTreeWalker}
+import wdlTools.types.{TypedAbstractSyntaxTreeVisitor, TypedAbstractSyntaxTreeWalker}
 import wdlTools.util.Options
 
 case class LinterTypedAbstractSyntaxTreeWalker(opts: Options,
-                                               visitors: Vector[TypedSyntaxTreeVisitor])
-    extends TypedSyntaxTreeWalker(opts) {
+                                               visitors: Vector[TypedAbstractSyntaxTreeVisitor])
+    extends TypedAbstractSyntaxTreeWalker(opts) {
   def visitEveryContext(ctx: VisitorContext[Element]): Unit = {}
 
   override def visitName[P <: Element](name: String, parent: VisitorContext[P]): Unit = {
@@ -68,22 +68,30 @@ case class LinterTypedAbstractSyntaxTreeWalker(opts: Options,
     super.visitExpression(ctx)
   }
 
+  override def visitDefinition[P <: Element](name: String,
+                                             wdlType: WdlType,
+                                             expr: Option[Expr],
+                                             parent: VisitorContext[P]): Unit = {
+    visitors.foreach(_.visitDefinition(name, wdlType, expr, parent))
+    super.visitDefinition(name, wdlType, expr, parent)
+  }
+
   override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
     visitEveryContext(ctx.asInstanceOf[VisitorContext[Element]])
     visitors.foreach(_.visitDeclaration(ctx))
     super.visitDeclaration(ctx)
   }
 
-  override def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {
+  override def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {
     visitEveryContext(ctx.asInstanceOf[VisitorContext[Element]])
-    visitors.foreach(_.visitInputSection(ctx))
-    super.visitInputSection(ctx)
+    visitors.foreach(_.visitInputDefinition(ctx))
+    super.visitInputDefinition(ctx)
   }
 
-  override def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {
+  override def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {
     visitEveryContext(ctx.asInstanceOf[VisitorContext[Element]])
-    visitors.foreach(_.visitOutputSection(ctx))
-    super.visitOutputSection(ctx)
+    visitors.foreach(_.visitOutputDefinition(ctx))
+    super.visitOutputDefinition(ctx)
   }
 
   override def visitCallName(actualName: String,

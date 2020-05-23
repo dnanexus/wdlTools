@@ -58,7 +58,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
   }
 
   private def configFromFile(path: Path): Map[String, RuleConf] = {
-    val config = readJsonSource(Source.fromFile(path.toFile))
+    val config = readJsonSource(Source.fromFile(path.toFile), path.toString)
 
     def getRuleSpecs(key: String): Option[Vector[JsValue]] = {
       config.get(key) match {

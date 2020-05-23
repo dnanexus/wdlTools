@@ -76,9 +76,8 @@ object TextSource {
 // by the ANTLR machinery and we transform it into this format.
 final case class SyntaxError(docSourceUrl: Option[URL],
                              symbol: String,
-                             line: Int,
-                             charPositionInLine: Int,
-                             msg: String)
+                             textSource: TextSource,
+                             reason: String)
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
@@ -99,9 +98,9 @@ object SyntaxException {
   def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
     // make one big report on all the syntax errors
     val messages = errors.map {
-      case SyntaxError(docSourceUrl, symbol, line, position, msg) =>
+      case SyntaxError(docSourceUrl, symbol, textSource, msg) =>
         val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-        s"${msg} at ${symbol}${urlPart} line ${line} column ${position}"
+        s"${msg} at ${symbol}${urlPart} ${textSource}"
     }
     messages.mkString("\n")
   }

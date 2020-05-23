@@ -1,14 +1,16 @@
 package wdlTools.types
 
-import wdlTools.types.TypedSyntaxTreeVisitor.VisitorContext
+import java.net.URL
+
+import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
+import wdlTools.types.WdlTypes.T
 import wdlTools.util.Options
-import wdlTools.util.Util.getFilename
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
-class TypedSyntaxTreeVisitor {
+class TypedAbstractSyntaxTreeVisitor {
   type WdlType = WdlTypes.T
 
   def visitDocument(ctx: VisitorContext[Document]): Unit = {}
@@ -85,11 +87,16 @@ class TypedSyntaxTreeVisitor {
     }
   }
 
+  def visitDefinition[P <: Element](name: String,
+                                    wdlType: T,
+                                    expr: Option[Expr],
+                                    parent: VisitorContext[P]): Unit = {}
+
   def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
 
-  def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {}
+  def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {}
 
-  def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {}
+  def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {}
 
   def visitCallName(actualName: String,
                     fullyQualifiedName: String,
@@ -131,8 +138,13 @@ class TypedSyntaxTreeVisitor {
   def visitTask(ctx: VisitorContext[Task]): Unit = {}
 }
 
-object TypedSyntaxTreeVisitor {
-  case class VisitorContext[T <: Element](element: T, parent: Option[VisitorContext[_]] = None) {
+object TypedAbstractSyntaxTreeVisitor {
+  case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
+    lazy val docSourceUrl: URL = element match {
+      case d: Document => d.docSourceUrl
+      case _           => findAncestor[Document].get.element.docSourceUrl
+    }
+
     def createChildContext[C <: Element](element: C): VisitorContext[C] = {
       VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
     }
@@ -192,7 +204,7 @@ object TypedSyntaxTreeVisitor {
   }
 }
 
-class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
+class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTreeVisitor {
   override def visitDocument(ctx: VisitorContext[Document]): Unit = {
     visitVersion(ctx.createChildContext[Version](ctx.element.version))
 
@@ -222,11 +234,7 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   }
 
   override def visitImportDoc(ctx: VisitorContext[ImportDoc]): Unit = {
-    val name = ctx.element.name
-      .getOrElse(
-          getFilename(ctx.element.addr).replace(".wdl", "")
-      )
-    visitImportName(name, ctx)
+    visitImportName(ctx.element.namespace, ctx)
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(ctx.createChildContext[ImportAlias](alias))
     }
@@ -242,23 +250,31 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
     }
   }
 
+  override def visitDefinition[P <: Element](name: String,
+                                             wdlType: T,
+                                             expr: Option[Expr],
+                                             parent: VisitorContext[P]): Unit = {
+    visitName(name, parent)
+    if (expr.isDefined) {
+      visitExpression(parent.createChildContext[Expr](expr.get))
+    }
+  }
+
   override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-    visitName[Declaration](ctx.element.name, ctx)
-    if (ctx.element.expr.isDefined) {
-      visitExpression(ctx.createChildContext[Expr](ctx.element.expr.get))
+    visitDefinition(ctx.element.name, ctx.element.wdlType, ctx.element.expr, ctx)
+  }
+
+  override def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {
+    ctx.element match {
+      case RequiredInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OptionalInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+        visitDefinition(name, wdlType, Some(defaultExpr), ctx)
     }
   }
 
-  override def visitInputSection(ctx: VisitorContext[InputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
-      visitDeclaration(ctx.createChildContext[Declaration](decl))
-    }
-  }
-
-  override def visitOutputSection(ctx: VisitorContext[OutputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
-      visitDeclaration(ctx.createChildContext[Declaration](decl))
-    }
+  override def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {
+    visitDefinition(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
   }
 
   override def visitCallName(actualName: String,
@@ -327,16 +343,13 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   override def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {
     visitName[Workflow](ctx.element.name, ctx)
 
-    if (ctx.element.input.isDefined) {
-      visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
+    ctx.element.inputs.foreach { inp =>
+      visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
     }
-
     visitBody[Workflow](ctx.element.body, ctx)
-
-    if (ctx.element.output.isDefined) {
-      visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
+    ctx.element.outputs.foreach { out =>
+      visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
     }
-
     if (ctx.element.meta.isDefined) {
       visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
     }
@@ -383,28 +396,22 @@ class TypedSyntaxTreeWalker(opts: Options) extends TypedSyntaxTreeVisitor {
   override def visitTask(ctx: VisitorContext[Task]): Unit = {
     visitName[Task](ctx.element.name, ctx)
 
-    if (ctx.element.input.isDefined) {
-      visitInputSection(ctx.createChildContext[InputSection](ctx.element.input.get))
+    ctx.element.inputs.foreach { inp =>
+      visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
     }
-
     ctx.element.declarations.foreach { decl =>
       visitDeclaration(ctx.createChildContext[Declaration](decl))
     }
-
     visitCommandSection(ctx.createChildContext[CommandSection](ctx.element.command))
-
-    if (ctx.element.output.isDefined) {
-      visitOutputSection(ctx.createChildContext[OutputSection](ctx.element.output.get))
+    ctx.element.outputs.foreach { out =>
+      visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
     }
-
     if (ctx.element.runtime.isDefined) {
       visitRuntimeSection(ctx.createChildContext[RuntimeSection](ctx.element.runtime.get))
     }
-
     if (ctx.element.hints.isDefined) {
       visitHintsSection(ctx.createChildContext[HintsSection](ctx.element.hints.get))
     }
-
     if (ctx.element.meta.isDefined) {
       visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
     }

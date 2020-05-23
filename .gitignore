@@ -16,8 +16,8 @@ src/main/java
 gen/
 *.tokens
 
-# Jar file of the ANTLR4 parser generator
-antlr-*.jar
+# Jar files
+*.jar
 
-# optional test resources
-src/test/resources/corpora/
+# test corpora
+src/test/resources/corpora

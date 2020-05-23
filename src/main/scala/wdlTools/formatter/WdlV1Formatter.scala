@@ -392,6 +392,7 @@ case class WdlV1Formatter(opts: Options,
       inStringOrCommand: Boolean = false,
       inPlaceholder: Boolean = false,
       inOperation: Boolean = false,
+      parentOperation: Option[String] = None,
       stringModifier: Option[String => String] = None
   ): Span = {
 
@@ -404,19 +405,23 @@ case class WdlV1Formatter(opts: Options,
       * @param inString         override the current value of `inString`
       * @param inPlaceholder    override the current value of `inPlaceholder`
       * @param inOperation      override the current value of `inOperation`
+      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+      *                         same operations are not grouped.
       * @return a Span
       */
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
                inPlaceholder: Boolean = inPlaceholder,
-               inOperation: Boolean = inOperation): Span = {
+               inOperation: Boolean = inOperation,
+               parentOperation: Option[String] = None): Span = {
       buildExpression(
           nestedExpression,
           placeholderOpen = placeholderOpen,
           inStringOrCommand = inString,
           inPlaceholder = inPlaceholder,
           inOperation = inOperation,
+          parentOperation = parentOperation,
           stringModifier = stringModifier
       )
     }
@@ -429,9 +434,15 @@ case class WdlV1Formatter(opts: Options,
     def operation(oper: String, lhs: Expr, rhs: Expr, textSource: TextSource): Span = {
       Operation(
           oper,
-          nested(lhs, inPlaceholder = inStringOrCommand, inOperation = true),
-          nested(rhs, inPlaceholder = inStringOrCommand, inOperation = true),
-          grouped = inOperation,
+          nested(lhs,
+                 inPlaceholder = inStringOrCommand,
+                 inOperation = true,
+                 parentOperation = Some(oper)),
+          nested(rhs,
+                 inPlaceholder = inStringOrCommand,
+                 inOperation = true,
+                 parentOperation = Some(oper)),
+          grouped = inOperation && !parentOperation.contains(oper),
           inString = inStringOrCommand,
           textSource
       )

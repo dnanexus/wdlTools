@@ -4,8 +4,8 @@ import java.net.URL
 import java.nio.file.Files
 
 import wdlTools.syntax.{TextSource, WdlVersion}
-import wdlTools.types.{TypedAbstractSyntax, TypedSyntaxTreeVisitor, Unification}
-import wdlTools.types.TypedSyntaxTreeVisitor.VisitorContext
+import wdlTools.types.{TypedAbstractSyntax, TypedAbstractSyntaxTreeVisitor, Unification}
+import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.exprToString
@@ -21,7 +21,7 @@ import scala.util.Random
 
 object TypedAbstractSyntaxTreeRules {
   class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
-      extends TypedSyntaxTreeVisitor {
+      extends TypedAbstractSyntaxTreeVisitor {
     protected def addEvent(ctx: VisitorContext[_ <: Element],
                            message: Option[String] = None): Unit = {
       addEventFromElement(ctx.element, message)
@@ -168,7 +168,7 @@ object TypedAbstractSyntaxTreeRules {
 
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       // ignore coercions in output sections
-      if (ctx.findAncestor[OutputSection].isEmpty) {
+      if (ctx.findAncestor[OutputDefinition].isEmpty) {
         ctx.getParent[Element].element match {
           case Declaration(_, wdlType, expr, _)
               if expr.isDefined && isQuestionableCoercion(wdlType,
@@ -429,16 +429,18 @@ object TypedAbstractSyntaxTreeRules {
         "dict"
     )
 
-    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-      super.visitDeclaration(ctx)
-
-      if (ctx.findAncestor[OutputSection].isEmpty) {
-        // declaration is not in an OutputSection
-        val parent = ctx.findAncestorExecutable.get
-        if (!declarations.contains(parent)) {
-          declarations(parent) = mutable.ArrayBuffer.empty
-        }
-        declarations(parent).append(ctx.element)
+    override def visitDefinition[P <: Element](name: String,
+                                               wdlType: WdlType,
+                                               expr: Option[Expr],
+                                               parent: VisitorContext[P]): Unit = {
+      parent.element match {
+        // ignore declaration in an OutputSection
+        case _: OutputDefinition => ()
+        case _ =>
+          val exe = parent.findAncestorExecutable.get
+          declarations
+            .getOrElseUpdate(exe, mutable.ArrayBuffer.empty[Element])
+            .append(parent.element)
       }
     }
 
@@ -493,7 +495,7 @@ object TypedAbstractSyntaxTreeRules {
 
       // check all declarations within each parent callable to see if they have any referrers
       val wf = ctx.element.workflow
-      val wfHasOutputs = wf.forall(_.output.isDefined)
+      val wfHasOutputs = wf.forall(_.outputs.nonEmpty)
       declarations.foreach {
         case (parent, decls) =>
           val refs = referrers.get(parent.name)
@@ -521,19 +523,27 @@ object TypedAbstractSyntaxTreeRules {
                                        events: mutable.Buffer[LintEvent],
                                        docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl, events) {
-    override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
-      ctx.element match {
-        case Declaration(_, T_Optional(declType), Some(expr), _)
-            if ctx.findAncestor[InputSection].isEmpty && (expr.wdlType match {
-              case T_Optional(_) => false
-              case _             => true
-            }) && (declType match {
-              case T_File | T_Directory =>
-                val parent = ctx.findAncestor[OutputSection]
-                parent.isDefined && parent.get.findAncestor[Task].nonEmpty
-              case _ => false
-            }) =>
-          addEvent(ctx)
+    private val fileTypes: Set[T] = Set(T_File, T_Directory)
+
+    override def visitDefinition[P <: Element](name: String,
+                                               wdlType: WdlType,
+                                               expr: Option[Expr],
+                                               parent: VisitorContext[P]): Unit = {
+      if (expr.isDefined) {
+        (wdlType, expr.get.wdlType) match {
+          case (T_Optional(_), T_Optional(_)) => ()
+          case (T_Optional(_), _) =>
+            parent.element match {
+              case _: InputDefinition =>
+                // ignore cases in input section
+                ()
+              case _: OutputDefinition if fileTypes.contains(wdlType) =>
+                // ignore File/Dir types in outpu section
+                ()
+              case _ => addEvent(parent)
+            }
+          case _ => ()
+        }
       }
     }
   }

@@ -12,8 +12,8 @@ case class Upgrade(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val url = conf.upgrade.url()
     val opts = conf.upgrade.getOptions
-    val outputDir = conf.format.outputDir.toOption
-    val overwrite = conf.format.overwrite()
+    val outputDir = conf.upgrade.outputDir.toOption
+    val overwrite = conf.upgrade.overwrite()
     val upgrader = Upgrader(opts)
     // write out upgraded versions
     val documents =

@@ -4,18 +4,17 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.Verbosity._
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/wdlTools/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
-  private val opts = Options(
+  private val opts = BasicOptions(
       antlr4Trace = false,
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir, structsDir)
