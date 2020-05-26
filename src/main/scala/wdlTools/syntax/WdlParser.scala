@@ -8,7 +8,7 @@ import wdlTools.util.{Options, SourceCode, Util}
 import scala.collection.mutable
 
 trait DocumentWalker[T] {
-  def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
+  def walk(visitor: (Document, T) => T): T
 }
 
 abstract class WdlParser(opts: Options) {
@@ -42,16 +42,11 @@ abstract class WdlParser(opts: Options) {
     Util.getUrl(addr, opts.localDirectories)
   }
 
-  def getDocumentWalker[T](
-      url: URL,
-      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
-  ): Walker[T] = {
-    Walker[T](SourceCode.loadFrom(url), results)
+  def getDocumentWalker[T](url: URL, start: T): Walker[T] = {
+    Walker[T](SourceCode.loadFrom(url), start)
   }
 
-  case class Walker[T](sourceCode: SourceCode,
-                       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
-      extends DocumentWalker[T] {
+  case class Walker[T](sourceCode: SourceCode, start: T) extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
@@ -60,13 +55,14 @@ abstract class WdlParser(opts: Options) {
       }.toMap
     }
 
-    def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
-      val visited: mutable.Set[Option[URL]] = mutable.HashSet.empty
+    def walk(visitor: (Document, T) => T): T = {
+      var visited: Set[Option[URL]] = Set.empty
+      var results: T = start
 
       def addDocument(url: Option[URL], doc: Document): Unit = {
         if (!visited.contains(url)) {
-          visited.add(url)
-          visitor(doc, results)
+          visited += url
+          results = visitor(doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {
               case (uri, doc) => addDocument(Some(uri), doc)
@@ -77,7 +73,7 @@ abstract class WdlParser(opts: Options) {
 
       val document = parseDocument(sourceCode)
       addDocument(sourceCode.url, document)
-      results.toMap
+      results
     }
   }
 }

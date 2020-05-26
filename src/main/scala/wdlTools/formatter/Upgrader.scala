@@ -28,11 +28,11 @@ case class Upgrader(opts: Options) {
     )
 
     // parse and format the document (and any imports)
-    parser.getDocumentWalker[Seq[String]](url).walk { (doc, results) =>
+    parser.getDocumentWalker[Map[URL, Seq[String]]](url, Map.empty).walk { (doc, results) =>
       if (doc.version.value >= destVersion) {
         throw new Exception(s"Cannot convert WDL version ${doc.version} to ${destVersion}")
       }
-      results(doc.sourceUrl) = formatter.formatDocument(doc)
+      results + (doc.sourceUrl -> formatter.formatDocument(doc))
     }
   }
 }

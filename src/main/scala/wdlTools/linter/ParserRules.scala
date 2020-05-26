@@ -11,19 +11,16 @@ import scala.collection.mutable
 
 // These are mostly to check things related to whitespace, which is not accessible from the AST
 object ParserRules {
-  type LinterParserRuleApplySig = (
-      RuleConf,
-      mutable.Buffer[LintEvent],
-      Grammar
-  ) => LinterParserRule
+  type LinterParserRuleApplySig = (RuleConf, Grammar) => LinterParserRule
 
   // ideally we could provide the id as a class annotation, but dealing with annotations
   // in Scala is currently horrendous - for how it would be done, see
   // https://stackoverflow.com/questions/23046958/accessing-an-annotation-value-in-scala
-  class LinterParserRule(conf: RuleConf,
-                         docSourceUrl: Option[URL],
-                         events: mutable.Buffer[LintEvent])
-      extends AllParseTreeListener {
+  class LinterParserRule(conf: RuleConf, docSourceUrl: Option[URL]) extends AllParseTreeListener {
+    private var events: Vector[LintEvent] = Vector.empty
+
+    def getEvents: Vector[LintEvent] = events
+
     protected def addEventFromTokens(tok: Token,
                                      stopToken: Option[Token] = None,
                                      message: Option[String] = None): Unit = {
@@ -31,14 +28,12 @@ object ParserRules {
     }
 
     protected def addEvent(textSource: TextSource, message: Option[String] = None): Unit = {
-      events.append(LintEvent(conf, textSource, docSourceUrl, message))
+      events :+= LintEvent(conf, textSource, docSourceUrl, message)
     }
   }
 
-  abstract class HiddenTokensLinterParserRule(conf: RuleConf,
-                                              events: mutable.Buffer[LintEvent],
-                                              grammar: Grammar)
-      extends LinterParserRule(conf, grammar.docSourceUrl, events) {
+  abstract class HiddenTokensLinterParserRule(conf: RuleConf, grammar: Grammar)
+      extends LinterParserRule(conf, grammar.docSourceUrl) {
     private val tokenIndexes: mutable.Set[Int] = mutable.HashSet.empty
 
     protected def addEvent(tok: Token): Unit = {
@@ -63,10 +58,8 @@ object ParserRules {
     }
   }
 
-  abstract class EveryRuleHiddenTokensLinterParserRule(conf: RuleConf,
-                                                       events: mutable.Buffer[LintEvent],
-                                                       grammar: Grammar)
-      extends HiddenTokensLinterParserRule(conf, events, grammar) {
+  abstract class EveryRuleHiddenTokensLinterParserRule(conf: RuleConf, grammar: Grammar)
+      extends HiddenTokensLinterParserRule(conf, grammar) {
     override def exitEveryRule(ctx: ParserRuleContext): Unit = {
       grammar
         .getHiddenTokens(ctx, within = true)
@@ -77,15 +70,15 @@ object ParserRules {
     def isViolation(token: Token): Boolean
   }
 
-  case class WhitespaceTabsRule(conf: RuleConf, events: mutable.Buffer[LintEvent], grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(conf, events, grammar) {
+  case class WhitespaceTabsRule(conf: RuleConf, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(conf, grammar) {
     override def isViolation(token: Token): Boolean = {
       token.getText.contains("\t")
     }
   }
 
-  case class OddIndentRule(conf: RuleConf, events: mutable.Buffer[LintEvent], grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(conf, events, grammar) {
+  case class OddIndentRule(conf: RuleConf, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(conf, grammar) {
     private val indentRegex = "\n+([ \t]+)".r
 
     override def isViolation(token: Token): Boolean = {
@@ -101,10 +94,8 @@ object ParserRules {
     }
   }
 
-  case class MultipleBlankLineRule(conf: RuleConf,
-                                   events: mutable.Buffer[LintEvent],
-                                   grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(conf, events, grammar) {
+  case class MultipleBlankLineRule(conf: RuleConf, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(conf, grammar) {
     private val multipleReturns = "(\n\\s*){3,}".r
 
     override def isViolation(token: Token): Boolean = {
@@ -112,8 +103,8 @@ object ParserRules {
     }
   }
 
-  case class TopLevelIndentRule(conf: RuleConf, events: mutable.Buffer[LintEvent], grammar: Grammar)
-      extends HiddenTokensLinterParserRule(conf, events, grammar) {
+  case class TopLevelIndentRule(conf: RuleConf, grammar: Grammar)
+      extends HiddenTokensLinterParserRule(conf, grammar) {
     private val endWhitespaceRegex = "\\s$".r
 
     def checkIndent(ctx: ParserRuleContext): Unit = {
@@ -145,10 +136,8 @@ object ParserRules {
     }
   }
 
-  case class DeprecatedCommandStyleRule(conf: RuleConf,
-                                        events: mutable.Buffer[LintEvent],
-                                        grammar: Grammar)
-      extends HiddenTokensLinterParserRule(conf, events, grammar) {
+  case class DeprecatedCommandStyleRule(conf: RuleConf, grammar: Grammar)
+      extends HiddenTokensLinterParserRule(conf, grammar) {
 
     override def exitTask_command_expr_part(ctx: ParserRuleContext): Unit = {
       if (grammar.version >= WdlVersion.V1) {

@@ -32,9 +32,7 @@ case class ProjectGenerator(opts: Options,
   lazy val formatter: WdlV1Formatter = WdlV1Formatter(opts)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = developerReadmes,
-                    generatedFiles = generatedFiles,
-                    renderer = renderer)
+    ReadmeGenerator(developerReadmes = developerReadmes, renderer = renderer)
   lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
   lazy val parsers: Parsers = Parsers(opts)

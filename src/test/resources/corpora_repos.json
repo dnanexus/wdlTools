@@ -2,21 +2,30 @@
   "corpora": [
     {
       "url": "https://github.com/ENCODE-DCC/atac-seq-pipeline.git",
+      "tag": "15dbaacedc52b0b7b722ed03e0fdb710470fefc1",
       "entrypoints": {
         "path": "atac.wdl",
         "lint": {
-          "UnusedDeclaration": 63,
-          "MixedIndentation": 15,
-          "OptionalCoercion": 1020,
-          "UnusedCall": 45,
-          "StringCoercion": 30,
-          "FileCoercion": 71,
-          "MissingVersion": 29
+          "T006": 108,
+          "P001": 15,
+          "T004": 1020,
+          "T001": 30,
+          "T002": 71,
+          "A007": 29
         }
       }
     },
     {
-      "url": "https://github.com/ENCODE-DCC/chip-seq-pipeline2.git"
+      "url": "https://github.com/ENCODE-DCC/chip-seq-pipeline2.git",
+      "tag":  "e2a698d0dcc3d7b16ac8b9dc86d2f9097a35f0b8",
+      "entrypoints": {
+        "path": "chip.wdl",
+        "lint": {
+          "T000": 16,
+          "P001": 32,
+          "A007": 31
+        }
+      }
     },
     {
       "url": "https://github.com/broadinstitute/viral-ngs.git"

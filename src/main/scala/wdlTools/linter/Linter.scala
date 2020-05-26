@@ -7,56 +7,42 @@ import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers, SyntaxError}
 import wdlTools.types.{TypeError, TypeInfer, TypeOptions, Unification}
 
-import scala.collection.mutable
+case class LinterParserRuleFactory(rules: Map[String, RuleConf]) extends ParseTreeListenerFactory {
+  private var listeners: Map[URL, Vector[ParserRules.LinterParserRule]] = Map.empty
 
-case class LinterParserRuleFactory(
-    rules: Map[String, RuleConf],
-    events: mutable.Map[URL, mutable.Buffer[LintEvent]]
-) extends ParseTreeListenerFactory {
+  def getEvents(url: URL): Vector[LintEvent] =
+    listeners.get(url).map(l => l.flatMap(_.getEvents)).getOrElse(Vector.empty)
+
   override def createParseTreeListeners(
       grammar: Antlr4Util.Grammar
   ): Vector[ParseTreeListener] = {
-    val docEvents =
-      events.getOrElseUpdate(grammar.docSourceUrl.get, mutable.ArrayBuffer.empty[LintEvent])
-    rules.collect {
+    val docListeners = rules.collect {
       case (id, conf) if ParserRules.allRules.contains(id) =>
-        ParserRules.allRules(id)(conf, docEvents, grammar)
+        ParserRules.allRules(id)(conf, grammar)
     }.toVector
+    listeners += (grammar.docSourceUrl.get -> docListeners)
+    docListeners
   }
 }
 
-case class Linter(opts: TypeOptions,
-                  rules: Map[String, RuleConf],
-                  events: mutable.Map[URL, mutable.Buffer[LintEvent]] = mutable.HashMap.empty) {
-  def hasAnyEvents: Boolean = events.nonEmpty
-
-  def hasEvents(url: URL, ruleIds: Set[String] = Set.empty): Boolean = {
-    val docEvents = events.get(url)
-    if (docEvents.nonEmpty && ruleIds.nonEmpty) {
-      docEvents.exists(_.map(event => ruleIds.contains(event.rule.id)).toVector.exists(b => b))
-    } else {
-      docEvents.exists(_.nonEmpty)
-    }
-  }
-
-  def getOrderedEvents: Map[URL, Vector[LintEvent]] =
-    events.map {
-      case (url, docEvents) => url -> docEvents.toVector.sortWith(_ < _)
-    }.toMap
-
+case class Linter(opts: TypeOptions, rules: Map[String, RuleConf]) {
+  private var parserErrorEvents: Map[URL, Vector[LintEvent]] = Map.empty
   private val parserErrorRule =
     RuleConf("P000", "parser_error", "Error while parsing WDL document", Severity.Error, Map.empty)
 
   private def handleParserErrors(errors: Vector[SyntaxError]): Boolean = {
     // convert parser exception to LintEvent
-    errors.foreach { err =>
-      events
-        .getOrElseUpdate(err.docSourceUrl.get, mutable.ArrayBuffer.empty[LintEvent])
-        .append(LintEvent(parserErrorRule, err.textSource, err.docSourceUrl, Some(err.reason)))
+    errors.groupBy(_.docSourceUrl.get).foreach {
+      case (url, docErrors) =>
+        val docEvents = docErrors.map(err =>
+          LintEvent(parserErrorRule, err.textSource, err.docSourceUrl, Some(err.reason))
+        )
+        parserErrorEvents += (url -> (parserErrorEvents.getOrElse(url, Vector.empty) ++ docEvents))
     }
     false
   }
 
+  private var typeErrorEvents: Map[URL, Vector[LintEvent]] = Map.empty
   private val typeErrorRule =
     RuleConf("T000",
              "type_error",
@@ -65,68 +51,78 @@ case class Linter(opts: TypeOptions,
              Map.empty)
 
   private def handleTypeErrors(errors: Vector[TypeError]): Boolean = {
-    errors.foreach { err =>
-      events
-        .getOrElseUpdate(err.docSourceUrl.get, mutable.ArrayBuffer.empty[LintEvent])
-        .append(LintEvent(typeErrorRule, err.textSource, err.docSourceUrl, Some(err.reason)))
+    errors.groupBy(_.docSourceUrl.get).foreach {
+      case (url, docErrors) =>
+        val docEvents = docErrors
+          .map(err => LintEvent(typeErrorRule, err.textSource, err.docSourceUrl, Some(err.reason)))
+        typeErrorEvents += (url -> (typeErrorEvents.getOrElse(url, Vector.empty) ++ docEvents))
     }
     false
   }
 
-  def apply(url: URL): Unit = {
+  def apply(url: URL): Map[URL, Vector[LintEvent]] = {
+    val parserRulesFactory = LinterParserRuleFactory(rules)
     val parsers = Parsers(
         opts,
-        listenerFactories = Vector(LinterParserRuleFactory(rules, events)),
+        listenerFactories = Vector(parserRulesFactory),
         errorHandler = Some(handleParserErrors)
     )
     val astRules = rules.view.filterKeys(AbstractSyntaxTreeRules.allRules.contains)
     val tstRules = rules.view.filterKeys(TypedAbstractSyntaxTreeRules.allRules.contains)
     val unification = Unification(opts)
-    parsers.getDocumentWalker[mutable.Buffer[LintEvent]](url, events).walk { (doc, _) =>
-      // stop if the document already has lint events due to parser errors
-      if (!hasEvents(url, Set(parserErrorRule.id))) {
-        val tDoc = if (tstRules.nonEmpty) {
-          // First run the TypeChecker to infer the types of all expressions
-          // and catch any type exceptions
-          val typeChecker = TypeInfer(opts, Some(handleTypeErrors))
-          val (tDoc, _) = typeChecker.apply(doc)
-          Some(tDoc)
-        } else {
-          None
-        }
-        // stop if the document already has lint events due to type errors
-        if (!hasEvents(url, Set(typeErrorRule.id))) {
-          val wdlVersion = doc.version.value
-          val docEvents = events.getOrElseUpdate(url, mutable.ArrayBuffer.empty[LintEvent])
-          if (astRules.nonEmpty) {
-            val astVisitors = astRules.map {
-              case (id, conf) =>
-                AbstractSyntaxTreeRules.allRules(id)(
-                    conf,
-                    wdlVersion,
-                    docEvents,
-                    Some(url)
-                )
-            }.toVector
-            val astWalker = LinterAbstractSyntaxTreeWalker(opts, astVisitors)
-            astWalker.apply(doc)
+    parsers
+      .getDocumentWalker[Map[URL, Vector[LintEvent]]](url, Map.empty)
+      .walk { (doc, result) =>
+        val docUrl = doc.sourceUrl
+        val docParserErrorEvents = parserErrorEvents.getOrElse(docUrl, Vector.empty)
+        val docParserRuleEvents = parserRulesFactory.getEvents(docUrl)
+        // stop if there are lint events due to parser errors
+        val docTreeEvents: Vector[LintEvent] =
+          if (docParserErrorEvents.isEmpty && (astRules.nonEmpty || tstRules.nonEmpty)) {
+            val wdlVersion = doc.version.value
+            val astEvents = if (astRules.nonEmpty) {
+              val astVisitors = astRules.map {
+                case (id, conf) =>
+                  AbstractSyntaxTreeRules.allRules(id)(
+                      conf,
+                      wdlVersion,
+                      Some(url)
+                  )
+              }.toVector
+              val astWalker = LinterAbstractSyntaxTreeWalker(opts, astVisitors)
+              astWalker.apply(doc)
+              astVisitors.flatMap(_.getEvents)
+            } else {
+              Vector.empty
+            }
+            // run TypeInfer to infer the types of all expressions and catch any type exceptions
+            val typeChecker = TypeInfer(opts, Some(handleTypeErrors))
+            val (tDoc, _) = typeChecker.apply(doc)
+            val docTypeErrorEvents = typeErrorEvents.getOrElse(docUrl, Vector.empty)
+            // stop if the document has lint events due to type errors
+            val tstEvents = if (docTypeErrorEvents.isEmpty && tstRules.nonEmpty) {
+              val tstVisitors = tstRules.map {
+                case (id, conf) =>
+                  TypedAbstractSyntaxTreeRules.allRules(id)(
+                      conf,
+                      wdlVersion,
+                      unification,
+                      Some(url)
+                  )
+              }.toVector
+              val tstWalker = LinterTypedAbstractSyntaxTreeWalker(opts, tstVisitors)
+              tstWalker.apply(tDoc)
+              tstVisitors.flatMap(_.getEvents)
+            } else {
+              Vector.empty
+            }
+            astEvents ++ docTypeErrorEvents ++ tstEvents
+          } else {
+            Vector.empty
           }
-          if (tstRules.nonEmpty) {
-            val tstVisitors = tstRules.map {
-              case (id, conf) =>
-                TypedAbstractSyntaxTreeRules.allRules(id)(
-                    conf,
-                    wdlVersion,
-                    unification,
-                    docEvents,
-                    Some(url)
-                )
-            }.toVector
-            val tstWalker = LinterTypedAbstractSyntaxTreeWalker(opts, tstVisitors)
-            tstWalker.apply(tDoc.get)
-          }
-        }
+        val allDocEvents: Vector[LintEvent] = result
+          .getOrElse(url, Vector.empty) ++ docParserErrorEvents ++ docParserRuleEvents ++ docTreeEvents
+        result + (url -> allDocEvents.sortWith(_ < _))
       }
-    }
   }
 }

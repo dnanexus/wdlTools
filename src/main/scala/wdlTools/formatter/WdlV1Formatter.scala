@@ -11,8 +11,7 @@ import wdlTools.util.Options
 import scala.collection.BufferedIterator
 import scala.collection.mutable
 
-case class WdlV1Formatter(opts: Options,
-                          documents: mutable.Map[URL, Vector[String]] = mutable.Map.empty) {
+case class WdlV1Formatter(opts: Options) {
 
   private case class Literal(value: Any,
                              quoting: Boolean = false,
@@ -1348,9 +1347,10 @@ case class WdlV1Formatter(opts: Options,
     lineFormatter.toVector
   }
 
-  def formatDocuments(url: URL): Unit = {
-    Parsers(opts).getDocumentWalker[Vector[String]](url, documents).walk { (doc, results) =>
-      results(doc.sourceUrl) = formatDocument(doc)
+  def formatDocuments(url: URL): Map[URL, Vector[String]] = {
+    Parsers(opts).getDocumentWalker[Map[URL, Vector[String]]](url, Map.empty).walk {
+      (doc, results) =>
+        results + (doc.sourceUrl -> formatDocument(doc))
     }
   }
 }

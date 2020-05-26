@@ -20,8 +20,12 @@ import scala.sys.process._
 import scala.util.Random
 
 object TypedAbstractSyntaxTreeRules {
-  class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
+  class LinterTstRule(conf: RuleConf, docSourceUrl: Option[URL])
       extends TypedAbstractSyntaxTreeVisitor {
+    private var events: Vector[LintEvent] = Vector.empty
+
+    def getEvents: Vector[LintEvent] = events
+
     protected def addEvent(ctx: VisitorContext[_ <: Element],
                            message: Option[String] = None): Unit = {
       addEventFromElement(ctx.element, message)
@@ -33,7 +37,7 @@ object TypedAbstractSyntaxTreeRules {
 
     protected def addEventFromSource(textSource: TextSource,
                                      message: Option[String] = None): Unit = {
-      events.append(LintEvent(conf, textSource, docSourceUrl, message))
+      events :+= LintEvent(conf, textSource, docSourceUrl, message)
     }
   }
 
@@ -41,7 +45,6 @@ object TypedAbstractSyntaxTreeRules {
       RuleConf,
       WdlVersion,
       Unification,
-      mutable.Buffer[LintEvent],
       Option[URL]
   ) => LinterTstRule
 
@@ -88,9 +91,8 @@ object TypedAbstractSyntaxTreeRules {
   case class StringCoercionRule(conf: RuleConf,
                                 version: WdlVersion,
                                 unification: Unification,
-                                events: mutable.Buffer[LintEvent],
                                 docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
 
     private val expectedTypes: Set[T] = Set(T_String)
     private val stringTypes: Set[T] = Set(T_String, T_File, T_Directory)
@@ -161,9 +163,8 @@ object TypedAbstractSyntaxTreeRules {
   case class FileCoercionRule(conf: RuleConf,
                               version: WdlVersion,
                               unification: Unification,
-                              events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     private val expectedTypes: Set[T] = Set(T_File, T_Directory)
 
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
@@ -233,9 +234,8 @@ object TypedAbstractSyntaxTreeRules {
   case class ArrayCoercionRule(conf: RuleConf,
                                version: WdlVersion,
                                unification: Unification,
-                               events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       ctx.getParent[Element].element match {
         case Declaration(_, wdlType, expr, _)
@@ -279,9 +279,8 @@ object TypedAbstractSyntaxTreeRules {
   case class OptionalCoercionRule(conf: RuleConf,
                                   version: WdlVersion,
                                   unification: Unification,
-                                  events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {
       ctx.getParent[Element].element match {
         case Declaration(_, wdlType, expr, _)
@@ -354,9 +353,8 @@ object TypedAbstractSyntaxTreeRules {
   case class NonEmptyCoercionRule(conf: RuleConf,
                                   version: WdlVersion,
                                   unification: Unification,
-                                  events: mutable.Buffer[LintEvent],
                                   docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     private val ignoreFunctions = Set("glob", "read_lines", "read_tsv", "read_array")
 
     private def isNonemptyCoercion(toType: T, fromType: T): Boolean = {
@@ -409,9 +407,8 @@ object TypedAbstractSyntaxTreeRules {
   case class UnusedDeclarationRule(conf: RuleConf,
                                    version: WdlVersion,
                                    unification: Unification,
-                                   events: mutable.Buffer[LintEvent],
                                    docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     // map of callables to declarations
     private val declarations: mutable.Map[Callable, mutable.Buffer[Element]] = mutable.HashMap.empty
     // map of callables to references
@@ -520,9 +517,8 @@ object TypedAbstractSyntaxTreeRules {
   case class UnnecessaryQuantifierRule(conf: RuleConf,
                                        version: WdlVersion,
                                        unification: Unification,
-                                       events: mutable.Buffer[LintEvent],
                                        docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     private val fileTypes: Set[T] = Set(T_File, T_Directory)
 
     override def visitDefinition[P <: Element](name: String,
@@ -563,9 +559,8 @@ object TypedAbstractSyntaxTreeRules {
   case class ShellCheckRule(conf: RuleConf,
                             version: WdlVersion,
                             unification: Unification,
-                            events: mutable.Buffer[LintEvent],
                             docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     private val suppressions = Set(1009, 1072, 1083, 2043, 2050, 2157, 2193)
     private val suppressionsStr = suppressions.mkString(",")
     private val shellCheckPath =
@@ -664,9 +659,8 @@ object TypedAbstractSyntaxTreeRules {
   case class SelectArrayRule(conf: RuleConf,
                              version: WdlVersion,
                              unification: Unification,
-                             events: mutable.Buffer[LintEvent],
                              docSourceUrl: Option[URL])
-      extends LinterTstRule(conf, docSourceUrl, events) {
+      extends LinterTstRule(conf, docSourceUrl) {
     private val selectFuncNames = Set("select_first", "select_all")
 
     override def visitExpression(ctx: VisitorContext[Expr]): Unit = {

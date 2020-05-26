@@ -1,5 +1,6 @@
 package wdlTools.linter
 
+import java.net.URL
 import java.nio.file.Paths
 
 import wdlTools.util.JsonUtil._
@@ -22,8 +23,8 @@ class CorporaTests extends AnyWordSpec with Matchers {
           else classOf[Ignore].getName
       )
 
-  private def getLintCounts(events: Vector[LintEvent]): Map[String, Int] = {
-    events.map(_.rule.id).groupBy(x => x).map(x => x._2.head -> x._2.size)
+  private def getLintCounts(events: Map[URL, Vector[LintEvent]]): Map[String, Int] = {
+    events.values.flatten.toVector.map(_.rule.id).groupBy(x => x).map(x => x._2.head -> x._2.size)
   }
 
   "corpora test" should {
@@ -39,11 +40,16 @@ class CorporaTests extends AnyWordSpec with Matchers {
         ).map(id => id -> RuleConf(id, "x", "x", Severity.Error, Map.empty)).toMap
 
       corpora.map(getFields).foreach { corpus =>
-        val root = if (corpus.contains("root")) {
-          corporaDirPath.resolve(getString(corpus("root")))
+        val root = corporaDirPath.resolve(if (corpus.contains("root")) {
+          getString(corpus("root"))
         } else {
-          corporaDirPath
-        }
+          val path = new URL(getString(corpus("url"))).getPath
+          if (path.endsWith(".git")) {
+            path.dropRight(4)
+          } else {
+            path
+          }
+        })
         getValues(corpus("entrypoints")).map(getFields).filter(_.contains("lint")).foreach {
           example =>
             val path = root.resolve(getString(example("path")))
@@ -53,9 +59,8 @@ class CorporaTests extends AnyWordSpec with Matchers {
               path.toFile should exist
 
               val linter = Linter(opts, rules)
-              linter.apply(url)
-
-              val actualLint = getLintCounts(linter.events(url).toVector)
+              val events = linter.apply(url)
+              val actualLint = getLintCounts(events)
               val expectedLint = getFields(example("lint")).view.mapValues(getInt).toMap
               actualLint should equal(expectedLint)
             }

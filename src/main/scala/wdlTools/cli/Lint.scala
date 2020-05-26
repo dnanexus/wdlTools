@@ -211,9 +211,9 @@ case class Lint(conf: WdlToolsConf) extends Command {
         getDefaultRules
       }
     val linter = Linter(opts, rulesConfig)
-    linter.apply(url)
+    val events = linter.apply(url)
 
-    if (linter.hasAnyEvents) {
+    if (events.nonEmpty) {
       // Load rule descriptions
       val outputFile = conf.lint.outputFile.toOption
       val toFile = outputFile.isDefined
@@ -228,10 +228,10 @@ case class Lint(conf: WdlToolsConf) extends Command {
         System.out
       }
       if (conf.lint.json()) {
-        val js = eventsToJson(linter.getOrderedEvents, rulePrototypes).prettyPrint
+        val js = eventsToJson(events, rulePrototypes).prettyPrint
         printer.println(js)
       } else {
-        printEvents(linter.getOrderedEvents, rulePrototypes, printer, effects = !toFile)
+        printEvents(events, rulePrototypes, printer, effects = !toFile)
       }
       if (toFile) {
         printer.close()

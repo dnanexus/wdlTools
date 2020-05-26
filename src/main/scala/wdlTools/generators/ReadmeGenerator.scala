@@ -6,12 +6,7 @@ import java.nio.file.Path
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.util.Util
 
-import scala.collection.mutable
-
-case class ReadmeGenerator(developerReadmes: Boolean = false,
-                           renderer: Renderer = Renderer(),
-                           generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
-
+case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
   val TASK_README_TEMPLATE = "/templates/readme/TaskReadme.md.ssp"
   val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/readme/WorkflowReadme.developer.md.ssp"
@@ -22,6 +17,9 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
     private val fname = wdlPath.getFileName.toString
     require(fname.endsWith(".wdl"))
     private val wdlName = fname.slice(0, fname.length - 4)
+    private var generatedFiles: Map[URL, String] = Map.empty
+
+    def getGeneratedFiles: Map[URL, String] = generatedFiles
 
     def getReadmeNameAndPath(elementName: String, developer: Boolean): (String, Path) = {
       val devStr = if (developer) {
@@ -44,7 +42,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles(Util.pathToUrl(path)) = contents
+      generatedFiles += (Util.pathToUrl(path) -> contents)
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -55,12 +53,12 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles(Util.pathToUrl(path)) = contents
+      generatedFiles += (Util.pathToUrl(path) -> contents)
       readmeName
     }
   }
 
-  def apply(document: Document): Unit = {
+  def apply(document: Document): Map[URL, String] = {
     val generator = Generator(document.sourceUrl)
 
     val tasks: Seq[(String, String)] = document.elements.flatMap {
@@ -79,5 +77,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false,
         generator.generateWorkflowReadme(document.workflow.get, tasks, developer = true)
       }
     }
+
+    generator.getGeneratedFiles
   }
 }

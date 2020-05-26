@@ -10,24 +10,22 @@ import wdlTools.util.Util.getFilename
 import scala.collection.mutable
 
 object AbstractSyntaxTreeRules {
-  class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL], events: mutable.Buffer[LintEvent])
-      extends AbstractSyntaxTreeVisitor {
+  class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL]) extends AbstractSyntaxTreeVisitor {
+    private var events: Vector[LintEvent] = Vector.empty
+
+    def getEvents: Vector[LintEvent] = events
+
     protected def addEvent(ctx: VisitorContext[_ <: Element],
                            message: Option[String] = None): Unit = {
       addEventFromElement(ctx.element, message)
     }
 
     protected def addEventFromElement(element: Element, message: Option[String] = None): Unit = {
-      events.append(LintEvent(conf, element.text, docSourceUrl, message))
+      events :+= LintEvent(conf, element.text, docSourceUrl, message)
     }
   }
 
-  type LinterAstRuleApplySig = (
-      RuleConf,
-      WdlVersion,
-      mutable.Buffer[LintEvent],
-      Option[URL]
-  ) => LinterAstRule
+  type LinterAstRuleApplySig = (RuleConf, WdlVersion, Option[URL]) => LinterAstRule
 
   // rules ported from winstanley
   // did not port:
@@ -38,11 +36,8 @@ object AbstractSyntaxTreeRules {
   // * wildcard outputs - the parser does not allow these even in draft-2
   // * unexpected/unsupplied inputs - the type-checker catches this
 
-  case class NonPortableTaskRule(conf: RuleConf,
-                                 version: WdlVersion,
-                                 events: mutable.Buffer[LintEvent],
-                                 docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class NonPortableTaskRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
     private val containerKeys = Set("docker", "container")
 
     override def visitTask(
@@ -56,11 +51,8 @@ object AbstractSyntaxTreeRules {
     }
   }
 
-  case class NoTaskInputsRule(conf: RuleConf,
-                              version: WdlVersion,
-                              events: mutable.Buffer[LintEvent],
-                              docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class NoTaskInputsRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
     override def visitTask(
         ctx: VisitorContext[Task]
     ): Unit = {
@@ -70,11 +62,8 @@ object AbstractSyntaxTreeRules {
     }
   }
 
-  case class NoTaskOutputsRule(conf: RuleConf,
-                               version: WdlVersion,
-                               events: mutable.Buffer[LintEvent],
-                               docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class NoTaskOutputsRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
 
     override def visitTask(
         ctx: VisitorContext[Task]
@@ -93,11 +82,8 @@ object AbstractSyntaxTreeRules {
   /**
     * Collisions between names that are allowed but confusing.
     */
-  case class NameCollisionRule(conf: RuleConf,
-                               version: WdlVersion,
-                               events: mutable.Buffer[LintEvent],
-                               docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class NameCollisionRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
 
     private val elements: mutable.Map[String, mutable.Set[Element]] = mutable.HashMap.empty
 
@@ -119,11 +105,8 @@ object AbstractSyntaxTreeRules {
   /**
     * A file is imported but never used
     */
-  case class UnusedImportRule(conf: RuleConf,
-                              version: WdlVersion,
-                              events: mutable.Buffer[LintEvent],
-                              docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class UnusedImportRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
     private val dottedNameRegexp = "(.*?)\\..+".r
     private val usedImportNames: mutable.Set[String] = mutable.HashSet.empty
     private val usedTypeNames: mutable.Set[String] = mutable.HashSet.empty
@@ -171,17 +154,14 @@ object AbstractSyntaxTreeRules {
     * versions, we check against a known set of keys and issue a warning for
     * any that don't match.
     */
-  case class UnknownRuntimeKeyRule(conf: RuleConf,
-                                   version: WdlVersion,
-                                   events: mutable.Buffer[LintEvent],
-                                   docSourceUrl: Option[URL])
+  case class UnknownRuntimeKeyRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
       extends LinterAstRule(if (version >= WdlVersion.V2) {
         // Invalid runtime key is always an error for WDL 2+
         // TODO: If this ends up being a parse error then we don't have to check for it here
         conf.copy(severity = Severity.Error)
       } else {
         conf
-      }, docSourceUrl, events) {
+      }, docSourceUrl) {
 
     private val keys = Set(
         "container",
@@ -220,11 +200,8 @@ object AbstractSyntaxTreeRules {
   /**
     * Issue a warning for any version < 1.0.
     */
-  case class MissingVersionRule(conf: RuleConf,
-                                version: WdlVersion,
-                                events: mutable.Buffer[LintEvent],
-                                docSourceUrl: Option[URL])
-      extends LinterAstRule(conf, docSourceUrl, events) {
+  case class MissingVersionRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
+      extends LinterAstRule(conf, docSourceUrl) {
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
       if (version < WdlVersion.V1) {
         addEvent(ctx)

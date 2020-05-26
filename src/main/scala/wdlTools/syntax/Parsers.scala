@@ -7,8 +7,6 @@ import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
 
-import scala.collection.mutable
-
 case class Parsers(opts: Options = BasicOptions(),
                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None) {
@@ -49,10 +47,7 @@ case class Parsers(opts: Options = BasicOptions(),
     parser.parseDocument(sourceCode)
   }
 
-  def getDocumentWalker[T](
-      url: URL,
-      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
-  ): DocumentWalker[T] = {
+  def getDocumentWalker[T](url: URL, results: T): DocumentWalker[T] = {
     val sourceCode = SourceCode.loadFrom(url)
     val parser = getParser(sourceCode)
     parser.Walker(sourceCode, results)
