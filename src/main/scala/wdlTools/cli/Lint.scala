@@ -213,7 +213,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     val linter = Linter(opts, rulesConfig)
     linter.apply(url)
 
-    if (linter.hasEvents) {
+    if (linter.hasAnyEvents) {
       // Load rule descriptions
       val outputFile = conf.lint.outputFile.toOption
       val toFile = outputFile.isDefined

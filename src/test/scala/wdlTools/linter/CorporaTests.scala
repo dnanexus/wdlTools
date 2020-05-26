@@ -6,7 +6,7 @@ import wdlTools.util.JsonUtil._
 import org.scalatest.{Ignore, Tag}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import wdlTools.util.Options
+import wdlTools.types.TypeOptions
 
 import scala.io.Source
 
@@ -30,7 +30,7 @@ class CorporaTests extends AnyWordSpec with Matchers {
     "test linting of external WDL corpora" taggedAs CorporaAvailable in {
       val corpora =
         getValues(readJsonSource(Source.fromFile(configFile), configFile.toString)("corpora"))
-      val opts = Options(followImports = true)
+      val opts = TypeOptions()
       val rules: Map[String, RuleConf] =
         (
             ParserRules.allRules.keys.toSet ++

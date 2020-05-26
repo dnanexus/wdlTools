@@ -8,10 +8,11 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, ParserRules, RuleConf, Severity}
 import wdlTools.syntax.TextSource
-import wdlTools.util.{BasicOptions, Util}
+import wdlTools.types.TypeOptions
+import wdlTools.util.Util
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private val opts = BasicOptions()
+  private val opts = TypeOptions()
 
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/wdlTools/lint/${subdir}/${fname}").getPath)
