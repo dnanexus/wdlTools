@@ -15,10 +15,8 @@ import org.openwdl.wdl.parser.draft_2.WdlDraft2Parser.{
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{Comment, CommentMap, SyntaxException, TextSource}
+import wdlTools.syntax.{CommentMap, SyntaxException, TextSource}
 import wdlTools.util.Options
-
-import scala.collection.mutable
 
 case class ParseTop(opts: Options, grammar: WdlDraft2Grammar)
     extends WdlDraft2ParserBaseVisitor[Element] {
@@ -1187,8 +1185,7 @@ document_element
     : version document_element* (workflow document_element*)?
     ;
    */
-  def visitDocument(ctx: WdlDraft2Parser.DocumentContext,
-                    comments: mutable.Map[Int, Comment]): Document = {
+  def visitDocument(ctx: WdlDraft2Parser.DocumentContext, comments: CommentMap): Document = {
     val elems: Vector[DocumentElement] =
       ctx
         .document_element()
@@ -1207,7 +1204,7 @@ document_element
              elems,
              workflow,
              getTextSource(ctx),
-             CommentMap(comments.toMap))
+             comments)
   }
 
   def visitExprDocument(ctx: WdlDraft2Parser.Expr_documentContext): Expr = {

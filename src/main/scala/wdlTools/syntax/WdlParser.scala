@@ -5,22 +5,19 @@ import java.net.URL
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 import wdlTools.util.{Options, SourceCode, Util}
 
-import scala.collection.mutable
-
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
 }
 
 abstract class WdlParser(opts: Options) {
-
   // cache of documents that have already been fetched and parsed.
-  private val docCache: mutable.Map[URL, Option[AbstractSyntax.Document]] = mutable.Map.empty
+  private var docCache: Map[URL, Option[AbstractSyntax.Document]] = Map.empty
 
   protected def followImport(url: URL): Option[AbstractSyntax.Document] = {
     docCache.get(url) match {
       case None =>
         val aDoc = Some(parseDocument(SourceCode.loadFrom(url)))
-        docCache(url) = aDoc
+        docCache += (url -> aDoc)
         aDoc
       case Some(aDoc) => aDoc
     }

@@ -5,8 +5,6 @@ import java.io.EOFException
 import wdlTools.util.InteractiveConsole.{Reader, _}
 import wdlTools.util.Util.BiMap
 
-import scala.collection.mutable
-
 case class InteractiveConsole(promptColor: String = "",
                               separator: String = ": ",
                               afterEntry: Option[String] = None) {
@@ -188,18 +186,18 @@ case class InteractiveConsole(promptColor: String = "",
     if (firstResult.isEmpty) {
       Vector.empty
     } else if (multiple) {
-      val result: mutable.Buffer[T] = mutable.ArrayBuffer(firstResult.get)
+      var result: Vector[T] = Vector(firstResult.get)
       var continue = true
       while (continue) {
         n += 1
         val nextResult = getOnce(optional, n)
         if (nextResult.isDefined) {
-          result.append(nextResult.get)
+          result :+= nextResult.get
         } else {
           continue = false
         }
       }
-      result.toVector
+      result
     } else {
       Vector(firstResult.get)
     }

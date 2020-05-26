@@ -6,6 +6,7 @@ import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.{Comment, CommentMap}
 import wdlTools.util.Util.MutableHolder
 
+// TODO: try to get rid of mutable
 import scala.collection.mutable
 
 class LineFormatter(

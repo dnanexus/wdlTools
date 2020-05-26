@@ -1,15 +1,14 @@
 package wdlTools.generators
 
 import java.net.URL
-import scala.collection.mutable
 
 import wdlTools.syntax.AbstractSyntax._
 
 import spray.json._
 
-case class TestsGenerator(generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
-  def apply(url: URL, wdlName: String, doc: Document): Unit = {
-    val data: mutable.Map[String, JsValue] = mutable.HashMap.empty
+object TestsGenerator {
+  def apply(url: URL, wdlName: String, doc: Document): String = {
+    var data: Map[String, JsValue] = Map.empty
 
     def getDummyValue(value: Type): JsValue = {
       value match {
@@ -36,7 +35,7 @@ case class TestsGenerator(generatedFiles: mutable.Map[URL, String] = mutable.Has
         case Declaration(name, wdlType, expr, _)
             if expr.isEmpty && !wdlType.isInstanceOf[TypeOptional] && !data.contains(name) =>
           val dataName = s"input_${name}"
-          data(dataName) = getDummyValue(wdlType)
+          data += (dataName -> getDummyValue(wdlType))
           name -> JsString(dataName)
       }.toMap)
     }
@@ -96,11 +95,9 @@ case class TestsGenerator(generatedFiles: mutable.Map[URL, String] = mutable.Has
         )
     }
 
-    val json = JsObject(
-        "data" -> JsObject(data.toMap),
+    JsObject(
+        "data" -> JsObject(data),
         "tests" -> JsArray(workflowTest ++ taskTests)
     ).prettyPrint
-
-    generatedFiles(url) = json
   }
 }

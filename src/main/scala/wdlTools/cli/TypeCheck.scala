@@ -8,7 +8,6 @@ import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException}
 import wdlTools.types.{TypeError, TypeException, TypeInfer}
 
-import scala.collection.mutable
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls
 
@@ -65,13 +64,13 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     val url = conf.check.url()
     val opts = conf.check.getOptions
     val parsers = Parsers(opts)
-    val errors: mutable.Map[URL, mutable.Buffer[TypeError]] = mutable.HashMap.empty
+    var errors: Map[URL, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
-      typeErrors.foreach { err =>
-        errors
-          .getOrElseUpdate(err.docSourceUrl.get, mutable.ArrayBuffer.empty[TypeError])
-          .append(err)
+      typeErrors.groupBy(_.docSourceUrl).foreach {
+        case (Some(url), docErrors) =>
+          errors += (url -> (errors.getOrElse(url, Vector.empty) ++ docErrors))
+        case other => throw new RuntimeException(s"Unexpected ${other}")
       }
       false
     }
@@ -99,12 +98,11 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       } else {
         System.out
       }
-      val finalErrors = errors.view.mapValues(_.toVector).toMap
       if (conf.check.json()) {
-        val js = errorsToJson(finalErrors).prettyPrint
+        val js = errorsToJson(errors).prettyPrint
         printer.println(js)
       } else {
-        printErrors(finalErrors, printer, effects = !toFile)
+        printErrors(errors, printer, effects = !toFile)
       }
       if (toFile) {
         printer.close()

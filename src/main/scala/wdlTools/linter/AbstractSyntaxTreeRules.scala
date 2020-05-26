@@ -7,8 +7,6 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.AbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.util.Util.getFilename
 
-import scala.collection.mutable
-
 object AbstractSyntaxTreeRules {
   class LinterAstRule(conf: RuleConf, docSourceUrl: Option[URL]) extends AbstractSyntaxTreeVisitor {
     private var events: Vector[LintEvent] = Vector.empty
@@ -85,13 +83,10 @@ object AbstractSyntaxTreeRules {
   case class NameCollisionRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
       extends LinterAstRule(conf, docSourceUrl) {
 
-    private val elements: mutable.Map[String, mutable.Set[Element]] = mutable.HashMap.empty
+    private var elements: Map[String, Set[Element]] = Map.empty
 
     override def visitName[P <: Element](name: String, parent: VisitorContext[P]): Unit = {
-      if (!elements.contains(name)) {
-        elements(name) = mutable.HashSet.empty[Element]
-      }
-      elements(name).add(parent.element)
+      elements += (name -> (elements.getOrElse(name, Set.empty[Element]) + parent.element))
     }
 
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
@@ -108,8 +103,8 @@ object AbstractSyntaxTreeRules {
   case class UnusedImportRule(conf: RuleConf, version: WdlVersion, docSourceUrl: Option[URL])
       extends LinterAstRule(conf, docSourceUrl) {
     private val dottedNameRegexp = "(.*?)\\..+".r
-    private val usedImportNames: mutable.Set[String] = mutable.HashSet.empty
-    private val usedTypeNames: mutable.Set[String] = mutable.HashSet.empty
+    private var usedImportNames: Set[String] = Set.empty
+    private var usedTypeNames: Set[String] = Set.empty
 
     override def visitDocument(ctx: VisitorContext[Document]): Unit = {
       super.visitDocument(ctx)
@@ -124,7 +119,7 @@ object AbstractSyntaxTreeRules {
       val (usedAliases, unusedAliases) =
         allImportAliases.partition(x => usedTypeNames.contains(x._1))
       allImports.view
-        .filterKeys(usedImportNames.toSet ++ usedAliases.map(_._2._1).toSet)
+        .filterKeys(usedImportNames ++ usedAliases.map(_._2._1).toSet)
         .values
         .foreach { imp =>
           addEventFromElement(imp, Some("import"))
@@ -136,15 +131,15 @@ object AbstractSyntaxTreeRules {
 
     override def visitDataType(ctx: VisitorContext[Type]): Unit = {
       ctx.element match {
-        case TypeIdentifier(id, _)  => usedTypeNames.add(id)
-        case TypeStruct(name, _, _) => usedTypeNames.add(name)
+        case TypeIdentifier(id, _)  => usedTypeNames += id
+        case TypeStruct(name, _, _) => usedTypeNames += name
         case _                      => ()
       }
     }
 
     override def visitCall(ctx: VisitorContext[Call]): Unit = {
       ctx.element.name match {
-        case dottedNameRegexp(namespace) => usedImportNames.add(namespace)
+        case dottedNameRegexp(namespace) => usedImportNames += namespace
       }
     }
   }

@@ -7,8 +7,6 @@ import wdlTools.syntax
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.syntax.{AllParseTreeListener, Antlr4Util, TextSource, WdlVersion}
 
-import scala.collection.mutable
-
 // These are mostly to check things related to whitespace, which is not accessible from the AST
 object ParserRules {
   type LinterParserRuleApplySig = (RuleConf, Grammar) => LinterParserRule
@@ -34,7 +32,7 @@ object ParserRules {
 
   abstract class HiddenTokensLinterParserRule(conf: RuleConf, grammar: Grammar)
       extends LinterParserRule(conf, grammar.docSourceUrl) {
-    private val tokenIndexes: mutable.Set[Int] = mutable.HashSet.empty
+    private var tokenIndexes: Set[Int] = Set.empty
 
     protected def addEvent(tok: Token): Unit = {
       val idx = tok.getTokenIndex
@@ -53,7 +51,7 @@ object ParserRules {
             }
         )
         addEvent(textSource)
-        tokenIndexes.add(idx)
+        tokenIndexes += idx
       }
     }
   }

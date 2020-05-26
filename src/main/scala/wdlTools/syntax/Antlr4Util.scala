@@ -18,8 +18,6 @@ import scala.jdk.CollectionConverters._
 import wdlTools.syntax
 import wdlTools.util.{Options, Verbosity}
 
-import scala.collection.mutable
-
 object Antlr4Util {
   def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
     // TODO: for an ending token that containing newlines, the endLine and endCol will be wrong
@@ -76,18 +74,19 @@ object Antlr4Util {
     def hasErrors: Boolean = errors.nonEmpty
   }
 
-  private case class CommentListener(tokenStream: BufferedTokenStream,
-                                     channelIndex: Int,
-                                     docSourceUrl: Option[URL] = None,
-                                     comments: mutable.Map[Int, Comment] = mutable.HashMap.empty)
+  private case class CommentListener(tokenStream: BufferedTokenStream, channelIndex: Int)
       extends AllParseTreeListener {
+    private var comments: Map[Int, Comment] = Map.empty
+
+    def getComments: CommentMap = CommentMap(comments)
+
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
         val source = Antlr4Util.getTextSource(tok, None)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
-          comments(source.line) = Comment(tok.getText, source)
+          comments += (source.line -> Comment(tok.getText, source))
         }
       }
     }
@@ -116,21 +115,6 @@ object Antlr4Util {
     def createParseTreeListeners(grammar: Grammar): Vector[ParseTreeListener]
   }
 
-  private case object CommentListenerFactory extends ParseTreeListenerFactory {
-    override def createParseTreeListeners(grammar: Grammar): Vector[ParseTreeListener] = {
-      Vector(
-          CommentListener(
-              grammar.parser.getTokenStream.asInstanceOf[BufferedTokenStream],
-              grammar.commentChannel,
-              grammar.docSourceUrl,
-              grammar.comments
-          )
-      )
-    }
-  }
-
-  private val defaultListenerFactories = Vector(CommentListenerFactory)
-
   class Grammar(
       val version: WdlVersion,
       val lexer: Lexer,
@@ -138,8 +122,7 @@ object Antlr4Util {
       val listenerFactories: Vector[ParseTreeListenerFactory],
       val docSourceUrl: Option[URL] = None,
       val docSource: String,
-      val opts: Options,
-      val comments: mutable.Map[Int, Comment] = mutable.HashMap.empty
+      val opts: Options
   ) {
     val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSourceUrl)
     // setting up our own error handling
@@ -160,8 +143,13 @@ object Antlr4Util {
 
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
+    val commentListener: CommentListener = CommentListener(
+        parser.getTokenStream.asInstanceOf[BufferedTokenStream],
+        commentChannel
+    )
 
-    (defaultListenerFactories ++ listenerFactories).foreach(
+    parser.addParseListener(commentListener)
+    listenerFactories.foreach(
         _.createParseTreeListeners(this).map(parser.addParseListener)
     )
 
@@ -247,15 +235,12 @@ object Antlr4Util {
       }
     }
 
-    def visitDocument[T <: ParserRuleContext, E](
-        ctx: T,
-        visitor: (T, mutable.Map[Int, Comment]) => E
-    ): E = {
+    def visitDocument[T <: ParserRuleContext, E](ctx: T, visitor: (T, CommentMap) => E): E = {
       if (ctx == null) {
         throw new Exception("WDL file does not contain a valid document")
       }
       beforeParse()
-      val result = visitor(ctx, comments)
+      val result = visitor(ctx, commentListener.getComments)
       afterParse()
       result
     }

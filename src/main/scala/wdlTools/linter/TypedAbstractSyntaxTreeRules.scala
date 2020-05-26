@@ -15,7 +15,6 @@ import wdlTools.util.Util.{stripLeadingWhitespace, writeStringToFile}
 import spray.json._
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.sys.process._
 import scala.util.Random
 
@@ -410,9 +409,9 @@ object TypedAbstractSyntaxTreeRules {
                                    docSourceUrl: Option[URL])
       extends LinterTstRule(conf, docSourceUrl) {
     // map of callables to declarations
-    private val declarations: mutable.Map[Callable, mutable.Buffer[Element]] = mutable.HashMap.empty
+    private var declarations: Map[Callable, Vector[Element]] = Map.empty
     // map of callables to references
-    private val referrers: mutable.Map[String, mutable.Set[String]] = mutable.HashMap.empty
+    private var referrers: Map[String, Vector[String]] = Map.empty
     private val indexSuffixes = Set(
         "index",
         "indexes",
@@ -435,9 +434,8 @@ object TypedAbstractSyntaxTreeRules {
         case _: OutputDefinition => ()
         case _ =>
           val exe = parent.findAncestorExecutable.get
-          declarations
-            .getOrElseUpdate(exe, mutable.ArrayBuffer.empty[Element])
-            .append(parent.element)
+          declarations += (exe -> (declarations
+            .getOrElse(exe, Vector.empty[Element]) :+ parent.element))
       }
     }
 
@@ -447,10 +445,8 @@ object TypedAbstractSyntaxTreeRules {
       if (ctx.element.callee.output.nonEmpty) {
         // ignore call to callable with no outputs
         val parent = ctx.findAncestorExecutable.get
-        if (!declarations.contains(parent)) {
-          declarations(parent) = mutable.ArrayBuffer.empty
-        }
-        declarations(parent).append(ctx.element)
+        declarations += (parent -> (declarations
+          .getOrElse(parent, Vector.empty[Element]) :+ ctx.element))
       }
     }
 
@@ -458,10 +454,7 @@ object TypedAbstractSyntaxTreeRules {
       ctx.element match {
         case ExprIdentifier(id, _, _) =>
           val parentName = ctx.findAncestorExecutable.get.name
-          if (!referrers.contains(parentName)) {
-            referrers(parentName) = mutable.HashSet.empty
-          }
-          referrers(parentName).add(id)
+          referrers += (parentName -> (referrers.getOrElse(parentName, Set.empty[String]) + id))
         case _ => super.traverseExpression(ctx)
       }
     }
