@@ -285,7 +285,12 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "default placeholder" taggedAs Edge in {
     val command = evalCommand("default_placeholder.wdl")
-    command.trim shouldBe "hello"
+    command shouldBe "hello"
+  }
+
+  it should "strip common indent" taggedAs Edge in {
+    val command = evalCommand("indented_command.wdl")
+    command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
   }
 
   it should "bad coercion" in {
