@@ -206,9 +206,9 @@ object Util {
     val wsRegex = "^([ \t]*)$".r
     val nonWsRegex = "^([ \t]*)(.+)$".r
     val (lineOffset, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
-      case (l, wsRegex(_)) if l._2.isEmpty => (l._1 + 1, l._2)
-      case (l, nonWsRegex(ws, txt))        => (l._1, l._2 :+ (ws, txt))
-      case (l, txt)                        => (l._1, l._2 :+ ("", txt))
+      case ((lineOffset, content), wsRegex(_)) if content.isEmpty => (lineOffset + 1, content)
+      case ((lineOffset, content), nonWsRegex(ws, txt))           => (lineOffset, content :+ (ws, txt))
+      case ((lineOffset, content), txt)                           => (lineOffset, content :+ ("", txt))
     }
     if (content.isEmpty) {
       (lineOffset, 0, "")
