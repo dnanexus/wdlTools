@@ -411,7 +411,7 @@ object TypedAbstractSyntaxTreeRules {
     // map of callables to declarations
     private var declarations: Map[Callable, Vector[Element]] = Map.empty
     // map of callables to references
-    private var referrers: Map[String, Vector[String]] = Map.empty
+    private var referrers: Map[String, Set[String]] = Map.empty
     private val indexSuffixes = Set(
         "index",
         "indexes",

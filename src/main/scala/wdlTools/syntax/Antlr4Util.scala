@@ -143,7 +143,7 @@ object Antlr4Util {
 
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
-    val commentListener: CommentListener = CommentListener(
+    private val commentListener = CommentListener(
         parser.getTokenStream.asInstanceOf[BufferedTokenStream],
         commentChannel
     )

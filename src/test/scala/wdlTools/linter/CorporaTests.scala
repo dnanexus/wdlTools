@@ -38,6 +38,7 @@ class CorporaTests extends AnyWordSpec with Matchers {
               AbstractSyntaxTreeRules.allRules.keys.toSet ++
               TypedAbstractSyntaxTreeRules.allRules.keys.toSet
         ).map(id => id -> RuleConf(id, "x", "x", Severity.Error, Map.empty)).toMap
+      val linter = Linter(opts, rules)
 
       corpora.map(getFields).foreach { corpus =>
         val root = corporaDirPath.resolve(if (corpus.contains("root")) {
@@ -51,16 +52,36 @@ class CorporaTests extends AnyWordSpec with Matchers {
           }
         })
         getValues(corpus("entrypoints")).map(getFields).filter(_.contains("lint")).foreach {
-          example =>
+          case example if example.contains("path") =>
             val path = root.resolve(getString(example("path")))
             val url = path.toUri.toURL
-
             s"test lint in ${path}" in {
               path.toFile should exist
-
-              val linter = Linter(opts, rules)
               val events = linter.apply(url)
               val actualLint = getLintCounts(events)
+              val expectedLint = getFields(example("lint")).view.mapValues(getInt).toMap
+              actualLint should equal(expectedLint)
+            }
+          case example =>
+            val dir = if (example.contains("dir")) {
+              root.resolve(getString(example("dir")))
+            } else {
+              root
+            }
+            val exclude = example
+              .get("exclude")
+              .map(e => getValues(e).map(getString).toSet)
+              .getOrElse(Set.empty)
+            val wdls: Vector[URL] = dir.toFile
+              .listFiles { f =>
+                f.isFile && f.getName.endsWith(".wdl") && !exclude.contains(f.getName)
+              }
+              .map(_.toURI.toURL)
+              .toVector
+            s"test lint ${wdls.length} fils in ${dir}" in {
+              val actualLint = getLintCounts(wdls.foldLeft(Map.empty[URL, Vector[LintEvent]]) {
+                case (lint, url) => lint ++ linter.apply(url)
+              })
               val expectedLint = getFields(example("lint")).view.mapValues(getInt).toMap
               actualLint should equal(expectedLint)
             }
