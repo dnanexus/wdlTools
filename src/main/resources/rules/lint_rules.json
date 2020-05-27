@@ -19,6 +19,10 @@
     "name": "deprecated_command_style",
     "description": "Deprecated command block style - use ~{} instead"
   },
+  "P006": {
+    "name": "command_mixed_indentation",
+    "description": "Mixed space and tab whitespace characters in command block"
+  },
   "A001": {
     "name": "non_portable_task",
     "description": "Non-portable task"

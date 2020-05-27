@@ -135,7 +135,7 @@ object ParserRules {
   }
 
   case class DeprecatedCommandStyleRule(conf: RuleConf, grammar: Grammar)
-      extends HiddenTokensLinterParserRule(conf, grammar) {
+      extends LinterParserRule(conf, grammar.docSourceUrl) {
 
     override def exitTask_command_expr_part(ctx: ParserRuleContext): Unit = {
       if (grammar.version >= WdlVersion.V1) {
@@ -146,12 +146,23 @@ object ParserRules {
     }
   }
 
+  case class CommandMixedIndentationRule(conf: RuleConf, grammar: Grammar)
+      extends LinterParserRule(conf, grammar.docSourceUrl) {
+    private val mixedWsRegex = "[\r\n]( +\t|\t+ )".r
+    override def exitTask_command_string_part(ctx: ParserRuleContext): Unit = {
+      if (mixedWsRegex.findFirstIn(ctx.getText).isDefined) {
+        addEventFromTokens(ctx.start, Some(ctx.stop))
+      }
+    }
+  }
+
   // TODO: load these dynamically from a file
   val allRules: Map[String, LinterParserRuleApplySig] = Map(
       "P001" -> WhitespaceTabsRule.apply,
       "P002" -> OddIndentRule.apply,
       "P003" -> MultipleBlankLineRule.apply,
       "P004" -> TopLevelIndentRule.apply,
-      "P005" -> DeprecatedCommandStyleRule.apply
+      "P005" -> DeprecatedCommandStyleRule.apply,
+      "P006" -> CommandMixedIndentationRule.apply
   )
 }

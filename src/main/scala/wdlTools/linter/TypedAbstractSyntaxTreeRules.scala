@@ -594,7 +594,8 @@ object TypedAbstractSyntaxTreeRules {
           }
         }
         val (offsetLine, offsetCol, script) = stripLeadingWhitespace(
-            ctx.element.parts.map(x => exprToString(x, Some(callback))).mkString("")
+            ctx.element.parts.map(x => exprToString(x, Some(callback))).mkString(""),
+            ignoreEmptyLast = true
         )
         val tempFile = Files.createTempFile("shellcheck", ".sh")
         val shellCheckCommand = Seq(
