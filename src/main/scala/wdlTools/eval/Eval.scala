@@ -5,7 +5,7 @@ import java.net.URL
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.Options
+import wdlTools.util.{Options, Util}
 
 case class Eval(opts: Options,
                 evalCfg: EvalConfig,
@@ -297,7 +297,7 @@ case class Eval(opts: Options,
       case eObj: TAT.ExprObject =>
         V_Object(eObj.value.map {
           case (k, v) => k -> apply(v, ctx)
-        }.toMap)
+        })
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, boolExpr, _, _) =>
@@ -509,12 +509,15 @@ case class Eval(opts: Options,
   // evaluate all the parts of a command section.
   //
   def applyCommand(command: TAT.CommandSection, ctx: Context): String = {
-    command.parts
+    val commandStr = command.parts
       .map { expr =>
         val value = apply(expr, ctx)
         val str = Serialize.primitiveValueToString(value, expr.text, docSourceUrl)
         str
       }
       .mkString("")
+    // strip off common leading whitespace
+    val (_, _, strippedCommandStr) = Util.stripLeadingWhitespace(commandStr, ignoreEmptyLast = true)
+    strippedCommandStr
   }
 }
