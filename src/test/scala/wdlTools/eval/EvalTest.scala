@@ -293,6 +293,16 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
   }
 
+  it should "strip common indent in python heredoc" taggedAs Edge in {
+    val command = evalCommand("python_heredoc.wdl")
+    command shouldBe """python <<CODE
+                       |  with open("/path/to/file.txt") as fp:
+                       |    for line in fp:
+                       |      if not line.startswith('#'):
+                       |        print(line.strip())
+                       |CODE""".stripMargin
+  }
+
   it should "bad coercion" in {
     val file = srcDir.resolve("bad_coercion.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
