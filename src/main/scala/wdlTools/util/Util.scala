@@ -182,6 +182,51 @@ object Util {
   }
 
   /**
+    * Given a multi-line string, determine the largest w such that each line
+    * begins with at least w whitespace characters.
+    * @param s the string to trim
+    * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
+    *  is the number of lines trimmed from the beginning of the string,
+    *  colOffset is the number of whitespace characters trimmed from the
+    *  beginning of the line containing the first non-whitespace character,
+    *  and trimmedString is `s` with all all prefix and suffix whitespace
+    *  trimmed, as well as `w` whitespace characters trimmed from the
+    *  beginning of each line.
+    *  @example
+    *    val s = "   \n  hello\n   goodbye  "
+    *    stripLeadingWhitespace(s) => (1, 2, "hello\n goodbye")
+    */
+  def stripLeadingWhitespace(s: String): (Int, Int, String) = {
+    val lines = s.split(System.lineSeparator())
+    val wsRegex = "^\\s*$".r
+    val nonWsRegex = "^(\\s.*)(.*)$".r
+    val (lineOffset, content) = lines.foldLeft((0, Vector.empty[(Int, String)])) {
+      case (l, wsRegex(_)) if l._2.isEmpty => (l._1 + 1, l._2)
+      case (l, nonWsRegex(ws, txt))        => (l._1, l._2 :+ (ws.length, txt))
+      case other                           => throw new Exception(s"Unexpected non-matching line ${other}")
+    }
+    if (content.isEmpty) {
+      (lineOffset, 0, "")
+    } else {
+      val (wsLengths, strippedLines) = content.unzip
+      val colOffset = wsLengths.min
+      (lineOffset,
+       colOffset,
+       (
+           if (colOffset == 0) {
+             strippedLines
+           } else {
+             strippedLines.zip(wsLengths).map {
+               case (line, wsLength) if wsLength > colOffset =>
+                 (" " * (wsLength - colOffset)) + line
+               case (line, _) => line
+             }
+           }
+       ).mkString(System.lineSeparator()))
+    }
+  }
+
+  /**
     * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
