@@ -29,9 +29,9 @@ class BaseTest extends AnyFlatSpec with Matchers {
         .toMap
     val linter = Linter(opts, rules)
     val url = getWdlUrl("simple.wdl", "v1")
-    linter.apply(url)
+    val allLints = linter.apply(url)
+    val lints = allLints(url)
 
-    val lints = linter.getOrderedEvents(url)
     lints.size shouldBe 8
 
     inside(lints(0)) {

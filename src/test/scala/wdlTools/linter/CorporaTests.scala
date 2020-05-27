@@ -8,6 +8,7 @@ import org.scalatest.{Ignore, Tag}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import wdlTools.types.TypeOptions
+import wdlTools.util.Util
 
 import scala.io.Source
 
@@ -41,16 +42,17 @@ class CorporaTests extends AnyWordSpec with Matchers {
       val linter = Linter(opts, rules)
 
       corpora.map(getFields).foreach { corpus =>
-        val root = corporaDirPath.resolve(if (corpus.contains("root")) {
+        val rootPath = if (corpus.contains("root")) {
           getString(corpus("root"))
         } else {
-          val path = new URL(getString(corpus("url"))).getPath
+          val path = Util.getFilename(getString(corpus("url")))
           if (path.endsWith(".git")) {
             path.dropRight(4)
           } else {
             path
           }
-        })
+        }
+        val root = corporaDirPath.resolve(rootPath)
         getValues(corpus("entrypoints")).map(getFields).filter(_.contains("lint")).foreach {
           case example if example.contains("path") =>
             val path = root.resolve(getString(example("path")))
@@ -78,7 +80,7 @@ class CorporaTests extends AnyWordSpec with Matchers {
               }
               .map(_.toURI.toURL)
               .toVector
-            s"test lint ${wdls.length} fils in ${dir}" in {
+            s"test lint ${wdls.length} files in ${dir}" in {
               val actualLint = getLintCounts(wdls.foldLeft(Map.empty[URL, Vector[LintEvent]]) {
                 case (lint, url) => lint ++ linter.apply(url)
               })
