@@ -1071,7 +1071,7 @@ case class TypeInfer(conf: TypeOptions,
           varName -> T_Array(typ)
       }
 
-    val tScatter = TAT.Scatter(scatter.identifier, wdlType, eCollection, tElements, scatter.text)
+    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tElements, scatter.text)
     (tScatter, bindingsWithArray)
   }
 
