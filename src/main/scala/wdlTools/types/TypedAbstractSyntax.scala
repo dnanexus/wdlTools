@@ -111,7 +111,7 @@ object TypedAbstractSyntax {
     * This definition based on Cromwell wom.callable.Callable.InputDefinition. It
     * is easier to use a variant of this interface for backward compatibility with dxWDL.
     */
-  sealed trait InputDefinition {
+  sealed trait InputDefinition extends Element {
     val name: String
     val wdlType: WdlTypes.T
     val text: TextSource
@@ -141,6 +141,7 @@ object TypedAbstractSyntax {
       extends InputDefinition
 
   case class OutputDefinition(name: String, wdlType: WdlTypes.T, expr: Expr, text: TextSource)
+      extends Element
 
   // A workflow or a task.
   sealed trait Callable {
@@ -168,14 +169,14 @@ object TypedAbstractSyntax {
   case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
-  sealed trait MetaValue
-  case object MetaValueNull extends MetaValue
-  case class MetaValueBoolean(value: Boolean) extends MetaValue
-  case class MetaValueInt(value: Int) extends MetaValue
-  case class MetaValueFloat(value: Double) extends MetaValue
-  case class MetaValueString(value: String) extends MetaValue
-  case class MetaValueObject(value: Map[String, MetaValue]) extends MetaValue
-  case class MetaValueArray(value: Vector[MetaValue]) extends MetaValue
+  sealed trait MetaValue extends Element
+  case class MetaValueNull(text: TextSource) extends MetaValue
+  case class MetaValueBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaValueInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaValueFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaValueString(value: String, text: TextSource) extends MetaValue
+  case class MetaValueObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
@@ -186,7 +187,7 @@ object TypedAbstractSyntax {
   // import statement with the typed-AST for the referenced document
   case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, text: TextSource)
       extends Element
-  case class ImportDoc(name: Option[String],
+  case class ImportDoc(namespace: String,
                        aliases: Vector[ImportAlias],
                        addr: String,
                        doc: Document,
@@ -194,7 +195,10 @@ object TypedAbstractSyntax {
       extends DocumentElement
 
   // a definition of a struct
-  case class StructDefinition(name: String, members: Map[String, WdlType], text: TextSource)
+  case class StructDefinition(name: String,
+                              wdlType: WdlTypes.T_Struct,
+                              members: Map[String, WdlType],
+                              text: TextSource)
       extends DocumentElement
 
   // A task
@@ -222,6 +226,7 @@ object TypedAbstractSyntax {
   // call add                      add
   // call a.b.c                    c
   //
+
   case class Call(fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
@@ -233,6 +238,7 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   case class Scatter(identifier: String,
+                     wdlType: WdlTypes.T,
                      expr: Expr,
                      body: Vector[WorkflowElement],
                      text: TextSource)
@@ -242,6 +248,7 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   // A workflow
+
   case class Workflow(name: String,
                       wdlType: WdlTypes.T_Workflow,
                       inputs: Vector[InputDefinition],

@@ -6,8 +6,8 @@ import org.antlr.v4.runtime.tree.ParseTreeListener
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers}
-import wdlTools.types.TypeInfer
-import wdlTools.util.Options
+import wdlTools.types.{TypeInfer, TypeOptions}
+import wdlTools.util.{Options, TypeCheckingRegime}
 
 import scala.collection.mutable
 
@@ -47,7 +47,14 @@ case class Linter(opts: Options,
           events(doc.sourceUrl) = docEvents
         }
         // First run the TypeChecker to infer the types of all expressions
-        val typeChecker = TypeInfer(opts)
+        val typeChecker = TypeInfer(
+            TypeOptions(
+                localDirectories = opts.localDirectories,
+                verbosity = opts.verbosity,
+                antlr4Trace = opts.antlr4Trace,
+                typeChecking = TypeCheckingRegime.Strict
+            )
+        )
         val (_, typesContext) = typeChecker.apply(doc)
         // Now execute the linter rules
         val visitors = astRules.map {

@@ -9,8 +9,9 @@ import wdlTools.util.{Options, SourceCode}
 
 // parse and follow imports
 case class ParseAll(opts: Options,
-                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty)
-    extends WdlParser(opts) {
+                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
+                    errorHandler: Option[(Option[URL], Throwable) => Boolean] = None)
+    extends WdlParser(opts, errorHandler) {
   private case class Translator(docSourceUrl: Option[URL] = None) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
@@ -333,7 +334,7 @@ case class ParseAll(opts: Options,
         case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (opts.followImports) {
-            Some(followImport(getDocSourceUrl(importDoc.addr.value)))
+            followImport(getDocSourceUrl(importDoc.addr.value))
           } else {
             None
           }

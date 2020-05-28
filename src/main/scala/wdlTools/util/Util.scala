@@ -84,6 +84,13 @@ object Util {
     resolved
   }
 
+  def getFilename(addr: String, dropExt: String = "", addExt: String = ""): String = {
+    ((Paths.get(new URL(addr).getPath).getFileName.toString, dropExt) match {
+      case (fn, ext) if fn.length > 0 && fn.endsWith(ext) => fn.dropRight(dropExt.length)
+      case (fn, _)                                        => fn
+    }) + addExt
+  }
+
   /**
     * Reads the lines from a file and concatenates the lines using the system line separator.
     * @param path the path to the file
@@ -175,6 +182,61 @@ object Util {
   }
 
   /**
+    * Given a multi-line string, determine the largest w such that each line
+    * begins with at least w whitespace characters.
+    * @param s the string to trim
+    * @param ignoreEmptyLast ignore the last last line if it is empty
+    * @param lineSep character to use to separate lines in the returned String
+    * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
+    *  is the number of lines trimmed from the beginning of the string,
+    *  colOffset is the number of whitespace characters trimmed from the
+    *  beginning of the line containing the first non-whitespace character,
+    *  and trimmedString is `s` with all all prefix and suffix whitespace
+    *  trimmed, as well as `w` whitespace characters trimmed from the
+    *  beginning of each line.
+    *  @example
+    *    val s = "   \n  hello\n   goodbye\n "
+    *    stripLeadingWhitespace(s, false) => (1, 1, "hello\n  goodbye\n")
+    *     stripLeadingWhitespace(s, true) => (1, 2, "hello\n goodbye")
+    */
+  def stripLeadingWhitespace(s: String,
+                             ignoreEmptyLast: Boolean = false,
+                             lineSep: String = System.lineSeparator()): (Int, Int, String) = {
+    val lines = s.split("\r\n?|\n")
+    val wsRegex = "^([ \t]*)$".r
+    val nonWsRegex = "^([ \t]*)(.+)$".r
+    val (lineOffset, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
+      case ((lineOffset, content), wsRegex(_)) if content.isEmpty => (lineOffset + 1, content)
+      case ((lineOffset, content), nonWsRegex(ws, txt))           => (lineOffset, content :+ (ws, txt))
+      case ((lineOffset, content), txt)                           => (lineOffset, content :+ ("", txt))
+    }
+    if (content.isEmpty) {
+      (lineOffset, 0, "")
+    } else {
+      val (whitespace, strippedLines) = (
+          if (ignoreEmptyLast && content.nonEmpty && content.last._2.trim.isEmpty) {
+            content.slice(0, content.length - 1)
+          } else {
+            content
+          }
+      ).unzip
+      val colOffset = whitespace.map(_.length).min
+      val strippedContent = (
+          if (colOffset == 0) {
+            strippedLines
+          } else {
+            // add back to each line any whitespace longer than colOffset
+            strippedLines.zip(whitespace).map {
+              case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+              case (line, _)                           => line
+            }
+          }
+      ).mkString(lineSep)
+      (lineOffset, colOffset, strippedContent)
+    }
+  }
+
+  /**
     * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
@@ -188,11 +250,12 @@ object Util {
   def prettyFormat(a: Any,
                    indentSize: Int = 2,
                    maxElementWidth: Int = 30,
-                   depth: Int = 0): String = {
+                   depth: Int = 0,
+                   callback: Option[Product => Option[String]] = None): String = {
     val indent = " " * depth * indentSize
     val fieldIndent = indent + (" " * indentSize)
-    val thisDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth)
-    val nextDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth + 1)
+    val thisDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth, callback)
+    val nextDepth = prettyFormat(_: Any, indentSize, maxElementWidth, depth + 1, callback)
     a match {
       // Make Strings look similar to their literal form.
       case s: String =>
@@ -215,26 +278,30 @@ object Util {
         result.substring(0, result.length - 1) + "\n" + indent + ")"
       // Product should cover case classes.
       case p: Product =>
-        val prefix = p.productPrefix
-        // We'll use reflection to get the constructor arg names and values.
-        val cls = p.getClass
-        val fields = cls.getDeclaredFields.filterNot(_.isSynthetic).map(_.getName)
-        val values = p.productIterator.toSeq
-        // If we weren't able to match up fields/values, fall back to toString.
-        if (fields.length != values.length) return p.toString
-        fields.zip(values).toList match {
-          // If there are no fields, just use the normal String representation.
-          case Nil => p.toString
-          // If there is just one field, let's just print it as a wrapper.
-          case (_, value) :: Nil => s"$prefix(${thisDepth(value)})"
-          // If there is more than one field, build up the field names and values.
-          case kvps =>
-            val prettyFields = kvps.map { case (k, v) => s"$fieldIndent$k = ${nextDepth(v)}" }
-            // If the result is not too long, pretty print on one line.
-            val resultOneLine = s"$prefix(${prettyFields.mkString(", ")})"
-            if (resultOneLine.length <= maxElementWidth) return resultOneLine
-            // Otherwise, build it with newlines and proper field indents.
-            s"$prefix(\n${prettyFields.mkString(",\n")}\n$indent)"
+        callback.map(_(p)) match {
+          case Some(Some(s)) => s
+          case _ =>
+            val prefix = p.productPrefix
+            // We'll use reflection to get the constructor arg names and values.
+            val cls = p.getClass
+            val fields = cls.getDeclaredFields.filterNot(_.isSynthetic).map(_.getName)
+            val values = p.productIterator.toSeq
+            // If we weren't able to match up fields/values, fall back to toString.
+            if (fields.length != values.length) return p.toString
+            fields.zip(values).toList match {
+              // If there are no fields, just use the normal String representation.
+              case Nil => p.toString
+              // If there is just one field, let's just print it as a wrapper.
+              case (_, value) :: Nil => s"$prefix(${thisDepth(value)})"
+              // If there is more than one field, build up the field names and values.
+              case kvps =>
+                val prettyFields = kvps.map { case (k, v) => s"$fieldIndent$k = ${nextDepth(v)}" }
+                // If the result is not too long, pretty print on one line.
+                val resultOneLine = s"$prefix(${prettyFields.mkString(", ")})"
+                if (resultOneLine.length <= maxElementWidth) return resultOneLine
+                // Otherwise, build it with newlines and proper field indents.
+                s"$prefix(\n${prettyFields.mkString(",\n")}\n$indent)"
+            }
         }
       // If we haven't specialized this type, just use its toString.
       case _ => a.toString

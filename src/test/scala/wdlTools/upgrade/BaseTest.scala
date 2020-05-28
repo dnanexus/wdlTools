@@ -2,14 +2,15 @@ package wdlTools.upgrade
 
 import java.net.URL
 import java.nio.file.{Path, Paths}
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.formatter.Upgrader
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{Options, Util, Verbosity}
+import wdlTools.util.{BasicOptions, Util, Verbosity}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private lazy val opts = Options(verbosity = Verbosity.Verbose)
+  private lazy val opts = BasicOptions(verbosity = Verbosity.Verbose)
 
   def getBeforePath(fname: String): Path = {
     Paths.get(getClass.getResource(s"/wdlTools/upgrade/before/${fname}").getPath)

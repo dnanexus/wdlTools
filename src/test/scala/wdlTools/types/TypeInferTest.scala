@@ -5,10 +5,10 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Options, TypeCheckingRegime, Util => UUtil, Verbosity}
+import wdlTools.util.{TypeCheckingRegime, Util => UUtil, Verbosity}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
-  private val opts = Options(
+  private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
           Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)

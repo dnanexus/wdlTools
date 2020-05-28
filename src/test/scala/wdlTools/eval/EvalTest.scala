@@ -5,21 +5,22 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
+import wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{EvalConfig, Options, Util => UUtil, TypeCheckingRegime, Verbosity}
-import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
+import wdlTools.util.{TypeCheckingRegime, Verbosity, Util => UUtil}
+import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/wdlTools/eval/v1").getPath)
   private val opts =
-    Options(typeChecking = TypeCheckingRegime.Lenient,
-            antlr4Trace = false,
-            localDirectories = Vector(srcDir),
-            verbosity = Verbosity.Normal)
+    TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
+                antlr4Trace = false,
+                localDirectories = Vector(srcDir),
+                verbosity = Verbosity.Normal)
   private val parser = ParseAll(opts)
   private val typeInfer = TypeInfer(opts)
+  private val linesep = System.lineSeparator()
 
   def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {
@@ -39,7 +40,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig(homeDir, tmpDir, stdout, stderr)
+    eval.EvalConfig(homeDir, tmpDir, stdout, stderr)
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
@@ -259,34 +260,47 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "evaluate simple command section" in {
     val command = evalCommand("command_simple.wdl")
-    command.trim shouldBe "We just discovered a new flower with 100 basepairs. Is that possible?"
+    command shouldBe "We just discovered a new flower with 100 basepairs. Is that possible?"
   }
 
   it should "evaluate command section with some variables" in {
     val command = evalCommand("command2.wdl")
-    command.trim shouldBe "His trumpet playing is not bad"
+    command shouldBe "His trumpet playing is not bad"
   }
 
   it should "command section with several kinds of primitives" in {
     val command = evalCommand("command3.wdl")
-    command.trim shouldBe "His trumpet playing is good. There are 10 instruments in the band. It this true?"
+    command shouldBe "His trumpet playing is good. There are 10 instruments in the band. It this true?"
   }
 
   it should "separator placeholder" in {
     val command = evalCommand("sep_placeholder.wdl")
-    command.trim shouldBe "We have lots of numbers here 1, 10, 100"
+    command shouldBe "We have lots of numbers here 1, 10, 100"
   }
 
   it should "boolean placeholder" taggedAs Edge in {
     val command = evalCommand("bool_placeholder.wdl")
-    val lines = command.split("\n")
-    lines(1).trim shouldBe "--no"
-    lines(2).trim shouldBe "--yes"
+    command shouldBe s"--no${linesep}--yes"
   }
 
   it should "default placeholder" taggedAs Edge in {
     val command = evalCommand("default_placeholder.wdl")
-    command.trim shouldBe "hello"
+    command shouldBe "hello"
+  }
+
+  it should "strip common indent" taggedAs Edge in {
+    val command = evalCommand("indented_command.wdl")
+    command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
+  }
+
+  it should "strip common indent in python heredoc" taggedAs Edge in {
+    val command = evalCommand("python_heredoc.wdl")
+    command shouldBe """python <<CODE
+                       |  with open("/path/to/file.txt") as fp:
+                       |    for line in fp:
+                       |      if not line.startswith('#'):
+                       |        print(line.strip())
+                       |CODE""".stripMargin
   }
 
   it should "bad coercion" in {
