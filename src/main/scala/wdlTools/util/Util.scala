@@ -245,6 +245,61 @@ object Util {
   }
 
   /**
+    * Given a multi-line string, determine the largest w such that each line
+    * begins with at least w whitespace characters.
+    * @param s the string to trim
+    * @param ignoreEmptyLast ignore the last last line if it is empty
+    * @param lineSep character to use to separate lines in the returned String
+    * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
+    *  is the number of lines trimmed from the beginning of the string,
+    *  colOffset is the number of whitespace characters trimmed from the
+    *  beginning of the line containing the first non-whitespace character,
+    *  and trimmedString is `s` with all all prefix and suffix whitespace
+    *  trimmed, as well as `w` whitespace characters trimmed from the
+    *  beginning of each line.
+    *  @example
+    *    val s = "   \n  hello\n   goodbye\n "
+    *    stripLeadingWhitespace(s, false) => (1, 1, "hello\n  goodbye\n")
+    *     stripLeadingWhitespace(s, true) => (1, 2, "hello\n goodbye")
+    */
+  def stripLeadingWhitespace(s: String,
+                             ignoreEmptyLast: Boolean = false,
+                             lineSep: String = System.lineSeparator()): (Int, Int, String) = {
+    val lines = s.split("\r\n?|\n")
+    val wsRegex = "^([ \t]*)$".r
+    val nonWsRegex = "^([ \t]*)(.+)$".r
+    val (lineOffset, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
+      case ((lineOffset, content), wsRegex(_)) if content.isEmpty => (lineOffset + 1, content)
+      case ((lineOffset, content), nonWsRegex(ws, txt))           => (lineOffset, content :+ (ws, txt))
+      case ((lineOffset, content), txt)                           => (lineOffset, content :+ ("", txt))
+    }
+    if (content.isEmpty) {
+      (lineOffset, 0, "")
+    } else {
+      val (whitespace, strippedLines) = (
+          if (ignoreEmptyLast && content.nonEmpty && content.last._2.trim.isEmpty) {
+            content.slice(0, content.length - 1)
+          } else {
+            content
+          }
+      ).unzip
+      val colOffset = whitespace.map(_.length).min
+      val strippedContent = (
+          if (colOffset == 0) {
+            strippedLines
+          } else {
+            // add back to each line any whitespace longer than colOffset
+            strippedLines.zip(whitespace).map {
+              case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+              case (line, _)                           => line
+            }
+          }
+      ).mkString(lineSep)
+      (lineOffset, colOffset, strippedContent)
+    }
+  }
+
+  /**
     * Pretty formats a Scala value similar to its source represention.
     * Particularly useful for case classes.
     * @see https://gist.github.com/carymrobbins/7b8ed52cd6ea186dbdf8
