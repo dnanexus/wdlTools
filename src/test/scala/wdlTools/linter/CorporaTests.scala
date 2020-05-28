@@ -3,12 +3,11 @@ package wdlTools.linter
 import java.net.URL
 import java.nio.file.Paths
 
-import wdlTools.util.JsonUtil._
-import org.scalatest.{Ignore, Tag}
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 import wdlTools.types.TypeOptions
 import wdlTools.util.Util
+import wdlTools.util.JsonUtil._
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.io.Source
 
@@ -18,29 +17,25 @@ class CorporaTests extends AnyWordSpec with Matchers {
   private val corporaDirPath = Paths.get(getClass.getResource(s"/corpora").getPath)
   private val corporaDir = corporaDirPath.toFile
   private val configFile = Paths.get(getClass.getResource(s"/corpora_repos.json").getPath).toFile
-  private object CorporaAvailable
-      extends Tag(
-          if (configFile.exists && corporaDir.exists && corporaDir.isDirectory) ""
-          else classOf[Ignore].getName
-      )
+  private val corporaAvailable = configFile.exists && corporaDir.exists && corporaDir.isDirectory
 
   private def getLintCounts(events: Map[URL, Vector[LintEvent]]): Map[String, Int] = {
     events.values.flatten.toVector.map(_.rule.id).groupBy(x => x).map(x => x._2.head -> x._2.size)
   }
 
-  "corpora test" should {
-    "test linting of external WDL corpora" taggedAs CorporaAvailable in {
-      val corpora =
-        getValues(readJsonSource(Source.fromFile(configFile), configFile.toString)("corpora"))
-      val opts = TypeOptions()
-      val rules: Map[String, RuleConf] =
-        (
-            ParserRules.allRules.keys.toSet ++
-              AbstractSyntaxTreeRules.allRules.keys.toSet ++
-              TypedAbstractSyntaxTreeRules.allRules.keys.toSet
-        ).map(id => id -> RuleConf(id, "x", "x", Severity.Error, Map.empty)).toMap
-      val linter = Linter(opts, rules)
+  if (corporaAvailable) {
+    val corpora =
+      getValues(readJsonSource(Source.fromFile(configFile), configFile.toString)("corpora"))
+    val opts = TypeOptions()
+    val rules: Map[String, RuleConf] =
+      (
+          ParserRules.allRules.keys.toSet ++
+            AbstractSyntaxTreeRules.allRules.keys.toSet ++
+            TypedAbstractSyntaxTreeRules.allRules.keys.toSet
+      ).map(id => id -> RuleConf(id, "x", "x", Severity.Error, Map.empty)).toMap
+    val linter = Linter(opts, rules)
 
+    "corpora test" should {
       corpora.map(getFields).foreach { corpus =>
         val rootPath = if (corpus.contains("root")) {
           getString(corpus("root"))
