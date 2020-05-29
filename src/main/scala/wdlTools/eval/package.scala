@@ -40,4 +40,5 @@ object EvalException {
   }
 }
 
+// an error that occurs during (de)serialization of JSON
 final class JsonSerializationException(message: String) extends Exception(message)
