@@ -1349,7 +1349,7 @@ case class WdlV1Formatter(opts: Options) {
   def formatDocuments(url: URL): Map[URL, Vector[String]] = {
     Parsers(opts).getDocumentWalker[Map[URL, Vector[String]]](url, Map.empty).walk {
       (doc, results) =>
-        results + (doc.sourceUrl -> formatDocument(doc))
+        results + (doc.sourceUrl.get -> formatDocument(doc))
     }
   }
 }

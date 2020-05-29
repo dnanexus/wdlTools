@@ -1199,12 +1199,7 @@ document_element
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(grammar.docSourceUrl.get,
-             grammar.docSource,
-             elems,
-             workflow,
-             getTextSource(ctx),
-             comments)
+    Document(grammar.docSourceUrl, grammar.docSource, elems, workflow, getTextSource(ctx), comments)
   }
 
   def visitExprDocument(ctx: WdlDraft2Parser.Expr_documentContext): Expr = {

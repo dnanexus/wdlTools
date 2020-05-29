@@ -72,7 +72,7 @@ object DocumentationGenerator {
                                meta: Vector[KeyValueDocumentation],
                                comment: Option[DocumentationComment])
 
-  case class WdlDocumentation(sourceUrl: URL,
+  case class WdlDocumentation(sourceUrl: Option[URL],
                               imports: Vector[ImportDocumentation],
                               structs: Vector[StructDocumentation],
                               workflow: Option[WorkflowDocumentation],
@@ -275,7 +275,7 @@ case class DocumentationGenerator(opts: Options) {
       (doc, results) =>
         val docs = generateDocumentation(doc)
         if (docs.isDefined) {
-          results + (doc.sourceUrl -> docs.get)
+          results + (doc.sourceUrl.get -> docs.get)
         } else {
           results
         }

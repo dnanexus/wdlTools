@@ -32,7 +32,7 @@ case class Upgrader(opts: Options) {
       if (doc.version.value >= destVersion) {
         throw new Exception(s"Cannot convert WDL version ${doc.version} to ${destVersion}")
       }
-      results + (doc.sourceUrl -> formatter.formatDocument(doc))
+      results + (doc.sourceUrl.get -> formatter.formatDocument(doc))
     }
   }
 }

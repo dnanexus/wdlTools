@@ -15,8 +15,8 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
     if (conf.printTree.typed()) {
       def ignoreImports(p: Product): Option[String] = {
         p match {
-          case d: TypedAbstractSyntax.Document if d.docSourceUrl != url => Some("...")
-          case _                                                        => None
+          case d: TypedAbstractSyntax.Document if d.sourceUrl.get != url => Some("...")
+          case _                                                         => None
         }
       }
       val typeChecker = TypeInfer(
@@ -28,8 +28,8 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
     } else {
       def ignoreImports(p: Product): Option[String] = {
         p match {
-          case d: AbstractSyntax.Document if d.sourceUrl != url => Some("...")
-          case _                                                => None
+          case d: AbstractSyntax.Document if d.sourceUrl.get != url => Some("...")
+          case _                                                    => None
         }
       }
       println(Util.prettyFormat(document, callback = Some(ignoreImports)))

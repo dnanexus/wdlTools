@@ -140,9 +140,9 @@ class TypedAbstractSyntaxTreeVisitor {
 
 object TypedAbstractSyntaxTreeVisitor {
   case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
-    lazy val docSourceUrl: URL = element match {
-      case d: Document => d.docSourceUrl
-      case _           => findAncestor[Document].get.element.docSourceUrl
+    lazy val docSourceUrl: Option[URL] = element match {
+      case d: Document => d.sourceUrl
+      case _           => findAncestor[Document].get.element.sourceUrl
     }
 
     def createChildContext[C <: Element](element: C): VisitorContext[C] = {

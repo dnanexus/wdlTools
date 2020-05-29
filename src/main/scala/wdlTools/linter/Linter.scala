@@ -75,13 +75,12 @@ case class Linter(opts: TypeOptions, rules: Map[String, RuleConf]) {
     val astRules = rules.view.filterKeys(AbstractSyntaxTreeRules.allRules.contains)
     val tstRules = rules.view.filterKeys(TypedAbstractSyntaxTreeRules.allRules.contains)
     val unification = Unification(opts)
-
     val result = parsers
       .getDocumentWalker[Map[URL, Vector[LintEvent]]](url, Map.empty)
       .walk { (doc, result) =>
-        val docUrl = doc.sourceUrl
+        val docUrl = doc.sourceUrl.get
         // stop if there are lint events due to parser errors
-        result + (url -> (result.getOrElse(url, Vector.empty) ++ (
+        result + (docUrl -> (result.getOrElse(url, Vector.empty) ++ (
             if (!parserErrorEvents.contains(docUrl) && (astRules.nonEmpty || tstRules.nonEmpty)) {
               val wdlVersion = doc.version.value
               val astEvents = if (astRules.nonEmpty) {
