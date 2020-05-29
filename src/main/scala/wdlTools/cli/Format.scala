@@ -15,8 +15,8 @@ case class Format(conf: WdlToolsConf) extends Command {
     val outputDir = conf.format.outputDir.toOption
     val overwrite = conf.format.overwrite()
     val formatter = WdlV1Formatter(opts)
-    formatter.formatDocuments(url)
-    formatter.documents.foreach {
+    val documents = formatter.formatDocuments(url)
+    documents.foreach {
       case (uri, lines) =>
         if (outputDir.isDefined || overwrite) {
           Files.write(Util.getLocalPath(uri, outputDir, overwrite), lines.asJava)

@@ -5,23 +5,22 @@ import java.net.URL
 import java.nio.file.Files
 
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
-import wdlTools.syntax.{Parsers, SyntaxException, TextSource}
-import wdlTools.types.{Context, TypeException, TypeInfer}
+import wdlTools.syntax.{Parsers, SyntaxException}
+import wdlTools.types.{TypeError, TypeException, TypeInfer}
 
-import scala.collection.mutable
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls
 
 case class TypeCheck(conf: WdlToolsConf) extends Command {
-  private def errorsToJson(errors: Map[URL, Vector[(String, TextSource)]]): JsObject = {
-    def getError(reason: String, textSource: TextSource): JsObject = {
+  private def errorsToJson(errors: Map[URL, Vector[TypeError]]): JsObject = {
+    def getError(err: TypeError): JsObject = {
       JsObject(
           Map(
-              "reason" -> JsString(reason),
-              "startLine" -> JsNumber(textSource.line),
-              "startCol" -> JsNumber(textSource.col),
-              "endLine" -> JsNumber(textSource.endLine),
-              "endCol" -> JsNumber(textSource.endCol)
+              "reason" -> JsString(err.reason),
+              "startLine" -> JsNumber(err.textSource.line),
+              "startCol" -> JsNumber(err.textSource.col),
+              "endLine" -> JsNumber(err.textSource.endLine),
+              "endCol" -> JsNumber(err.textSource.endCol)
           )
       )
     }
@@ -29,12 +28,12 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       case (url, docErrors) =>
         JsObject(
             Map("source" -> JsString(url.toString),
-                "errors" -> JsArray(docErrors.map(err => getError(err._1, err._2))))
+                "errors" -> JsArray(docErrors.map(err => getError(err))))
         )
     }.toVector)))
   }
 
-  private def printErrors(errors: Map[URL, Vector[(String, TextSource)]],
+  private def printErrors(errors: Map[URL, Vector[TypeError]],
                           printer: PrintStream,
                           effects: Boolean): Unit = {
     def colorMsg(msg: String, color: String): String = {
@@ -55,9 +54,8 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       printer.println(border1)
       printer.println(colorMsg("Line:Col | Description", AnsiColor.BOLD))
       printer.println(border2)
-      docErrors.sortWith(_._2 < _._2).foreach {
-        case (reason, textSource) =>
-          printer.println(f"${textSource}%-9s| ${reason}")
+      docErrors.sortWith(_.textSource < _.textSource).foreach { err =>
+        printer.println(f"${err.textSource}%-9s| ${err.reason}")
       }
     }
   }
@@ -66,14 +64,14 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     val url = conf.check.url()
     val opts = conf.check.getOptions
     val parsers = Parsers(opts)
-    val errors: mutable.Map[URL, mutable.Buffer[(String, TextSource)]] = mutable.HashMap.empty
+    var errors: Map[URL, Vector[TypeError]] = Map.empty
 
-    def errorHandler(reason: String, textSource: TextSource, ctx: Context): Boolean = {
-      val url = ctx.docSourceUrl.get
-      if (!errors.contains(url)) {
-        errors(url) = mutable.ArrayBuffer.empty
+    def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
+      typeErrors.groupBy(_.docSourceUrl).foreach {
+        case (Some(url), docErrors) =>
+          errors += (url -> (errors.getOrElse(url, Vector.empty) ++ docErrors))
+        case other => throw new RuntimeException(s"Unexpected ${other}")
       }
-      errors(url).append((reason, textSource))
       false
     }
 
@@ -100,12 +98,11 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       } else {
         System.out
       }
-      val finalErrors = errors.view.mapValues(_.toVector).toMap
       if (conf.check.json()) {
-        val js = errorsToJson(finalErrors).prettyPrint
+        val js = errorsToJson(errors).prettyPrint
         printer.println(js)
       } else {
-        printErrors(finalErrors, printer, effects = !toFile)
+        printErrors(errors, printer, effects = !toFile)
       }
       if (toFile) {
         printer.close()

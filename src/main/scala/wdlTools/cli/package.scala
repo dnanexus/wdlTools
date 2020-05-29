@@ -258,6 +258,16 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
+
+    override def getOptions: TypeOptions = {
+      TypeOptions(
+          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          followImports = followImports(),
+          verbosity = verbosity,
+          antlr4Trace = antlr4Trace(),
+          typeChecking = TypeCheckingRegime.Strict
+      )
+    }
   }
   addSubcommand(lint)
 

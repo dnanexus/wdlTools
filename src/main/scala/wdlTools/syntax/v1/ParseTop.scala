@@ -7,10 +7,9 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1.{WdlV1Parser, WdlV1ParserBaseVisitor}
 import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.syntax.{Comment, CommentMap, SyntaxException, TextSource, WdlVersion}
+import wdlTools.syntax.{CommentMap, SyntaxException, TextSource, WdlVersion}
 import wdlTools.util.{Options, Util}
 
-import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 case class ParseTop(opts: Options, grammar: WdlV1Grammar) extends WdlV1ParserBaseVisitor[Element] {
@@ -38,16 +37,13 @@ struct
       .toVector
 
     // check that each field appears once
-    val memberNames: mutable.Set[String] = mutable.HashSet.empty
-    members.foreach { member =>
-      if (memberNames.contains(member.name)) {
+    members.foldLeft(Set.empty[String]) {
+      case (names, member) if names.contains(member.name) =>
         throw new SyntaxException(s"struct ${sName} has field ${member.name} defined twice",
                                   getTextSource(ctx),
                                   grammar.docSourceUrl)
-      }
-      memberNames.add(member.name)
+      case (names, member) => names + member.name
     }
-
     TypeStruct(sName, members, getTextSource(ctx))
   }
 
@@ -1215,8 +1211,7 @@ document
 	: version document_element* (workflow document_element*)?
 	;
    */
-  def visitDocument(ctx: WdlV1Parser.DocumentContext,
-                    comments: mutable.Map[Int, Comment]): Document = {
+  def visitDocument(ctx: WdlV1Parser.DocumentContext, comments: CommentMap): Document = {
     val version = visitVersion(ctx.version())
 
     val elems: Vector[DocumentElement] =
@@ -1238,7 +1233,7 @@ document
              elems,
              workflow,
              getTextSource(ctx),
-             CommentMap(comments.toMap))
+             comments)
   }
 
   def visitExprDocument(ctx: WdlV1Parser.Expr_documentContext): Expr = {

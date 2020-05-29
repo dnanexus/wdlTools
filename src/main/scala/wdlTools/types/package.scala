@@ -16,10 +16,15 @@ case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate)
     extends Options
 
+final case class TypeError(docSourceUrl: Option[URL], textSource: TextSource, reason: String)
+
 // Type error exception
 final class TypeException(message: String) extends Exception(message) {
   def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
     this(TypeException.formatMessage(msg, text, docSourceUrl))
+  }
+  def this(errors: Seq[TypeError]) = {
+    this(TypeException.formatMessageFromErrorList(errors))
   }
 }
 
@@ -27,6 +32,16 @@ object TypeException {
   def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
     val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
     s"${msg} at ${text}${urlPart}"
+  }
+
+  def formatMessageFromErrorList(errors: Seq[TypeError]): String = {
+    // make one big report on all the type errors
+    val messages = errors.map {
+      case TypeError(docSourceUrl, textSource, msg) =>
+        val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
+        s"${msg} at ${urlPart} ${textSource}"
+    }
+    messages.mkString("\n")
   }
 }
 

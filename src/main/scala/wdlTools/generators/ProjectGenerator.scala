@@ -9,7 +9,6 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
-import scala.collection.mutable
 import util.control.Breaks._
 
 case class ProjectGenerator(opts: Options,
@@ -22,8 +21,7 @@ case class ProjectGenerator(opts: Options,
                             dockerfile: Boolean = false,
                             tests: Boolean = false,
                             makefile: Boolean = true,
-                            dockerImage: Option[String] = None,
-                            generatedFiles: mutable.Map[URL, String] = mutable.HashMap.empty) {
+                            dockerImage: Option[String] = None) {
 
   val DOCKERFILE_TEMPLATE = "/templates/project/Dockerfile.ssp"
   val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
@@ -32,10 +30,7 @@ case class ProjectGenerator(opts: Options,
   lazy val formatter: WdlV1Formatter = WdlV1Formatter(opts)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
-    ReadmeGenerator(developerReadmes = developerReadmes,
-                    generatedFiles = generatedFiles,
-                    renderer = renderer)
-  lazy val testsGenerator: TestsGenerator = TestsGenerator(generatedFiles = generatedFiles)
+    ReadmeGenerator(developerReadmes = developerReadmes, renderer = renderer)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
   lazy val parsers: Parsers = Parsers(opts)
   lazy val fragParser: WdlParser = parsers.getParser(wdlVersion)
@@ -78,11 +73,12 @@ case class ProjectGenerator(opts: Options,
 
   def readFields(fieldType: String,
                  choicesAllowed: Boolean,
-                 fields: mutable.Buffer[FieldModel],
+                 startFields: Vector[FieldModel],
                  predefinedPrompt: Option[String] = None,
                  predefinedChoices: Vector[FieldModel] = Vector.empty): Unit = {
     lazy val predefinedChoiceMap: Map[String, FieldModel] =
       predefinedChoices.map(field => field.name -> field).toMap
+    var fields = startFields
     var continue: Boolean =
       console.askYesNo(prompt = s"Define ${fieldType.toLowerCase}s interactively?",
                        default = Some(true))
@@ -100,7 +96,7 @@ case class ProjectGenerator(opts: Options,
               menu = Some(true)
           )
           if (predefinedChoice.isDefined) {
-            fields.append(predefinedChoiceMap(predefinedChoice.get).copy(linked = true))
+            fields :+= predefinedChoiceMap(predefinedChoice.get).copy(linked = true)
             break
           }
         }
@@ -145,9 +141,7 @@ case class ProjectGenerator(opts: Options,
         } else {
           Vector.empty
         }
-        fields.append(
-            FieldModel(name, label, help, optional, dataType, patterns, default, choices)
-        )
+        fields :+= FieldModel(name, label, help, optional, dataType, patterns, default, choices)
       }
       continue = console.askYesNo(prompt = s"Define another ${fieldType}?", default = Some(true))
     }
@@ -166,8 +160,8 @@ case class ProjectGenerator(opts: Options,
     if (model.description.isEmpty && !readmes) {
       model.description = console.askOnce[String](prompt = "Workflow description", optional = true)
     }
-    readFields(fieldType = "Input", choicesAllowed = true, fields = model.inputs)
-    readFields(fieldType = "Output", choicesAllowed = false, fields = model.outputs)
+    readFields(fieldType = "Input", choicesAllowed = true, startFields = model.inputs)
+    readFields(fieldType = "Output", choicesAllowed = false, startFields = model.outputs)
   }
 
   def populateTask(model: TaskModel = TaskModel(),
@@ -190,24 +184,24 @@ case class ProjectGenerator(opts: Options,
     }
     readFields(fieldType = "Input",
                choicesAllowed = true,
-               fields = model.inputs,
+               startFields = model.inputs,
                predefinedPrompt = Some("Is this a workflow input?"),
                predefinedChoices = predefinedInputs)
-    readFields(fieldType = "Output", choicesAllowed = false, fields = model.outputs)
+    readFields(fieldType = "Output", choicesAllowed = false, startFields = model.outputs)
     model
   }
 
-  def apply(workflowModel: Option[WorkflowModel], taskModels: Vector[TaskModel]): Unit = {
+  def apply(workflowModel: Option[WorkflowModel],
+            taskModels: Vector[TaskModel]): Map[URL, String] = {
     val tasksAndLinkedInputs = if (interactive) {
       val predefinedTaskInputs = if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
-        workflowModel.get.inputs.toVector
+        workflowModel.get.inputs
       } else {
         Vector.empty
       }
-      val tasksBuf: mutable.Buffer[(Task, Set[String])] = mutable.ArrayBuffer.empty
-      taskModels.foreach { taskModel =>
-        tasksBuf.append(populateTask(taskModel, predefinedInputs = predefinedTaskInputs).toTask)
+      var tasks: Vector[(Task, Set[String])] = taskModels.map { taskModel =>
+        populateTask(taskModel, predefinedInputs = predefinedTaskInputs).toTask
       }
       var word = if (taskModels.isEmpty) {
         "a"
@@ -215,10 +209,10 @@ case class ProjectGenerator(opts: Options,
         "another"
       }
       while (console.askYesNo(s"Add ${word} task?", default = Some(false))) {
-        tasksBuf.append(populateTask(predefinedInputs = predefinedTaskInputs).toTask)
+        tasks :+= populateTask(predefinedInputs = predefinedTaskInputs).toTask
         word = "another"
       }
-      tasksBuf.toVector
+      tasks
     } else {
       taskModels.map(_.toTask)
     }
@@ -232,27 +226,41 @@ case class ProjectGenerator(opts: Options,
                        CommentMap.empty)
     val wdlName = s"${name}.wdl"
     val docUrl = Util.pathToUrl(outputDir.resolve(wdlName))
-    generatedFiles(docUrl) = formatter.formatDocument(doc).mkString(System.lineSeparator())
-
-    if (readmes) {
-      readmeGenerator.apply(doc)
-    }
-
-    if (dockerfile) {
-      val dockerfileUrl = Util.pathToUrl(outputDir.resolve("Dockerfile"))
-      generatedFiles(dockerfileUrl) = renderer.render(DOCKERFILE_TEMPLATE)
-    }
-
-    if (tests) {
-      val testUrl = Util.pathToUrl(outputDir.resolve("tests").resolve(s"test_${name}.json"))
-      testsGenerator.apply(testUrl, wdlName, doc)
-    }
-
-    if (makefile) {
-      val makefileUrl = Util.pathToUrl(outputDir.resolve("Makefile"))
-      generatedFiles(makefileUrl) = renderer
-        .render(MAKEFILE_TEMPLATE, Map("name" -> name, "test" -> tests, "docker" -> dockerfile))
-    }
+    Map(docUrl -> formatter.formatDocument(doc).mkString(System.lineSeparator())) ++ (
+        if (readmes) {
+          readmeGenerator.apply(doc)
+        } else {
+          Map.empty
+        }
+    ) ++ (
+        if (dockerfile) {
+          val dockerfileUrl = Util.pathToUrl(outputDir.resolve("Dockerfile"))
+          Map(dockerfileUrl -> renderer.render(DOCKERFILE_TEMPLATE))
+        } else {
+          Map.empty
+        }
+    ) ++ (
+        if (tests) {
+          val testUrl = Util.pathToUrl(
+              outputDir.resolve("tests").resolve(s"test_${name}.json")
+          )
+          Map(testUrl -> TestsGenerator.apply(testUrl, wdlName, doc))
+        } else {
+          Map.empty
+        }
+    ) ++ (
+        if (makefile) {
+          val makefileUrl = Util.pathToUrl(outputDir.resolve("Makefile"))
+          Map(
+              makefileUrl -> renderer.render(
+                  MAKEFILE_TEMPLATE,
+                  Map("name" -> name, "test" -> tests, "docker" -> dockerfile)
+              )
+          )
+        } else {
+          Map.empty
+        }
+    )
   }
 }
 
@@ -348,14 +356,14 @@ object ProjectGenerator {
                        var summary: Option[String] = None,
                        var description: Option[String] = None,
                        var docker: Option[String] = None,
-                       inputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty,
-                       outputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty) {
+                       inputs: Vector[FieldModel] = Vector.empty,
+                       outputs: Vector[FieldModel] = Vector.empty) {
     def toTask: (Task, Set[String]) = {
-      val (inputSection, linkedInputs) = getInput(inputs.toVector)
+      val (inputSection, linkedInputs) = getInput(inputs)
       val task = Task(
           name.get,
           inputSection,
-          getOutput(outputs.toVector),
+          getOutput(outputs),
           CommandSection(Vector.empty, null),
           Vector.empty,
           getMeta(
@@ -363,7 +371,7 @@ object ProjectGenerator {
                 case (key: String, Some(value: String)) => key -> value
               }
           ),
-          getParameterMeta(inputs.toVector),
+          getParameterMeta(inputs),
           Some(
               RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null)), null)
           ),
@@ -379,8 +387,8 @@ object ProjectGenerator {
                            var title: Option[String] = None,
                            var summary: Option[String] = None,
                            var description: Option[String] = None,
-                           inputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty,
-                           outputs: mutable.Buffer[FieldModel] = mutable.ArrayBuffer.empty) {
+                           inputs: Vector[FieldModel] = Vector.empty,
+                           outputs: Vector[FieldModel] = Vector.empty) {
     def toWorkflow(tasksAndLinkedInputs: Vector[(Task, Set[String])]): Workflow = {
       val calls: Vector[Call] = tasksAndLinkedInputs.map {
         case (task, linkedInputs) =>
@@ -401,17 +409,17 @@ object ProjectGenerator {
           Call(task.name, None, Vector.empty, callInputs, null)
       }
 
-      val (wfInputSection, _) = getInput(inputs.toVector)
+      val (wfInputSection, _) = getInput(inputs)
       Workflow(
           name.get,
           wfInputSection,
-          getOutput(outputs.toVector),
+          getOutput(outputs),
           getMeta(
               Map("title" -> title, "summary" -> summary, description -> "description").collect {
                 case (key: String, Some(value: String)) => key -> value
               }
           ),
-          getParameterMeta(inputs.toVector),
+          getParameterMeta(inputs),
           calls,
           null
       )

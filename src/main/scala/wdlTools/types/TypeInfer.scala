@@ -17,10 +17,10 @@ import wdlTools.util.{Util => UUtil}
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(conf: TypeOptions,
-                     errorHandler: Option[(String, TextSource, Context) => Boolean] = None) {
+case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
+  private var errors = Vector.empty[TypeError]
 
   // A group of bindings. This is typically a part of the context. For example,
   // the body of a scatter.
@@ -31,9 +31,7 @@ case class TypeInfer(conf: TypeOptions,
   }
 
   private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
-    if (errorHandler.forall(eh => eh(reason, textSource, ctx))) {
-      throw new TypeException(reason, textSource, ctx.docSourceUrl)
-    }
+    errors = errors :+ TypeError(ctx.docSourceUrl, textSource, reason)
   }
 
   // The add operation is overloaded.
@@ -709,16 +707,16 @@ case class TypeInfer(conf: TypeOptions,
   // language for meta values only.
   private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(text)                          => TAT.MetaValueNull(text)
-      case AST.ValueBoolean(value, text)                => TAT.MetaValueBoolean(value, text)
-      case AST.ValueInt(value, text)                    => TAT.MetaValueInt(value, text)
-      case AST.ValueFloat(value, text)                  => TAT.MetaValueFloat(value, text)
-      case AST.ValueString(value, text)                 => TAT.MetaValueString(value, text)
-      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaValueNull(text)
-      case AST.ExprIdentifier(id, text)                 => TAT.MetaValueString(id, text)
-      case AST.ExprArray(vec, text)                     => TAT.MetaValueArray(vec.map(metaValueFromExpr(_, ctx)), text)
+      case AST.ValueNull(text)                          => TAT.MetaNull(text)
+      case AST.ValueBoolean(value, text)                => TAT.MetaBoolean(value, text)
+      case AST.ValueInt(value, text)                    => TAT.MetaInt(value, text)
+      case AST.ValueFloat(value, text)                  => TAT.MetaFloat(value, text)
+      case AST.ValueString(value, text)                 => TAT.MetaString(value, text)
+      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaNull(text)
+      case AST.ExprIdentifier(id, text)                 => TAT.MetaString(id, text)
+      case AST.ExprArray(vec, text)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)), text)
       case AST.ExprMap(members, text) =>
-        TAT.MetaValueObject(
+        TAT.MetaObject(
             members.map {
               case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
                 key -> metaValueFromExpr(value, ctx)
@@ -730,7 +728,7 @@ case class TypeInfer(conf: TypeOptions,
             text
         )
       case AST.ExprObject(members, text) =>
-        TAT.MetaValueObject(
+        TAT.MetaObject(
             members.map {
               case AST.ExprObjectMember(key, value, _) =>
                 key -> metaValueFromExpr(value, ctx)
@@ -741,7 +739,7 @@ case class TypeInfer(conf: TypeOptions,
         )
       case other =>
         handleError(s"${SUtil.exprToString(other)} is an invalid meta value", expr.text, ctx)
-        TAT.MetaValueNull(other.text)
+        TAT.MetaNull(other.text)
     }
   }
 
@@ -764,7 +762,7 @@ case class TypeInfer(conf: TypeOptions,
                 kv.text,
                 ctx
             )
-            TAT.MetaValueNull(kv.expr.text)
+            TAT.MetaNull(kv.expr.text)
           }
           kv.id -> metaValue
         }.toMap,
@@ -1163,7 +1161,7 @@ case class TypeInfer(conf: TypeOptions,
     val initCtx = Context(
         version = doc.version.value,
         stdlib = Stdlib(conf, doc.version.value),
-        docSourceUrl = Some(doc.sourceUrl)
+        docSourceUrl = doc.sourceUrl
     )
 
     // translate each of the elements in the document
@@ -1269,6 +1267,10 @@ case class TypeInfer(conf: TypeOptions,
   def apply(doc: AST.Document): (TAT.Document, Context) = {
     //val (tDoc, _) = applyDoc(doc)
     //tDoc
-    applyDoc(doc)
+    val (tDoc, ctx) = applyDoc(doc)
+    if (errors.nonEmpty && errorHandler.forall(eh => eh(errors))) {
+      throw new TypeException(errors)
+    }
+    (tDoc, ctx)
   }
 }
