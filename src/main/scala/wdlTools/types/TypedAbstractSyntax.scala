@@ -170,13 +170,13 @@ object TypedAbstractSyntax {
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
-  case class MetaNull(text: TextSource) extends MetaValue
-  case class MetaBoolean(value: Boolean, text: TextSource) extends MetaValue
-  case class MetaInt(value: Int, text: TextSource) extends MetaValue
-  case class MetaFloat(value: Double, text: TextSource) extends MetaValue
-  case class MetaString(value: String, text: TextSource) extends MetaValue
-  case class MetaObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
-  case class MetaArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
+  case class MetaValueNull(text: TextSource) extends MetaValue
+  case class MetaValueBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaValueInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaValueFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaValueString(value: String, text: TextSource) extends MetaValue
+  case class MetaValueObject(value: Map[String, MetaValue], text: TextSource) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element

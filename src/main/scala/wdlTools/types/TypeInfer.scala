@@ -707,16 +707,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   // language for meta values only.
   private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(text)                          => TAT.MetaNull(text)
-      case AST.ValueBoolean(value, text)                => TAT.MetaBoolean(value, text)
-      case AST.ValueInt(value, text)                    => TAT.MetaInt(value, text)
-      case AST.ValueFloat(value, text)                  => TAT.MetaFloat(value, text)
-      case AST.ValueString(value, text)                 => TAT.MetaString(value, text)
-      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaNull(text)
-      case AST.ExprIdentifier(id, text)                 => TAT.MetaString(id, text)
-      case AST.ExprArray(vec, text)                     => TAT.MetaArray(vec.map(metaValueFromExpr(_, ctx)), text)
+      case AST.ValueNull(text)                          => TAT.MetaValueNull(text)
+      case AST.ValueBoolean(value, text)                => TAT.MetaValueBoolean(value, text)
+      case AST.ValueInt(value, text)                    => TAT.MetaValueInt(value, text)
+      case AST.ValueFloat(value, text)                  => TAT.MetaValueFloat(value, text)
+      case AST.ValueString(value, text)                 => TAT.MetaValueString(value, text)
+      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaValueNull(text)
+      case AST.ExprIdentifier(id, text)                 => TAT.MetaValueString(id, text)
+      case AST.ExprArray(vec, text)                     => TAT.MetaValueArray(vec.map(metaValueFromExpr(_, ctx)), text)
       case AST.ExprMap(members, text) =>
-        TAT.MetaObject(
+        TAT.MetaValueObject(
             members.map {
               case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
                 key -> metaValueFromExpr(value, ctx)
@@ -728,7 +728,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             text
         )
       case AST.ExprObject(members, text) =>
-        TAT.MetaObject(
+        TAT.MetaValueObject(
             members.map {
               case AST.ExprObjectMember(key, value, _) =>
                 key -> metaValueFromExpr(value, ctx)
@@ -739,7 +739,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         )
       case other =>
         handleError(s"${SUtil.exprToString(other)} is an invalid meta value", expr.text, ctx)
-        TAT.MetaNull(other.text)
+        TAT.MetaValueNull(other.text)
     }
   }
 
@@ -762,7 +762,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
                 kv.text,
                 ctx
             )
-            TAT.MetaNull(kv.expr.text)
+            TAT.MetaValueNull(kv.expr.text)
           }
           kv.id -> metaValue
         }.toMap,
