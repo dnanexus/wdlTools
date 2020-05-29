@@ -8,8 +8,6 @@ import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.{Options, Util}
 
-import scala.collection.mutable
-
 object DocumentationGenerator {
   case class DocumentationComment(comments: Vector[Comment]) {
     private val commentRegex = "#+\\s*(.*)".r
@@ -74,7 +72,7 @@ object DocumentationGenerator {
                                meta: Vector[KeyValueDocumentation],
                                comment: Option[DocumentationComment])
 
-  case class WdlDocumentation(sourceUrl: URL,
+  case class WdlDocumentation(sourceUrl: Option[URL],
                               imports: Vector[ImportDocumentation],
                               structs: Vector[StructDocumentation],
                               workflow: Option[WorkflowDocumentation],
@@ -83,10 +81,7 @@ object DocumentationGenerator {
 
 }
 
-case class DocumentationGenerator(
-    opts: Options,
-    documentation: mutable.Map[String, String] = mutable.HashMap.empty
-) {
+case class DocumentationGenerator(opts: Options) {
   private val DOCUMENT_TEMPLATE = "/templates/documentation/document.ssp"
   private val STRUCTS_TEMPLATE = "/templates/documentation/structs.ssp"
   private val INDEX_TEMPLATE = "/templates/documentation/index.ssp"
@@ -275,25 +270,31 @@ case class DocumentationGenerator(
     }
   }
 
-  def apply(url: URL, title: String): Unit = {
-    val docs = Parsers(opts).getDocumentWalker[WdlDocumentation](url).walk { (doc, results) =>
-      val docs = generateDocumentation(doc)
-      if (docs.isDefined) {
-        results(doc.sourceUrl) = docs.get
-      }
-    }
-    val renderer: Renderer = Renderer()
-    docs.foreach {
-      case (url, doc) =>
-        documentation(Util.getFilename(url.getPath, ".wdl", ".md")) =
-          renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
+  def apply(url: URL, title: String): Map[String, String] = {
+    val docs = Parsers(opts).getDocumentWalker[Map[URL, WdlDocumentation]](url, Map.empty).walk {
+      (doc, results) =>
+        val docs = generateDocumentation(doc)
+        if (docs.isDefined) {
+          results + (doc.sourceUrl.get -> docs.get)
+        } else {
+          results
+        }
     }
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
-    if (structs.nonEmpty) {
-      documentation("structs.md") = renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs))
-    }
-    documentation("index.md") =
-      renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> documentation.keys.toVector))
+    val renderer: Renderer = Renderer()
+    val pages = docs.map {
+      case (url, doc) =>
+        Util.getFilename(url.getPath, ".wdl", ".md") ->
+          renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
+    } ++ (if (structs.nonEmpty) {
+            Map("structs.md" -> renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)))
+          } else {
+            Map.empty
+          })
+    pages ++ Map(
+        "index.md" ->
+          renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.keys.toVector))
+    )
   }
 }

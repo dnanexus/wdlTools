@@ -9,10 +9,8 @@ import wdlTools.syntax.{Parsers, TextSource, WdlVersion}
 import wdlTools.util.Options
 
 import scala.collection.BufferedIterator
-import scala.collection.mutable
 
-case class WdlV1Formatter(opts: Options,
-                          documents: mutable.Map[URL, Vector[String]] = mutable.Map.empty) {
+case class WdlV1Formatter(opts: Options) {
 
   private case class Literal(value: Any,
                              quoting: Boolean = false,
@@ -839,7 +837,7 @@ case class WdlV1Formatter(opts: Options,
       var groupStart = line
       var inputItr = inputs.iterator.buffered
       var otherItr = other.iterator.buffered
-      val otherGroups: mutable.Buffer[TopDeclarationsSection] = mutable.ArrayBuffer.empty
+      var otherGroups: Vector[TopDeclarationsSection] = Vector.empty
 
       def nextGroup(
           a: BufferedIterator[Statement],
@@ -867,7 +865,7 @@ case class WdlV1Formatter(opts: Options,
       while (inputItr.hasNext) {
         val otherResult = nextGroup(otherItr, inputItr)
         if (otherResult._1.isDefined) {
-          otherGroups.append(otherResult._1.get)
+          otherGroups :+= otherResult._1.get
         }
         otherItr = otherResult._2
 
@@ -887,7 +885,7 @@ case class WdlV1Formatter(opts: Options,
       lineFormatter.emptyLine()
 
       if (otherGroups.nonEmpty) {
-        otherGroups.toVector.foreach(group => group.format(lineFormatter))
+        otherGroups.foreach(group => group.format(lineFormatter))
       }
       if (otherItr.hasNext) {
         nextGroup(otherItr, inputItr)._1.get.format(lineFormatter)
@@ -954,17 +952,17 @@ case class WdlV1Formatter(opts: Options,
   }
 
   private def splitWorkflowElements(elements: Vector[WorkflowElement]): Vector[Statement] = {
-    val statements: mutable.Buffer[Statement] = mutable.ArrayBuffer.empty
-    val declarations: mutable.Buffer[Declaration] = mutable.ArrayBuffer.empty
+    var statements: Vector[Statement] = Vector.empty
+    var declarations: Vector[Declaration] = Vector.empty
 
     elements.foreach {
-      case declaration: Declaration => declarations.append(declaration)
+      case declaration: Declaration => declarations :+= declaration
       case other =>
         if (declarations.nonEmpty) {
-          statements.append(DeclarationsSection(declarations.toVector))
-          declarations.clear()
+          statements :+= DeclarationsSection(declarations)
+          declarations = Vector.empty
         }
-        statements.append(other match {
+        statements :+= (other match {
           case call: Call               => CallBlock(call)
           case scatter: Scatter         => ScatterBlock(scatter)
           case conditional: Conditional => ConditionalBlock(conditional)
@@ -973,10 +971,10 @@ case class WdlV1Formatter(opts: Options,
     }
 
     if (declarations.nonEmpty) {
-      statements.append(DeclarationsSection(declarations.toVector))
+      statements :+= DeclarationsSection(declarations)
     }
 
-    statements.toVector
+    statements
   }
 
   private case class WorkflowElementBody(override val statements: Vector[Statement])
@@ -1348,9 +1346,10 @@ case class WdlV1Formatter(opts: Options,
     lineFormatter.toVector
   }
 
-  def formatDocuments(url: URL): Unit = {
-    Parsers(opts).getDocumentWalker[Vector[String]](url, documents).walk { (doc, results) =>
-      results(doc.sourceUrl) = formatDocument(doc)
+  def formatDocuments(url: URL): Map[URL, Vector[String]] = {
+    Parsers(opts).getDocumentWalker[Map[URL, Vector[String]]](url, Map.empty).walk {
+      (doc, results) =>
+        results + (doc.sourceUrl.get -> formatDocument(doc))
     }
   }
 }

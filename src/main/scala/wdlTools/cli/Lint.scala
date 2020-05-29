@@ -30,9 +30,9 @@ case class Lint(conf: WdlToolsConf) extends Command {
         Rules.defaultRules
       }
     val linter = Linter(opts, rules)
-    linter.apply(url)
+    val lint = linter.apply(url)
 
-    if (linter.hasEvents) {
+    if (lint.nonEmpty) {
       // Load rule descriptions
       val rules = readJsonSource(Source.fromResource(RULES_RESOURCE))
       val outputFile = conf.lint.outputFile.toOption
@@ -48,10 +48,10 @@ case class Lint(conf: WdlToolsConf) extends Command {
         System.out
       }
       if (conf.lint.json()) {
-        val js = eventsToJson(linter.getOrderedEvents, rules).prettyPrint
+        val js = eventsToJson(lint, rules).prettyPrint
         printer.println(js)
       } else {
-        printEvents(linter.getOrderedEvents, rules, printer, effects = !toFile)
+        printEvents(lint, rules, printer, effects = !toFile)
       }
       if (toFile) {
         printer.close()

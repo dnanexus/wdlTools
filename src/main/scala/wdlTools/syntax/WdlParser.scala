@@ -5,28 +5,19 @@ import java.net.URL
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 import wdlTools.util.{Options, SourceCode, Util}
 
-import scala.collection.mutable
-
 trait DocumentWalker[T] {
-  def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T]
+  def walk(visitor: (Document, T) => T): T
 }
 
-abstract class WdlParser(opts: Options,
-                         errorHandler: Option[(Option[URL], Throwable) => Boolean] = None) {
+abstract class WdlParser(opts: Options) {
   // cache of documents that have already been fetched and parsed.
-  private val docCache: mutable.Map[URL, Option[AbstractSyntax.Document]] = mutable.Map.empty
+  private var docCache: Map[URL, Option[AbstractSyntax.Document]] = Map.empty
 
   protected def followImport(url: URL): Option[AbstractSyntax.Document] = {
     docCache.get(url) match {
       case None =>
-        val aDoc =
-          try {
-            Some(parseDocument(SourceCode.loadFrom(url)))
-          } catch {
-            case e: Throwable if errorHandler.isDefined && errorHandler.get(Some(url), e) => None
-            case e: Throwable                                                             => throw e
-          }
-        docCache(url) = aDoc
+        val aDoc = Some(parseDocument(SourceCode.loadFrom(url)))
+        docCache += (url -> aDoc)
         aDoc
       case Some(aDoc) => aDoc
     }
@@ -48,16 +39,11 @@ abstract class WdlParser(opts: Options,
     Util.getUrl(addr, opts.localDirectories)
   }
 
-  def getDocumentWalker[T](
-      url: URL,
-      results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T]
-  ): Walker[T] = {
-    Walker[T](SourceCode.loadFrom(url), results)
+  def getDocumentWalker[T](url: URL, start: T): Walker[T] = {
+    Walker[T](SourceCode.loadFrom(url), start)
   }
 
-  case class Walker[T](sourceCode: SourceCode,
-                       results: mutable.Map[URL, T] = mutable.HashMap.empty[URL, T])
-      extends DocumentWalker[T] {
+  case class Walker[T](sourceCode: SourceCode, start: T) extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[URL, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
@@ -66,13 +52,14 @@ abstract class WdlParser(opts: Options,
       }.toMap
     }
 
-    def walk(visitor: (Document, mutable.Map[URL, T]) => Unit): Map[URL, T] = {
-      val visited: mutable.Set[Option[URL]] = mutable.HashSet.empty
+    def walk(visitor: (Document, T) => T): T = {
+      var visited: Set[Option[URL]] = Set.empty
+      var results: T = start
 
       def addDocument(url: Option[URL], doc: Document): Unit = {
         if (!visited.contains(url)) {
-          visited.add(url)
-          visitor(doc, results)
+          visited += url
+          results = visitor(doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {
               case (uri, doc) => addDocument(Some(uri), doc)
@@ -81,14 +68,9 @@ abstract class WdlParser(opts: Options,
         }
       }
 
-      try {
-        val document = parseDocument(sourceCode)
-        addDocument(sourceCode.url, document)
-      } catch {
-        case e: Throwable if errorHandler.isDefined && errorHandler.get(sourceCode.url, e) => ()
-        case e: Throwable                                                                  => throw e
-      }
-      results.toMap
+      val document = parseDocument(sourceCode)
+      addDocument(sourceCode.url, document)
+      results
     }
   }
 }

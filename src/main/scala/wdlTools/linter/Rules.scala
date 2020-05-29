@@ -27,15 +27,15 @@ object Rules {
   type LinterParserRuleApplySig = (
       String,
       Severity,
-      mutable.Buffer[LintEvent],
       Grammar
   ) => LinterParserRule
 
-  class LinterParserRule(id: String,
-                         severity: Severity,
-                         docSourceUrl: Option[URL],
-                         events: mutable.Buffer[LintEvent])
+  class LinterParserRule(id: String, severity: Severity, docSourceUrl: Option[URL])
       extends AllParseTreeListener {
+    private var events: Vector[LintEvent] = Vector.empty
+
+    def getEvents: Vector[LintEvent] = events
+
     protected def addEventFromTokens(tok: Token,
                                      stopToken: Option[Token] = None,
                                      message: Option[String] = None): Unit = {
@@ -43,15 +43,12 @@ object Rules {
     }
 
     protected def addEvent(textSource: TextSource, message: Option[String] = None): Unit = {
-      events.append(LintEvent(id, severity, textSource, docSourceUrl, message))
+      events :+= LintEvent(id, severity, textSource, docSourceUrl, message)
     }
   }
 
-  abstract class HiddenTokensLinterParserRule(id: String,
-                                              severity: Severity,
-                                              events: mutable.Buffer[LintEvent],
-                                              grammar: Grammar)
-      extends LinterParserRule(id, severity, grammar.docSourceUrl, events) {
+  abstract class HiddenTokensLinterParserRule(id: String, severity: Severity, grammar: Grammar)
+      extends LinterParserRule(id, severity, grammar.docSourceUrl) {
     private val tokenIndexes: mutable.Set[Int] = mutable.HashSet.empty
 
     protected def addEvent(tok: Token): Unit = {
@@ -78,9 +75,8 @@ object Rules {
 
   abstract class EveryRuleHiddenTokensLinterParserRule(id: String,
                                                        severity: Severity,
-                                                       events: mutable.Buffer[LintEvent],
                                                        grammar: Grammar)
-      extends HiddenTokensLinterParserRule(id, severity, events, grammar) {
+      extends HiddenTokensLinterParserRule(id, severity, grammar) {
     override def exitEveryRule(ctx: ParserRuleContext): Unit = {
       grammar
         .getHiddenTokens(ctx, within = true)
@@ -91,21 +87,15 @@ object Rules {
     def isViolation(token: Token): Boolean
   }
 
-  case class WhitespaceTabsRule(id: String,
-                                severity: Severity,
-                                events: mutable.Buffer[LintEvent],
-                                grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(id, severity, events, grammar) {
+  case class WhitespaceTabsRule(id: String, severity: Severity, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(id, severity, grammar) {
     override def isViolation(token: Token): Boolean = {
       token.getText.contains("\t")
     }
   }
 
-  case class OddIndentRule(id: String,
-                           severity: Severity,
-                           events: mutable.Buffer[LintEvent],
-                           grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(id, severity, events, grammar) {
+  case class OddIndentRule(id: String, severity: Severity, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(id, severity, grammar) {
     private val indentRegex = "\n+([ \t]+)".r
 
     override def isViolation(token: Token): Boolean = {
@@ -121,11 +111,8 @@ object Rules {
     }
   }
 
-  case class MultipleBlankLineRule(id: String,
-                                   severity: Severity,
-                                   events: mutable.Buffer[LintEvent],
-                                   grammar: Grammar)
-      extends EveryRuleHiddenTokensLinterParserRule(id, severity, events, grammar) {
+  case class MultipleBlankLineRule(id: String, severity: Severity, grammar: Grammar)
+      extends EveryRuleHiddenTokensLinterParserRule(id, severity, grammar) {
     private val multipleReturns = "(\n\\s*){3,}".r
 
     override def isViolation(token: Token): Boolean = {
@@ -133,11 +120,8 @@ object Rules {
     }
   }
 
-  case class TopLevelIndentRule(id: String,
-                                severity: Severity,
-                                events: mutable.Buffer[LintEvent],
-                                grammar: Grammar)
-      extends HiddenTokensLinterParserRule(id, severity, events, grammar) {
+  case class TopLevelIndentRule(id: String, severity: Severity, grammar: Grammar)
+      extends HiddenTokensLinterParserRule(id, severity, grammar) {
     private val endWhitespaceRegex = "\\s$".r
 
     def checkIndent(ctx: ParserRuleContext): Unit = {
@@ -169,11 +153,8 @@ object Rules {
     }
   }
 
-  case class DeprecatedCommandStyleRule(id: String,
-                                        severity: Severity,
-                                        events: mutable.Buffer[LintEvent],
-                                        grammar: Grammar)
-      extends HiddenTokensLinterParserRule(id, severity, events, grammar) {
+  case class DeprecatedCommandStyleRule(id: String, severity: Severity, grammar: Grammar)
+      extends HiddenTokensLinterParserRule(id, severity, grammar) {
 
     override def exitTask_command_expr_part(ctx: ParserRuleContext): Unit = {
       if (grammar.version >= WdlVersion.V1) {
@@ -197,13 +178,19 @@ object Rules {
   // Note that most of these are caught by the type-checker, but it's
   // still good to be able to warn the user
 
-  class LinterAstRule(id: String,
-                      severity: Severity,
-                      docSourceUrl: Option[URL],
-                      events: mutable.Buffer[LintEvent])
+  class LinterAstRule(id: String, severity: Severity, docSourceUrl: Option[URL])
       extends ASTVisitor {
-    protected def addEvent(element: Element, message: Option[String] = None): Unit = {
-      events.append(LintEvent(id, severity, element.text, docSourceUrl, message))
+    private var events: Vector[LintEvent] = Vector.empty
+
+    def getEvents: Vector[LintEvent] = events
+
+    protected def addEvent(ctx: ASTVisitor.Context[_ <: Element],
+                           message: Option[String] = None): Unit = {
+      addEventFromElement(ctx.element, message)
+    }
+
+    protected def addEventFromElement(element: Element, message: Option[String] = None): Unit = {
+      events :+= LintEvent(id, severity, element.text, docSourceUrl, message)
     }
   }
 
@@ -212,7 +199,6 @@ object Rules {
       Severity,
       WdlVersion,
       types.Context,
-      mutable.Buffer[LintEvent],
       Option[URL]
   ) => LinterAstRule
 
@@ -322,16 +308,15 @@ object Rules {
                                  severity: Severity,
                                  version: WdlVersion,
                                  typesContext: types.Context,
-                                 events: mutable.Buffer[LintEvent],
                                  docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(id, severity, docSourceUrl) {
     private val containerKeys = Set("docker", "container")
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.runtime.isEmpty) {
-        addEvent(ctx.element, Some("add a runtime section specifying a container"))
+        addEvent(ctx, Some("add a runtime section specifying a container"))
       } else if (!ctx.element.runtime.get.kvs.exists(kv => containerKeys.contains(kv.id))) {
-        addEvent(ctx.element, Some("add a container to the runtime section"))
+        addEvent(ctx, Some("add a container to the runtime section"))
       }
     }
   }
@@ -340,12 +325,11 @@ object Rules {
                               severity: Severity,
                               version: WdlVersion,
                               typesContext: types.Context,
-                              events: mutable.Buffer[LintEvent],
                               docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(id, severity, docSourceUrl) {
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.input.isEmpty || ctx.element.input.get.declarations.isEmpty) {
-        addEvent(ctx.element)
+        addEvent(ctx)
       }
     }
   }
@@ -354,13 +338,12 @@ object Rules {
                                severity: Severity,
                                version: WdlVersion,
                                typesContext: types.Context,
-                               events: mutable.Buffer[LintEvent],
                                docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl, events) {
+      extends LinterAstRule(id, severity, docSourceUrl) {
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.output.isEmpty || ctx.element.output.get.declarations.isEmpty) {
-        addEvent(ctx.element)
+        addEvent(ctx)
       }
     }
   }
