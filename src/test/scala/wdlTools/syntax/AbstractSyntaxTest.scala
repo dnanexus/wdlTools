@@ -97,4 +97,24 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
       parser.parseDocument(getTaskSource("runtime_section_duplicate_key.wdl"))
     }
   }
+
+  it should "parse a WDL string" in {
+    val wdl =
+      """version 1.0
+        |task foo {
+        |  command {
+        |    echo 'hello'
+        |  }
+        |}
+        |""".stripMargin
+    val parsers = Parsers(opts)
+    val src = SourceCode(None, wdl.split("\n").toVector)
+    val parser = parsers.getParser(src)
+    val doc = parser.parseDocument(src)
+    doc.version should matchPattern {
+      case Version(WdlVersion.V1, _) =>
+    }
+    doc.elements.size shouldBe 1
+    doc.elements.head.asInstanceOf[Task].name shouldBe "foo"
+  }
 }

@@ -1232,7 +1232,7 @@ document
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(grammar.docSourceUrl.get,
+    Document(grammar.docSourceUrl,
              grammar.docSource,
              version,
              elems,

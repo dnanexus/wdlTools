@@ -191,7 +191,7 @@ object AbstractSyntax {
                       text: TextSource)
       extends Element
 
-  case class Document(sourceUrl: URL,
+  case class Document(sourceUrl: Option[URL],
                       sourceCode: String,
                       version: Version,
                       elements: Vector[DocumentElement],
