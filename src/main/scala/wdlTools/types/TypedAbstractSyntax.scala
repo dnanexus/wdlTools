@@ -238,7 +238,6 @@ object TypedAbstractSyntax {
       extends WorkflowElement
 
   case class Scatter(identifier: String,
-                     wdlType: WdlTypes.T,
                      expr: Expr,
                      body: Vector[WorkflowElement],
                      text: TextSource)
