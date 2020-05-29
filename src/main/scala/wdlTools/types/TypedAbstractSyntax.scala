@@ -259,7 +259,7 @@ object TypedAbstractSyntax {
       extends Element
       with Callable
 
-  case class Document(docSourceUrl: URL,
+  case class Document(sourceUrl: Option[URL],
                       sourceCode: String,
                       version: Version,
                       elements: Vector[DocumentElement],

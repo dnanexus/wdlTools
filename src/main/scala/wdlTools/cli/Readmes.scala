@@ -1,5 +1,7 @@
 package wdlTools.cli
 
+import java.net.URL
+
 import wdlTools.generators.{ReadmeGenerator, Renderer}
 import wdlTools.syntax.Parsers
 import wdlTools.util.Util
@@ -11,8 +13,9 @@ case class Readmes(conf: WdlToolsConf) extends Command {
     val url = conf.readmes.url()
     val parsers = Parsers(conf.readmes.getOptions)
     val renderer = Renderer()
-    val readmes = parsers.getDocumentWalker[String](url).walk { (doc, results) =>
-      ReadmeGenerator(conf.readmes.developerReadmes(), renderer, results).apply(doc)
+    val readmes = parsers.getDocumentWalker[Map[URL, String]](url, Map.empty).walk {
+      (doc, results) =>
+        results ++ ReadmeGenerator(conf.readmes.developerReadmes(), renderer).apply(doc)
     }
     Util.writeContentsToFiles(readmes,
                               outputDir = conf.readmes.outputDir.toOption,

@@ -34,7 +34,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
     val beforeURL = getWdlUrl(fname = "simple.wdl", subdir = "before")
     val expected = getWdlSource(fname = "simple.wdl", subdir = "after")
     val formatter = WdlV1Formatter(opts)
-    formatter.formatDocuments(beforeURL)
-    formatter.documents(beforeURL).mkString("\n") shouldBe expected
+    val documents = formatter.formatDocuments(beforeURL)
+    documents(beforeURL).mkString("\n") shouldBe expected
   }
 }

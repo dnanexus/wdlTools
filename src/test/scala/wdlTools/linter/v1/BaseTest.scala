@@ -7,13 +7,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, Severity}
 import wdlTools.syntax.TextSource
-import wdlTools.util.{BasicOptions, Util}
+import wdlTools.types.TypeOptions
+import wdlTools.util.Util
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private val opts = BasicOptions()
+  private val opts = TypeOptions()
 
   def getWdlPath(fname: String, subdir: String): Path = {
-    Paths.get(getClass.getResource(s"/lint/${subdir}/${fname}").getPath)
+    Paths.get(getClass.getResource(s"/wdlTools/linter/${subdir}/${fname}").getPath)
   }
 
   private def getWdlUrl(fname: String, subdir: String): URL = {
@@ -23,9 +24,9 @@ class BaseTest extends AnyFlatSpec with Matchers {
   it should "detect lints" in {
     val linter = Linter(opts)
     val url = getWdlUrl("simple.wdl", "v1")
-    linter.apply(url)
+    val allLints = linter.apply(url)
+    val lints = allLints(url)
 
-    val lints = linter.getOrderedEvents(url)
     lints.size shouldBe 8
 
     lints(0) should matchPattern {
