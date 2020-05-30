@@ -2,8 +2,11 @@ package wdlTools.eval
 
 import java.net.URL
 import java.nio.file.Path
+import java.nio.charset.Charset
 
 import wdlTools.syntax.TextSource
+
+import scala.io.Codec
 
 case class Context(bindings: Map[String, WdlValues.V]) {
   def addBinding(name: String, value: WdlValues.V): Context = {
@@ -23,8 +26,13 @@ trait StandardLibraryImpl {
   * @param tmpDir   directory for placing temporary files.
   * @param stdout   the file that has a copy of standard output. This is used in the command section.
   * @param stderr   as above for standard error.
+  * @param encoding the encoding to use when reading files.
   */
-case class EvalConfig(homeDir: Path, tmpDir: Path, stdout: Path, stderr: Path)
+case class EvalConfig(homeDir: Path,
+                      tmpDir: Path,
+                      stdout: Path,
+                      stderr: Path,
+                      encoding: Charset = Codec.default.charSet)
 
 // A runtime error
 final class EvalException(message: String) extends Exception(message) {

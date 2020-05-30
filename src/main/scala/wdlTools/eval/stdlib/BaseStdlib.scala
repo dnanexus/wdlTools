@@ -8,11 +8,12 @@ import wdlTools.eval._
 import wdlTools.syntax.TextSource
 import wdlTools.types.WdlTypes._
 import wdlTools.util.Options
-
 import kantan.csv._
 import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
 import kantan.csv.ops._
 import spray.json._
+
+import scala.io.Source
 
 abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
     extends StandardLibraryImpl {
@@ -101,7 +102,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_lines(args: Vector[V], text: TextSource): V_Array = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    V_Array(content.getLines.map(x => V_String(x)).toVector)
+    V_Array(Source.fromString(content).getLines.map(x => V_String(x)).toVector)
   }
 
   private val tsvConf = CsvConfiguration('\t', '"', QuotePolicy.WhenNeeded, Header.None)
@@ -113,7 +114,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_tsv(args: Vector[V], text: TextSource): V_Array = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    val reader = content.mkString.asCsvReader[Vector[String]](tsvConf)
+    val reader = content.asCsvReader[Vector[String]](tsvConf)
     V_Array(reader.map {
       case Left(err) =>
         throw new EvalException(s"Invalid tsv file ${file}: ${err}", text, docSourceUrl)
@@ -128,7 +129,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_map(args: Vector[V], text: TextSource): V_Map = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    val reader = content.mkString.asCsvReader[(String, String)](tsvConf)
+    val reader = content.asCsvReader[(String, String)](tsvConf)
     V_Map(
         reader
           .map {
@@ -149,7 +150,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   // * removed in Version 2
   protected def read_object(args: Vector[V], text: TextSource): V_Object = {
     val file = getWdlFile(args, text)
-    val content = iosp.readFile(file.value, text).mkString
+    val content = iosp.readFile(file.value, text)
     val lines: Vector[Vector[String]] = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
@@ -177,7 +178,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_objects(args: Vector[V], text: TextSource): V_Array = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    val lines = content.mkString
+    val lines = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
         case Left(err)  => throw new EvalException(s"Invalid tsv file ${file}: ${err}")
@@ -221,7 +222,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
     try {
-      Serialize.fromJson(content.mkString.parseJson)
+      Serialize.fromJson(content.parseJson)
     } catch {
       case e: JsonSerializationException =>
         throw new EvalException(e.getMessage, text, docSourceUrl)
@@ -236,7 +237,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
     try {
-      V_Int(content.mkString.trim.toInt)
+      V_Int(content.trim.toInt)
     } catch {
       case _: Throwable =>
         throw new EvalException(s"could not convert (${content}) to an integer", text, docSourceUrl)
@@ -250,7 +251,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_string(args: Vector[V], text: TextSource): V_String = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    V_String(content.mkString)
+    V_String(content)
   }
 
   // Float read_float(String|File)
@@ -261,7 +262,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
     try {
-      V_Float(content.mkString.trim.toDouble)
+      V_Float(content.trim.toDouble)
     } catch {
       case _: Throwable =>
         throw new EvalException(s"could not convert (${content}) to a float", text, docSourceUrl)
@@ -275,7 +276,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
   protected def read_boolean(args: Vector[V], text: TextSource): V_Boolean = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    content.mkString.trim.toLowerCase() match {
+    content.trim.toLowerCase() match {
       case "false" => V_Boolean(false)
       case "true"  => V_Boolean(true)
       case _ =>

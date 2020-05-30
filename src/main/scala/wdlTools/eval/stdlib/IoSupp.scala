@@ -8,7 +8,6 @@ import wdlTools.eval.{EvalConfig, EvalException}
 import wdlTools.syntax.TextSource
 import wdlTools.util.{Options, Util, Verbosity}
 
-import scala.io.Source
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
@@ -42,12 +41,12 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
   }
 
   // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-  private def readLocalFile(p: Path): Source = {
+  private def readLocalFile(p: Path): String = {
     assertExists(p)
-    Source.fromFile(p.toFile)
+    new String(Files.readAllBytes(p), evalCfg.encoding)
   }
 
-  private def readUrlContent(url: URL): Source = {
+  private def readUrlContent(url: URL): String = {
     val is = url.openStream()
     val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
 
@@ -62,7 +61,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
           buffer.write(data, 0, nRead)
       }
 
-      Source.fromBytes(buffer.toByteArray)
+      new String(buffer.toByteArray, evalCfg.encoding)
     } finally {
       is.close()
       buffer.close()
@@ -70,7 +69,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
   }
 
   // Read the contents of the file/URL and return a string
-  def readFile(pathOrUrl: String, text: TextSource): Source = {
+  def readFile(pathOrUrl: String, text: TextSource): String = {
     // check that file isn't too big
     val fileSizeMiB = BigDecimal(size(pathOrUrl, text)) / MiB
     if (fileSizeMiB > MaxFileSizeMiB) {
@@ -105,7 +104,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
     */
   def writeFile(p: Path, content: String, text: TextSource): Unit = {
     try {
-      Files.write(p, content.getBytes())
+      Files.write(p, content.getBytes(evalCfg.encoding))
     } catch {
       case t: Throwable =>
         throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}",
