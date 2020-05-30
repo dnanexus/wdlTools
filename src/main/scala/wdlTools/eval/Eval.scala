@@ -4,8 +4,7 @@ import java.net.URL
 
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
-
-import wdlTools.types.{TypedAbstractSyntax => TAT, WdlTypes}
+import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 import wdlTools.util.{Options, Util}
 
 case class Eval(opts: Options,
@@ -13,11 +12,8 @@ case class Eval(opts: Options,
                 wdlVersion: WdlVersion,
                 docSourceUrl: Option[URL]) {
   // choose the standard library implementation based on version
-  private val stdlib = wdlVersion match {
-    case WdlVersion.Draft_2 => StdlibDraft2(opts, evalCfg, docSourceUrl)
-    case WdlVersion.V1      => StdlibV1(opts, evalCfg, docSourceUrl)
-    case WdlVersion.V2      => throw new Exception("WDL V2 is not yet supported")
-  }
+  private val standardLibrary =
+    stdlib.getStandardLibraryImpl(wdlVersion, opts, evalCfg, docSourceUrl)
   private val coercion = Coercion(docSourceUrl)
 
   private def getStringVal(value: V, text: TextSource): String = {
@@ -482,7 +478,7 @@ case class Eval(opts: Options,
       //   read_int("4")
       case TAT.ExprApply(funcName, _, elements, _, text) =>
         val funcArgs = elements.map(e => apply(e, ctx))
-        stdlib.call(funcName, funcArgs, text)
+        standardLibrary.call(funcName, funcArgs, text)
 
       // Access a field in a struct or an object. For example:
       //   Int z = x.a

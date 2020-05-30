@@ -26,7 +26,7 @@ object Serialize {
 
       // compound values
       case V_Array(vec) =>
-        JsArray(vec.map(toJson(_)))
+        JsArray(vec.map(toJson))
       case V_Object(members) =>
         JsObject(members.map { case (k, v) => k -> toJson(v) })
       case V_Struct(_, members) =>
@@ -51,7 +51,7 @@ object Serialize {
 
       // compound values
       case JsArray(vec) =>
-        V_Array(vec.map(fromJson(_)))
+        V_Array(vec.map(fromJson))
       case JsObject(fields) =>
         V_Object(fields.map { case (k, v) => k -> fromJson(v) })
     }
