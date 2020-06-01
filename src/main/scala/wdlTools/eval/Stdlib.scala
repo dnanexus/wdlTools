@@ -1,28 +1,163 @@
-package wdlTools.eval.stdlib
+package wdlTools.eval
 
 import java.net.URL
 import java.nio.file.{Path, Paths}
 
-import wdlTools.eval.WdlValues._
-import wdlTools.eval._
-import wdlTools.syntax.TextSource
-import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
-import kantan.csv._
 import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
+import kantan.csv._
 import kantan.csv.ops._
 import spray.json._
+import wdlTools.eval
+import wdlTools.eval.WdlValues._
+import wdlTools.syntax.{TextSource, WdlVersion}
+import wdlTools.types.WdlTypes._
+import wdlTools.util.Options
 
 import scala.io.Source
 
-abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
+case class Stdlib(opts: Options,
+                  evalCfg: EvalConfig,
+                  version: WdlVersion,
+                  docSourceUrl: Option[URL])
     extends StandardLibraryImpl {
   type FunctionImpl = (Vector[WdlValues.V], TextSource) => V
 
   protected val coercion: Coercion = Coercion(docSourceUrl)
-  protected val iosp: IoSupp = stdlib.IoSupp(opts, evalCfg, docSourceUrl)
+  protected val iosp: IoSupp = eval.IoSupp(opts, evalCfg, docSourceUrl)
 
-  protected def funcTable: Map[String, FunctionImpl]
+  private val draft2FuncTable: Map[String, FunctionImpl] = Map(
+      "stdout" -> stdout,
+      "stderr" -> stderr,
+      // read from a file
+      "read_lines" -> read_lines,
+      "read_tsv" -> read_tsv,
+      "read_map" -> read_map,
+      "read_object" -> read_object,
+      "read_objects" -> read_objects,
+      "read_json" -> read_json,
+      "read_int" -> read_int,
+      "read_string" -> read_string,
+      "read_float" -> read_float,
+      "read_boolean" -> read_boolean,
+      // write to a file
+      "write_lines" -> write_lines,
+      "write_tsv" -> write_tsv,
+      "write_map" -> write_map,
+      "write_object" -> write_object,
+      "write_objects" -> write_objects,
+      "write_json" -> write_json,
+      // other functions
+      "size" -> size,
+      "sub" -> sub,
+      "range" -> range,
+      "transpose" -> transpose,
+      "zip" -> zip,
+      "cross" -> cross,
+      "length" -> length,
+      "flatten" -> flatten,
+      "prefix" -> prefix,
+      "select_first" -> select_first,
+      "select_all" -> select_all,
+      "defined" -> defined,
+      "basename" -> basename,
+      "floor" -> floor,
+      "ceil" -> ceil,
+      "round" -> round,
+      "glob" -> glob
+  )
+
+  val v1FuncTable: Map[String, FunctionImpl] = Map(
+      "stdout" -> stdout,
+      "stderr" -> stderr,
+      // read from a file
+      "read_lines" -> read_lines,
+      "read_tsv" -> read_tsv,
+      "read_map" -> read_map,
+      "read_object" -> read_object,
+      "read_objects" -> read_objects,
+      "read_json" -> read_json,
+      "read_int" -> read_int,
+      "read_string" -> read_string,
+      "read_float" -> read_float,
+      "read_boolean" -> read_boolean,
+      // write to a file
+      "write_lines" -> write_lines,
+      "write_tsv" -> write_tsv,
+      "write_map" -> write_map,
+      "write_object" -> write_object,
+      "write_objects" -> write_objects,
+      "write_json" -> write_json,
+      // other functions
+      "size" -> size,
+      "sub" -> sub,
+      "range" -> range,
+      "transpose" -> transpose,
+      "zip" -> zip,
+      "cross" -> cross,
+      "length" -> length,
+      "flatten" -> flatten,
+      "prefix" -> prefix,
+      "select_first" -> select_first,
+      "select_all" -> select_all,
+      "defined" -> defined,
+      "basename" -> basename,
+      "floor" -> floor,
+      "ceil" -> ceil,
+      "round" -> round,
+      "glob" -> glob
+  )
+
+  val v2FuncTable: Map[String, FunctionImpl] = Map(
+      "stdout" -> stdout,
+      "stderr" -> stderr,
+      // read from a file
+      "read_lines" -> read_lines,
+      "read_tsv" -> read_tsv,
+      "read_map" -> read_map,
+      "read_json" -> read_json,
+      "read_int" -> read_int,
+      "read_string" -> read_string,
+      "read_float" -> read_float,
+      "read_boolean" -> read_boolean,
+      // write to a file
+      "write_lines" -> write_lines,
+      "write_tsv" -> write_tsv,
+      "write_map" -> write_map,
+      "write_json" -> write_json,
+      // other functions
+      "size" -> size,
+      "sub" -> sub,
+      "range" -> range,
+      "transpose" -> transpose,
+      "zip" -> zip,
+      "cross" -> cross,
+      "as_pairs" -> as_pairs,
+      "as_map" -> as_map,
+      "keys" -> keys,
+      "collect_by_key" -> collect_by_key,
+      "length" -> length,
+      "flatten" -> flatten,
+      "prefix" -> prefix,
+      "suffix" -> suffix,
+      "quote" -> quote,
+      "squote" -> squote,
+      "select_first" -> select_first,
+      "select_all" -> select_all,
+      "defined" -> defined,
+      "basename" -> basename,
+      "floor" -> floor,
+      "ceil" -> ceil,
+      "round" -> round,
+      "glob" -> glob
+  )
+
+  // choose the standard library prototypes according to the WDL version
+  private val funcTable: Map[String, FunctionImpl] = version match {
+    case WdlVersion.Draft_2 => draft2FuncTable
+    case WdlVersion.V1      => v1FuncTable
+    case WdlVersion.V2      => v2FuncTable
+    case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
+  }
 
   def call(funcName: String, args: Vector[V], text: TextSource): V = {
     if (!(funcTable contains funcName))
@@ -636,7 +771,7 @@ abstract class BaseStdlib(opts: Options, evalCfg: EvalConfig, docSourceUrl: Opti
     V_Array(vec.map(str => V_String(pref + str)))
   }
 
-  // Array[String] prefix(String, Array[X])
+  // Array[String] suffix(String, Array[X])
   //
   // Given a String and an Array[X] where X is a primitive type, the
   // suffix function returns an array of strings comprised of each

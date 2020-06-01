@@ -12,8 +12,7 @@ case class Eval(opts: Options,
                 wdlVersion: WdlVersion,
                 docSourceUrl: Option[URL]) {
   // choose the standard library implementation based on version
-  private val standardLibrary =
-    stdlib.getStandardLibraryImpl(wdlVersion, opts, evalCfg, docSourceUrl)
+  private val standardLibrary = Stdlib(opts, evalCfg, wdlVersion, docSourceUrl)
   private val coercion = Coercion(docSourceUrl)
 
   private def getStringVal(value: V, text: TextSource): String = {
