@@ -4,13 +4,19 @@ import java.io.{FileNotFoundException, IOException}
 
 import scala.jdk.CollectionConverters._
 import java.net.URL
+import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
 import Verbosity._
 
+import scala.io.{Codec, Source}
+
 object Util {
+  // the spec states that WDL files must use UTF8 encoding
+  val DefaultEncoding: Charset = Codec.UTF8.charSet
+  val DefaultLineSeparator: String = "\n"
 
   /**
     * The current wdlTools version.
@@ -97,7 +103,7 @@ object Util {
     * @return
     */
   def readFromFile(path: Path): String = {
-    readLinesFromFile(path).mkString(System.lineSeparator())
+    new String(Files.readAllBytes(path), DefaultEncoding)
   }
 
   /**
@@ -105,8 +111,8 @@ object Util {
     * @param path the path to the file
     * @return a Seq of the lines from the file
     */
-  def readLinesFromFile(path: Path): Seq[String] = {
-    val source = io.Source.fromFile(path.toString)
+  def readLinesFromFile(path: Path): Vector[String] = {
+    val source = Source.fromFile(path.toString, DefaultEncoding.name)
     try {
       source.getLines.toVector
     } finally {
@@ -127,7 +133,7 @@ object Util {
     docs.foreach {
       case (url, lines) =>
         val outputPath = Util.getLocalPath(url, outputDir, overwrite)
-        Files.write(outputPath, lines.asJava)
+        Files.write(outputPath, lines.asJava, DefaultEncoding)
     }
   }
 
@@ -187,7 +193,7 @@ object Util {
       throw new Exception(s"File already exists: ${path}")
     }
     Files.createDirectories(path.getParent)
-    Files.write(path, contents.getBytes())
+    Files.write(path, contents.getBytes(DefaultEncoding))
   }
 
   /**

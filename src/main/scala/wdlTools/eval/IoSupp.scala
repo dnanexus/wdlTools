@@ -1,29 +1,48 @@
 package wdlTools.eval
 
 import java.io.ByteArrayOutputStream
-import java.net.{URL, HttpURLConnection}
-import java.nio.charset.StandardCharsets._
-import java.nio.file.{Files, FileSystems, Path, Paths, PathMatcher}
+import java.net.{HttpURLConnection, MalformedURLException, URL}
+import java.nio.file._
+
+import wdlTools.syntax.TextSource
+import wdlTools.util.{Options, Util, Verbosity}
+
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
-import wdlTools.util.{Options, Util}
-import wdlTools.util.Verbosity._
+case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
+  val MiB = BigDecimal(1024 * 1024)
+  val MaxFileSizeMiB = BigDecimal(256)
 
-case class IoSupp(opts: Options, evalCfg: EvalConfig) {
-  private def isUrl(pathOrUrl: String): Boolean = {
-    pathOrUrl.contains("://")
+  private def asPathOrUrl(pathOrUrl: String, text: TextSource): Either[Path, URL] = {
+    try {
+      if (pathOrUrl.contains("://")) {
+        Right(new URL(pathOrUrl))
+      } else {
+        Left(Paths.get(pathOrUrl))
+      }
+    } catch {
+      case _: MalformedURLException =>
+        throw new EvalException(s"Invalid URL ${pathOrUrl}", text, docSourceUrl)
+      case _: InvalidPathException =>
+        throw new EvalException(s"Invalid path ${pathOrUrl}", text, docSourceUrl)
+      case t: Throwable =>
+        throw new EvalException(s"Invalid path or URL ${pathOrUrl}: ${t.getMessage}",
+                                text,
+                                docSourceUrl)
+    }
+  }
+
+  private def assertExists(p: Path): Unit = {
+    if (!Files.exists(p)) {
+      throw new FileSystemNotFoundException(s"File ${p} not found")
+    }
   }
 
   // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
   private def readLocalFile(p: Path): String = {
-    if (!Files.exists(p))
-      throw new RuntimeException(s"File ${p} not found")
-
-    // TODO: Check that the file isn't over 256 MiB.
-    // I have seen a user read a 30GiB file this case, and cause an ugly error.
-
-    new String(Files.readAllBytes(p), UTF_8)
+    assertExists(p)
+    new String(Files.readAllBytes(p), evalCfg.encoding)
   }
 
   private def readUrlContent(url: URL): String = {
@@ -41,12 +60,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
           buffer.write(data, 0, nRead)
       }
 
-      // make it a string
-      new String(buffer.toByteArray, UTF_8)
-    } catch {
-      case e: Throwable =>
-        Util.error(s"Error reading ${url.toString}")
-        throw e
+      new String(buffer.toByteArray, evalCfg.encoding)
     } finally {
       is.close()
       buffer.close()
@@ -54,31 +68,48 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
   }
 
   // Read the contents of the file/URL and return a string
-  //
-  // This may be a binary file that does not lend itself to splitting into lines.
-  // Hence, we aren't using the Source module.
-  def readFile(pathOrUrl: String): String = {
-    if (isUrl(pathOrUrl)) {
-      // A URL
-      val url = new URL(pathOrUrl)
-      val content = url.getProtocol match {
-        case "http" | "https" => readUrlContent(new URL(pathOrUrl))
-        case "file"           => readLocalFile(Paths.get(pathOrUrl))
-        case _                => throw new RuntimeException(s"unknown protocol in URL ${url}")
-      }
-      return content
+  def readFile(pathOrUrl: String, text: TextSource): String = {
+    // check that file isn't too big
+    val fileSizeMiB = BigDecimal(size(pathOrUrl, text)) / MiB
+    if (fileSizeMiB > MaxFileSizeMiB) {
+      throw new EvalException(
+          s"${pathOrUrl} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported",
+          text,
+          docSourceUrl
+      )
     }
-
-    // This is a local file
-    val p = Paths.get(pathOrUrl)
-    readLocalFile(p)
+    try {
+      asPathOrUrl(pathOrUrl, text) match {
+        case Left(path) => readLocalFile(path)
+        case Right(url) =>
+          url.getProtocol match {
+            case "http" | "https" => readUrlContent(new URL(pathOrUrl))
+            case "file"           => readLocalFile(Paths.get(pathOrUrl))
+            case _                => throw new EvalException(s"unknown protocol in URL ${url}", text, docSourceUrl)
+          }
+      }
+    } catch {
+      case e: EvalException =>
+        Util.error(s"Error reading ${pathOrUrl}")
+        throw e
+      case t: Throwable =>
+        Util.error(s"Error reading ${pathOrUrl}")
+        throw new EvalException(s"Error reading ${pathOrUrl}: ${t.getMessage}", text, docSourceUrl)
+    }
   }
 
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(p: Path, content: String): Unit = {
-    Files.write(p, content.getBytes())
+  def writeFile(p: Path, content: String, text: TextSource): Unit = {
+    try {
+      Files.write(p, content.getBytes(evalCfg.encoding))
+    } catch {
+      case t: Throwable =>
+        throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}",
+                                text,
+                                docSourceUrl)
+    }
   }
 
   /**
@@ -86,7 +117,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     * @return the list of globbed paths
     */
   def glob(pattern: String): Vector[String] = {
-    if (opts.verbosity == Verbose) {
+    if (opts.verbosity == Verbosity.Verbose) {
       System.out.println(s"glob(${pattern})")
     }
     val baseDir = evalCfg.homeDir
@@ -106,7 +137,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
           .toVector
         files.sorted
       }
-    if (opts.verbosity == Verbose) {
+    if (opts.verbosity == Verbosity.Verbose) {
       System.out.println(s"""glob results=${retval.mkString("\n")}""")
     }
     retval
@@ -115,29 +146,37 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
   /**
     * Return the size of the file located at "path"
     */
-  def size(pathOrUrl: String): Long = {
-    if (isUrl(pathOrUrl)) {
-      // A url
-      // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
-      val url = new URL(pathOrUrl)
-      var conn: HttpURLConnection = null
-      try {
-        conn = url.openConnection().asInstanceOf[HttpURLConnection]
-        conn.setRequestMethod("HEAD")
-        return conn.getContentLengthLong
-      } catch {
-        case e: Throwable =>
-          throw e
-      } finally {
-        if (conn != null) {
-          conn.disconnect()
+  def size(pathOrUrl: String, text: TextSource): Long = {
+    asPathOrUrl(pathOrUrl, text) match {
+      case Left(path) =>
+        try {
+          assertExists(path)
+          path.toFile.length()
+        } catch {
+          case t: Throwable =>
+            throw new EvalException(s"Error getting size of file ${pathOrUrl}: ${t.getMessage}",
+                                    text,
+                                    docSourceUrl)
         }
-      }
+      case Right(url) =>
+        // A url
+        // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
+        var conn: HttpURLConnection = null
+        try {
+          conn = url.openConnection().asInstanceOf[HttpURLConnection]
+          conn.setRequestMethod("HEAD")
+          conn.getContentLengthLong
+        } catch {
+          case t: Throwable =>
+            throw new EvalException(s"Error getting size of URL ${url}: ${t.getMessage}",
+                                    text,
+                                    docSourceUrl)
+        } finally {
+          if (conn != null) {
+            conn.disconnect()
+          }
+        }
     }
-
-    // a file
-    val p = Paths.get(pathOrUrl)
-    p.toFile.length()
   }
 
   def mkTempFile(): Path = {
