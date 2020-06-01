@@ -5,7 +5,7 @@ import java.net.URL
 import wdlTools.formatter.Spacing.Spacing
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Parsers, TextSource, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, TextSource, WdlVersion}
 import wdlTools.util.Options
 
 import scala.collection.BufferedIterator
@@ -1339,11 +1339,21 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  def formatDocument(document: Document): Vector[String] = {
-    val documentSections = DocumentSections(document)
-    val lineFormatter = LineFormatter(document.comments)
-    documentSections.format(lineFormatter)
+  def formatElement(element: Element, comments: CommentMap): Vector[String] = {
+    val stmt = element match {
+      case d: Document => DocumentSections(d)
+      case t: Task     => TaskBlock(t)
+      case w: Workflow => WorkflowBlock(w)
+      case other =>
+        throw new RuntimeException(s"Formatting element of type ${other.getClass} not supported")
+    }
+    val lineFormatter = LineFormatter(comments)
+    stmt.format(lineFormatter)
     lineFormatter.toVector
+  }
+
+  def formatDocument(document: Document): Vector[String] = {
+    formatElement(document, document.comments)
   }
 
   def formatDocuments(url: URL): Map[URL, Vector[String]] = {
