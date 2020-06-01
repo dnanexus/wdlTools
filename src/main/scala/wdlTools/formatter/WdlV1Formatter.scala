@@ -393,20 +393,16 @@ case class WdlV1Formatter(opts: Options) {
       parentOperation: Option[String] = None,
       stringModifier: Option[String => String] = None
   ): Span = {
-
-    /**
-      * Builds an expression that occurs nested within another expression. By default, passes
-      * all the current parameter values to the nested call.
-      *
-      * @param nestedExpression the nested Expr
-      * @param placeholderOpen  override the current value of `placeholderOpen`
-      * @param inString         override the current value of `inString`
-      * @param inPlaceholder    override the current value of `inPlaceholder`
-      * @param inOperation      override the current value of `inOperation`
-      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-      *                         same operations are not grouped.
-      * @return a Span
-      */
+    // Builds an expression that occurs nested within another expression. By default, passes
+    //all the current parameter values to the nested call.
+    // @param nestedExpression the nested Expr
+    // @param placeholderOpen  override the current value of `placeholderOpen`
+    // @param inString         override the current value of `inString`
+    // @param inPlaceholder    override the current value of `inPlaceholder`
+    // @param inOperation      override the current value of `inOperation`
+    // @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+    //                         same operations are not grouped.
+    // @return a Span
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
@@ -1339,7 +1335,7 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  def formatElement(element: Element, comments: CommentMap): Vector[String] = {
+  def formatElement(element: Element, comments: CommentMap = CommentMap.empty): Vector[String] = {
     val stmt = element match {
       case d: Document => DocumentSections(d)
       case t: Task     => TaskBlock(t)
