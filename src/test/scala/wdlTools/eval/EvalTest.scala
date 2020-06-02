@@ -315,12 +315,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
 
-    val ctxEnd = evaluator.applyDeclarations(decls,
-                                             Context(Map("i2" -> V_Null)))
+    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map("i2" -> V_Null)))
     val bd = ctxEnd.bindings
 
-    bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)),
-                                           V_Null,
-                                           V_Optional(V_Int(100))))
+    bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 }
