@@ -24,9 +24,9 @@ case class Unification(conf: TypeOptions) {
       case (T_Float, T_Int | T_Float)                                 => true
       case (T_Float, T_Int | T_Float | T_String) if regime == Lenient => true
 
-      // only the file -> string conversion is documented in spec 1.0
-      case (T_String, T_String | T_File)                                 => true
-      case (T_String, T_Boolean | T_Int | T_Float) if regime >= Moderate => true
+        // only the file -> string conversion is documented in spec 1.0
+        // I would love to remove most of the auto-conversions.
+      case (T_String, T_Boolean | T_Int | T_Float | T_String | T_File) => true
 
       case (T_File, T_String | T_File) => true
 
