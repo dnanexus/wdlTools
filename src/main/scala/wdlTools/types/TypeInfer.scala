@@ -924,10 +924,9 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           val errorMsg = callee.input.get(argName) match {
             case None =>
               Some(s"call ${call} has argument ${argName} that does not exist in the callee")
-            case Some((calleeType, _)) if regime == Strict && calleeType != tExpr.wdlType =>
-              Some(s"argument ${argName} has wrong type ${tExpr.wdlType}, expecting ${calleeType}")
-            case Some((calleeType, _))
-                if regime >= Moderate && !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
+//            case Some((calleeType, _)) if regime == Strict && calleeType != tExpr.wdlType =>
+//              Some(s"argument ${argName} has wrong type ${tExpr.wdlType}, expecting ${calleeType}")
+            case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
               )
