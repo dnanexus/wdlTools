@@ -64,6 +64,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
 
       // compound types
       // recursively descend into the sub structures and coerce them.
+      case (WdlTypes.T_Optional(_), V_Null) => V_Null
       case (WdlTypes.T_Optional(t), V_Optional(v)) =>
         V_Optional(coerceTo(t, v, text))
       case (WdlTypes.T_Optional(t), v) =>

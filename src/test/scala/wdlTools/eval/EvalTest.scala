@@ -278,22 +278,22 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     command shouldBe "We have lots of numbers here 1, 10, 100"
   }
 
-  it should "boolean placeholder" taggedAs Edge in {
+  it should "boolean placeholder" in {
     val command = evalCommand("bool_placeholder.wdl")
     command shouldBe s"--no${linesep}--yes"
   }
 
-  it should "default placeholder" taggedAs Edge in {
+  it should "default placeholder" in {
     val command = evalCommand("default_placeholder.wdl")
     command shouldBe "hello"
   }
 
-  it should "strip common indent" taggedAs Edge in {
+  it should "strip common indent" in {
     val command = evalCommand("indented_command.wdl")
     command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
   }
 
-  it should "strip common indent in python heredoc" taggedAs Edge in {
+  it should "strip common indent in python heredoc" in {
     val command = evalCommand("python_heredoc.wdl")
     command shouldBe """python <<CODE
                        |  with open("/path/to/file.txt") as fp:
@@ -311,4 +311,16 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
   }
 
+  it should "handle null and optionals" taggedAs Edge in {
+    val file = srcDir.resolve("conditionals3.wdl")
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
+
+    val ctxEnd = evaluator.applyDeclarations(decls,
+                                             Context(Map("i2" -> V_Null)))
+    val bd = ctxEnd.bindings
+
+    bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)),
+                                           V_Null,
+                                           V_Optional(V_Int(100))))
+  }
 }
