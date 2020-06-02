@@ -5,7 +5,7 @@ import java.net.URL
 import wdlTools.formatter.Spacing.Spacing
 import wdlTools.formatter.Wrapping.Wrapping
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Parsers, TextSource, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, TextSource, WdlVersion}
 import wdlTools.util.Options
 
 import scala.collection.BufferedIterator
@@ -393,20 +393,16 @@ case class WdlV1Formatter(opts: Options) {
       parentOperation: Option[String] = None,
       stringModifier: Option[String => String] = None
   ): Span = {
-
-    /**
-      * Builds an expression that occurs nested within another expression. By default, passes
-      * all the current parameter values to the nested call.
-      *
-      * @param nestedExpression the nested Expr
-      * @param placeholderOpen  override the current value of `placeholderOpen`
-      * @param inString         override the current value of `inString`
-      * @param inPlaceholder    override the current value of `inPlaceholder`
-      * @param inOperation      override the current value of `inOperation`
-      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-      *                         same operations are not grouped.
-      * @return a Span
-      */
+    // Builds an expression that occurs nested within another expression. By default, passes
+    //all the current parameter values to the nested call.
+    // @param nestedExpression the nested Expr
+    // @param placeholderOpen  override the current value of `placeholderOpen`
+    // @param inString         override the current value of `inString`
+    // @param inPlaceholder    override the current value of `inPlaceholder`
+    // @param inOperation      override the current value of `inOperation`
+    // @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+    //                         same operations are not grouped.
+    // @return a Span
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
@@ -1339,11 +1335,21 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  def formatDocument(document: Document): Vector[String] = {
-    val documentSections = DocumentSections(document)
-    val lineFormatter = LineFormatter(document.comments)
-    documentSections.format(lineFormatter)
+  def formatElement(element: Element, comments: CommentMap = CommentMap.empty): Vector[String] = {
+    val stmt = element match {
+      case d: Document => DocumentSections(d)
+      case t: Task     => TaskBlock(t)
+      case w: Workflow => WorkflowBlock(w)
+      case other =>
+        throw new RuntimeException(s"Formatting element of type ${other.getClass} not supported")
+    }
+    val lineFormatter = LineFormatter(comments)
+    stmt.format(lineFormatter)
     lineFormatter.toVector
+  }
+
+  def formatDocument(document: Document): Vector[String] = {
+    formatElement(document, document.comments)
   }
 
   def formatDocuments(url: URL): Map[URL, Vector[String]] = {
