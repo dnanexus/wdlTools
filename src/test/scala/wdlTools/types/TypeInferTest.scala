@@ -45,6 +45,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "shadow_II.wdl" -> TResult(correct = true),
       "shadow.wdl" -> TResult(correct = false),
       "polymorphic_types.wdl" -> TResult(correct = true),
+      "empty_array_in_call.wdl" -> TResult(correct = true, Some(TypeCheckingRegime.Strict)),
       // correct tasks
       "command_string.wdl" -> TResult(correct = true),
       "comparisons.wdl" -> TResult(correct = true),
