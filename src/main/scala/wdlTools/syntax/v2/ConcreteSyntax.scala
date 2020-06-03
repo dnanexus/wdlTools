@@ -51,8 +51,8 @@ object ConcreteSyntax {
 
   case class ExprIdentifier(id: String, text: TextSource) extends Expr
 
-  case class ExprUniraryPlus(value: Expr, text: TextSource) extends Expr
-  case class ExprUniraryMinus(value: Expr, text: TextSource) extends Expr
+  case class ExprUnaryPlus(value: Expr, text: TextSource) extends Expr
+  case class ExprUnaryMinus(value: Expr, text: TextSource) extends Expr
   case class ExprLor(a: Expr, b: Expr, text: TextSource) extends Expr
   case class ExprLand(a: Expr, b: Expr, text: TextSource) extends Expr
   case class ExprNegate(value: Expr, text: TextSource) extends Expr

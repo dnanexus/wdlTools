@@ -464,16 +464,16 @@ string
     ExprNegate(expr, getTextSource(ctx))
   }
 
-  // | (PLUS | MINUS) expr #unirarysigned
-  override def visitUnirarysigned(ctx: WdlV1Parser.UnirarysignedContext): Expr = {
+  // | (PLUS | MINUS) expr #unarysigned
+  override def visitUnarysigned(ctx: WdlV1Parser.UnarysignedContext): Expr = {
     val expr = visitExpr(ctx.expr())
 
     if (ctx.PLUS() != null)
-      ExprUniraryPlus(expr, getTextSource(ctx))
+      ExprUnaryPlus(expr, getTextSource(ctx))
     else if (ctx.MINUS() != null)
-      ExprUniraryMinus(expr, getTextSource(ctx))
+      ExprUnaryMinus(expr, getTextSource(ctx))
     else
-      throw new SyntaxException("bad unirary expression", getTextSource(ctx), grammar.docSourceUrl)
+      throw new SyntaxException("bad unary expression", getTextSource(ctx), grammar.docSourceUrl)
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -530,9 +530,9 @@ string
   }
 
   /* expr_infix1
-	: expr_infix1 AND expr_infix2 #land
-	| expr_infix2 #infix2
-	; */
+    : expr_infix1 AND expr_infix2 #land
+    | expr_infix2 #infix2
+    ; */
   private def visitExpr_infix1(ctx: WdlV1Parser.Expr_infix1Context): Expr = {
     ctx match {
       case land: WdlV1Parser.LandContext     => visitLand(land)
@@ -620,7 +620,7 @@ string
 	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
 	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
 	| NOT expr #negate
-	| (PLUS | MINUS) expr #unirarysigned
+	| (PLUS | MINUS) expr #unarysigned
 	| expr_core LBRACK expr RBRACK #at
 	| IF expr THEN expr ELSE expr #ifthenelse
 	| Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
@@ -637,7 +637,7 @@ string
       case map_literal: WdlV1Parser.Map_literalContext     => visitMap_literal(map_literal)
       case obj_literal: WdlV1Parser.Object_literalContext  => visitObject_literal(obj_literal)
       case negate: WdlV1Parser.NegateContext               => visitNegate(negate)
-      case unirarysigned: WdlV1Parser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
+      case unarysigned: WdlV1Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlV1Parser.AtContext                       => visitAt(at)
       case ifthenelse: WdlV1Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
       case apply: WdlV1Parser.ApplyContext                 => visitApply(apply)

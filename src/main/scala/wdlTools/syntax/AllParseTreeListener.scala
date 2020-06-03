@@ -109,8 +109,8 @@ class AllParseTreeListener
   def exitAt(ctx: ParserRuleContext): Unit = {}
   def enterNegate(ctx: ParserRuleContext): Unit = {}
   def exitNegate(ctx: ParserRuleContext): Unit = {}
-  def enterUnirarysigned(ctx: ParserRuleContext): Unit = {}
-  def exitUnirarysigned(ctx: ParserRuleContext): Unit = {}
+  def enterUnarysigned(ctx: ParserRuleContext): Unit = {}
+  def exitUnarysigned(ctx: ParserRuleContext): Unit = {}
   def enterMap_literal(ctx: ParserRuleContext): Unit = {}
   def exitMap_literal(ctx: ParserRuleContext): Unit = {}
   def enterIfthenelse(ctx: ParserRuleContext): Unit = {}
@@ -491,11 +491,11 @@ class AllParseTreeListener
   override def exitNegate(ctx: WdlDraft2Parser.NegateContext): Unit = {
     exitNegate(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterUnirarysigned(ctx: WdlDraft2Parser.UnirarysignedContext): Unit = {
-    enterUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def enterUnarysigned(ctx: WdlDraft2Parser.UnarysignedContext): Unit = {
+    enterUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitUnirarysigned(ctx: WdlDraft2Parser.UnirarysignedContext): Unit = {
-    exitUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def exitUnarysigned(ctx: WdlDraft2Parser.UnarysignedContext): Unit = {
+    exitUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMap_literal(ctx: WdlDraft2Parser.Map_literalContext): Unit = {
     enterMap_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1054,11 +1054,11 @@ class AllParseTreeListener
   override def exitNegate(ctx: WdlV1Parser.NegateContext): Unit = {
     exitNegate(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterUnirarysigned(ctx: WdlV1Parser.UnirarysignedContext): Unit = {
-    enterUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def enterUnarysigned(ctx: WdlV1Parser.UnarysignedContext): Unit = {
+    enterUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitUnirarysigned(ctx: WdlV1Parser.UnirarysignedContext): Unit = {
-    exitUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def exitUnarysigned(ctx: WdlV1Parser.UnarysignedContext): Unit = {
+    exitUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMap_literal(ctx: WdlV1Parser.Map_literalContext): Unit = {
     enterMap_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1590,11 +1590,11 @@ class AllParseTreeListener
   override def exitNegate(ctx: WdlV2Parser.NegateContext): Unit = {
     exitNegate(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterUnirarysigned(ctx: WdlV2Parser.UnirarysignedContext): Unit = {
-    enterUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def enterUnarysigned(ctx: WdlV2Parser.UnarysignedContext): Unit = {
+    enterUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitUnirarysigned(ctx: WdlV2Parser.UnirarysignedContext): Unit = {
-    exitUnirarysigned(ctx.asInstanceOf[ParserRuleContext])
+  override def exitUnarysigned(ctx: WdlV2Parser.UnarysignedContext): Unit = {
+    exitUnarysigned(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMap_literal(ctx: WdlV2Parser.Map_literalContext): Unit = {
     enterMap_literal(ctx.asInstanceOf[ParserRuleContext])

@@ -42,11 +42,9 @@ DEFAULT: 'default';
 // Primitive Literals
 IntLiteral
 	: Digits
-	| SignedDigits
 	;
 FloatLiteral
-	: SignedFloatFragment
-	| FloatFragment
+	: FloatFragment
 	;
 BoolLiteral
 	: 'true'

@@ -62,9 +62,9 @@ object Util {
         s"{sep=${exprToString(sep, callback)} ${exprToString(value, callback)}"
 
       // operators on one argument
-      case ExprUniraryPlus(value: Expr, _) =>
+      case ExprUnaryPlus(value: Expr, _) =>
         s"+ ${exprToString(value, callback)}"
-      case ExprUniraryMinus(value: Expr, _) =>
+      case ExprUnaryMinus(value: Expr, _) =>
         s"- ${exprToString(value, callback)}"
       case ExprNegate(value: Expr, _) =>
         s"not(${exprToString(value, callback)})"
