@@ -164,9 +164,9 @@ object Util {
         s"{sep=${exprToString(sep, callback)} ${exprToString(value, callback)}"
 
       // operators on one argument
-      case TAT.ExprUniraryPlus(value, _, _) =>
+      case TAT.ExprUnaryPlus(value, _, _) =>
         s"+ ${exprToString(value, callback)}"
-      case TAT.ExprUniraryMinus(value, _, _) =>
+      case TAT.ExprUnaryMinus(value, _, _) =>
         s"- ${exprToString(value, callback)}"
       case TAT.ExprNegate(value, _, _) =>
         s"not(${exprToString(value, callback)})"

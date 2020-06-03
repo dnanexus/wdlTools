@@ -329,7 +329,7 @@ case class Eval(opts: Options,
         }
 
       // operators on one argument
-      case e: TAT.ExprUniraryPlus =>
+      case e: TAT.ExprUnaryPlus =>
         apply(e.value, ctx) match {
           case V_Float(f) => V_Float(f)
           case V_Int(k)   => V_Int(k)
@@ -339,7 +339,7 @@ case class Eval(opts: Options,
                                     docSourceUrl)
         }
 
-      case e: TAT.ExprUniraryMinus =>
+      case e: TAT.ExprUnaryMinus =>
         apply(e.value, ctx) match {
           case V_Float(f) => V_Float(-1 * f)
           case V_Int(k)   => V_Int(-1 * k)

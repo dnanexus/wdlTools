@@ -348,16 +348,16 @@ string
     ExprNegate(expr, getTextSource(ctx))
   }
 
-  // | (PLUS | MINUS) expr #unirarysigned
-  override def visitUnirarysigned(ctx: WdlV2Parser.UnirarysignedContext): Expr = {
+  // | (PLUS | MINUS) expr #unarysigned
+  override def visitUnarysigned(ctx: WdlV2Parser.UnarysignedContext): Expr = {
     val expr = visitExpr(ctx.expr())
 
     if (ctx.PLUS() != null)
-      ExprUniraryPlus(expr, getTextSource(ctx))
+      ExprUnaryPlus(expr, getTextSource(ctx))
     else if (ctx.MINUS() != null)
-      ExprUniraryMinus(expr, getTextSource(ctx))
+      ExprUnaryMinus(expr, getTextSource(ctx))
     else
-      throw new SyntaxException("bad unirary expression", getTextSource(ctx), grammar.docSourceUrl)
+      throw new SyntaxException("bad unary expression", getTextSource(ctx), grammar.docSourceUrl)
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -504,7 +504,7 @@ string
 	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
 	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
 	| NOT expr #negate
-	| (PLUS | MINUS) expr #unirarysigned
+	| (PLUS | MINUS) expr #unarysigned
 	| expr_core LBRACK expr RBRACK #at
 	| IF expr THEN expr ELSE expr #ifthenelse
 	| Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
@@ -520,7 +520,7 @@ string
       case pair_literal: WdlV2Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlV2Parser.Map_literalContext     => visitMap_literal(map_literal)
       case negate: WdlV2Parser.NegateContext               => visitNegate(negate)
-      case unirarysigned: WdlV2Parser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
+      case unarysigned: WdlV2Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlV2Parser.AtContext                       => visitAt(at)
       case ifthenelse: WdlV2Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
       case apply: WdlV2Parser.ApplyContext                 => visitApply(apply)

@@ -442,14 +442,14 @@ string
     ExprNegate(expr, getTextSource(ctx))
   }
 
-  // | (PLUS | MINUS) expr #unirarysigned
-  override def visitUnirarysigned(ctx: WdlDraft2Parser.UnirarysignedContext): Expr = {
+  // | (PLUS | MINUS) expr #unarysigned
+  override def visitUnarysigned(ctx: WdlDraft2Parser.UnarysignedContext): Expr = {
     val expr = visitExpr(ctx.expr())
 
     if (ctx.PLUS() != null)
-      ExprUniraryPlus(expr, getTextSource(ctx))
+      ExprUnaryPlus(expr, getTextSource(ctx))
     else if (ctx.MINUS() != null)
-      ExprUniraryMinus(expr, getTextSource(ctx))
+      ExprUnaryMinus(expr, getTextSource(ctx))
     else
       throw new SyntaxException("sanity", getTextSource(ctx), grammar.docSourceUrl)
   }
@@ -595,7 +595,7 @@ string
 	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
 	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
 	| NOT expr #negate
-	| (PLUS | MINUS) expr #unirarysigned
+	| (PLUS | MINUS) expr #unarysigned
 	| expr_core LBRACK expr RBRACK #at
 	| IF expr THEN expr ELSE expr #ifthenelse
 	| Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
@@ -612,7 +612,7 @@ string
       case map_literal: WdlDraft2Parser.Map_literalContext     => visitMap_literal(map_literal)
       case obj_literal: WdlDraft2Parser.Object_literalContext  => visitObject_literal(obj_literal)
       case negate: WdlDraft2Parser.NegateContext               => visitNegate(negate)
-      case unirarysigned: WdlDraft2Parser.UnirarysignedContext => visitUnirarysigned(unirarysigned)
+      case unarysigned: WdlDraft2Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlDraft2Parser.AtContext                       => visitAt(at)
       case ifthenelse: WdlDraft2Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
       case apply: WdlDraft2Parser.ApplyContext                 => visitApply(apply)

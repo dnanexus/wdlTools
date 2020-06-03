@@ -48,11 +48,9 @@ COMMAND: 'command'-> mode(Command);
 NONELITERAL: 'None';
 IntLiteral
 	: Digits
-	| SignedDigits
 	;
 FloatLiteral
-	: SignedFloatFragment
-	| FloatFragment
+	: FloatFragment
 	;
 BoolLiteral
 	: 'true'

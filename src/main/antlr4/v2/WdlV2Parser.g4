@@ -125,7 +125,7 @@ expr_core
   | expr_core LBRACK expr RBRACK #at
     | expr_core DOT Identifier #get_name
     | NOT expr #negate
-    | (PLUS | MINUS) expr #unirarysigned
+    | (PLUS | MINUS) expr #unarysigned
   | primitive_literal #primitives
   | Identifier #left_name
   ;

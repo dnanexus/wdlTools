@@ -381,12 +381,12 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         TAT.ExprPlaceholderSep(se, ve, t, text)
 
       // math operators on one argument
-      case AST.ExprUniraryPlus(value, text) =>
+      case AST.ExprUnaryPlus(value, text) =>
         val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUniraryPlus(ve, typeEvalMathOp(ve, ctx), text)
-      case AST.ExprUniraryMinus(value, text) =>
+        TAT.ExprUnaryPlus(ve, typeEvalMathOp(ve, ctx), text)
+      case AST.ExprUnaryMinus(value, text) =>
         val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUniraryMinus(ve, typeEvalMathOp(ve, ctx), text)
+        TAT.ExprUnaryMinus(ve, typeEvalMathOp(ve, ctx), text)
 
       // logical operators
       case AST.ExprLor(a: AST.Expr, b: AST.Expr, text) =>

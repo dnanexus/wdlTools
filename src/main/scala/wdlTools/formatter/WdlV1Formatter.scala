@@ -420,7 +420,7 @@ case class WdlV1Formatter(opts: Options) {
       )
     }
 
-    def unirary(oper: String, value: Expr, textSource: TextSource): Span = {
+    def unary(oper: String, value: Expr, textSource: TextSource): Span = {
       val operSpan = Literal.fromStart(oper, textSource)
       SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
     }
@@ -542,23 +542,23 @@ case class WdlV1Formatter(opts: Options) {
       // appear in a string or command block
       case other =>
         val span = other match {
-          case ExprUniraryPlus(value, text)  => unirary(Symbols.UnaryPlus, value, text)
-          case ExprUniraryMinus(value, text) => unirary(Symbols.UnaryMinus, value, text)
-          case ExprNegate(value, text)       => unirary(Symbols.LogicalNot, value, text)
-          case ExprLor(a, b, text)           => operation(Symbols.LogicalOr, a, b, text)
-          case ExprLand(a, b, text)          => operation(Symbols.LogicalAnd, a, b, text)
-          case ExprEqeq(a, b, text)          => operation(Symbols.Equality, a, b, text)
-          case ExprLt(a, b, text)            => operation(Symbols.LessThan, a, b, text)
-          case ExprLte(a, b, text)           => operation(Symbols.LessThanOrEqual, a, b, text)
-          case ExprGt(a, b, text)            => operation(Symbols.GreaterThan, a, b, text)
-          case ExprGte(a, b, text)           => operation(Symbols.GreaterThanOrEqual, a, b, text)
-          case ExprNeq(a, b, text)           => operation(Symbols.Inequality, a, b, text)
-          case ExprAdd(a, b, text)           => operation(Symbols.Addition, a, b, text)
-          case ExprSub(a, b, text)           => operation(Symbols.Subtraction, a, b, text)
-          case ExprMul(a, b, text)           => operation(Symbols.Multiplication, a, b, text)
-          case ExprDivide(a, b, text)        => operation(Symbols.Division, a, b, text)
-          case ExprMod(a, b, text)           => operation(Symbols.Remainder, a, b, text)
-          case ExprIdentifier(id, text)      => Literal.fromStart(id, text)
+          case ExprUnaryPlus(value, text)  => unary(Symbols.UnaryPlus, value, text)
+          case ExprUnaryMinus(value, text) => unary(Symbols.UnaryMinus, value, text)
+          case ExprNegate(value, text)     => unary(Symbols.LogicalNot, value, text)
+          case ExprLor(a, b, text)         => operation(Symbols.LogicalOr, a, b, text)
+          case ExprLand(a, b, text)        => operation(Symbols.LogicalAnd, a, b, text)
+          case ExprEqeq(a, b, text)        => operation(Symbols.Equality, a, b, text)
+          case ExprLt(a, b, text)          => operation(Symbols.LessThan, a, b, text)
+          case ExprLte(a, b, text)         => operation(Symbols.LessThanOrEqual, a, b, text)
+          case ExprGt(a, b, text)          => operation(Symbols.GreaterThan, a, b, text)
+          case ExprGte(a, b, text)         => operation(Symbols.GreaterThanOrEqual, a, b, text)
+          case ExprNeq(a, b, text)         => operation(Symbols.Inequality, a, b, text)
+          case ExprAdd(a, b, text)         => operation(Symbols.Addition, a, b, text)
+          case ExprSub(a, b, text)         => operation(Symbols.Subtraction, a, b, text)
+          case ExprMul(a, b, text)         => operation(Symbols.Multiplication, a, b, text)
+          case ExprDivide(a, b, text)      => operation(Symbols.Division, a, b, text)
+          case ExprMod(a, b, text)         => operation(Symbols.Remainder, a, b, text)
+          case ExprIdentifier(id, text)    => Literal.fromStart(id, text)
           case ExprAt(array, index, text) =>
             val arraySpan = nested(array, inPlaceholder = inStringOrCommand)
             val prefix = SpanSequence(

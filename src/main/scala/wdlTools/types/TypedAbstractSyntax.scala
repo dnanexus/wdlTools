@@ -56,8 +56,8 @@ object TypedAbstractSyntax {
       extends Expr
 
   // operators on one argument
-  case class ExprUniraryPlus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprUniraryMinus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
+  case class ExprUnaryPlus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
+  case class ExprUnaryMinus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
   case class ExprNegate(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
 
   // operators on two arguments
