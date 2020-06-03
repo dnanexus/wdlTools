@@ -14,7 +14,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val parser = v1.ParseAll(opts)
 
   def getWdlPath(fname: String, subdir: String): Path = {
-    Paths.get(getClass.getResource(s"/wdlTools/format/${subdir}/${fname}").getPath)
+    Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
   private def getWdlUrl(fname: String, subdir: String): URL = {
