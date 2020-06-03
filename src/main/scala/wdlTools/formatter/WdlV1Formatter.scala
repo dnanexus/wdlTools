@@ -144,7 +144,7 @@ case class WdlV1Formatter(opts: Options) {
     private val endLengths: (Int, Int) =
       ends.map(e => (e._1.length, e._2.length)).getOrElse((0, 0))
 
-    override lazy val length: Int = body.length + endLengths._1 + endLengths._2
+    override lazy val length: Int = body.map(_.length).getOrElse(0) + endLengths._1 + endLengths._2
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       if (ends.isDefined) {
@@ -154,7 +154,7 @@ case class WdlV1Formatter(opts: Options) {
           lineFormatter.endLine(continue = true)
           lineFormatter.beginLine()
         }
-        if (wrapping == Wrapping.Always || length > lineFormatter.lengthRemaining) {
+        if (body.nonEmpty && (wrapping == Wrapping.Always || length > lineFormatter.lengthRemaining)) {
           lineFormatter.append(prefix)
 
           val bodyFormatter = lineFormatter
@@ -163,7 +163,7 @@ case class WdlV1Formatter(opts: Options) {
                     newWrapping = wrapping)
           bodyFormatter.endLine(continue = true)
           bodyFormatter.beginLine()
-          bodyFormatter.append(body)
+          bodyFormatter.append(body.get)
 
           lineFormatter.endLine(continue = wrapAndIndentEnds)
           lineFormatter.beginLine()
@@ -171,15 +171,17 @@ case class WdlV1Formatter(opts: Options) {
         } else {
           val adjacentFormatter = lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping)
           adjacentFormatter.appendPrefix(prefix)
-          adjacentFormatter.append(body)
+          if (body.nonEmpty) {
+            adjacentFormatter.append(body.get)
+          }
           adjacentFormatter.appendSuffix(suffix)
         }
-      } else {
-        lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping).append(body)
+      } else if (body.isDefined) {
+        lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping).append(body.get)
       }
     }
 
-    def body: Composite
+    def body: Option[Composite]
   }
 
   private abstract class Container(items: Vector[Span],
@@ -188,20 +190,26 @@ case class WdlV1Formatter(opts: Options) {
                                    override val wrapping: Wrapping = Wrapping.AsNeeded)
       extends Group(ends = ends, wrapping = wrapping) {
 
-    override lazy val body: Composite = SpanSequence(
-        items.zipWithIndex.map {
-          case (item, i) if i < items.size - 1 =>
-            if (delimiter.isDefined) {
-              val delimiterLiteral = Literal.fromPrev(delimiter.get, item)
-              SpanSequence(Vector(item, delimiterLiteral))
-            } else {
-              item
-            }
-          case (item, _) => item
-        },
-        wrapping = wrapping,
-        spacing = Spacing.On
-    )
+    override lazy val body: Option[Composite] = if (items.nonEmpty) {
+      Some(
+          SpanSequence(
+              items.zipWithIndex.map {
+                case (item, i) if i < items.size - 1 =>
+                  if (delimiter.isDefined) {
+                    val delimiterLiteral = Literal.fromPrev(delimiter.get, item)
+                    SpanSequence(Vector(item, delimiterLiteral))
+                  } else {
+                    item
+                  }
+                case (item, _) => item
+              },
+              wrapping = wrapping,
+              spacing = Spacing.On
+          )
+      )
+    } else {
+      None
+    }
   }
 
   private trait Bounded {
@@ -334,9 +342,9 @@ case class WdlV1Formatter(opts: Options) {
       }, wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded)
       with BoundedComposite {
 
-    override lazy val body: Composite = {
+    override lazy val body: Option[Composite] = {
       val operLiteral = Literal.between(oper, lhs, rhs)
-      SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On)
+      Some(SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
     }
   }
 
@@ -348,14 +356,17 @@ case class WdlV1Formatter(opts: Options) {
                                  override val bounds: TextSource)
       extends Group(
           ends = Some(Literal.fromStart(open, bounds), Literal.fromEnd(close, bounds)),
-          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded
+          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
+          spacing = if (inString) Spacing.Off else Spacing.On
       )
       with BoundedComposite {
 
-    override lazy val body: Composite = SpanSequence(
-        options.getOrElse(Vector.empty) ++ Vector(value),
-        wrapping = wrapping,
-        spacing = Spacing.On
+    override lazy val body: Option[Composite] = Some(
+        SpanSequence(
+            options.getOrElse(Vector.empty) ++ Vector(value),
+            wrapping = wrapping,
+            spacing = Spacing.On
+        )
     )
   }
 
