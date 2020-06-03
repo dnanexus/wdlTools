@@ -924,8 +924,6 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           val errorMsg = callee.input.get(argName) match {
             case None =>
               Some(s"call ${call} has argument ${argName} that does not exist in the callee")
-//            case Some((calleeType, _)) if regime == Strict && calleeType != tExpr.wdlType =>
-//              Some(s"argument ${argName} has wrong type ${tExpr.wdlType}, expecting ${calleeType}")
             case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
@@ -942,16 +940,24 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
     // check that all the compulsory arguments are provided
     val missingInputs = callee.input.flatMap {
-      case (argName, (_, false)) =>
+      case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
+          case None if conf.allowNonWorkflowInputs =>
+            UUtil.warning(
+                s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
+                conf.verbosity
+            )
+            Some(argName -> TAT.ValueNone(wdlType, call.text))
           case None =>
             handleError(s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
                         call.text,
                         ctx)
-            Some(argName -> TAT.ValueNone(T_Any, call.text))
-          case Some(_) => None
+            Some(argName -> TAT.ValueNone(wdlType, call.text))
+          case Some(_) =>
+            // argument is provided
+            None
         }
-      case (_, (_, _)) =>
+      case (_, (_, true)) =>
         // an optional argument, it may not be provided
         None
     }

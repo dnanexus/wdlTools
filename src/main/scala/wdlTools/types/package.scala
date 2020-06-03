@@ -7,13 +7,16 @@ import wdlTools.syntax.TextSource
 import wdlTools.util.{Options, TypeCheckingRegime, Verbosity}
 
 /**
-  * @param typeChecking strictness of type-checking
+  * @param typeChecking             strictness of type-checking
+  * @param allowNonWorkflowInputs   allow missing inputs; these can be provided at
+  *                                 runtime by the user
   */
 case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        followImports: Boolean = true,
                        verbosity: Verbosity.Verbosity = Verbosity.Normal,
                        antlr4Trace: Boolean = false,
-                       typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate)
+                       typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate,
+                       allowNonWorkflowInputs: Boolean = true)
     extends Options
 
 final case class TypeError(docSourceUrl: Option[URL], textSource: TextSource, reason: String)
