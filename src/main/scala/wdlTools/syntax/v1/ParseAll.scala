@@ -76,10 +76,10 @@ case class ParseAll(opts: Options,
           AST.ExprPlaceholderSep(translateExpr(sep), translateExpr(value), srcText)
 
         // operators on one argument
-        case CST.ExprUniraryPlus(value, srcText) =>
-          AST.ExprUniraryPlus(translateExpr(value), srcText)
-        case CST.ExprUniraryMinus(value, srcText) =>
-          AST.ExprUniraryMinus(translateExpr(value), srcText)
+        case CST.ExprUnaryPlus(value, srcText) =>
+          AST.ExprUnaryPlus(translateExpr(value), srcText)
+        case CST.ExprUnaryMinus(value, srcText) =>
+          AST.ExprUnaryMinus(translateExpr(value), srcText)
         case CST.ExprNegate(value, srcText) =>
           AST.ExprNegate(translateExpr(value), srcText)
 
