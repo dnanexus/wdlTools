@@ -164,7 +164,7 @@ object ConcreteSyntax {
                       parameterMeta: Option[ParameterMetaSection],
                       body: Vector[WorkflowElement],
                       text: TextSource)
-      extends Element
+      extends DocumentElement
 
   case class Version(value: WdlVersion = WdlVersion.V2, text: TextSource) extends Element
   case class Document(sourceUrl: Option[URL],
