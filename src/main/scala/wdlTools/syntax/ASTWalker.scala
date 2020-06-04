@@ -26,6 +26,8 @@ class ASTVisitor {
 
   def visitStructMember(ctx: Context[StructMember]): Unit = {}
 
+  def visitMetaValue(ctx: Context[MetaValue]): Unit = {}
+
   def visitExpression(ctx: Context[Expr]): Unit = {}
 
   def visitDeclaration(ctx: Context[Declaration]): Unit = {}
@@ -222,7 +224,7 @@ class ASTWalker(opts: Options) extends ASTVisitor {
 
   override def visitMetaKV(ctx: Context[MetaKV]): Unit = {
     visitIdentifier[MetaKV](ctx.element.id, ctx)
-    visitExpression(createContext[Expr, MetaKV](ctx.element.expr, ctx))
+    visitMetaValue(createContext[MetaValue, MetaKV](ctx.element.value, ctx))
   }
 
   override def visitMetaSection(ctx: Context[MetaSection]): Unit = {

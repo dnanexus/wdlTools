@@ -109,6 +109,7 @@ object Symbols {
   val Version: String = "version"
   val Workflow: String = "workflow"
   val Null: String = "null"
+  val None: String = "None"
 
   // data types
   val ArrayType: String = "Array"

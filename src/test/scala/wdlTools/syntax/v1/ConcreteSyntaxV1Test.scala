@@ -324,14 +324,14 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", ExprString("Robin Hood", _), _) =>
+      case MetaKV("author", MetaValueString("Robin Hood", _), _) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", ExprString("just because", _), _) =>
+      case MetaKV("inp_file", MetaValueString("just because", _), _) =>
     }
 
     task.declarations(0) should matchPattern {
@@ -450,7 +450,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     wf.meta.get shouldBe a[MetaSection]
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _)) =>
+      case Vector(MetaKV("author", MetaValueString("Robert Heinlein", _), _)) =>
     }
   }
 

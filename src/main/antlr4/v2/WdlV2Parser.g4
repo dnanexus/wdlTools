@@ -121,11 +121,11 @@ expr_core
   | LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
   | Identifier LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #struct_literal
   | IF expr THEN expr ELSE expr #ifthenelse
-    | LPAREN expr RPAREN #expression_group
+  | LPAREN expr RPAREN #expression_group
   | expr_core LBRACK expr RBRACK #at
-    | expr_core DOT Identifier #get_name
-    | NOT expr #negate
-    | (PLUS | MINUS) expr #unarysigned
+  | expr_core DOT Identifier #get_name
+  | NOT expr #negate
+  | (PLUS | MINUS) expr #unarysigned
   | primitive_literal #primitives
   | Identifier #left_name
   ;
@@ -139,8 +139,8 @@ import_alias
   ;
 
 import_as
-    : AS Identifier
-    ;
+  : AS Identifier
+  ;
 
 import_doc
   : IMPORT string import_as? (import_alias)*
@@ -150,8 +150,26 @@ struct
   : STRUCT Identifier LBRACE (unbound_decls)* RBRACE
   ;
 
+meta_value
+  : BoolLiteral
+  | number
+  | meta_string
+  | meta_object
+  | meta_array
+  | NULL_LITERAL
+  ;
+
+meta_string
+  : DQUOTE string_part DQUOTE
+  | SQUOTE string_part SQUOTE
+  ;
+
+meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
+
+meta_object: LBRACE (meta_kv (COMMA meta_kv)*)* RBRACE;
+
 meta_kv
-  : Identifier COLON expr
+  : Identifier COLON meta_value
   ;
 
 parameter_meta
@@ -159,8 +177,8 @@ parameter_meta
   ;
 
 meta
-    :  META LBRACE meta_kv* RBRACE
-    ;
+  :  META LBRACE meta_kv* RBRACE
+  ;
 
 task_runtime_kv
   : RUNTIMECPU COLON expr
@@ -198,16 +216,16 @@ task_command
   ;
 
 task_command_string_part
-    : CommandStringPart*
-    ;
+  : CommandStringPart*
+  ;
 
 task_command_expr_part
-    : StringCommandStart expr RBRACE
-    ;
+  : StringCommandStart expr RBRACE
+  ;
 
 task_command_expr_with_string
-    : task_command_expr_part task_command_string_part
-    ;
+  : task_command_expr_part task_command_string_part
+  ;
 
 task_element
   : task_input
@@ -252,8 +270,8 @@ call_after
   ;
 
 call_name
-    : Identifier (DOT Identifier)*
-    ;
+  : Identifier (DOT Identifier)*
+  ;
 
 call
   : CALL call_name call_alias? (call_after)*  call_body?

@@ -34,7 +34,6 @@ object AbstractSyntax {
 
   // values
   sealed trait Value extends Expr
-  case class ValueNull(text: TextSource) extends Value
   case class ValueNone(text: TextSource) extends Value
   case class ValueString(value: String, text: TextSource) extends Value
   case class ValueBoolean(value: Boolean, text: TextSource) extends Value
@@ -130,8 +129,17 @@ object AbstractSyntax {
   case class HintsKV(id: String, expr: Expr, text: TextSource) extends Element
   case class HintsSection(kvs: Vector[HintsKV], text: TextSource) extends Element
 
+  // A specialized JSON-like object language for meta values only.
+  sealed trait MetaValue extends Element
+  case class MetaValueNull(text: TextSource) extends MetaValue
+  case class MetaValueBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaValueInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaValueFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaValueString(value: String, text: TextSource) extends MetaValue
+  case class MetaValueObject(value: Vector[MetaKV], text: TextSource) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
   // meta section
-  case class MetaKV(id: String, expr: Expr, text: TextSource) extends Element
+  case class MetaKV(id: String, value: MetaValue, text: TextSource) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 

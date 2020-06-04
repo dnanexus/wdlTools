@@ -136,51 +136,28 @@ case class ParseAll(opts: Options,
     // $meta_object = '{}' | '{' $parameter_meta_kv (, $parameter_meta_kv)* '}'
     // $meta_array = '[]' |  '[' $meta_value (, $meta_value)* ']'
     //
-    private def translateMetaValue(value: CST.Expr): AST.Expr = {
+    private def translateMetaValue(value: CST.MetaValue): AST.MetaValue = {
       value match {
         // values
-        case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
-        case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
-        case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
-
-        // special handling for null. It appears as an identifier here, even though
-        // it has not been defined, and it is no identifier.
-        case CST.ExprIdentifier(id, srcText) if id == "null" =>
-          AST.ExprIdentifier(id, srcText)
-        case CST.ExprIdentifier(id, srcText) =>
-          throw new SyntaxException(s"cannot access identifier (${id}) in a meta section",
-                                    srcText,
-                                    docSourceUrl)
-
-        // compound values
-        case CST.ExprPair(l, r, srcText) =>
-          AST.ExprPair(translateMetaValue(l), translateMetaValue(r), srcText)
-        case CST.ExprArrayLiteral(vec, srcText) =>
-          AST.ExprArray(vec.map(translateMetaValue), srcText)
-        case CST.ExprMapLiteral(m, srcText) =>
-          AST.ExprMap(
-              m.map {
-                case CST.ExprMapItem(CST.ExprIdentifier(k, text2), value, text) =>
-                  AST.ExprMapItem(AST.ExprIdentifier(k, text2), translateMetaValue(value), text)
-                case _ =>
-                  throw new SyntaxException(s"Illegal meta field value", srcText, docSourceUrl)
-              },
-              srcText
-          )
-        case CST.ExprObjectLiteral(m, srcText) =>
-          AST.ExprObject(m.map {
-            case CST.ExprObjectMember(fieldName, v, text) =>
-              AST.ExprObjectMember(fieldName, translateMetaValue(v), text)
+        case CST.MetaValueString(value, srcText)  => AST.MetaValueString(value, srcText)
+        case CST.MetaValueBoolean(value, srcText) => AST.MetaValueBoolean(value, srcText)
+        case CST.MetaValueInt(value, srcText)     => AST.MetaValueInt(value, srcText)
+        case CST.MetaValueFloat(value, srcText)   => AST.MetaValueFloat(value, srcText)
+        case CST.MetaValueNull(srcText)           => AST.MetaValueNull(srcText)
+        case CST.MetaValueArray(vec, srcText) =>
+          AST.MetaValueArray(vec.map(translateMetaValue), srcText)
+        case CST.MetaValueObject(m, srcText) =>
+          AST.MetaValueObject(m.map {
+            case CST.MetaKV(fieldName, v, text) =>
+              AST.MetaKV(fieldName, translateMetaValue(v), text)
           }, srcText)
-
         case other =>
           throw new SyntaxException("illegal expression in meta section", other.text, docSourceUrl)
       }
     }
 
     def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, translateMetaValue(kv.expr), kv.text)
+      AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.text)
     }
 
     def translateInputSection(
