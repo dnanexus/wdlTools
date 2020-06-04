@@ -309,7 +309,6 @@ document_element
   : import_doc
   | struct
   | task
-  | workflow
   ;
 
 document

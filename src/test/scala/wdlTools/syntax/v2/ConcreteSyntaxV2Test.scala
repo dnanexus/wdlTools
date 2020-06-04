@@ -46,8 +46,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
     val doc = getDocument(getSource("movies.wdl"))
 
     doc.version.value shouldBe WdlVersion.V2
-    doc.elements.size shouldBe 2
+    doc.elements.size shouldBe 1
     doc.elements(0) shouldBe a[ImportDoc]
-    doc.elements(1) shouldBe a[Workflow]
+    doc.workflow shouldBe defined
   }
 }
