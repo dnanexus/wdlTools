@@ -597,6 +597,7 @@ string
 	; */
 
   override def visitExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Expr = {
+    println(s"infix5 ${ctx.getText}")
     visitExpr_core(ctx.expr_core())
   }
 
@@ -628,6 +629,7 @@ string
 	| expr_core DOT Identifier #get_name
 	; */
   private def visitExpr_core(ctx: WdlV1Parser.Expr_coreContext): Expr = {
+    println(ctx.getClass)
     ctx match {
       case group: WdlV1Parser.Expression_groupContext => visitExpression_group(group)
       case primitives: WdlV1Parser.PrimitivesContext =>

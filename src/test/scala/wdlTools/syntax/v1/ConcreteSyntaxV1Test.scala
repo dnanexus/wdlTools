@@ -594,8 +594,13 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     val call = wf.body.head.asInstanceOf[Call]
     call.name shouldBe "cd.count_dogs"
   }
+
   it should "parse a two-level workflow" in {
     getDocument(getWorkflowSource("two_level.wdl"))
+  }
+
+  it should "parse wf_meta.wdl" in {
+    getDocument(getWorkflowSource("wf_param_meta.wdl"))
   }
 
   it should "report extra comma" in {
