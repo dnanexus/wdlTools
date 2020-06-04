@@ -55,6 +55,12 @@ case class LinterASTWalker(opts: Options, visitors: Vector[ASTVisitor]) extends 
     super.visitStructMember(ctx)
   }
 
+  override def visitMetaValue(ctx: Context[MetaValue]): Unit = {
+    visitEveryRule(ctx.asInstanceOf[Context[Element]])
+    visitors.foreach(_.visitMetaValue(ctx))
+    super.visitMetaValue(ctx)
+  }
+
   override def visitExpression(ctx: Context[Expr]): Unit = {
     visitEveryRule(ctx.asInstanceOf[Context[Element]])
     visitors.foreach(_.visitExpression(ctx))

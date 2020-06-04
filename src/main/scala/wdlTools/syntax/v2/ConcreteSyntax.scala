@@ -33,7 +33,6 @@ object ConcreteSyntax {
 
   // expressions
   sealed trait Expr extends Element
-  case class ExprNull(text: TextSource) extends Expr
   case class ExprNone(text: TextSource) extends Expr
   case class ExprString(value: String, text: TextSource) extends Expr
   case class ExprBoolean(value: Boolean, text: TextSource) extends Expr
@@ -46,7 +45,6 @@ object ConcreteSyntax {
   case class ExprCompoundString(value: Vector[Expr], text: TextSource) extends Expr
   case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
   case class ExprMapLiteral(value: Vector[ExprMapItem], text: TextSource) extends Expr
-  case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
   case class ExprArrayLiteral(value: Vector[Expr], text: TextSource) extends Expr
 
   case class ExprIdentifier(id: String, text: TextSource) extends Expr
@@ -98,8 +96,17 @@ object ConcreteSyntax {
   case class RuntimeKV(id: String, expr: Expr, text: TextSource) extends Element
   case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource) extends Element
 
+  // A specialized JSON-like object language for meta values only.
+  sealed trait MetaValue extends Element
+  case class MetaValueNull(text: TextSource) extends MetaValue
+  case class MetaValueBoolean(value: Boolean, text: TextSource) extends MetaValue
+  case class MetaValueInt(value: Int, text: TextSource) extends MetaValue
+  case class MetaValueFloat(value: Double, text: TextSource) extends MetaValue
+  case class MetaValueString(value: String, text: TextSource) extends MetaValue
+  case class MetaValueObject(value: Vector[MetaKV], text: TextSource) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue], text: TextSource) extends MetaValue
   // meta section
-  case class MetaKV(id: String, expr: Expr, text: TextSource) extends Element
+  case class MetaKV(id: String, value: MetaValue, text: TextSource) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 

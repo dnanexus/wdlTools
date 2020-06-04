@@ -149,6 +149,7 @@ import_as
 import_doc
   : IMPORT string import_as? (import_alias)*
   ;
+
 struct
   : STRUCT Identifier LBRACE (unbound_decls)* RBRACE
   ;
@@ -156,10 +157,15 @@ struct
 meta_value
   : BoolLiteral
   | number
-  | string
+  | meta_string
   | meta_object
   | meta_array
   | NULL_LITERAL
+  ;
+
+meta_string
+  : DQUOTE string_part DQUOTE
+  | SQUOTE string_part SQUOTE
   ;
 
 meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;

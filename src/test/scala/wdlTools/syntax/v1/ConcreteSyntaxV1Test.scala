@@ -10,7 +10,7 @@ import wdlTools.util.Verbosity._
 import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
-  private val sourcePath = Paths.get(getClass.getResource("/wdlTools/syntax/v1").getPath)
+  private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
@@ -324,14 +324,14 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", ExprString("Robin Hood", _), _) =>
+      case MetaKV("author", MetaValueString("Robin Hood", _), _) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", ExprString("just because", _), _) =>
+      case MetaKV("inp_file", MetaValueString("just because", _), _) =>
     }
 
     task.declarations(0) should matchPattern {
@@ -450,7 +450,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     wf.meta.get shouldBe a[MetaSection]
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", ExprString("Robert Heinlein", _), _)) =>
+      case Vector(MetaKV("author", MetaValueString("Robert Heinlein", _), _)) =>
     }
   }
 
@@ -593,6 +593,9 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     wf.body.size shouldBe 1
     val call = wf.body.head.asInstanceOf[Call]
     call.name shouldBe "cd.count_dogs"
+  }
+  it should "parse a two-level workflow" in {
+    getDocument(getWorkflowSource("two_level.wdl"))
   }
 
   it should "parse a two-level workflow" in {

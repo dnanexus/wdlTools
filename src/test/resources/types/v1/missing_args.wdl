@@ -1,0 +1,48 @@
+version 1.0
+
+# Check that toplevel calls are compiled to workflow stages, when
+# this workflow is compiled unlocked.
+workflow missing_args {
+  input {
+    Boolean flag
+    Int prime
+  }
+
+  # toplevel calls with missing argument
+  call Add {input: a = prime}
+  call MaybeInt
+
+  # not a toplevel call
+  if (flag) {
+    call Add as add2 {input: a=2, b = 3 }
+  }
+}
+
+
+task Add {
+  input {
+    Int a
+    Int b
+  }
+
+  command {
+    echo $((${a} + ${b}))
+  }
+
+  output {
+    Int result = read_int(stdout())
+  }
+}
+
+task MaybeInt {
+  input {
+    Int? a
+  }
+
+  command {
+  }
+
+  output {
+    Int? result = a
+  }
+}

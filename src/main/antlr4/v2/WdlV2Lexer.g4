@@ -43,6 +43,7 @@ MAP: 'Map';
 PAIR: 'Pair';
 AFTER: 'after';
 COMMAND: 'command'-> mode(Command);
+NULL_LITERAL: 'null';
 
 // Primitive Literals
 NONELITERAL: 'None';

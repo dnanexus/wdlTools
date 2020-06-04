@@ -462,7 +462,7 @@ case class WdlV1Formatter(opts: Options) {
 
     expr match {
       // literal values
-      case ValueNull(text) => Literal.fromStart(Symbols.Null, text)
+      case ValueNone(text) => Literal.fromStart(Symbols.None, text)
       case ValueString(value, text) =>
         val v = if (stringModifier.isDefined) {
           stringModifier.get(value)
@@ -910,12 +910,44 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class KVStatement(id: String, expr: Expr, override val bounds: TextSource)
+  private def buildMeta(metaValue: MetaValue): Span = {
+    metaValue match {
+      // literal values
+      case MetaValueNull(text) => Literal.fromStart(Symbols.Null, text)
+      case MetaValueString(value, text) =>
+        Literal.fromStart(value, text, quoted = true)
+      case MetaValueBoolean(value, text) => Literal.fromStart(value, text)
+      case MetaValueInt(value, text)     => Literal.fromStart(value, text)
+      case MetaValueFloat(value, text)   => Literal.fromStart(value, text)
+      case MetaValueArray(value, text) =>
+        BoundedContainer(
+            value.map(buildMeta),
+            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text),
+                 Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
+            Some(Symbols.ArrayDelimiter),
+            text
+        )
+      case MetaValueObject(value, text) =>
+        BoundedContainer(
+            value.map {
+              case MetaKV(k, v, memberText) =>
+                KeyValue(Literal.fromStart(k, memberText), buildMeta(v), bounds = memberText)
+            },
+            Some(Literal.fromStart(Symbols.ObjectOpen, text),
+                 Literal.fromEnd(Symbols.ObjectClose, text)),
+            Some(Symbols.ArrayDelimiter),
+            bounds = text,
+            Wrapping.Always
+        )
+    }
+  }
+
+  private case class MetaKVStatement(id: String, value: MetaValue, override val bounds: TextSource)
       extends BoundedStatement(bounds) {
     private val idToken = Literal.fromStart(id, bounds)
     private val delimToken = Literal.fromPrev(Symbols.KeyValueDelimiter, idToken)
     private val lhs = Vector(idToken, delimToken)
-    private val rhs = buildExpression(expr)
+    private val rhs = buildMeta(value)
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter.appendAll(Vector(SpanSequence(lhs), rhs))
@@ -925,7 +957,7 @@ case class WdlV1Formatter(opts: Options) {
   private case class MetadataSection(metaKV: Vector[MetaKV], override val bounds: TextSource)
       extends InnerSection(bounds) {
     override val statements: Vector[Statement] = {
-      metaKV.map(kv => KVStatement(kv.id, kv.expr, kv.text))
+      metaKV.map(kv => MetaKVStatement(kv.id, kv.value, kv.text))
     }
   }
 
@@ -1244,6 +1276,18 @@ case class WdlV1Formatter(opts: Options) {
 
       lineFormatter.beginLine()
       lineFormatter.append(Literal.fromEnd(Symbols.CommandClose, command.text))
+    }
+  }
+
+  private case class KVStatement(id: String, expr: Expr, override val bounds: TextSource)
+      extends BoundedStatement(bounds) {
+    private val idToken = Literal.fromStart(id, bounds)
+    private val delimToken = Literal.fromPrev(Symbols.KeyValueDelimiter, idToken)
+    private val lhs = Vector(idToken, delimToken)
+    private val rhs = buildExpression(expr)
+
+    override def formatContents(lineFormatter: LineFormatter): Unit = {
+      lineFormatter.appendAll(Vector(SpanSequence(lhs), rhs))
     }
   }
 

@@ -9,9 +9,9 @@ import wdlTools.syntax.v1.ParseAll
 import wdlTools.util.{BasicOptions, SourceCode, Util, Verbosity}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
-  private val tasksDir = Paths.get(getClass.getResource("/wdlTools/syntax/v1/tasks").getPath)
+  private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)
   private val workflowsDir =
-    Paths.get(getClass.getResource("/wdlTools/syntax/v1/workflows").getPath)
+    Paths.get(getClass.getResource("/syntax/v1/workflows").getPath)
   private val opts =
     BasicOptions(antlr4Trace = false,
                  localDirectories = Vector(tasksDir, workflowsDir),
@@ -72,7 +72,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("i", ExprIdentifier("null", _), _) =>
+      case MetaKV("i", MetaValueNull(_), _) =>
     }
   }
 

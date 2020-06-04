@@ -24,10 +24,15 @@ def typeToString(wdlType: Type): String = {
 def formatMetaValue(metaValue: ValueDocumentation, indent: String = ""): String = {
   metaValue match {
     case SimpleValueDocumentation(value, comment) =>
+      val s: String = value match {
+        case e: Expr => exprToString(e)
+        case v: MetaValue => metaValueToString(v)
+        case other => other.toString
+      }
       if (comment.isDefined) {
-        s"${exprToString(value)} (${comment.get})"
+        s"${s} (${comment.get})"
       } else {
-        exprToString(value)
+        s
       }
       case ListValueDocumentation(value, comment) => s"${value.map(x => formatMetaValue(x, indent + "    ")).mkString(", ")}"
       case MapValueDocumentation(value, comment) =>

@@ -229,8 +229,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   //
   private def applyExpr(expr: AST.Expr, bindings: Bindings, ctx: Context): TAT.Expr = {
     expr match {
-      // null can be any type optional
-      case AST.ValueNull(text)           => TAT.ValueNull(T_Optional(T_Any), text)
+      // None can be any type optional
+      case AST.ValueNone(text)           => TAT.ValueNone(T_Optional(T_Any), text)
       case AST.ValueBoolean(value, text) => TAT.ValueBoolean(value, T_Boolean, text)
       case AST.ValueInt(value, text)     => TAT.ValueInt(value, T_Int, text)
       case AST.ValueFloat(value, text)   => TAT.ValueFloat(value, T_Float, text)
@@ -705,40 +705,25 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
   // convert the generic expression syntax into a specialized JSON object
   // language for meta values only.
-  private def metaValueFromExpr(expr: AST.Expr, ctx: Context): TAT.MetaValue = {
+  private def applyMetaValue(expr: AST.MetaValue, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.ValueNull(text)                          => TAT.MetaValueNull(text)
-      case AST.ValueBoolean(value, text)                => TAT.MetaValueBoolean(value, text)
-      case AST.ValueInt(value, text)                    => TAT.MetaValueInt(value, text)
-      case AST.ValueFloat(value, text)                  => TAT.MetaValueFloat(value, text)
-      case AST.ValueString(value, text)                 => TAT.MetaValueString(value, text)
-      case AST.ExprIdentifier(id, text) if id == "null" => TAT.MetaValueNull(text)
-      case AST.ExprIdentifier(id, text)                 => TAT.MetaValueString(id, text)
-      case AST.ExprArray(vec, text)                     => TAT.MetaValueArray(vec.map(metaValueFromExpr(_, ctx)), text)
-      case AST.ExprMap(members, text) =>
+      case AST.MetaValueNull(text)           => TAT.MetaValueNull(text)
+      case AST.MetaValueBoolean(value, text) => TAT.MetaValueBoolean(value, text)
+      case AST.MetaValueInt(value, text)     => TAT.MetaValueInt(value, text)
+      case AST.MetaValueFloat(value, text)   => TAT.MetaValueFloat(value, text)
+      case AST.MetaValueString(value, text)  => TAT.MetaValueString(value, text)
+      case AST.MetaValueArray(vec, text) =>
+        TAT.MetaValueArray(vec.map(applyMetaValue(_, ctx)), text)
+      case AST.MetaValueObject(members, text) =>
         TAT.MetaValueObject(
             members.map {
-              case AST.ExprMapItem(AST.ValueString(key, _), value, _) =>
-                key -> metaValueFromExpr(value, ctx)
-              case AST.ExprMapItem(AST.ExprIdentifier(key, _), value, _) =>
-                key -> metaValueFromExpr(value, ctx)
-              case other =>
-                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
-            }.toMap,
-            text
-        )
-      case AST.ExprObject(members, text) =>
-        TAT.MetaValueObject(
-            members.map {
-              case AST.ExprObjectMember(key, value, _) =>
-                key -> metaValueFromExpr(value, ctx)
-              case other =>
-                throw new RuntimeException(s"bad value ${SUtil.exprToString(other)}")
+              case AST.MetaKV(key, value, _) =>
+                key -> applyMetaValue(value, ctx)
             }.toMap,
             text
         )
       case other =>
-        handleError(s"${SUtil.exprToString(other)} is an invalid meta value", expr.text, ctx)
+        handleError(s"${SUtil.metaValueToString(other)} is an invalid meta value", expr.text, ctx)
         TAT.MetaValueNull(other.text)
     }
   }
@@ -746,7 +731,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyMeta(metaSection: AST.MetaSection, ctx: Context): TAT.MetaSection = {
     TAT.MetaSection(metaSection.kvs.map {
       case AST.MetaKV(k, v, _) =>
-        k -> metaValueFromExpr(v, ctx)
+        k -> applyMetaValue(v, ctx)
     }.toMap, metaSection.text)
   }
 
@@ -755,14 +740,14 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     TAT.ParameterMetaSection(
         paramMetaSection.kvs.map { kv: AST.MetaKV =>
           val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
-            metaValueFromExpr(kv.expr, ctx)
+            applyMetaValue(kv.value, ctx)
           } else {
             handleError(
                 s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
                 kv.text,
                 ctx
             )
-            TAT.MetaValueNull(kv.expr.text)
+            TAT.MetaValueNull(kv.value.text)
           }
           kv.id -> metaValue
         }.toMap,
@@ -924,8 +909,6 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           val errorMsg = callee.input.get(argName) match {
             case None =>
               Some(s"call ${call} has argument ${argName} that does not exist in the callee")
-//            case Some((calleeType, _)) if regime == Strict && calleeType != tExpr.wdlType =>
-//              Some(s"argument ${argName} has wrong type ${tExpr.wdlType}, expecting ${calleeType}")
             case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
@@ -942,16 +925,24 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
     // check that all the compulsory arguments are provided
     val missingInputs = callee.input.flatMap {
-      case (argName, (_, false)) =>
+      case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
+          case None if conf.allowNonWorkflowInputs =>
+            UUtil.warning(
+                s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
+                conf.verbosity
+            )
+            Some(argName -> TAT.ValueNone(wdlType, call.text))
           case None =>
             handleError(s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
                         call.text,
                         ctx)
-            Some(argName -> TAT.ValueNone(T_Any, call.text))
-          case Some(_) => None
+            Some(argName -> TAT.ValueNone(wdlType, call.text))
+          case Some(_) =>
+            // argument is provided
+            None
         }
-      case (_, (_, _)) =>
+      case (_, (_, true)) =>
         // an optional argument, it may not be provided
         None
     }
@@ -1044,7 +1035,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     // add a binding for the iteration variable
     //
     // The iterator identifier is not exported outside the scatter
-    val (ctxInner, wdlType) =
+    val (ctxInner, _) =
       try {
         (ctxOuter.bindVar(scatter.identifier, elementType), elementType)
       } catch {

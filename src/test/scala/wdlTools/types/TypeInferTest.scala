@@ -11,7 +11,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -46,6 +46,8 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "shadow.wdl" -> TResult(correct = false),
       "polymorphic_types.wdl" -> TResult(correct = true),
       "empty_array_in_call.wdl" -> TResult(correct = true, Some(TypeCheckingRegime.Strict)),
+      // missing arguments that may be supplied with a companion json inputs file
+      "missing_args.wdl" -> TResult(correct = true),
       // correct tasks
       "command_string.wdl" -> TResult(correct = true),
       "comparisons.wdl" -> TResult(correct = true),
@@ -129,7 +131,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "type check test wdl files" taggedAs Edge in {
     val testFiles = getWdlSourceFiles(
-        Paths.get(getClass.getResource("/wdlTools/types/v1").getPath)
+        Paths.get(getClass.getResource("/types/v1").getPath)
     )
 
     // check that all results have a corresponding file
