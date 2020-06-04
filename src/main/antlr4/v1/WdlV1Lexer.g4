@@ -21,8 +21,8 @@ AS: 'as';
 In: 'in';
 INPUT: 'input';
 OUTPUT: 'output';
-PARAMETERMETA: 'parameter_meta';
-META: 'meta';
+PARAMETERMETA: 'parameter_meta' -> mode(Meta);
+META: 'meta' -> mode(Meta);
 COMMAND: 'command'-> mode(Command);
 RUNTIME: 'runtime';
 BOOLEAN: 'Boolean';
@@ -35,7 +35,7 @@ MAP: 'Map';
 PAIR: 'Pair';
 OBJECT: 'Object';
 OBJECT_LITERAL: 'object';
-NULL_LITERAL: 'null';
+
 SEP: 'sep';
 DEFAULT: 'default';
 
@@ -143,6 +143,58 @@ mode Version;
 
 VersionWhitespace: [ \t]+ -> channel(HIDDEN);
 ReleaseVersion: [a-zA-Z0-9.-]+ -> popMode;
+
+mode Meta;
+
+BeginMeta: '{' -> pushMode(MetaBody);
+MetaWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
+
+mode MetaBody;
+
+MetaBodyComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaIdentifier: Identifier;
+MetaColon: ':' -> pushMode(MetaValue);
+EndMeta: '}' -> popMode, mode(DEFAULT_MODE);
+MetaBodyWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
+
+mode MetaValue;
+
+MetaValueComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaBool: BoolLiteral -> popMode;
+MetaInt: IntLiteral -> popMode;
+MetaFloat: FloatLiteral -> popMode;
+MetaNull: 'null' -> popMode;
+MetaSquote: '\'' -> pushMode(MetaSquoteString);
+MetaDquote: '"' -> pushMode(MetaDquoteString);
+MetaLbrack: '[' -> pushMode(MetaValue);
+MetaComma: ',' -> pushMode(MetaValue);
+MetaRbrack: ']' -> popMode;
+MetaLbrace: '{' -> pushMode(MetaObject);
+MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
+
+
+mode MetaSquoteString;
+
+MetaSquoteEscapedChar: '\\' . -> type(MetaStringPart);
+MetaSquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(MetaStringPart);
+MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
+MetaStringPart: ~[\r\n']+;
+
+mode MetaDquoteString;
+
+MetaDquoteEscapedChar: '\\' . -> type(MetaStringPart);
+MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaStringPart);
+MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
+MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
+
+mode MetaObject;
+
+MetaObjectComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaObjectIdentifier: Identifier;
+MetaObjectColon: ':' -> pushMode(MetaValue);
+MetaObjectComma: ',';
+MetaRbrace: '}' -> popMode, popMode;
+MetaObjectWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 // Fragments
 
