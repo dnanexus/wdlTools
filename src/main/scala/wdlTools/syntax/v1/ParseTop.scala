@@ -697,12 +697,86 @@ any_decls
     throw new SyntaxException("bad declaration format", getTextSource(ctx), grammar.docSourceUrl)
   }
 
+  /* meta_value
+    : BoolLiteral
+    | number
+    | string
+    | meta_object
+    | meta_array
+    | NULL_LITERAL
+    ; */
+  override def visitMeta_value(ctx: WdlV1Parser.Meta_valueContext): MetaValue = {
+    if (ctx.NULL_LITERAL() != null) {
+      return MetaValueNull(getTextSource(ctx))
+    }
+    if (ctx.BoolLiteral() != null) {
+      val value = ctx.getText.toLowerCase() == "true"
+      return MetaValueBoolean(value, getTextSource(ctx))
+    }
+    if (ctx.number() != null) {
+      visitNumber(ctx.number()) match {
+        case ExprInt(value, text)   => MetaValueInt(value, text)
+        case ExprFloat(value, text) => MetaValueFloat(value, text)
+        case other                  => throw new RuntimeException(s"Invalid number expression ${other}")
+      }
+    }
+    if (ctx.meta_string() != null) {
+      return visitMeta_string(ctx.meta_string())
+    }
+    if (ctx.meta_array() != null) {
+      return visitMeta_array(ctx.meta_array())
+    }
+    if (ctx.meta_object() != null) {
+      return visitMeta_object(ctx.meta_object())
+    }
+    throw new SyntaxException("Not one of four supported variants of meta_value",
+                              getTextSource(ctx),
+                              grammar.docSourceUrl)
+  }
+
+  /* meta_string
+    : DQUOTE string_part DQUOTE
+    | SQUOTE string_part SQUOTE
+    ; */
+  override def visitMeta_string(ctx: WdlV1Parser.Meta_stringContext): MetaValueString = {
+    val parts: Vector[String] = ctx
+      .string_part()
+      .StringPart()
+      .asScala
+      .map(x => x.getText)
+      .toVector
+    MetaValueString(parts.mkString, getTextSource(ctx))
+  }
+
+  /* meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
+   */
+  override def visitMeta_array(ctx: WdlV1Parser.Meta_arrayContext): MetaValueArray = {
+    val items = ctx.meta_value().asScala.toVector.map(visitMeta_value)
+    MetaValueArray(items, getTextSource(ctx))
+  }
+
+  /* meta_object: LBRACE (meta_kv (COMMA meta_kv)*)* RBRACE;
+   */
+  override def visitMeta_object(ctx: WdlV1Parser.Meta_objectContext): MetaValueObject = {
+    val members = ctx
+      .meta_kv()
+      .asScala
+      .toVector
+      .map(visitMeta_kv)
+    MetaValueObject(members, getTextSource(ctx))
+  }
+
   /* meta_kv
-   : Identifier COLON expr
-   ; */
+     : Identifier COLON expr
+     ; */
   override def visitMeta_kv(ctx: WdlV1Parser.Meta_kvContext): MetaKV = {
     val id = getIdentifierText(ctx.Identifier(), ctx)
-    val expr = visitExpr(ctx.expr())
+    if (ctx.meta_value() == null) {
+      throw new SyntaxException(s"Invalid expression for meta key {id}",
+                                getTextSource(ctx),
+                                grammar.docSourceUrl)
+    }
+    val expr = visitMeta_value(ctx.meta_value())
     MetaKV(id, expr, getTextSource(ctx))
   }
 

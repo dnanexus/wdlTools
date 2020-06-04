@@ -21,7 +21,6 @@ object Util {
     }
 
     expr match {
-      case ValueNull(_)                    => "null"
       case ValueNone(_)                    => "None"
       case ValueString(value, _)           => value
       case ValueBoolean(value: Boolean, _) => value.toString
@@ -114,6 +113,30 @@ object Util {
 
       case ExprGetName(e: Expr, id: String, _) =>
         s"${exprToString(e, callback)}.${id}"
+    }
+  }
+
+  def metaValueToString(value: MetaValue,
+                        callback: Option[MetaValue => Option[String]] = None): String = {
+    if (callback.isDefined) {
+      val s = callback.get(value)
+      if (s.isDefined) {
+        return s.get
+      }
+    }
+    value match {
+      case MetaValueNull(_)                    => "null"
+      case MetaValueString(value, _)           => value
+      case MetaValueBoolean(value: Boolean, _) => value.toString
+      case MetaValueInt(value, _)              => value.toString
+      case MetaValueFloat(value, _)            => value.toString
+      case MetaValueArray(value, _) =>
+        "[" + value.map(x => metaValueToString(x, callback)).mkString(", ") + "]"
+      case MetaValueObject(value, _) =>
+        val m = value
+          .map(x => s"${x.id} : ${metaValueToString(x.value, callback)}")
+          .mkString(", ")
+        s"{$m}"
     }
   }
 }

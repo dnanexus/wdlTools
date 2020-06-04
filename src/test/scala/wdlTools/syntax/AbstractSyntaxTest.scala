@@ -72,7 +72,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("i", ExprIdentifier("null", _), _) =>
+      case MetaKV("i", MetaValueNull(_), _) =>
     }
   }
 

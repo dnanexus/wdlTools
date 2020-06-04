@@ -71,6 +71,22 @@ case class ProjectGenerator(opts: Options,
     }
   }
 
+  def exprToMetaValue(expr: Expr): MetaValue = {
+    if (requiresEvaluation(expr)) {
+      throw new Exception("Cannot use an expression that requires evaluation")
+    }
+    expr match {
+      case ValueString(value, text)  => MetaValueString(value, text)
+      case ValueInt(value, text)     => MetaValueInt(value, text)
+      case ValueFloat(value, text)   => MetaValueFloat(value, text)
+      case ValueBoolean(value, text) => MetaValueBoolean(value, text)
+      case ExprArray(value, text)    => MetaValueArray(value.map(exprToMetaValue), text)
+      case ExprObject(value, text) =>
+        MetaValueObject(value.map(x => MetaKV(x.key, exprToMetaValue(x.value), x.text)), text)
+      case other => throw new Exception(s"Invalid meta value ${other}")
+    }
+  }
+
   def readFields(fieldType: String,
                  choicesAllowed: Boolean,
                  startFields: Vector[FieldModel],
@@ -116,32 +132,71 @@ case class ProjectGenerator(opts: Options,
           Vector.empty
         }
 
-        def askDefault: Option[Expr] = {
-          console.askOnce[String](prompt = "Default", optional = true).map(fragParser.parseExpr)
+        def askDefault: Either[String, Option[MetaValue]] = {
+          try {
+            Right(
+                console
+                  .askOnce[String](prompt = "Default", optional = true)
+                  .map(x => fragParser.parseExpr(x))
+                  .map(exprToMetaValue)
+            )
+          } catch {
+            case t: Throwable => Left(t.getMessage)
+          }
         }
 
-        var default: Option[Expr] = askDefault
-        while (default.isDefined && requiresEvaluation(default.get)) {
-          console.error("Default value cannot be an expression that requires evaluation")
-          default = askDefault
+        var defaultOrError: Either[String, Option[MetaValue]] = askDefault
+        while (defaultOrError.isLeft) {
+          defaultOrError match {
+            case Left(err) =>
+              console.error(err)
+              defaultOrError = askDefault
+            case _ => throw new RuntimeException()
+          }
         }
         val choices = if (choicesAllowed) {
-          def askChoices: Seq[Expr] = {
-            console
-              .ask[String](promptPrefix = "Choice", optional = true, multiple = true)
-              .map(fragParser.parseExpr)
+          def askChoices: Either[String, Seq[MetaValue]] = {
+            try {
+              Right(
+                  console
+                    .ask[String](promptPrefix = "Choice", optional = true, multiple = true)
+                    .map(fragParser.parseExpr)
+                    .map(exprToMetaValue)
+              )
+            } catch {
+              case t: Throwable => Left(t.getMessage)
+            }
           }
 
-          var choiceList = askChoices
-          while (choiceList.nonEmpty && choiceList.exists(requiresEvaluation)) {
-            console.error("Choice value cannot be an expression that requires evaluation")
-            choiceList = askChoices
+          var choiceListOrError = askChoices
+          while (choiceListOrError.isLeft) {
+            choiceListOrError match {
+              case Left(err) =>
+                console.error(err)
+                choiceListOrError = askChoices
+              case _ => throw new RuntimeException()
+            }
           }
-          choiceList
+          choiceListOrError match {
+            case Right(x) => x
+            case _        => throw new RuntimeException()
+          }
         } else {
           Vector.empty
         }
-        fields :+= FieldModel(name, label, help, optional, dataType, patterns, default, choices)
+        fields :+= FieldModel(
+            name,
+            label,
+            help,
+            optional,
+            dataType,
+            patterns,
+            defaultOrError match {
+              case Right(default) => default
+              case _              => throw new RuntimeException()
+            },
+            choices
+        )
       }
       continue = console.askYesNo(prompt = s"Define another ${fieldType}?", default = Some(true))
     }
@@ -271,37 +326,39 @@ object ProjectGenerator {
                         optional: Boolean,
                         dataType: Type,
                         patterns: Seq[String] = Vector.empty,
-                        default: Option[Expr] = None,
-                        choices: Seq[Expr] = Vector.empty,
+                        default: Option[MetaValue] = None,
+                        choices: Seq[MetaValue] = Vector.empty,
                         linked: Boolean = false) {
     def toDeclaration: Declaration = {
       Declaration(name, dataType, None, null)
     }
 
     def toMeta: Option[MetaKV] = {
-      val metaMap: Vector[ExprObjectMember] = Map(
-          "label" -> label.map(ValueString(_, null)),
-          "help" -> help.map(ValueString(_, null)),
+      val metaMap: Vector[MetaKV] = Map(
+          "label" -> label.map(MetaValueString(_, null)),
+          "help" -> help.map(MetaValueString(_, null)),
           "patterns" -> (if (patterns.isEmpty) {
                            None
                          } else {
-                           Some(ExprArray(patterns.map(ValueString(_, null)).toVector, null))
+                           Some(
+                               MetaValueArray(patterns.map(MetaValueString(_, null)).toVector, null)
+                           )
                          }),
           "default" -> default,
           "choices" -> (if (choices.isEmpty) {
                           None
                         } else {
-                          Some(ExprArray(choices.toVector, null))
+                          Some(MetaValueArray(choices.toVector, null))
                         })
       ).collect {
           case (key, Some(value)) => key -> value
         }
-        .map(item => ExprObjectMember(item._1, item._2, null))
+        .map(item => MetaKV(item._1, item._2, null))
         .toVector
       if (metaMap.isEmpty) {
         None
       } else {
-        Some(MetaKV(name, ExprObject(metaMap, null), null))
+        Some(MetaKV(name, MetaValueObject(metaMap, null), null))
       }
     }
   }
@@ -332,7 +389,7 @@ object ProjectGenerator {
     } else {
       Some(
           MetaSection(items.map {
-            case (key, value) => MetaKV(key, ValueString(value, null), null)
+            case (key, value) => MetaKV(key, MetaValueString(value, null), null)
           }.toVector, null)
       )
     }

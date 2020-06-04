@@ -133,7 +133,7 @@ case class ParseAll(opts: Options,
     }
 
     def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, AST.ValueString(kv.value, kv.text), kv.text)
+      AST.MetaKV(kv.id, AST.MetaValueString(kv.value, kv.text), kv.text)
     }
 
     def translateInputSection(

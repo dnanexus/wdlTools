@@ -30,7 +30,7 @@ object DocumentationGenerator {
     val comment: Option[DocumentationComment]
   }
 
-  case class SimpleValueDocumentation(value: Expr, comment: Option[DocumentationComment])
+  case class SimpleValueDocumentation(value: Element, comment: Option[DocumentationComment])
       extends ValueDocumentation
 
   case class MapValueDocumentation(value: Map[String, ValueDocumentation],
@@ -105,6 +105,24 @@ case class DocumentationGenerator(opts: Options) {
         }
       }
 
+      def getMetaValueDocumentation(value: MetaValue, parentLine: Int): ValueDocumentation = {
+        val comment = if (value.text.line > parentLine) {
+          getDocumentationComment(value)
+        } else {
+          None
+        }
+        value match {
+          case MetaValueArray(value, text) =>
+            ListValueDocumentation(value.map(v => getMetaValueDocumentation(v, text.line)), comment)
+          case MetaValueObject(value, text) =>
+            MapValueDocumentation(
+                value.map(v => v.id -> getMetaValueDocumentation(v.value, text.line)).toMap,
+                comment
+            )
+          case other => SimpleValueDocumentation(other, comment)
+        }
+      }
+
       def getValueDocumentation(
           value: Expr,
           parentLine: Int
@@ -142,7 +160,7 @@ case class DocumentationGenerator(opts: Options) {
       def getMetaDocumentation(meta: MetaSection): Vector[KeyValueDocumentation] = {
         meta.kvs.map { kv =>
           KeyValueDocumentation(kv.id,
-                                getValueDocumentation(kv.expr, kv.text.line),
+                                getMetaValueDocumentation(kv.value, kv.text.line),
                                 getDocumentationComment(kv))
         }
       }
@@ -154,18 +172,20 @@ case class DocumentationGenerator(opts: Options) {
       ): Vector[DeclarationDocumentation] = {
         decls.map { d =>
           val paramMeta = meta.flatMap(_.kvs.collectFirst {
-            case kv: MetaKV if kv.id == d.name => kv.expr
+            case kv: MetaKV if kv.id == d.name => kv.value
           })
           val default = if (defaultAllowed) {
             d.expr.map(e => exprToString(e))
           } else {
             None
           }
-          DeclarationDocumentation(d.name,
-                                   d.wdlType,
-                                   default,
-                                   paramMeta.map(e => getValueDocumentation(e, meta.get.text.line)),
-                                   getDocumentationComment(d))
+          DeclarationDocumentation(
+              d.name,
+              d.wdlType,
+              default,
+              paramMeta.map(v => getMetaValueDocumentation(v, meta.get.text.line)),
+              getDocumentationComment(d)
+          )
         }
       }
 
