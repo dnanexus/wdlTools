@@ -2,15 +2,13 @@ package wdlTools.syntax
 
 import java.net.URL
 
-sealed abstract class WdlVersion(val name: String,
-                                 val order: Int,
-                                 val aliases: Set[String] = Set.empty)
+sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
   def compare(that: WdlVersion): Int = this.order - that.order
 }
 
 object WdlVersion {
-  case object Draft_2 extends WdlVersion("draft-2", 0)
+  case object Draft_2 extends WdlVersion("draft-2", 0, aliases = Set.empty)
   case object V1 extends WdlVersion("1.0", 1, aliases = Set("draft-3"))
   case object V2 extends WdlVersion("2.0", 2, aliases = Set("development"))
 

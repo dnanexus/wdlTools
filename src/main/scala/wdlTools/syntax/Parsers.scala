@@ -11,7 +11,7 @@ case class Parsers(opts: Options = BasicOptions(),
                    listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None) {
 
-  private lazy val parsers: Map[WdlVersion, WdlParser] = Map(
+  private val parsers: Map[WdlVersion, WdlParser] = Map(
       WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories, errorHandler),
       WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories, errorHandler),
       WdlVersion.V2 -> v2.ParseAll(opts, listenerFactories, errorHandler)
