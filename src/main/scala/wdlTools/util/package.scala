@@ -13,11 +13,6 @@ object Verbosity extends Enumeration {
   val Quiet, Normal, Verbose = Value
 }
 
-object TypeCheckingRegime extends Enumeration {
-  type TypeCheckingRegime = Value
-  val Strict, Moderate, Lenient = Value
-}
-
 /**
   * Common configuration options.
   *

@@ -126,7 +126,7 @@ class TypedAbstractSyntaxTreeVisitor {
 
   def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {}
 
-  def visitHintsKV(key: String, value: Expr, parent: VisitorContext[HintsSection]): Unit = {}
+  def visitHintsKV(key: String, value: MetaValue, parent: VisitorContext[HintsSection]): Unit = {}
 
   def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {}
 
@@ -374,10 +374,10 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
   }
 
   override def visitHintsKV(key: String,
-                            value: Expr,
+                            value: MetaValue,
                             parent: VisitorContext[HintsSection]): Unit = {
     visitName(key, parent)
-    visitExpression(parent.createChildContext[Expr](value))
+    visitMetaValue(parent.createChildContext[MetaValue](value))
   }
 
   override def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {

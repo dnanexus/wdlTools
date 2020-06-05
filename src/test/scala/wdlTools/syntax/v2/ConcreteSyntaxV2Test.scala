@@ -50,4 +50,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
     doc.elements(0) shouldBe a[ImportDoc]
     doc.workflow shouldBe defined
   }
+
+  it should "parse a task with complex hints" in {
+    getDocument(getSource("complex_hint_values.wdl"))
+  }
 }

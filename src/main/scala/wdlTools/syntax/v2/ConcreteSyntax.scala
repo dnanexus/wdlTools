@@ -109,10 +109,8 @@ object ConcreteSyntax {
   case class MetaKV(id: String, value: MetaValue, text: TextSource) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
-
   // hints section
-  case class HintsKV(id: String, expr: Expr, text: TextSource) extends Element
-  case class HintsSection(kvs: Vector[HintsKV], text: TextSource) extends Element
+  case class HintsSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 
   // imports
   case class ImportAddr(value: String, text: TextSource) extends Element

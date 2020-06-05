@@ -4,7 +4,12 @@ import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, TypeCheckingRegime, Verbosity}
+import wdlTools.util.{Options, Verbosity}
+
+object TypeCheckingRegime extends Enumeration {
+  type TypeCheckingRegime = Value
+  val Strict, Moderate, Lenient = Value
+}
 
 /**
   * @param typeChecking             strictness of type-checking
@@ -15,7 +20,8 @@ case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        followImports: Boolean = true,
                        verbosity: Verbosity.Verbosity = Verbosity.Normal,
                        antlr4Trace: Boolean = false,
-                       typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate,
+                       typeChecking: TypeCheckingRegime.TypeCheckingRegime =
+                         TypeCheckingRegime.Moderate,
                        allowNonWorkflowInputs: Boolean = true)
     extends Options
 

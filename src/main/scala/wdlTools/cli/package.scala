@@ -12,10 +12,10 @@ import org.rogach.scallop.{
   singleArgConverter
 }
 import wdlTools.syntax.WdlVersion
-import wdlTools.types.TypeOptions
-import wdlTools.util.TypeCheckingRegime.TypeCheckingRegime
+import wdlTools.types.{TypeCheckingRegime, TypeOptions}
+import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.Verbosity._
-import wdlTools.util.{BasicOptions, Options, TypeCheckingRegime, Util}
+import wdlTools.util.{BasicOptions, Options, Util}
 
 import scala.util.Try
 

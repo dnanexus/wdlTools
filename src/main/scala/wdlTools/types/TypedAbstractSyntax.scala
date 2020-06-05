@@ -166,7 +166,6 @@ object TypedAbstractSyntax {
   // >>>
   case class CommandSection(parts: Vector[Expr], text: TextSource) extends Element
   case class RuntimeSection(kvs: Map[String, Expr], text: TextSource) extends Element
-  case class HintsSection(kvs: Map[String, Expr], text: TextSource) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
@@ -181,6 +180,8 @@ object TypedAbstractSyntax {
   // the parameter sections have mappings from keys to json-like objects
   case class ParameterMetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
   case class MetaSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
+  // hints section
+  case class HintsSection(kvs: Map[String, MetaValue], text: TextSource) extends Element
 
   case class Version(value: WdlVersion, text: TextSource) extends Element
 

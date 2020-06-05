@@ -75,7 +75,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       false
     }
 
-    val checker = TypeInfer(opts, Some(errorHandler))
+    val checker = TypeInfer(opts, errorHandler = Some(errorHandler))
 
     try {
       checker.apply(parsers.parseDocument(url))

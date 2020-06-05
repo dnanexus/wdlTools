@@ -118,6 +118,9 @@ expr_infix5
   : expr_core
   ;
 
+// I think we can change object literal to
+// (Identifier COLON expr (COMMA Identifier COLON expr)* COMMA?)*
+// to ignore trailing comma - similar changes for array and meta
 expr_core
   : Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
   | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal

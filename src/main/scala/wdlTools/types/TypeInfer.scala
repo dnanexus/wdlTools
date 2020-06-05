@@ -1,12 +1,10 @@
 package wdlTools.types
 
-import wdlTools.syntax.{AbstractSyntax => AST}
-import wdlTools.syntax.TextSource
-import wdlTools.syntax.{Util => SUtil}
+import wdlTools.syntax.{TextSource, WdlVersion, AbstractSyntax => AST, Util => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
-import wdlTools.util.TypeCheckingRegime._
+import TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
 
 /**
@@ -28,6 +26,27 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   type Bindings = Map[String, WdlType]
   object Bindings {
     val empty = Map.empty[String, WdlType]
+  }
+
+  // get type restrictions, on a per-version basis
+  private def getRuntimeTypeRestrictions(version: WdlVersion): Map[String, Vector[T]] = {
+    version match {
+      case WdlVersion.V2 =>
+        Map(
+            "container" -> Vector(T_Array(T_String, nonEmpty = true), T_String),
+            "memory" -> Vector(T_Int, T_String),
+            "cpu" -> Vector(T_Float, T_Int),
+            "gpu" -> Vector(T_Boolean),
+            "disks" -> Vector(T_Int, T_Array(T_String, nonEmpty = true), T_String),
+            "maxRetries" -> Vector(T_Int),
+            "returnCodes" -> Vector(T_Array(T_Int, nonEmpty = true), T_Int, T_String)
+        )
+      case _ =>
+        Map(
+            "docker" -> Vector(T_Array(T_String, nonEmpty = true), T_String),
+            "memory" -> Vector(T_Int, T_String)
+        )
+    }
   }
 
   private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
@@ -308,7 +327,6 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), text)
 
       case AST.ExprMap(value, text) =>
-        // figure out the types from the first element
         val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
           applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
@@ -316,6 +334,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
         // unify the value types
         val tv = unifyTypes(m.values.map(_.wdlType), "map values", text, ctx)
+        T_Map(tk, tv)
         TAT.ExprMap(m, T_Map(tk, tv), text)
 
       // These are expressions like:
@@ -688,19 +707,22 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
+    val restrictions = getRuntimeTypeRestrictions(ctx.version)
     val m = rtSection.kvs.map {
-      case AST.RuntimeKV(name, expr, _) =>
-        name -> applyExpr(expr, Map.empty, ctx)
+      case AST.RuntimeKV(id, expr, text) =>
+        val tExpr = applyExpr(expr, Map.empty, ctx)
+        // if there are type restrictions, check that the type of the expression is coercible to
+        // one of the allowed types
+        if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+          throw new TypeException(
+              s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
+              text,
+              ctx.docSourceUrl
+          )
+        }
+        id -> tExpr
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
-  }
-
-  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
-    val m = hintsSection.kvs.map {
-      case AST.HintsKV(name, expr, _) =>
-        name -> applyExpr(expr, Map.empty, ctx)
-    }.toMap
-    TAT.HintsSection(m, hintsSection.text)
   }
 
   // convert the generic expression syntax into a specialized JSON object
@@ -752,6 +774,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           kv.id -> metaValue
         }.toMap,
         paramMetaSection.text
+    )
+  }
+
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
+    TAT.HintsSection(
+        hintsSection.kvs.map {
+          case AST.MetaKV(k, v, _) =>
+            k -> applyMetaValue(v, ctx)
+        }.toMap,
+        hintsSection.text
     )
   }
 

@@ -1,11 +1,13 @@
 package wdlTools.types
 
 import java.nio.file.{Files, Path, Paths}
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{TypeCheckingRegime, Util => UUtil, Verbosity}
+import wdlTools.util.{Verbosity, Util => UUtil}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
