@@ -155,33 +155,42 @@ struct
   ;
 
 meta_value
-  : BoolLiteral
-  | number
+  : MetaNull
+  | MetaBool
+  | MetaInt
+  | MetaFloat
   | meta_string
   | meta_object
   | meta_array
-  | NULL_LITERAL
   ;
 
 meta_string
-  : DQUOTE string_part DQUOTE
-  | SQUOTE string_part SQUOTE
+  : MetaDquote MetaStringPart* MetaDquote
+  | MetaSquote MetaStringPart* MetaSquote
   ;
 
-meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
+meta_array
+  : MetaLbrack (meta_value (MetaComma meta_value)*)* MetaRbrack
+  ;
 
-meta_object: LBRACE (meta_kv (COMMA meta_kv)*)* RBRACE;
+meta_object
+  : MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)*)* MetaRbrace
+  ;
+
+meta_object_kv
+  : MetaObjectIdentifier MetaObjectColon meta_value
+  ;
 
 meta_kv
-  : Identifier COLON meta_value
+  : MetaIdentifier MetaColon meta_value
   ;
 
 parameter_meta
-  : PARAMETERMETA LBRACE meta_kv* RBRACE
+  : PARAMETERMETA BeginMeta meta_kv* EndMeta
   ;
 
 meta
-  :	META LBRACE meta_kv* RBRACE
+  :	META BeginMeta meta_kv* EndMeta
   ;
 
 task_runtime_kv
