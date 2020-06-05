@@ -20,7 +20,8 @@ case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        followImports: Boolean = true,
                        verbosity: Verbosity.Verbosity = Verbosity.Normal,
                        antlr4Trace: Boolean = false,
-                       typeChecking: TypeCheckingRegime.Value = TypeCheckingRegime.Moderate,
+                       typeChecking: TypeCheckingRegime.TypeCheckingRegime =
+                         TypeCheckingRegime.Moderate,
                        allowNonWorkflowInputs: Boolean = true)
     extends Options
 
