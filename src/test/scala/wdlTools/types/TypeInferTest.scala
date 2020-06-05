@@ -13,8 +13,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/types/v1").getPath),
-          Paths.get(getClass.getResource("/types/v2").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -135,8 +134,6 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/types/v1").getPath)
-    ) ++ getWdlSourceFiles(
-        Paths.get(getClass.getResource("/types/v2").getPath)
     )
 
     // check that all results have a corresponding file
