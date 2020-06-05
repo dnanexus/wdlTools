@@ -11,7 +11,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
-        Paths.get(getClass.getResource("/types/v1").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
@@ -199,14 +199,14 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "handle several struct definitions" taggedAs Edge in {
     val opts2 = TypeOptions(
-      antlr4Trace = false,
-      localDirectories = Vector(structsDir),
-      verbosity = Verbosity.Quiet,
-      followImports = true
+        antlr4Trace = false,
+        localDirectories = Vector(structsDir),
+        verbosity = Verbosity.Quiet,
+        followImports = true
     )
     val checker = TypeInfer(opts2)
     val sourceFile = UUtil.pathToUrl(structsDir.resolve("file3.wdl"))
-    val doc = parser.parseDocument(sourceFile)
+    val doc = Parsers(opts2).parseDocument(sourceFile)
     checker.apply(doc)
   }
 }

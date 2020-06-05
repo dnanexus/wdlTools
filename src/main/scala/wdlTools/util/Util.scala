@@ -96,10 +96,9 @@ object Util {
         // treat it as a HTTP address
         new URL(addr).getPath
       } catch {
-        case e : java.net.MalformedURLException =>
+        case _: java.net.MalformedURLException =>
           // failed, it is just a local file
-          //addr
-          throw e
+          addr
       }
     ((Paths.get(fileFullPath).getFileName.toString, dropExt) match {
       case (fn, ext) if fn.length > 0 && fn.endsWith(ext) => fn.dropRight(dropExt.length)
