@@ -165,11 +165,17 @@ meta_string
   | MetaSquote MetaStringPart* MetaSquote
   ;
 
-meta_array: MetaLbrack (meta_value (MetaComma meta_value)*)* MetaRbrack;
+meta_array
+  : MetaLbrack (meta_value (MetaComma meta_value)*)* MetaRbrack
+  ;
 
-meta_object: MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)*)* MetaRbrace;
+meta_object
+  :MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)*)* MetaRbrace
+  ;
 
-meta_object_kv: MetaObjectIdentifier MetaObjectColon meta_value;
+meta_object_kv
+  :MetaObjectIdentifier MetaObjectColon meta_value
+  ;
 
 meta_kv
   : MetaIdentifier MetaColon meta_value
@@ -312,7 +318,6 @@ document_element
   : import_doc
   | struct
   | task
-  | workflow
   ;
 
 document

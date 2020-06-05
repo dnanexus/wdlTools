@@ -2,19 +2,24 @@ package wdlTools.syntax
 
 import java.net.URL
 
-sealed abstract class WdlVersion(val name: String, val order: Int) extends Ordered[WdlVersion] {
+sealed abstract class WdlVersion(val name: String,
+                                 val order: Int,
+                                 val aliases: Set[String] = Set.empty)
+    extends Ordered[WdlVersion] {
   def compare(that: WdlVersion): Int = this.order - that.order
 }
 
 object WdlVersion {
   case object Draft_2 extends WdlVersion("draft-2", 0)
-  case object V1 extends WdlVersion("1.0", 1)
-  case object V2 extends WdlVersion("2.0", 2)
+  case object V1 extends WdlVersion("1.0", 1, aliases = Set("draft-3"))
+  case object V2 extends WdlVersion("2.0", 2, aliases = Set("development"))
 
-  val All: Vector[WdlVersion] = Vector(V1, Draft_2).sortWith(_ < _)
+  val All: Vector[WdlVersion] = Vector(V2, V1, Draft_2).sortWith(_ < _)
 
   def withName(name: String): WdlVersion = {
-    val version = All.collectFirst { case v if v.name == name => v }
+    val version = All.collectFirst {
+      case v if v.name == name || v.aliases.contains(name) => v
+    }
     if (version.isDefined) {
       version.get
     } else {
