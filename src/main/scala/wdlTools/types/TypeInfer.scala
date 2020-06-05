@@ -1,12 +1,10 @@
 package wdlTools.types
 
-import wdlTools.syntax.{AbstractSyntax => AST}
-import wdlTools.syntax.TextSource
-import wdlTools.syntax.{Util => SUtil}
+import wdlTools.syntax.{TextSource, WdlVersion, AbstractSyntax => AST, Util => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
-import wdlTools.util.TypeCheckingRegime._
+import TypeCheckingRegime._
 import wdlTools.util.{Util => UUtil}
 
 /**
@@ -17,7 +15,9 @@ import wdlTools.util.{Util => UUtil}
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
+case class TypeInfer(conf: TypeOptions,
+                     typeRestrictions: Map[WdlVersion, TypeRestrictions] = Map.empty,
+                     errorHandler: Option[Vector[TypeError] => Boolean] = None) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
   private var errors = Vector.empty[TypeError]
@@ -28,6 +28,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   type Bindings = Map[String, WdlType]
   object Bindings {
     val empty = Map.empty[String, WdlType]
+  }
+
+  // get type restrictions, on a per-version basis
+  private def getTypeRestrictions(version: WdlVersion): TypeRestrictions = {
+    val defaultRestrictions = TypeRestrictions.getDefaultRestrictions(version)
+    if (typeRestrictions.contains(version)) {
+      defaultRestrictions.merge(typeRestrictions(version))
+    } else {
+      defaultRestrictions
+    }
   }
 
   private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
@@ -227,7 +237,10 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
   // Add the type to an expression
   //
-  private def applyExpr(expr: AST.Expr, bindings: Bindings, ctx: Context): TAT.Expr = {
+  private def applyExpr(expr: AST.Expr,
+                        bindings: Bindings,
+                        ctx: Context,
+                        unifyMaps: Boolean = true): TAT.Expr = {
     expr match {
       // None can be any type optional
       case AST.ValueNone(text)           => TAT.ValueNone(T_Optional(T_Any), text)
@@ -308,15 +321,19 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), text)
 
       case AST.ExprMap(value, text) =>
-        // figure out the types from the first element
         val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
           applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
-        // unify the key types
-        val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
-        // unify the value types
-        val tv = unifyTypes(m.values.map(_.wdlType), "map values", text, ctx)
-        TAT.ExprMap(m, T_Map(tk, tv), text)
+        val wdlType = if (unifyMaps) {
+          // unify the key types
+          val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
+          // unify the value types
+          val tv = unifyTypes(m.values.map(_.wdlType), "map values", text, ctx)
+          T_Map(tk, tv)
+        } else {
+          T_Map(T_Any, T_Any)
+        }
+        TAT.ExprMap(m, wdlType, text)
 
       // These are expressions like:
       // ${true="--yes" false="--no" boolean_value}
@@ -688,19 +705,23 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
+    val restrictions = getTypeRestrictions(ctx.version).runtime
     val m = rtSection.kvs.map {
-      case AST.RuntimeKV(name, expr, _) =>
-        name -> applyExpr(expr, Map.empty, ctx)
+      case AST.RuntimeKV(id, expr, text) =>
+        val idRestrictions = restrictions.get(id)
+        // if there are type restrictions, don't force all Map keys/values to be of same type
+        // since we might want to coerce the map to a Struct
+        val tExpr = applyExpr(expr, Map.empty, ctx, unifyMaps = idRestrictions.isEmpty)
+        if (!idRestrictions.forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+          throw new TypeException(
+              s"runtime id ${id} is not coercible to one of the allowed types ${idRestrictions}",
+              text,
+              ctx.docSourceUrl
+          )
+        }
+        id -> tExpr
     }.toMap
     TAT.RuntimeSection(m, rtSection.text)
-  }
-
-  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
-    val m = hintsSection.kvs.map {
-      case AST.HintsKV(name, expr, _) =>
-        name -> applyExpr(expr, Map.empty, ctx)
-    }.toMap
-    TAT.HintsSection(m, hintsSection.text)
   }
 
   // convert the generic expression syntax into a specialized JSON object
@@ -752,6 +773,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           kv.id -> metaValue
         }.toMap,
         paramMetaSection.text
+    )
+  }
+
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
+    TAT.HintsSection(
+        hintsSection.kvs.map {
+          case AST.MetaKV(k, v, _) =>
+            k -> applyMetaValue(v, ctx)
+        }.toMap,
+        hintsSection.text
     )
   }
 

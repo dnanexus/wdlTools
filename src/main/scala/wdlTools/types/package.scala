@@ -4,7 +4,12 @@ import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, TypeCheckingRegime, Verbosity}
+import wdlTools.util.{Options, Verbosity}
+
+object TypeCheckingRegime extends Enumeration {
+  type TypeCheckingRegime = Value
+  val Strict, Moderate, Lenient = Value
+}
 
 /**
   * @param typeChecking             strictness of type-checking

@@ -685,6 +685,15 @@ any_decls
     MetaSection(kvs, getTextSource(ctx))
   }
 
+  override def visitTask_hints(ctx: WdlV2Parser.Task_hintsContext): HintsSection = {
+    val kvs = ctx
+      .meta_kv()
+      .asScala
+      .map(x => visitMeta_kv(x))
+      .toVector
+    HintsSection(kvs, getTextSource(ctx))
+  }
+
   /* task_runtime_kv
    : Identifier COLON expr
    ; */
@@ -720,17 +729,6 @@ any_decls
       .map(x => visitTask_runtime_kv(x))
       .toVector
     RuntimeSection(kvs, getTextSource(ctx))
-  }
-
-  override def visitTask_hints_kv(ctx: WdlV2Parser.Task_hints_kvContext): HintsKV = {
-    val id: String = getIdentifierText(ctx.Identifier(), ctx)
-    val expr: Expr = visitExpr(ctx.expr())
-    HintsKV(id, expr, getTextSource(ctx))
-  }
-
-  override def visitTask_hints(ctx: WdlV2Parser.Task_hintsContext): HintsSection = {
-    val kvs = ctx.task_hints_kv().asScala.map(x => visitTask_hints_kv(x)).toVector
-    HintsSection(kvs, getTextSource(ctx))
   }
 
   /*

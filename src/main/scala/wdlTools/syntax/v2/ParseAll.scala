@@ -141,10 +141,6 @@ case class ParseAll(opts: Options,
       }
     }
 
-    def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.text)
-    }
-
     def translateInputSection(
         inp: CST.InputSection
     ): AST.InputSection = {
@@ -170,14 +166,41 @@ case class ParseAll(opts: Options,
                       decl.text)
     }
 
+    private def translateMetaKV(kvs: Vector[CST.MetaKV], name: String): Vector[AST.MetaKV] = {
+      // check for duplicate ids
+      kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
+          throw new SyntaxException(s"key ${kv.id} defined twice in ${name} section",
+                                    kv.text,
+                                    docSourceUrl)
+      }
+
+      kvs.map(kv => AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.text))
+    }
+
     def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.text)
+      AST.MetaSection(translateMetaKV(meta.kvs, "meta"), meta.text)
     }
 
     def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text)
+      AST.ParameterMetaSection(translateMetaKV(paramMeta.kvs, "parameter_meta"), paramMeta.text)
+    }
+
+    def translateHintsSection(
+        hints: CST.HintsSection
+    ): AST.HintsSection = {
+      hints.kvs.foldLeft(Set.empty[String]) {
+        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
+        case (_, kv) =>
+          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
+                                    kv.text,
+                                    docSourceUrl)
+      }
+
+      AST.HintsSection(translateMetaKV(hints.kvs, "hints"), hints.text)
     }
 
     def translateRuntimeSection(
@@ -198,26 +221,6 @@ case class ParseAll(opts: Options,
               AST.RuntimeKV(id, translateExpr(expr), text)
           },
           runtime.text
-      )
-    }
-
-    def translateHintsSection(
-        hints: CST.HintsSection
-    ): AST.HintsSection = {
-      hints.kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
-        case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
-                                    kv.text,
-                                    docSourceUrl)
-      }
-
-      AST.HintsSection(
-          hints.kvs.map {
-            case CST.HintsKV(id, expr, text) =>
-              AST.HintsKV(id, translateExpr(expr), text)
-          },
-          hints.text
       )
     }
 

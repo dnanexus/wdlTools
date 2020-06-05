@@ -126,9 +126,6 @@ object AbstractSyntax {
   case class RuntimeKV(id: String, expr: Expr, text: TextSource) extends Element
   case class RuntimeSection(kvs: Vector[RuntimeKV], text: TextSource) extends Element
 
-  case class HintsKV(id: String, expr: Expr, text: TextSource) extends Element
-  case class HintsSection(kvs: Vector[HintsKV], text: TextSource) extends Element
-
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
   case class MetaValueNull(text: TextSource) extends MetaValue
@@ -142,6 +139,8 @@ object AbstractSyntax {
   case class MetaKV(id: String, value: MetaValue, text: TextSource) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
   case class MetaSection(kvs: Vector[MetaKV], text: TextSource) extends Element
+  // hints section
+  case class HintsSection(kvs: Vector[MetaKV], text: TextSource) extends Element
 
   case class Version(value: WdlVersion, text: TextSource) extends Element
 

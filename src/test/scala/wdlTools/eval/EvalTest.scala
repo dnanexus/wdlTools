@@ -8,8 +8,8 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{TypeCheckingRegime, Verbosity, Util => UUtil}
-import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
+import wdlTools.util.{Verbosity, Util => UUtil}
+import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)

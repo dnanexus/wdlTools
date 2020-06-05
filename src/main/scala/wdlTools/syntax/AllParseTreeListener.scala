@@ -1755,12 +1755,6 @@ class AllParseTreeListener
   override def exitTask_runtime(ctx: WdlV2Parser.Task_runtimeContext): Unit = {
     exitTask_runtime(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterTask_hints_kv(ctx: WdlV2Parser.Task_hints_kvContext): Unit = {
-    enterTask_hints_kv(ctx.asInstanceOf[ParserRuleContext])
-  }
-  override def exitTask_hints_kv(ctx: WdlV2Parser.Task_hints_kvContext): Unit = {
-    exitTask_hints_kv(ctx.asInstanceOf[ParserRuleContext])
-  }
   override def enterTask_hints(ctx: WdlV2Parser.Task_hintsContext): Unit = {
     enterTask_hints(ctx.asInstanceOf[ParserRuleContext])
   }

@@ -203,12 +203,8 @@ task_runtime
   : RUNTIME LBRACE (task_runtime_kv)* RBRACE
   ;
 
-task_hints_kv
-  : Identifier COLON expr
-  ;
-
 task_hints
-  : HINTS LBRACE (task_hints_kv)* RBRACE
+  :	HINTS BeginMeta meta_kv* EndMeta
   ;
 
 task_input

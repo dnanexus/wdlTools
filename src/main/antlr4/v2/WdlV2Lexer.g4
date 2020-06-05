@@ -23,7 +23,7 @@ INPUT: 'input';
 OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta' -> mode(Meta);
 META: 'meta' -> mode(Meta);
-HINTS: 'hints';
+HINTS: 'hints' -> mode(Meta);
 RUNTIME: 'runtime';
 RUNTIMECPU: 'cpu';
 RUNTIMECONTAINER: 'container';

@@ -69,7 +69,7 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
         result + (docUrl -> (result.getOrElse(url, Vector.empty) ++ (
             if (!parserErrorEvents.contains(docUrl) && astRules.nonEmpty) {
               // First run the TypeChecker to infer the types of all expressions
-              val typeChecker = TypeInfer(opts, Some(handleTypeErrors))
+              val typeChecker = TypeInfer(opts, errorHandler = Some(handleTypeErrors))
               val (_, typesContext) = typeChecker.apply(doc)
               // Now execute the linter rules
               val astVisitors = astRules.map {

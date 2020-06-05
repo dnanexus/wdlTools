@@ -263,7 +263,7 @@ case class DocumentationGenerator(opts: Options) {
                     _.kvs.map(kv =>
                       KeyValueDocumentation(
                           kv.id,
-                          getValueDocumentation(kv.expr, kv.text.line),
+                          getMetaValueDocumentation(kv.value, kv.text.line),
                           getDocumentationComment(kv)
                       )
                     )
