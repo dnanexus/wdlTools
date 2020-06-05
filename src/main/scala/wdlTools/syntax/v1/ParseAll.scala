@@ -321,7 +321,8 @@ case class ParseAll(opts: Options,
       AST.Document(doc.sourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
     }
   }
-  private val versionRegexp = "version\\s+1.0.*".r
+
+  private val versionRegexp = "version\\s+(1.0|draft-3).*".r
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>

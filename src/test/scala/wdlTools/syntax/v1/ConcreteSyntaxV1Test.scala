@@ -598,6 +598,49 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     getDocument(getWorkflowSource("two_level.wdl"))
   }
 
+  it should "parse a task with meta keys that conflict with keywords" in {
+    val doc = getDocument(getWorkflowSource("meta_key_conflicts.wdl"))
+    doc.elements.size shouldBe 2
+    val task = doc.elements.head match {
+      case t: Task => t
+      case _       => throw new Exception("Expected a single task")
+    }
+    task.meta shouldBe defined
+    val metaKvs = task.meta.get.kvs
+    metaKvs.size shouldBe 1
+    metaKvs.head should matchPattern {
+      case MetaKV("version", MetaValueString("1.1", _), _) =>
+    }
+    task.parameterMeta shouldBe defined
+    val paramMetaKvs = task.parameterMeta.get.kvs
+    paramMetaKvs.size shouldBe 1
+    paramMetaKvs(0) should matchPattern {
+      case MetaKV(
+          "i",
+          MetaValueObject(Vector(
+                              MetaKV("description", MetaValueString("An int", _), _),
+                              MetaKV("default", MetaValueInt(3, _), _),
+                              MetaKV("array_of_objs",
+                                     MetaValueArray(
+                                         Vector(
+                                             MetaValueObject(
+                                                 Vector(
+                                                     MetaKV("foo", MetaValueBoolean(false, _), _),
+                                                     MetaKV("bar", MetaValueFloat(1.0, _), _)
+                                                 ),
+                                                 _
+                                             )
+                                         ),
+                                         _
+                                     ),
+                                     _)
+                          ),
+                          _),
+          _
+          ) =>
+    }
+  }
+
   it should "report extra comma" in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("extra_comma.wdl"))

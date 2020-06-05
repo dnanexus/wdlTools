@@ -141,6 +141,8 @@ class AllParseTreeListener
   def exitMeta_object(ctx: ParserRuleContext): Unit = {}
   def enterMeta_kv(ctx: ParserRuleContext): Unit = {}
   def exitMeta_kv(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_object_kv(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_object_kv(ctx: ParserRuleContext): Unit = {}
   def enterParameter_meta(ctx: ParserRuleContext): Unit = {}
   def exitParameter_meta(ctx: ParserRuleContext): Unit = {}
   def enterMeta(ctx: ParserRuleContext): Unit = {}
@@ -1151,6 +1153,12 @@ class AllParseTreeListener
   override def exitMeta_object(ctx: WdlV1Parser.Meta_objectContext): Unit = {
     exitMeta_object(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterMeta_object_kv(ctx: WdlV1Parser.Meta_object_kvContext): Unit = {
+    enterMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_object_kv(ctx: WdlV1Parser.Meta_object_kvContext): Unit = {
+    exitMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterMeta_kv(ctx: WdlV1Parser.Meta_kvContext): Unit = {
     enterMeta_kv(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1710,6 +1718,12 @@ class AllParseTreeListener
   }
   override def exitMeta_object(ctx: WdlV2Parser.Meta_objectContext): Unit = {
     exitMeta_object(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_object_kv(ctx: WdlV2Parser.Meta_object_kvContext): Unit = {
+    enterMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_object_kv(ctx: WdlV2Parser.Meta_object_kvContext): Unit = {
+    exitMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMeta_kv(ctx: WdlV2Parser.Meta_kvContext): Unit = {
     enterMeta_kv(ctx.asInstanceOf[ParserRuleContext])
