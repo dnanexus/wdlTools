@@ -754,6 +754,11 @@ any_decls
   private def visitMeta_kv(identifier: TerminalNode,
                            meta_value: WdlV1Parser.Meta_valueContext,
                            parent: ParserRuleContext) = {
+    if (identifier == null) {
+      throw new SyntaxException("missing identifier - maybe you have a trailing comma?",
+                                getTextSource(parent),
+                                grammar.docSourceUrl)
+    }
     val id = getIdentifierText(identifier, parent)
     if (meta_value == null) {
       throw new SyntaxException(s"Invalid expression for meta key ${id}",
