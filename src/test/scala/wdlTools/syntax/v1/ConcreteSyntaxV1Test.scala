@@ -641,6 +641,10 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "parse task with meta array of objects" in {
+    getDocument(getTaskSource("suggestions_meta.wdl"))
+  }
+
   it should "report extra comma" in {
     assertThrows[SyntaxException] {
       getDocument(getWorkflowSource("extra_comma.wdl"))
