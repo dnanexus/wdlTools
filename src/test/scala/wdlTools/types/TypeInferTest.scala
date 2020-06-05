@@ -6,56 +6,20 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.jdk.CollectionConverters._
-import wdlTools.syntax.{Parsers, WdlVersion}
-import wdlTools.types.WdlTypes.{T_Int, T_String}
+import wdlTools.syntax.Parsers
 import wdlTools.util.{Verbosity, Util => UUtil}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
       antlr4Trace = false,
       localDirectories = Vector(
-          Paths.get(getClass.getResource("/types/v1").getPath)
+          Paths.get(getClass.getResource("/types/v1").getPath),
+          Paths.get(getClass.getResource("/types/v2").getPath)
       ),
       verbosity = Verbosity.Quiet,
       followImports = true
   )
   private val parser = Parsers(opts)
-  // define custom types for dx-specific runtime keys
-  private val restart_struct_type =
-    WdlTypes.T_Struct(
-        "dx_restart",
-        Map(
-            "default" -> WdlTypes.T_Optional(WdlTypes.T_Int),
-            "max" -> WdlTypes.T_Optional(WdlTypes.T_Int),
-            "errors" -> WdlTypes.T_Optional(WdlTypes.T_Map(WdlTypes.T_String, WdlTypes.T_Int))
-        )
-    )
-  private val timeout_struct_type = WdlTypes.T_Struct(
-      "dx_timeout",
-      Map("days" -> WdlTypes.T_Optional(WdlTypes.T_Int),
-          "hours" -> WdlTypes.T_Optional(WdlTypes.T_Int),
-          "minutes" -> WdlTypes.T_Optional(WdlTypes.T_Int))
-  )
-  private val access_struct_type = WdlTypes.T_Struct(
-      "dx_access",
-      Map(
-          "network" -> WdlTypes.T_Optional(WdlTypes.T_Array(WdlTypes.T_String)),
-          "project" -> WdlTypes.T_Optional(WdlTypes.T_String),
-          "allProjects" -> WdlTypes.T_Optional(WdlTypes.T_String),
-          "developer" -> WdlTypes.T_Optional(WdlTypes.T_Boolean),
-          "projectCreation" -> WdlTypes.T_Optional(WdlTypes.T_Boolean)
-      )
-  )
-  private val typeRestrictions: Map[WdlVersion, TypeRestrictions] = Map(
-      WdlVersion.V1 -> TypeRestrictions(runtime = Map(
-          "dx_instance_type" -> Vector(WdlTypes.T_String),
-          "dx_ignore_reuse" -> Vector(WdlTypes.T_Boolean),
-          "dx_restart" -> Vector(T_Int, restart_struct_type),
-          "dx_timeout" -> Vector(T_String, timeout_struct_type),
-          "dx_access" -> Vector(access_struct_type)
-      )
-      )
-  )
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(folder: Path): Vector[Path] = {
@@ -96,7 +60,6 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       "input_section.wdl" -> TResult(correct = true),
       "output_section.wdl" -> TResult(correct = true),
       "echo-pairs.wdl" -> TResult(correct = true),
-      "custom_hint_types.wdl" -> TResult(correct = true),
       // incorrect tasks
       "comparison1.wdl" -> TResult(correct = false),
       "comparison2.wdl" -> TResult(correct = false),
@@ -124,7 +87,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
     }
-    val checker = TypeInfer(opts2, typeRestrictions)
+    val checker = TypeInfer(opts2)
     try {
       val doc = parser.parseDocument(UUtil.pathToUrl(file))
       checker.apply(doc)
@@ -140,7 +103,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
     }
-    val checker = TypeInfer(opts2, typeRestrictions)
+    val checker = TypeInfer(opts2)
     val checkVal =
       try {
         val doc = parser.parseDocument(UUtil.pathToUrl(file))
@@ -172,6 +135,8 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   it should "type check test wdl files" in {
     val testFiles = getWdlSourceFiles(
         Paths.get(getClass.getResource("/types/v1").getPath)
+    ) ++ getWdlSourceFiles(
+        Paths.get(getClass.getResource("/types/v2").getPath)
     )
 
     // check that all results have a corresponding file
@@ -205,7 +170,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "be able to handle GATK" in {
     val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
-    val checker = TypeInfer(opts2, typeRestrictions)
+    val checker = TypeInfer(opts2)
 
     val sources = Vector(
         "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl",
@@ -245,7 +210,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
         verbosity = Verbosity.Quiet,
         followImports = true
     )
-    val checker = TypeInfer(opts2, typeRestrictions)
+    val checker = TypeInfer(opts2)
     val sourceFile = UUtil.pathToUrl(structsDir.resolve("file3.wdl"))
     val doc = Parsers(opts2).parseDocument(sourceFile)
     checker.apply(doc)

@@ -15,9 +15,7 @@ import wdlTools.util.{Util => UUtil}
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(conf: TypeOptions,
-                     typeRestrictions: Map[WdlVersion, TypeRestrictions] = Map.empty,
-                     errorHandler: Option[Vector[TypeError] => Boolean] = None) {
+case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
   private val unify = Unification(conf)
   private val regime = conf.typeChecking
   private var errors = Vector.empty[TypeError]
@@ -31,12 +29,23 @@ case class TypeInfer(conf: TypeOptions,
   }
 
   // get type restrictions, on a per-version basis
-  private def getTypeRestrictions(version: WdlVersion): TypeRestrictions = {
-    val defaultRestrictions = TypeRestrictions.getDefaultRestrictions(version)
-    if (typeRestrictions.contains(version)) {
-      defaultRestrictions.merge(typeRestrictions(version))
-    } else {
-      defaultRestrictions
+  private def getRuntimeTypeRestrictions(version: WdlVersion): Map[String, Vector[T]] = {
+    version match {
+      case WdlVersion.V2 =>
+        Map(
+            "container" -> Vector(T_Array(T_String, nonEmpty = true), T_String),
+            "memory" -> Vector(T_Int, T_String),
+            "cpu" -> Vector(T_Float, T_Int),
+            "gpu" -> Vector(T_Boolean),
+            "disks" -> Vector(T_Int, T_Array(T_String, nonEmpty = true), T_String),
+            "maxRetries" -> Vector(T_Int),
+            "returnCodes" -> Vector(T_Array(T_Int, nonEmpty = true), T_Int, T_String)
+        )
+      case _ =>
+        Map(
+            "docker" -> Vector(T_Array(T_String, nonEmpty = true), T_String),
+            "memory" -> Vector(T_Int, T_String)
+        )
     }
   }
 
@@ -705,16 +714,15 @@ case class TypeInfer(conf: TypeOptions,
 
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
-    val restrictions = getTypeRestrictions(ctx.version).runtime
+    val restrictions = getRuntimeTypeRestrictions(ctx.version)
     val m = rtSection.kvs.map {
       case AST.RuntimeKV(id, expr, text) =>
-        val idRestrictions = restrictions.get(id)
-        // if there are type restrictions, don't force all Map keys/values to be of same type
-        // since we might want to coerce the map to a Struct
-        val tExpr = applyExpr(expr, Map.empty, ctx, unifyMaps = idRestrictions.isEmpty)
-        if (!idRestrictions.forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+        val tExpr = applyExpr(expr, Map.empty, ctx)
+        // if there are type restrictions, check that the type of the expression is coercible to
+        // one of the allowed types
+        if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
           throw new TypeException(
-              s"runtime id ${id} is not coercible to one of the allowed types ${idRestrictions}",
+              s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
               text,
               ctx.docSourceUrl
           )
