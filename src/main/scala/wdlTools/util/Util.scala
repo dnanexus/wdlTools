@@ -91,7 +91,16 @@ object Util {
   }
 
   def getFilename(addr: String, dropExt: String = "", addExt: String = ""): String = {
-    ((Paths.get(new URL(addr).getPath).getFileName.toString, dropExt) match {
+    val fileFullPath =
+      try {
+        // treat it as a HTTP address
+        new URL(addr).getPath
+      } catch {
+        case _: java.net.MalformedURLException =>
+          // failed, it is just a local file
+          addr
+      }
+    ((Paths.get(fileFullPath).getFileName.toString, dropExt) match {
       case (fn, ext) if fn.length > 0 && fn.endsWith(ext) => fn.dropRight(dropExt.length)
       case (fn, _)                                        => fn
     }) + addExt
