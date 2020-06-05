@@ -589,19 +589,18 @@ any_decls
     | NULL_LITERAL
     ; */
   override def visitMeta_value(ctx: WdlV2Parser.Meta_valueContext): MetaValue = {
-    if (ctx.NULL_LITERAL() != null) {
+    if (ctx.MetaNull() != null) {
       return MetaValueNull(getTextSource(ctx))
     }
-    if (ctx.BoolLiteral() != null) {
+    if (ctx.MetaBool() != null) {
       val value = ctx.getText.toLowerCase() == "true"
       return MetaValueBoolean(value, getTextSource(ctx))
     }
-    if (ctx.number() != null) {
-      visitNumber(ctx.number()) match {
-        case ExprInt(value, text)   => MetaValueInt(value, text)
-        case ExprFloat(value, text) => MetaValueFloat(value, text)
-        case other                  => throw new RuntimeException(s"Invalid number expression ${other}")
-      }
+    if (ctx.MetaInt() != null) {
+      return MetaValueInt(ctx.MetaInt().getText.toInt, getTextSource(ctx))
+    }
+    if (ctx.MetaFloat() != null) {
+      return MetaValueFloat(ctx.MetaFloat().getText.toDouble, getTextSource(ctx))
     }
     if (ctx.meta_string() != null) {
       return visitMeta_string(ctx.meta_string())
@@ -622,13 +621,8 @@ any_decls
     | SQUOTE string_part SQUOTE
     ; */
   override def visitMeta_string(ctx: WdlV2Parser.Meta_stringContext): MetaValueString = {
-    val parts: Vector[String] = ctx
-      .string_part()
-      .StringPart()
-      .asScala
-      .map(x => x.getText)
-      .toVector
-    MetaValueString(parts.mkString, getTextSource(ctx))
+    MetaValueString(ctx.MetaStringPart().asScala.toVector.map(x => x.getText).mkString,
+                    getTextSource(ctx))
   }
 
   /* meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
@@ -638,14 +632,27 @@ any_decls
     MetaValueArray(items, getTextSource(ctx))
   }
 
+  private def visitMeta_kv(identifier: TerminalNode,
+                           meta_value: WdlV2Parser.Meta_valueContext,
+                           parent: ParserRuleContext) = {
+    val id = getIdentifierText(identifier, parent)
+    if (meta_value == null) {
+      throw new SyntaxException(s"Invalid expression for meta key ${id}",
+                                getTextSource(parent),
+                                grammar.docSourceUrl)
+    }
+    val value = visitMeta_value(meta_value)
+    MetaKV(id, value, getTextSource(parent))
+  }
+
   /* meta_object: LBRACE (meta_kv (COMMA meta_kv)*)* RBRACE;
    */
   override def visitMeta_object(ctx: WdlV2Parser.Meta_objectContext): MetaValueObject = {
     val members = ctx
-      .meta_kv()
+      .meta_object_kv()
       .asScala
       .toVector
-      .map(visitMeta_kv)
+      .map(member => visitMeta_kv(member.MetaObjectIdentifier(), member.meta_value(), member))
     MetaValueObject(members, getTextSource(ctx))
   }
 
@@ -653,9 +660,7 @@ any_decls
      : Identifier COLON expr
      ; */
   override def visitMeta_kv(ctx: WdlV2Parser.Meta_kvContext): MetaKV = {
-    val id = getIdentifierText(ctx.Identifier(), ctx)
-    val expr = visitMeta_value(ctx.meta_value())
-    MetaKV(id, expr, getTextSource(ctx))
+    visitMeta_kv(ctx.MetaIdentifier(), ctx.meta_value(), ctx)
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
