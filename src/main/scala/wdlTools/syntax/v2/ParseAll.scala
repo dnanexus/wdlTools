@@ -330,7 +330,7 @@ case class ParseAll(opts: Options,
     }
   }
 
-  private val versionRegexp = "version\\s+2.0.*".r
+  private val versionRegexp = "version\\s+(2.0|development).*".r
 
   override def canParse(sourceCode: SourceCode): Boolean = {
     sourceCode.lines.foreach { line =>
