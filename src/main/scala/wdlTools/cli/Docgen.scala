@@ -2,7 +2,7 @@ package wdlTools.cli
 
 import java.nio.file.Files
 
-import wdlTools.generators.DocumentationGenerator
+import wdlTools.generators.project.DocumentationGenerator
 import wdlTools.util.Util
 
 import scala.language.reflectiveCalls

@@ -1,4 +1,4 @@
-package wdlTools.formatter
+package wdlTools.generators.code
 
 object Indenting extends Enumeration {
   type Indenting = Value
@@ -15,73 +15,12 @@ object Spacing extends Enumeration {
   val On, Off = Value
 }
 
-/**
-  * An element that (potentially) spans multiple source lines.
-  */
-trait Multiline extends Ordered[Multiline] {
-  def line: Int
-
-  def endLine: Int
-
-  lazy val lineRange: Range = line to endLine
-
-  override def compare(that: Multiline): Int = {
-    line - that.line match {
-      case 0     => endLine - that.endLine
-      case other => other
-    }
-  }
-}
-
-/**
-  * An element that can be formatted by a Formatter.
-  * Column positions are 1-based and end-exclusive
-  */
-trait Span extends Multiline {
+trait Sized {
 
   /**
-    * The length of the span in characters, if it were formatted without line-wrapping.
+    * The length of the element in characters, if it were formatted without line-wrapping.
     */
   def length: Int
-
-  /**
-    * The first column in the span.
-    */
-  def column: Int
-
-  /**
-    * The last column in the span.
-    */
-  def endColumn: Int
-}
-
-object Span {
-  // indicates the last token on a line
-  val TERMINAL: Int = Int.MaxValue
-}
-
-/**
-  * Marker trait for atomic Spans - those that format themselves via their
-  * toString method. An atomic Span is always on a single source line (i.e.
-  * `line` == `endLine`).
-  */
-trait Atom extends Span {
-  override def endLine: Int = line
-
-  def toString: String
-}
-
-/**
-  * A Span that contains other Spans and knows how to format itself.
-  */
-trait Composite extends Span {
-
-  /**
-    * Format the contents of the composite. The `lineFormatter` passed to this method
-    * must have `isLineBegun == true` on both entry and exit.
-    * @param lineFormatter the lineFormatter
-    */
-  def formatContents(lineFormatter: LineFormatter): Unit
 }
 
 /**

@@ -2,7 +2,8 @@ package wdlTools.cli
 
 import java.net.URL
 
-import wdlTools.generators.{ReadmeGenerator, Renderer}
+import wdlTools.generators.Renderer
+import wdlTools.generators.project.ReadmeGenerator
 import wdlTools.syntax.Parsers
 import wdlTools.util.Util
 

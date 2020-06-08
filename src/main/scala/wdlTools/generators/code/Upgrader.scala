@@ -1,4 +1,4 @@
-package wdlTools.formatter
+package wdlTools.generators.code
 
 import java.net.URL
 

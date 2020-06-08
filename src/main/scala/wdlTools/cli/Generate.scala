@@ -2,8 +2,8 @@ package wdlTools.cli
 
 import java.nio.file.{Path, Paths}
 
-import wdlTools.generators.ProjectGenerator.{TaskModel, WorkflowModel}
-import wdlTools.generators._
+import wdlTools.generators.project.ProjectGenerator.{TaskModel, WorkflowModel}
+import wdlTools.generators.project.ProjectGenerator
 import wdlTools.util.Util
 
 import scala.language.reflectiveCalls

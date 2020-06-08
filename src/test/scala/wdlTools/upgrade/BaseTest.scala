@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.formatter.Upgrader
+import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
 import wdlTools.util.{BasicOptions, Util, Verbosity}
 
@@ -27,7 +27,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   it should "Upgrade draft-2 to v1.0" in {
     val (beforeURL, afterPath) = getBeforeAfterPair("simple.wdl")
     val expected = Util.readFromFile(afterPath)
-    val upgrader = Upgrader(opts)
+    val upgrader = code.Upgrader(opts)
     val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1)
     documents(beforeURL).mkString("\n") shouldBe expected
   }

@@ -1,9 +1,10 @@
-package wdlTools.formatter
+package wdlTools.generators.code
 
 import java.net.URL
 
-import wdlTools.formatter.Spacing.Spacing
-import wdlTools.formatter.Wrapping.Wrapping
+import wdlTools.generators.code.Spacing.Spacing
+import wdlTools.generators.code.Wrapping.Wrapping
+import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, TextSource, WdlVersion}
 import wdlTools.util.Options
@@ -49,15 +50,15 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private object Literal {
-    def fromStart(value: Any, textSource: TextSource, quoted: Boolean = false): Literal = {
-      Literal(value, quoted, textSource.line, (Some(textSource.col), None))
+    def fromStart(value: Any, textSource: TextSource, quoting: Boolean = false): Literal = {
+      Literal(value, quoting, textSource.line, (Some(textSource.col), None))
     }
 
     def fromStartPosition(value: Any,
                           line: Int,
                           column: Int = 1,
-                          quoted: Boolean = false): Literal = {
-      Literal(value, quoted, line, (Some(column), None))
+                          quoting: Boolean = false): Literal = {
+      Literal(value, quoting, line, (Some(column), None))
     }
 
     def fromEnd(value: Any, textSource: TextSource, quoted: Boolean = false): Literal = {
@@ -71,26 +72,26 @@ case class WdlV1Formatter(opts: Options) {
       Literal(value, quoted, line, (None, Some(column)))
     }
 
-    def fromPrev(value: Any, prev: Span, quoted: Boolean = false): Literal = {
-      Literal(value, quoted, prev.endLine, (Some(prev.endColumn), None))
+    def fromPrev(value: Any, prev: Span, quoting: Boolean = false): Literal = {
+      Literal(value, quoting, prev.endLine, (Some(prev.endColumn), None))
     }
 
-    def fromNext(value: Any, next: Span, quoted: Boolean = false): Literal = {
-      Literal(value, quoted, next.line, (None, Some(next.column)))
+    def fromNext(value: Any, next: Span, quoting: Boolean = false): Literal = {
+      Literal(value, quoting, next.line, (None, Some(next.column)))
     }
 
     def between(value: String,
                 prev: Span,
                 next: Span,
-                quoted: Boolean = false,
+                quoting: Boolean = false,
                 preferPrev: Boolean = false): Literal = {
       if (prev.line == next.line) {
         require(prev.endColumn < next.column)
-        Literal.fromPrev(value, prev, quoted)
+        Literal.fromPrev(value, prev, quoting)
       } else if (preferPrev) {
-        Literal.fromPrev(value, prev, quoted)
+        Literal.fromPrev(value, prev, quoting)
       } else {
-        Literal.fromNext(value, next, quoted)
+        Literal.fromNext(value, next, quoting)
       }
     }
 
@@ -284,12 +285,13 @@ case class WdlV1Formatter(opts: Options) {
 
     private def isPrimitiveType(wdlType: Type): Boolean = {
       wdlType match {
-        case _: TypeString  => true
-        case _: TypeBoolean => true
-        case _: TypeInt     => true
-        case _: TypeFloat   => true
-        case _: TypeFile    => true
-        case _              => false
+        case _: TypeString    => true
+        case _: TypeBoolean   => true
+        case _: TypeInt       => true
+        case _: TypeFloat     => true
+        case _: TypeFile      => true
+        case _: TypeDirectory => true
+        case _                => false
       }
     }
 
@@ -469,7 +471,7 @@ case class WdlV1Formatter(opts: Options) {
         } else {
           value
         }
-        Literal.fromStart(v, text, quoted = inPlaceholder || !inStringOrCommand)
+        Literal.fromStart(v, text, quoting = inPlaceholder || !inStringOrCommand)
       case ValueBoolean(value, text) => Literal.fromStart(value, text)
       case ValueInt(value, text)     => Literal.fromStart(value, text)
       case ValueFloat(value, text)   => Literal.fromStart(value, text)
@@ -915,7 +917,7 @@ case class WdlV1Formatter(opts: Options) {
       // literal values
       case MetaValueNull(text) => Literal.fromStart(Symbols.Null, text)
       case MetaValueString(value, text) =>
-        Literal.fromStart(value, text, quoted = true)
+        Literal.fromStart(value, text, quoting = true)
       case MetaValueBoolean(value, text) => Literal.fromStart(value, text)
       case MetaValueInt(value, text)     => Literal.fromStart(value, text)
       case MetaValueFloat(value, text)   => Literal.fromStart(value, text)

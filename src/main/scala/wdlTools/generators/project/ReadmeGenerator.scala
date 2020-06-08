@@ -1,9 +1,10 @@
-package wdlTools.generators
+package wdlTools.generators.project
 
 import java.net.URL
 import java.nio.file.Path
 
-import wdlTools.syntax.AbstractSyntax._
+import wdlTools.generators.Renderer
+import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
 import wdlTools.util.Util
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {

@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.formatter.WdlV1Formatter
+import wdlTools.generators.code
 import wdlTools.syntax.{WdlVersion, v1}
 import wdlTools.util.{BasicOptions, Util}
 
@@ -33,7 +33,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   it should "reformat simple WDL" in {
     val beforeURL = getWdlUrl(fname = "simple.wdl", subdir = "before")
     val expected = getWdlSource(fname = "simple.wdl", subdir = "after")
-    val formatter = WdlV1Formatter(opts)
+    val formatter = code.WdlV1Formatter(opts)
     val documents = formatter.formatDocuments(beforeURL)
     documents(beforeURL).mkString("\n") shouldBe expected
   }
@@ -41,7 +41,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   it should "format add.wdl" in {
     val beforeURL = getWdlUrl(fname = "add.wdl", subdir = "before")
     val expected = getWdlSource(fname = "add.wdl", subdir = "after")
-    val formatter = WdlV1Formatter(opts)
+    val formatter = code.WdlV1Formatter(opts)
     val documents = formatter.formatDocuments(beforeURL)
     documents(beforeURL).mkString("\n") shouldBe expected
   }

@@ -1,10 +1,9 @@
-package wdlTools.generators
+package wdlTools.generators.project
 
 import java.net.URL
 
+import spray.json.{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsValue}
 import wdlTools.syntax.AbstractSyntax._
-
-import spray.json._
 
 object TestsGenerator {
   def apply(url: URL, wdlName: String, doc: Document): String = {

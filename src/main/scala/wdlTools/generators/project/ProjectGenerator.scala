@@ -1,15 +1,16 @@
-package wdlTools.generators
+package wdlTools.generators.project
 
 import java.net.URL
 import java.nio.file.Path
 
-import wdlTools.formatter.WdlV1Formatter
-import wdlTools.generators.ProjectGenerator._
+import wdlTools.generators.{Renderer, code}
+import wdlTools.generators.code.WdlV1Formatter
+import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
 import wdlTools.util.{InteractiveConsole, Options, Util}
 
-import util.control.Breaks._
+import scala.util.control.Breaks._
 
 case class ProjectGenerator(opts: Options,
                             name: String,
@@ -27,7 +28,7 @@ case class ProjectGenerator(opts: Options,
   val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
 
   val defaultDockerImage = "debian:stretch-slim"
-  lazy val formatter: WdlV1Formatter = WdlV1Formatter(opts)
+  lazy val formatter: WdlV1Formatter = code.WdlV1Formatter(opts)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
     ReadmeGenerator(developerReadmes = developerReadmes, renderer = renderer)

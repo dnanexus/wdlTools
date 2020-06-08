@@ -1,8 +1,9 @@
-package wdlTools.generators
+package wdlTools.generators.project
 
 import java.net.URL
 
-import wdlTools.generators.DocumentationGenerator._
+import wdlTools.generators.Renderer
+import wdlTools.generators.project.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
@@ -134,12 +135,12 @@ case class DocumentationGenerator(opts: Options) {
         }
         value match {
           case ExprObject(value, text) =>
-            MapValueDocumentation(
+            DocumentationGenerator.MapValueDocumentation(
                 value.map(v => v.key -> getValueDocumentation(v.value, text.line)).toMap,
                 comment
             )
           case ExprMap(value, text) =>
-            MapValueDocumentation(
+            DocumentationGenerator.MapValueDocumentation(
                 value
                   .map(v => exprToString(v.key) -> getValueDocumentation(v.value, text.line))
                   .toMap,
@@ -148,11 +149,13 @@ case class DocumentationGenerator(opts: Options) {
           case ExprArray(value, text) =>
             ListValueDocumentation(value.map(v => getValueDocumentation(v, text.line)), comment)
           case ExprPair(left, right, text) =>
-            ListValueDocumentation(Vector(
-                                       getValueDocumentation(left, text.line),
-                                       getValueDocumentation(right, text.line)
-                                   ),
-                                   comment)
+            DocumentationGenerator.ListValueDocumentation(
+                Vector(
+                    getValueDocumentation(left, text.line),
+                    getValueDocumentation(right, text.line)
+                ),
+                comment
+            )
           case other => SimpleValueDocumentation(other, comment)
         }
       }

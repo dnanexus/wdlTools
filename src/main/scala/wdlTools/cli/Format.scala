@@ -2,7 +2,7 @@ package wdlTools.cli
 
 import java.nio.file.Files
 
-import wdlTools.formatter._
+import wdlTools.generators.code.WdlV1Formatter
 import wdlTools.util.Util
 
 import scala.jdk.CollectionConverters._
