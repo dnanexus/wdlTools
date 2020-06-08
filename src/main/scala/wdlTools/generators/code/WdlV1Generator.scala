@@ -1001,7 +1001,7 @@ case class WdlV1Generator() {
     }
   }
 
-  def formatElement(element: Element): Vector[String] = {
+  def generateElement(element: Element): Vector[String] = {
     val stmt = element match {
       case d: Document => DocumentSections(d)
       case t: Task     => TaskBlock(t)
@@ -1014,8 +1014,8 @@ case class WdlV1Generator() {
     lineGenerator.toVector
   }
 
-  def formatDocument(document: Document): Vector[String] = {
-    formatElement(document)
+  def generateDocument(document: Document): Vector[String] = {
+    generateElement(document)
   }
 
   object LineGenerator {
