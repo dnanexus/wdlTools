@@ -10,7 +10,7 @@ import wdlTools.syntax.WdlVersion
 
 import scala.collection.mutable
 
-class WdlV1Generator {
+case class WdlV1Generator() {
 
   private case class Literal(value: Any, quoting: Boolean = false) extends Sized {
     override lazy val length: Int = toString.length

@@ -59,6 +59,8 @@ object Symbols {
   val BooleanType: String = "Boolean"
   val IntType: String = "Int"
   val FloatType: String = "Float"
+  val FileType: String = "File"
+  val DirectoryType: String = "Directory"
 
   // operators, etc
   val Access: String = "."
