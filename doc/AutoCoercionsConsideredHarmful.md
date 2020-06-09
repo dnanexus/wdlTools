@@ -107,9 +107,23 @@ File? x = y
 Array[File] af = ["a.txt", "b.txt"]
 ```
 
-I feel that auto-coercions are harmful. I suggest disallowing automatic coercions, allowing explicit coercions, and adding a few necessary stdlib function for type conversion. The new functions would be:
+I feel that auto-coercions are harmful. I suggest allowing explicit coercions, adding a few necessary stdlib function for type conversion, and disallowing automatic coercions. A few necessary stdlib functions are:
 
-Some(X) : X -> X?
-toInt()
-toString()
-toFile()
+```
+T? Some(T)
+Int toInt(String)
+String toString(Int|Float)
+File toFile(String)
+```
+
+In order to select the first non empty integer, as below:
+```
+  Int c = select_first([1, b])
+```
+
+one would write:
+```
+Int c = select_first([Some(1), b])
+```
+
+This would make the typing of `select_first` accurate; it would only take an array of `T?`.
