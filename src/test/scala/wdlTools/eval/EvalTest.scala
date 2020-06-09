@@ -40,7 +40,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    eval.EvalConfig(homeDir, tmpDir, stdout, stderr)
+    eval.EvalConfig.make(homeDir, tmpDir, stdout, stderr)
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
