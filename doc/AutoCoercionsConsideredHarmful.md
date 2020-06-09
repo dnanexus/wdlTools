@@ -1,12 +1,13 @@
 # Automatic coercions considered harmful
+_Written by O. Rodeh._
 
-I spent four years working on WDL applications and tools, including a type checker, evaluator, and cloud executor. This page describes a line of thought regarding type checking for WDL programs.
+This page describes a line of thought regarding type checking for WDL programs, it reflects only the author's point of view. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
 
 # Coercions
 
-WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows failed because static type checking was too lenient. This resulted in failures in long running expensive customer pipelines.
+WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows errored out because static type checking was too lenient. This resulted in long running expensive customer pipelines failing. The issue is two fold: the turn around time is long, and the cost can run to thousands of dollars.
 
-For example, under the WDL type system, a `File` is auto-coercible into `File?`. However, this is not the case in the DNAnexus simpler type-system. If you have a task that takes an `Array[File?]` and call it with `Array[File]`  this will fail. For example:
+For example, under the WDL type system, a `File` is auto-coercible into `File?`. However, this is not the case in the DNAnexus simpler type-system. If you have a task that takes an `Array[File?]` and call it with `Array[File]` this will fail. For example:
 
 ```wdl
 version 1.0
@@ -24,7 +25,7 @@ workflow bar {
     Array[File] my_files
   }
 
-  call long_expensive_callculation {}
+  call long_expensive_calculation {}
 
   call foo { input : bams = my_files }
 
@@ -32,7 +33,7 @@ workflow bar {
 }
 ```
 
-Workflow `bar` will fail when it calls `foo`, after it has spent a long time running an expensive calculation. This is frustrating for the users. We could prevent this, as well as many other errors, by performing stricter type checking. For motivation, please examine the list below, it was compiling when typechecking GATK pipelines on the web.
+Workflow `bar` will fail when it calls `foo`, after it has spent a long time running an expensive calculation. This is frustrating for the users. We could prevent this, as well as many other errors, by performing stricter type checking. Below is an eclectic list of automatic coercions that appears in [GATK pipelines](https://github.com/gatk-workflows). The GATK pipelines are large real world workflows that our customers expect to execute flawlessly on our platform. The code is a simplified version of the real program lines, stripping a way the context to focus on the main point.
 
 Converting between `T` and `T?` occurs automatically
 ```
@@ -41,7 +42,6 @@ Converting between `T` and `T?` occurs automatically
   Array[File]? files2 = files
 
   # Convert an optional int to an int
-  # This will fail at runtime if a is null
   Int a = 3
   Int? b = a
 
@@ -101,13 +101,13 @@ Array[Array[Int]] aai = [[1, 2], ["foo"], [1.4, 4.9, 9.3]]
 
 # Proposal
 
-While explicit coercions make sense, such, for example:
+While explicit coercions are useful and make sense, for example:
 ```
 File? x = y
 Array[File] af = ["a.txt", "b.txt"]
 ```
 
-I feel that auto-coercions are harmful. I suggest disallowing automatic coercions, allow explicit coercions, and adding a few necessary stdlib function for type conversion. The new functions are:
+I feel that auto-coercions are harmful. I suggest disallowing automatic coercions, allowing explicit coercions, and adding a few necessary stdlib function for type conversion. The new functions would be:
 
 Some(X) : X -> X?
 toInt()
