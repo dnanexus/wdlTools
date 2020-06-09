@@ -118,15 +118,12 @@ expr_infix5
   : expr_core
   ;
 
-// I think we can change object literal to
-// (Identifier COLON expr (COMMA Identifier COLON expr)* COMMA?)*
-// to ignore trailing comma - similar changes for array and meta
 expr_core
-  : Identifier LPAREN (expr (COMMA expr)*)? RPAREN #apply
-  | LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
+  : Identifier LPAREN (expr (COMMA expr)* COMMA?)? RPAREN #apply
+  | LBRACK (expr (COMMA expr)* COMMA?)* RBRACK #array_literal
   | LPAREN expr COMMA expr RPAREN #pair_literal
-  | LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
-  | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  | LBRACE (expr COLON expr (COMMA expr COLON expr)* COMMA?)* RBRACE #map_literal
+  | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)* COMMA?)* RBRACE #object_literal
   | IF expr THEN expr ELSE expr #ifthenelse
   | LPAREN expr RPAREN #expression_group
   | expr_core LBRACK expr RBRACK #at
@@ -173,11 +170,11 @@ meta_string
   ;
 
 meta_array
-  : MetaLbrack (meta_value (MetaComma meta_value)*)* MetaRbrack
+  : MetaLbrack (meta_value (MetaComma meta_value)* MetaComma?)* MetaRbrack
   ;
 
 meta_object
-  : MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)*)* MetaRbrace
+  : MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)* MetaObjectComma?)* MetaRbrace
   ;
 
 meta_object_kv
@@ -259,7 +256,7 @@ call_input
   ;
 
 call_inputs
-  : INPUT COLON (call_input (COMMA call_input)*) COMMA?
+  : INPUT COLON (call_input (COMMA call_input)* COMMA?)*
   ;
 
 call_body
