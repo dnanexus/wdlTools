@@ -12,6 +12,14 @@ workflow foo {
   call baz {
     input: s = "hi",
   }
+
+  meta {
+    # TODO: Get trailing commas to work for meta
+    foo: {
+      bar: 1
+    }
+    baz: [1, 2, 3]
+  }
 }
 
 task baz {

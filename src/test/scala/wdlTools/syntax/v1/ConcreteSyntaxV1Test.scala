@@ -694,6 +694,19 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
                 Some(CallInputs(Vector(CallInput("s", ExprString("hi", _), _)), _)),
                 _) =>
     }
+
+    wf.meta shouldBe defined
+    val meta = wf.meta.get.kvs
+    meta.size shouldBe 2
+    meta should matchPattern {
+      case Vector(
+          MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1, _), _)), _), _),
+          MetaKV("baz",
+                 MetaValueArray(Vector(MetaValueInt(1, _), MetaValueInt(2, _), MetaValueInt(3, _)),
+                                _),
+                 _)
+          ) =>
+    }
   }
 
   it should "report bad types" in {
