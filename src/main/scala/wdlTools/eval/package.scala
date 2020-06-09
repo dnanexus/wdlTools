@@ -26,8 +26,9 @@ trait StandardLibraryImpl {
 // else is considered a local file.
 //
 // PREFIX
-//   For S3 it is        s3://
-//   For dnanexus it is  dx://
+//   For S3              s3://
+//   For google cloud    gs://
+//   For dnanexus        dx://
 //
 trait FileAccessProtocol {
   val prefixes : Vector[String]
@@ -56,7 +57,7 @@ case class EvalConfig(homeDir: Path,
                       encoding: Charset)
 
 object EvalConfig {
-  // Add the default protocols (file and web) into the configuration.
+  // Always add the default protocols (file and web) into the configuration.
   def make(homeDir: Path,
            tmpDir: Path,
            stdout: Path,
