@@ -12,13 +12,11 @@ import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-case class IoSupp(opts: Options,
-                  evalCfg: EvalConfig,
-                  docSourceUrl: Option[URL]) {
+case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
 
   // Figure out which protocol should be used
-  private def figureOutProtocol(pathOrUrl: String, text : TextSource) : FileAccessProtocol = {
-    val prefix : String =
+  private def figureOutProtocol(pathOrUrl: String, text: TextSource): FileAccessProtocol = {
+    val prefix: String =
       if (pathOrUrl.contains("://")) {
         new URL(pathOrUrl).getProtocol
       } else {
@@ -26,23 +24,20 @@ case class IoSupp(opts: Options,
       }
     evalCfg.protocols.get(prefix) match {
       case None =>
-        throw new EvalException(s"Protocol ${prefix} not supported",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"Protocol ${prefix} not supported", text, docSourceUrl)
       case Some(proto) => proto
     }
   }
 
-  def size(pathOrUrl: String, text: TextSource) : Long = {
+  def size(pathOrUrl: String, text: TextSource): Long = {
     val proto = figureOutProtocol(pathOrUrl, text)
     try {
       proto.size(pathOrUrl)
     } catch {
-      case e : Throwable =>
-        throw new EvalException(
-          s"error getting size of ${pathOrUrl}, msg=${e.getMessage}",
-          text,
-          docSourceUrl)
+      case e: Throwable =>
+        throw new EvalException(s"error getting size of ${pathOrUrl}, msg=${e.getMessage}",
+                                text,
+                                docSourceUrl)
     }
   }
 
@@ -52,14 +47,12 @@ case class IoSupp(opts: Options,
     try {
       proto.readFile(pathOrUrl)
     } catch {
-      case e : Throwable =>
-        throw new EvalException(
-          s"error read file ${pathOrUrl}, msg=${e.getMessage}",
-          text,
-          docSourceUrl)
+      case e: Throwable =>
+        throw new EvalException(s"error read file ${pathOrUrl}, msg=${e.getMessage}",
+                                text,
+                                docSourceUrl)
     }
   }
-
 
   /**
     * Write "content" to the specified "path" location
@@ -119,7 +112,7 @@ object IoSupp {
   case class LocalFiles(encoding: Charset) extends FileAccessProtocol {
     val prefixes = Vector("", "file")
 
-    def size(path : String) : Long = {
+    def size(path: String): Long = {
       val p = Paths.get(path)
       if (!Files.exists(p)) {
         throw new FileSystemNotFoundException(s"File ${p} not found")
@@ -132,12 +125,12 @@ object IoSupp {
       }
     }
 
-    def readFile(path : String) : String = {
+    def readFile(path: String): String = {
       // check that file isn't too big
       val fileSizeMiB = BigDecimal(size(path)) / MiB
       if (fileSizeMiB > MaxFileSizeMiB) {
         throw new Exception(
-          s"${path} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
+            s"${path} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
         )
       }
       new String(Files.readAllBytes(Paths.get(path)), encoding)
@@ -147,7 +140,7 @@ object IoSupp {
   case class HttpProtocol(encoding: Charset) extends FileAccessProtocol {
     val prefixes = Vector("http", "https")
 
-    private def getUrl(rawUrl : String) : URL = {
+    private def getUrl(rawUrl: String): URL = {
       if (!rawUrl.contains("://"))
         throw new Exception(s"$rawUrl is not a URL")
       new URL(rawUrl)
@@ -156,7 +149,7 @@ object IoSupp {
     // A url
     // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
     //
-    def size(rawUrl : String) : Long = {
+    def size(rawUrl: String): Long = {
       val url = getUrl(rawUrl)
       var conn: HttpURLConnection = null
       try {
@@ -178,7 +171,8 @@ object IoSupp {
       val fileSizeMiB = BigDecimal(size(rawUrl)) / MiB
       if (fileSizeMiB > MaxFileSizeMiB)
         throw new Exception(
-          s"${rawUrl} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported")
+            s"${rawUrl} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
+        )
 
       val url = getUrl(rawUrl)
       val is = url.openStream()

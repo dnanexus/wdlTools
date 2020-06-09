@@ -31,13 +31,13 @@ trait StandardLibraryImpl {
 //   For dnanexus        dx://
 //
 trait FileAccessProtocol {
-  val prefixes : Vector[String]
+  val prefixes: Vector[String]
 
   // Get the size of the file in bytes
-  def size(path : String) : Long
+  def size(path: String): Long
 
   // Read the entire file into a string
-  def readFile(path : String) : String
+  def readFile(path: String): String
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
@@ -53,7 +53,7 @@ case class EvalConfig(homeDir: Path,
                       tmpDir: Path,
                       stdout: Path,
                       stderr: Path,
-                      protocols : Map[String, FileAccessProtocol],
+                      protocols: Map[String, FileAccessProtocol],
                       encoding: Charset)
 
 object EvalConfig {
@@ -62,25 +62,20 @@ object EvalConfig {
            tmpDir: Path,
            stdout: Path,
            stderr: Path,
-           userProtos : Vector[FileAccessProtocol] = Vector.empty,
+           userProtos: Vector[FileAccessProtocol] = Vector.empty,
            encoding: Charset = Codec.default.charSet) = {
-    val defaultProtos = Vector(IoSupp.LocalFiles(encoding),
-                               IoSupp.HttpProtocol(encoding))
+    val defaultProtos = Vector(IoSupp.LocalFiles(encoding), IoSupp.HttpProtocol(encoding))
     val allProtos = defaultProtos ++ userProtos
-    val dispatchTbl : Map[String, FileAccessProtocol] =
-      allProtos.map {
-        proto => proto.prefixes.map { prefix =>
-          (prefix, proto)
+    val dispatchTbl: Map[String, FileAccessProtocol] =
+      allProtos
+        .map { proto =>
+          proto.prefixes.map { prefix =>
+            (prefix, proto)
+          }
         }
-      }
         .flatten
         .toMap
-    new EvalConfig(homeDir,
-                   tmpDir,
-                   stdout,
-                   stderr,
-                   dispatchTbl,
-                   encoding)
+    new EvalConfig(homeDir, tmpDir, stdout, stderr, dispatchTbl, encoding)
   }
 }
 
