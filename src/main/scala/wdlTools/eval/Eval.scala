@@ -17,6 +17,9 @@ case class Eval(opts: Options,
 
   private def getStringVal(value: V, text: TextSource): String = {
     value match {
+      case V_Boolean(b) => b.toString
+      case V_Int(i) => i.toString
+      case V_Float(x) => x.toString
       case V_String(s) => s
       case V_File(s)   => s
       case other       => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
