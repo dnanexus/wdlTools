@@ -196,6 +196,7 @@ MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
 mode MetaArray;
 
 MetaArrayComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaArrayCommaRbrack: ',' [ \t\r\n]* ']' -> popMode, popMode;
 MetaArrayComma: ',' -> pushMode(MetaValue);
 MetaRbrack: ']' -> popMode, popMode;
 MetaArrayWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
@@ -204,6 +205,7 @@ mode MetaObject;
 
 MetaObjectIdentifier: Identifier;
 MetaObjectColon: ':' -> pushMode(MetaValue);
+MetaObjectCommaRbrace: ',' [ \t\r\n]* '}' -> popMode, popMode;
 MetaObjectComma: ',';
 MetaRbrace: '}' -> popMode, popMode;
 MetaObjectWhitespace: [ \t\r\n]+ -> channel(HIDDEN);

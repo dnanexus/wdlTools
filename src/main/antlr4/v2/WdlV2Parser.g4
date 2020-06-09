@@ -171,12 +171,12 @@ meta_string
 
 meta_array
   : MetaEmptyArray
-  | MetaLbrack meta_value (MetaArrayComma meta_value)* MetaRbrack
+  | MetaLbrack meta_value (MetaArrayComma meta_value)* (MetaArrayCommaRbrack | MetaRbrack)
   ;
 
 meta_object
   : MetaEmptyObject
-  | MetaLbrace meta_object_kv (MetaObjectComma meta_object_kv)* MetaRbrace
+  | MetaLbrace meta_object_kv (MetaObjectComma meta_object_kv)* (MetaObjectCommaRbrace | MetaRbrace)
   ;
 
 meta_object_kv
