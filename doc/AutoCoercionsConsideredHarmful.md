@@ -1,7 +1,7 @@
 # Automatic coercions considered harmful
 _Written by O. Rodeh._
 
-This page describes a line of thought regarding type checking for WDL programs, it reflects only the author's point of view. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
+This page describes a line of thought regarding type checking for WDL programs. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
 
 # Coercions
 
