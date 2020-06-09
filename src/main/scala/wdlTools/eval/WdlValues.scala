@@ -12,6 +12,7 @@ object WdlValues {
   case class V_Float(value: Double) extends V
   case class V_String(value: String) extends V
   case class V_File(value: String) extends V
+  case class V_Directory(value: String) extends V
 
   // compound values
   case class V_Pair(l: V, r: V) extends V

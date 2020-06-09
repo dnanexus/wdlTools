@@ -15,7 +15,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
   private val opts = BasicOptions(
-      antlr4Trace = true,
+      antlr4Trace = false,
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
