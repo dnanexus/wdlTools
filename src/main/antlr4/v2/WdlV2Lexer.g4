@@ -166,15 +166,16 @@ MetaBodyWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaValue;
 
+MetaValueComment: '#' ~[\r\n]* -> channel(COMMENTS);
 MetaBool: BoolLiteral -> popMode;
 MetaInt: IntLiteral -> popMode;
 MetaFloat: FloatLiteral -> popMode;
 MetaNull: 'null' -> popMode;
 MetaSquote: '\'' -> pushMode(MetaSquoteString);
 MetaDquote: '"' -> pushMode(MetaDquoteString);
-MetaLbrack: '[' -> pushMode(MetaValue);
-MetaComma: ',' -> pushMode(MetaValue);
-MetaRbrack: ']' -> popMode;
+MetaEmptyObject: '{' [ \t\r\n]* '}' -> popMode;
+MetaEmptyArray: '[' [ \t\r\n]* ']' -> popMode;
+MetaLbrack: '[' -> pushMode(MetaArray), pushMode(MetaValue);
 MetaLbrace: '{' -> pushMode(MetaObject);
 MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
@@ -191,6 +192,13 @@ MetaDquoteEscapedChar: '\\' . -> type(MetaStringPart);
 MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
+
+mode MetaArray;
+
+MetaArrayComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaArrayComma: ',' -> pushMode(MetaValue);
+MetaRbrack: ']' -> popMode, popMode;
+MetaArrayWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaObject;
 

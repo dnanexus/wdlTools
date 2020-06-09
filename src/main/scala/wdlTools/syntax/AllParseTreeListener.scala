@@ -1,4 +1,5 @@
 package wdlTools.syntax
+
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, TerminalNode}
 import org.openwdl.wdl.parser.draft_2.{WdlDraft2Parser, WdlDraft2ParserListener}
@@ -133,6 +134,8 @@ class AllParseTreeListener
   def exitImport_doc(ctx: ParserRuleContext): Unit = {}
   def enterMeta_value(ctx: ParserRuleContext): Unit = {}
   def exitMeta_value(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_string_part(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_string_part(ctx: ParserRuleContext): Unit = {}
   def enterMeta_string(ctx: ParserRuleContext): Unit = {}
   def exitMeta_string(ctx: ParserRuleContext): Unit = {}
   def enterMeta_array(ctx: ParserRuleContext): Unit = {}
@@ -1135,6 +1138,12 @@ class AllParseTreeListener
   override def exitMeta_value(ctx: WdlV1Parser.Meta_valueContext): Unit = {
     exitMeta_value(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterMeta_string_part(ctx: WdlV1Parser.Meta_string_partContext): Unit = {
+    enterMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_string_part(ctx: WdlV1Parser.Meta_string_partContext): Unit = {
+    exitMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterMeta_string(ctx: WdlV1Parser.Meta_stringContext): Unit = {
     enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1700,6 +1709,12 @@ class AllParseTreeListener
   }
   override def exitMeta_value(ctx: WdlV2Parser.Meta_valueContext): Unit = {
     exitMeta_value(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_string_part(ctx: WdlV2Parser.Meta_string_partContext): Unit = {
+    enterMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_string_part(ctx: WdlV2Parser.Meta_string_partContext): Unit = {
+    exitMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMeta_string(ctx: WdlV2Parser.Meta_stringContext): Unit = {
     enterMeta_string(ctx.asInstanceOf[ParserRuleContext])

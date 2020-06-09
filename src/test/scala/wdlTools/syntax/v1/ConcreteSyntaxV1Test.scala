@@ -15,7 +15,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
   private val opts = BasicOptions(
-      antlr4Trace = false,
+      antlr4Trace = true,
       verbosity = Quiet,
       localDirectories = Vector(tasksDir, workflowsDir, structsDir)
   )
@@ -697,14 +697,17 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     wf.meta shouldBe defined
     val meta = wf.meta.get.kvs
-    meta.size shouldBe 2
+    meta.size shouldBe 5
     meta should matchPattern {
       case Vector(
+          MetaKV("x", MetaValueString("'", _), _),
+          MetaKV("y", MetaValueString("\"", _), _),
           MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1, _), _)), _), _),
           MetaKV("baz",
                  MetaValueArray(Vector(MetaValueInt(1, _), MetaValueInt(2, _), MetaValueInt(3, _)),
                                 _),
-                 _)
+                 _),
+          MetaKV("blorf", MetaValueArray(Vector(), _), _)
           ) =>
     }
   }

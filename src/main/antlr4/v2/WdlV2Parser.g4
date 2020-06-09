@@ -160,21 +160,27 @@ meta_value
   | meta_array
   ;
 
+meta_string_part
+  : MetaStringPart*
+  ;
+
 meta_string
-  : MetaDquote MetaStringPart* MetaDquote
-  | MetaSquote MetaStringPart* MetaSquote
+  : MetaDquote meta_string_part MetaDquote
+  | MetaSquote meta_string_part MetaSquote
   ;
 
 meta_array
-  : MetaLbrack (meta_value (MetaComma meta_value)* MetaComma?)* MetaRbrack
+  : MetaEmptyArray
+  | MetaLbrack meta_value (MetaArrayComma meta_value)* MetaRbrack
   ;
 
 meta_object
-  :MetaLbrace (meta_object_kv (MetaObjectComma meta_object_kv)* MetaObjectComma?)* MetaRbrace
+  : MetaEmptyObject
+  | MetaLbrace meta_object_kv (MetaObjectComma meta_object_kv)* MetaRbrace
   ;
 
 meta_object_kv
-  :MetaObjectIdentifier MetaObjectColon meta_value
+  : MetaObjectIdentifier MetaObjectColon meta_value
   ;
 
 meta_kv

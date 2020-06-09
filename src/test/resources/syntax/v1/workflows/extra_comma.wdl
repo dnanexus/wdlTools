@@ -14,11 +14,13 @@ workflow foo {
   }
 
   meta {
-    # TODO: Get trailing commas to work for meta
+    x: "'"
+    y: '"'
     foo: {
-      bar: 1
+      bar: 1,
     }
-    baz: [1, 2, 3]
+    baz: [1, 2, 3, ]
+    blorf: []
   }
 }
 

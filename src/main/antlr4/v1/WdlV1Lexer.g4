@@ -166,12 +166,11 @@ MetaFloat: FloatLiteral -> popMode;
 MetaNull: 'null' -> popMode;
 MetaSquote: '\'' -> pushMode(MetaSquoteString);
 MetaDquote: '"' -> pushMode(MetaDquoteString);
-MetaLbrack: '[' -> pushMode(MetaValue);
-MetaComma: ',' -> pushMode(MetaValue);
-MetaRbrack: ']' -> popMode;
+MetaEmptyObject: '{' [ \t\r\n]* '}' -> popMode;
+MetaEmptyArray: '[' [ \t\r\n]* ']' -> popMode;
+MetaLbrack: '[' -> pushMode(MetaArray), pushMode(MetaValue);
 MetaLbrace: '{' -> pushMode(MetaObject);
 MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
-
 
 mode MetaSquoteString;
 
@@ -187,11 +186,20 @@ MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> t
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
 
+mode MetaArray;
+
+MetaArrayComment: '#' ~[\r\n]* -> channel(COMMENTS);
+MetaArrayCommaRbrack: ',' [ \t\r\n]* ']' -> popMode, popMode;
+MetaArrayComma: ',' -> pushMode(MetaValue);
+MetaRbrack: ']' -> popMode, popMode;
+MetaArrayWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
+
 mode MetaObject;
 
 MetaObjectComment: '#' ~[\r\n]* -> channel(COMMENTS);
 MetaObjectIdentifier: Identifier;
 MetaObjectColon: ':' -> pushMode(MetaValue);
+MetaObjectCommaRbrace: ',' [ \t\r\n]* '}' -> popMode, popMode;
 MetaObjectComma: ',';
 MetaRbrace: '}' -> popMode, popMode;
 MetaObjectWhitespace: [ \t\r\n]+ -> channel(HIDDEN);

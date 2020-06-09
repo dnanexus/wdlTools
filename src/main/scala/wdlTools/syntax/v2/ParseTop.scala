@@ -621,14 +621,20 @@ any_decls
     | SQUOTE string_part SQUOTE
     ; */
   override def visitMeta_string(ctx: WdlV2Parser.Meta_stringContext): MetaValueString = {
-    MetaValueString(ctx.MetaStringPart().asScala.toVector.map(x => x.getText).mkString,
-                    getTextSource(ctx))
+    MetaValueString(
+        ctx.meta_string_part().MetaStringPart().asScala.toVector.map(x => x.getText).mkString,
+        getTextSource(ctx)
+    )
   }
 
   /* meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
    */
   override def visitMeta_array(ctx: WdlV2Parser.Meta_arrayContext): MetaValueArray = {
-    val items = ctx.meta_value().asScala.toVector.map(visitMeta_value)
+    val items = if (ctx.MetaEmptyArray() != null) {
+      Vector.empty
+    } else {
+      ctx.meta_value().asScala.toVector.map(visitMeta_value)
+    }
     MetaValueArray(items, getTextSource(ctx))
   }
 
