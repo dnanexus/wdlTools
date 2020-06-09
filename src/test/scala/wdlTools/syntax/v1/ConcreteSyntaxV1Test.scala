@@ -645,9 +645,67 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     getDocument(getTaskSource("suggestions_meta.wdl"))
   }
 
-  it should "report extra comma" in {
-    assertThrows[SyntaxException] {
-      getDocument(getWorkflowSource("extra_comma.wdl"))
+  it should "parse workflow with empty call input" in {
+    getDocument(getWorkflowSource("empty_call_input.wdl"))
+  }
+
+  it should "allow trailing comma" in {
+    val doc = getDocument(getWorkflowSource("extra_comma.wdl"))
+    doc.workflow shouldBe defined
+    val wf = doc.workflow.get
+    wf.body.size shouldBe 4
+    wf.body(0) should matchPattern {
+      case Declaration(
+          "a",
+          TypeArray(TypeInt(_), false, _),
+          Some(ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _)),
+          _
+          ) =>
+    }
+    wf.body(1) should matchPattern {
+      case Declaration(
+          "m",
+          TypeMap(TypeString(_), TypeInt(_), _),
+          Some(
+              ExprMapLiteral(
+                  Vector(ExprMapItem(ExprString("hello", _), ExprInt(1, _), _)),
+                  _
+              )
+          ),
+          _
+          ) =>
+    }
+    wf.body(2) should matchPattern {
+      case Declaration(
+          "obj",
+          TypeObject(_),
+          Some(
+              ExprObjectLiteral(
+                  Vector(ExprObjectMember("foo", ExprInt(2, _), _)),
+                  _
+              )
+          ),
+          _
+          ) =>
+    }
+    wf.body(3) should matchPattern {
+      case Call("baz",
+                None,
+                Some(CallInputs(Vector(CallInput("s", ExprString("hi", _), _)), _)),
+                _) =>
+    }
+
+    wf.meta shouldBe defined
+    val meta = wf.meta.get.kvs
+    meta.size shouldBe 2
+    meta should matchPattern {
+      case Vector(
+          MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1, _), _)), _), _),
+          MetaKV("baz",
+                 MetaValueArray(Vector(MetaValueInt(1, _), MetaValueInt(2, _), MetaValueInt(3, _)),
+                                _),
+                 _)
+          ) =>
     }
   }
 
