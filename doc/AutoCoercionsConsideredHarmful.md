@@ -5,7 +5,7 @@ This page describes a line of thought regarding type checking for WDL programs. 
 
 # Coercions
 
-WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows errored out because static type checking was too lenient. This resulted in long running expensive customer pipelines failing. The issue is two fold: the turn around time is long, and the cost can run to thousands of dollars.
+WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows errored out because static type checking was too lenient. This resulted in long running expensive customer pipelines failing. The issue is twofold: the turn around time is long, and the cost can run to thousands of dollars.
 
 For example, under the WDL type system, a `File` is auto-coercible into `File?`. However, this is not the case in the DNAnexus simpler type-system. If you have a task that takes an `Array[File?]` and call it with `Array[File]` this will fail. For example:
 
