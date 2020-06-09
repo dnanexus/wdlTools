@@ -17,9 +17,12 @@ case class Eval(opts: Options,
 
   private def getStringVal(value: V, text: TextSource): String = {
     value match {
-      case V_String(s) => s
-      case V_File(s)   => s
-      case other       => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
+      case V_Boolean(b) => b.toString
+      case V_Int(i)     => i.toString
+      case V_Float(x)   => x.toString
+      case V_String(s)  => s
+      case V_File(s)    => s
+      case other        => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
     }
   }
 
@@ -481,6 +484,13 @@ case class Eval(opts: Options,
 
       // Access a field in a struct or an object. For example:
       //   Int z = x.a
+      //
+      // shortcut. The environment has a bindings for "x.a"
+      case TAT.ExprGetName(TAT.ExprIdentifier(id, _: WdlTypes.T_Call, _), fieldName, _, _)
+          if (ctx.bindings contains s"$id.$fieldName") =>
+        ctx.bindings(s"$id.$fieldName")
+
+      // normal path, first, evaluate the expression "x" then access field "a"
       case TAT.ExprGetName(e: TAT.Expr, fieldName, _, text) =>
         val ev = apply(e, ctx)
         exprGetName(ev, fieldName, ctx, text)
