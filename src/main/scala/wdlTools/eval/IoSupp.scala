@@ -15,16 +15,25 @@ import scala.util.Random
 case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
 
   // Figure out which protocol should be used
-  private def figureOutProtocol(pathOrUrl: String, text: TextSource): FileAccessProtocol = {
-    val prefix: String =
+  //
+//   For S3              s3://
+//   For google cloud    gs://
+//   For dnanexus        dx://
+//
+  //
+  def figureOutProtocol(pathOrUrl: String, text: TextSource): FileAccessProtocol = {
+    val protocolName: String =
       if (pathOrUrl.contains("://")) {
-        new URL(pathOrUrl).getProtocol
+        val i = pathOrUrl.indexOf("://")
+        if (i <= 0)
+          throw new EvalException(s"no protocol found for ${pathOrUrl}")
+        pathOrUrl.substring(0, i)
       } else {
         "file"
       }
-    evalCfg.protocols.get(prefix) match {
+    evalCfg.protocols.get(protocolName) match {
       case None =>
-        throw new EvalException(s"Protocol ${prefix} not supported", text, docSourceUrl)
+        throw new EvalException(s"Protocol ${protocolName} not supported", text, docSourceUrl)
       case Some(proto) => proto
     }
   }
