@@ -125,9 +125,9 @@ object Util {
       case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
       case TAT.ValueInt(value, _, _)              => value.toString
       case TAT.ValueFloat(value, _, _)            => value.toString
-      case TAT.ValueString(value, _, _)           => value
-      case TAT.ValueFile(value, _, _)             => value
-      case TAT.ValueDirectory(value, _, _)        => value
+      case TAT.ValueString(value, _, _)           => s""""$value"""" // add double quotes around value
+      case TAT.ValueFile(value, _, _)             => s""""$value"""" // -"-
+      case TAT.ValueDirectory(value, _, _)        => s""""$value"""" // -"-
       case TAT.ExprIdentifier(id: String, _, _)   => id
 
       case TAT.ExprCompoundString(value, _, _) =>
