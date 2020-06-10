@@ -21,7 +21,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
 //   For dnanexus        dx://
 //
   //
-  def getProtocol(url: URL, text: TextSource): FileAccessProtocol = {
+  private def getProtocol(url: URL, text: TextSource): FileAccessProtocol = {
     System.out.println(s"pathOrUrl=${url}")
     val protocolName = url.getProtocol
     System.out.println(s"protocolName = ${protocolName}")
