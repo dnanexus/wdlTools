@@ -1001,7 +1001,8 @@ case class WdlV1Generator() {
     }
   }
 
-  def generateElement(element: Element): Vector[String] = {
+  def generateElement(element: Element,
+                      headerLines: Vector[String] = Vector.empty): Vector[String] = {
     val stmt = element match {
       case d: Document => DocumentSections(d)
       case t: Task     => TaskBlock(t)
@@ -1011,11 +1012,14 @@ case class WdlV1Generator() {
     }
     val lineGenerator = LineGenerator()
     stmt.format(lineGenerator)
-    lineGenerator.toVector
+    val headerComments = headerLines.map(s => s"# ${s}")
+    val lines = lineGenerator.toVector
+    headerComments ++ lines
   }
 
-  def generateDocument(document: Document): Vector[String] = {
-    generateElement(document)
+  def generateDocument(document: Document,
+                       headerComment: Vector[String] = Vector.empty): Vector[String] = {
+    generateElement(document, headerComment)
   }
 
   object LineGenerator {
