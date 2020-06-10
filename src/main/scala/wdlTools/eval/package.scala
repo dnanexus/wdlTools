@@ -1,6 +1,6 @@
 package wdlTools.eval
 
-import java.net.URL
+import java.net.{URI, URL}
 import java.nio.file.Path
 import java.nio.charset.Charset
 
@@ -34,10 +34,10 @@ trait FileAccessProtocol {
   val prefixes: Vector[String]
 
   // Get the size of the file in bytes
-  def size(path: String): Long
+  def size(uri: URI): Long
 
   // Read the entire file into a string
-  def readFile(path: String): String
+  def readFile(uri: URI): String
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
@@ -63,18 +63,15 @@ object EvalConfig {
            stdout: Path,
            stderr: Path,
            userProtos: Vector[FileAccessProtocol] = Vector.empty,
-           encoding: Charset = Codec.default.charSet) = {
+           encoding: Charset = Codec.default.charSet): EvalConfig = {
     val defaultProtos = Vector(IoSupp.LocalFiles(encoding), IoSupp.HttpProtocol(encoding))
     val allProtos = defaultProtos ++ userProtos
     val dispatchTbl: Map[String, FileAccessProtocol] =
-      allProtos
-        .map { proto =>
-          proto.prefixes.map { prefix =>
-            (prefix, proto)
-          }
+      allProtos.flatMap { proto =>
+        proto.prefixes.map { prefix =>
+          (prefix, proto)
         }
-        .flatten
-        .toMap
+      }.toMap
     new EvalConfig(homeDir, tmpDir, stdout, stderr, dispatchTbl, encoding)
   }
 }

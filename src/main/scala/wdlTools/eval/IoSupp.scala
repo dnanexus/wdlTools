@@ -1,12 +1,12 @@
 package wdlTools.eval
 
 import java.io.ByteArrayOutputStream
-import java.net.{HttpURLConnection, URL}
+import java.net.{HttpURLConnection, URI, URL}
 import java.nio.charset.Charset
 import java.nio.file._
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.util.{Options, Util, Verbosity}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
@@ -14,56 +14,56 @@ import scala.util.Random
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
 case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
 
-  // Figure out which protocol should be used
-  //
-//   For S3              s3://
-//   For google cloud    gs://
-//   For dnanexus        dx://
-//
-  //
-  def figureOutProtocol(pathOrUrl: String, text: TextSource): FileAccessProtocol = {
-    val protocolName: String =
-      if (pathOrUrl.contains("://")) {
-        val i = pathOrUrl.indexOf("://")
-        if (i <= 0)
-          throw new EvalException(s"no protocol found for ${pathOrUrl}")
-        pathOrUrl.substring(0, i)
-      } else {
-        "file"
+  /** Figure out which scheme should be used
+    *
+    *  For S3              s3://
+    *  For google cloud    gs://
+    *  For dnanexus        dx://
+    *
+    */
+  def getProtocol(uri: URI, text: TextSource): FileAccessProtocol = {
+    val protocol =
+      try {
+        uri.getScheme
+      } catch {
+        case _: NullPointerException =>
+          "file"
       }
 
-    if (opts.verbosity == Verbosity.Verbose) {
-      System.out.println(s"""figure out protocol ${pathOrUrl} -> ${protocolName}""")
+    if (opts.verbosity >= Verbosity.Verbose) {
+      System.out.println(s"uri ${uri} has protocol ${protocol}")
     }
 
-    evalCfg.protocols.get(protocolName) match {
+    evalCfg.protocols.get(protocol) match {
       case None =>
-        throw new EvalException(s"Protocol ${protocolName} not supported", text, docSourceUrl)
+        throw new EvalException(s"Protocol ${protocol} not supported", text, docSourceUrl)
       case Some(proto) =>
         proto
     }
   }
 
-  def size(pathOrUrl: String, text: TextSource): Long = {
-    val proto = figureOutProtocol(pathOrUrl, text)
+  def size(pathOrUri: String, text: TextSource): Long = {
+    val uri = Util.getUri(pathOrUri)
+    val proto = getProtocol(uri, text)
     try {
-      proto.size(pathOrUrl)
+      proto.size(uri)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error getting size of ${pathOrUrl}, msg=${e.getMessage}",
+        throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}",
                                 text,
                                 docSourceUrl)
     }
   }
 
   // Read the contents of the file/URL and return a string
-  def readFile(pathOrUrl: String, text: TextSource): String = {
-    val proto = figureOutProtocol(pathOrUrl, text)
+  def readFile(pathOrUri: String, text: TextSource): String = {
+    val uri = Util.getUri(pathOrUri)
+    val proto = getProtocol(uri, text)
     try {
-      proto.readFile(pathOrUrl)
+      proto.readFile(uri)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error read file ${pathOrUrl}, msg=${e.getMessage}",
+        throw new EvalException(s"error read file ${pathOrUri}, msg=${e.getMessage}",
                                 text,
                                 docSourceUrl)
     }
@@ -127,8 +127,8 @@ object IoSupp {
   case class LocalFiles(encoding: Charset) extends FileAccessProtocol {
     val prefixes = Vector("", "file")
 
-    def size(path: String): Long = {
-      val p = Paths.get(path)
+    def size(uri: URI): Long = {
+      val p = Paths.get(uri.getPath)
       if (!Files.exists(p)) {
         throw new FileSystemNotFoundException(s"File ${p} not found")
       }
@@ -136,36 +136,30 @@ object IoSupp {
         p.toFile.length()
       } catch {
         case t: Throwable =>
-          throw new Exception(s"Error getting size of file ${path}: ${t.getMessage}")
+          throw new Exception(s"Error getting size of file ${uri}: ${t.getMessage}")
       }
     }
 
-    def readFile(path: String): String = {
+    def readFile(uri: URI): String = {
       // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(path)) / MiB
+      val fileSizeMiB = BigDecimal(size(uri)) / MiB
       if (fileSizeMiB > MaxFileSizeMiB) {
         throw new Exception(
-            s"${path} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
+            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
         )
       }
-      new String(Files.readAllBytes(Paths.get(path)), encoding)
+      new String(Files.readAllBytes(Paths.get(uri.getPath)), encoding)
     }
   }
 
   case class HttpProtocol(encoding: Charset) extends FileAccessProtocol {
     val prefixes = Vector("http", "https")
 
-    private def getUrl(rawUrl: String): URL = {
-      if (!rawUrl.contains("://"))
-        throw new Exception(s"$rawUrl is not a URL")
-      new URL(rawUrl)
-    }
-
     // A url
     // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
     //
-    def size(rawUrl: String): Long = {
-      val url = getUrl(rawUrl)
+    def size(uri: URI): Long = {
+      val url = uri.toURL
       var conn: HttpURLConnection = null
       try {
         conn = url.openConnection().asInstanceOf[HttpURLConnection]
@@ -181,15 +175,15 @@ object IoSupp {
       }
     }
 
-    def readFile(rawUrl: String): String = {
+    def readFile(uri: URI): String = {
       // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(rawUrl)) / MiB
+      val fileSizeMiB = BigDecimal(size(uri)) / MiB
       if (fileSizeMiB > MaxFileSizeMiB)
         throw new Exception(
-            s"${rawUrl} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
+            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
         )
 
-      val url = getUrl(rawUrl)
+      val url = uri.toURL
       val is = url.openStream()
       val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
 
