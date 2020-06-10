@@ -34,10 +34,10 @@ trait FileAccessProtocol {
   val prefixes: Vector[String]
 
   // Get the size of the file in bytes
-  def size(path: String): Long
+  def size(url: URL): Long
 
   // Read the entire file into a string
-  def readFile(path: String): String
+  def readFile(url: URL): String
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
