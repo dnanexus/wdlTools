@@ -1,11 +1,11 @@
 # Automatic coercions considered harmful
 Authors: O. Rodeh with J. Didion
 
-This page describes a line of thought regarding type checking for WDL programs, it reflects only the author's point of view. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
+This page describes a line of thought regarding type checking for WDL programs. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
 
 # Coercions
 
-WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows errored out because static type checking was too lenient. This resulted in long running expensive customer pipelines failing. The issue is two fold: the turn around time is long, and the cost can run to thousands of dollars.
+WDL makes wide ranging use of coercions to convert one type to another. This is, in general, a well accepted idea used in a wide variety of programming languages. At DNAnexus we have run into several instances where WDL workflows errored out because static type checking was too lenient. This resulted in long running expensive customer pipelines failing. The issue is twofold: the turn around time is long, and the cost can run to thousands of dollars.
 
 For example, under the WDL type system, a `File` is auto-coercible into `File?`. However, this is not the case in the DNAnexus simpler type-system. If you have a task that takes an `Array[File?]` and call it with `Array[File]` this will fail. For example:
 
@@ -53,11 +53,8 @@ Converting between strings, integer, and floats "just works".
 ```
   # Convert an integer to a string
   String s = 3
-
-  # https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/haplotypecaller-gvcf-gatk4.wdl#L211
   Int z = 1.3
 
-  # https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/JointGenotyping-terra.wdl#L475
   # converting Array[String] to Array[Int]
   Int d = "3"
   Array[Int] numbers = ["1", "2"]
@@ -128,6 +125,18 @@ Int c = select_first([Some(1), b])
 
 This would make the typing of `select_first` accurate; it would only take an array of `T?`.
 
+Code like:
+```
+ # Convert an optional int to an int
+  Int a = 3
+  Int? b = a
+```
+
+would be written:
+```
+Int? b = Some(a)
+````
+
 A pythonic way of writing these functions would be to have a single cast function that takes a type and a value and either casts the value to the type or throws an error. For example:
 
 ```
@@ -145,3 +154,5 @@ String? s2 = None
 File? f1 = cast(File?, s1)  # f1 == Some(File("foo/bar.txt"))
 File? f2 = cast(File?, s2) # f2 == None
 ```
+
+I hope this approach would reduce the number of preventable runtime errors.
