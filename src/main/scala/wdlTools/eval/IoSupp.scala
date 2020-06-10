@@ -22,6 +22,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
 //
   //
   def figureOutProtocol(pathOrUrl: String, text: TextSource): FileAccessProtocol = {
+    System.out.println(s"pathOrUrl=${pathOrUrl}")
     val protocolName: String =
       if (pathOrUrl.contains("://")) {
         val i = pathOrUrl.indexOf("://")
@@ -31,10 +32,13 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
       } else {
         "file"
       }
+    System.out.println(s"protocolName = ${protocolName}")
     evalCfg.protocols.get(protocolName) match {
       case None =>
         throw new EvalException(s"Protocol ${protocolName} not supported", text, docSourceUrl)
-      case Some(proto) => proto
+      case Some(proto) =>
+        System.out.println(s"prefixes = ${proto.prefixes}")
+        proto
     }
   }
 
