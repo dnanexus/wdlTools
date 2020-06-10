@@ -7,7 +7,7 @@ import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
 import kantan.csv._
 import kantan.csv.ops._
 import spray.json._
-import wdlTools.eval
+
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.WdlTypes._
@@ -23,7 +23,7 @@ case class Stdlib(opts: Options,
   type FunctionImpl = (Vector[WdlValues.V], TextSource) => V
 
   protected val coercion: Coercion = Coercion(docSourceUrl)
-  protected val iosp: IoSupp = eval.IoSupp(opts, evalCfg, docSourceUrl)
+  protected val iosp: IoSupp = IoSupp(opts, evalCfg, docSourceUrl)
 
   private val draft2FuncTable: Map[String, FunctionImpl] = Map(
       "stdout" -> stdout,
@@ -334,7 +334,7 @@ case class Stdlib(opts: Options,
                          text: TextSource): V_Object = {
     if (keys.size != values.size) {
       throw new EvalException(
-          s"""read_object : the number of keys (${keys.size}) 
+          s"""read_object : the number of keys (${keys.size})
              |must be the same as the number of values (${values.size})""".stripMargin
             .replace("\t", " "),
           text,
@@ -571,24 +571,27 @@ case class Stdlib(opts: Options,
   //
   // recursively dive into the entire structure and sum up all the file sizes. Strings
   // are coerced into file paths.
-  private def sizeCore(arg: V, text: TextSource): Double = {
-    def f(arg: V): Double = {
-      arg match {
-        case V_String(path) => iosp.size(path, text).toDouble
-        case V_File(path)   => iosp.size(path, text).toDouble
-        case V_Array(ar) =>
-          ar.foldLeft(0.0) {
-            case (accu, wv) => accu + f(wv)
-          }
-        case V_Optional(value) => f(value)
-        case _                 => 0
-      }
+  private def sizeCoreInner(arg: V, text: TextSource): Double = {
+    arg match {
+      case V_String(path) => iosp.size(path, text).toDouble
+      case V_File(path)   => iosp.size(path, text).toDouble
+      case V_Array(ar) =>
+        ar.foldLeft(0.0) {
+          case (accu, wv) => accu + sizeCoreInner(wv, text)
+        }
+      case V_Optional(value) => sizeCoreInner(value, text)
+      case _                 => 0
     }
+  }
+
+  private def sizeCore(arg: V, text: TextSource): Double = {
     try {
-      f(arg)
+      sizeCoreInner(arg, text)
     } catch {
-      case _: Throwable =>
-        throw new EvalException(s"size(${arg})", text, docSourceUrl)
+      case e: EvalException =>
+        throw e
+      case e: Throwable =>
+        throw new EvalException(s"size(${arg}  msg=${e.getMessage})", text, docSourceUrl)
     }
   }
 

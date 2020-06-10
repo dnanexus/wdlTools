@@ -2,7 +2,6 @@ package wdlTools.eval
 
 import java.nio.file.{Files, Path, Paths}
 
-
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -79,10 +78,10 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     val buf = "hello bunny"
     Util.writeStringToFile(buf, p, overwrite = true)
     val len = ioSupp.size(p.toString, dummyTextSource)
-    len shouldBe(buf.size)
+    len shouldBe (buf.size)
 
     val data = ioSupp.readFile(p.toString, dummyTextSource)
-    data shouldBe(buf)
+    data shouldBe (buf)
   }
 
   it should "be able to use size from Stdlib" in {
@@ -90,14 +89,11 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     val buf = "make Shasta full"
     Util.writeStringToFile(buf, p, overwrite = true)
 
-    val stdlib = Stdlib(opts,
-                        evalCfg,
-                        WdlVersion.V1,
-                        None)
+    val stdlib = Stdlib(opts, evalCfg, WdlVersion.V1, None)
     val retval = stdlib.call("size", Vector(WdlValues.V_String(p.toString)), dummyTextSource)
     inside(retval) {
       case WdlValues.V_Float(x) =>
-        x.toInt shouldBe(buf.size)
+        x.toInt shouldBe (buf.size)
     }
   }
 }
