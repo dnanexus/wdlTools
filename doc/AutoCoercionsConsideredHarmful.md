@@ -1,5 +1,5 @@
 # Automatic coercions considered harmful
-_Written by O. Rodeh._
+Authors: O. Rodeh with J. Didion
 
 This page describes a line of thought regarding type checking for WDL programs, it reflects only the author's point of view. It is based on experience acquired while working with DNAnexus customers on their WDL pipelines. The author also wrote a WDL type checker, evaluator, and cloud executor.
 
@@ -101,13 +101,13 @@ Array[Array[Int]] aai = [[1, 2], ["foo"], [1.4, 4.9, 9.3]]
 
 # Proposal
 
-While explicit coercions are useful and make sense, for example:
+Explicit coercions are useful and make sense, for example:
 ```
 File? x = y
 Array[File] af = ["a.txt", "b.txt"]
 ```
 
-I feel that auto-coercions are harmful. I suggest allowing explicit coercions, adding a few necessary stdlib function for type conversion, and disallowing automatic coercions. A few necessary stdlib functions are:
+However, auto-coercions can lead to unexpected behavior and costly/confusing job failures. We suggest allowing explicit coercions, adding a few necessary stdlib function for type conversion, and disallowing automatic coercions. A few necessary stdlib functions, written _a la Scala_, are:
 
 ```
 T? Some(T)
@@ -127,3 +127,21 @@ Int c = select_first([Some(1), b])
 ```
 
 This would make the typing of `select_first` accurate; it would only take an array of `T?`.
+
+A pythonic way of writing these functions would be to have a single cast function that takes a type and a value and either casts the value to the type or throws an error. For example:
+
+```
+Int i = cast(Int, "hello")
+String s = cast(String, 1)
+File f = cast(File, "foo/bar.txt")
+File err = cast(File, 1)  # throws an error because Int to File casting is not allowed
+```
+
+cast could even handle optional types, which would get rid of the need for Some(), e.g.
+
+```
+String s1 = "foo/bar.txt"
+String? s2 = None
+File? f1 = cast(File?, s1)  # f1 == Some(File("foo/bar.txt"))
+File? f2 = cast(File?, s2) # f2 == None
+```
