@@ -58,12 +58,12 @@ case class EvalConfig(homeDir: Path,
 
 object EvalConfig {
   // Always add the default protocols (file and web) into the configuration.
-  def create(homeDir: Path,
-             tmpDir: Path,
-             stdout: Path,
-             stderr: Path,
-             userProtos: Vector[FileAccessProtocol] = Vector.empty,
-             encoding: Charset = Codec.default.charSet): EvalConfig = {
+  def make(homeDir: Path,
+           tmpDir: Path,
+           stdout: Path,
+           stderr: Path,
+           userProtos: Vector[FileAccessProtocol] = Vector.empty,
+           encoding: Charset = Codec.default.charSet): EvalConfig = {
     val defaultProtos = Vector(IoSupp.LocalFiles(encoding), IoSupp.HttpProtocol(encoding))
     val allProtos = defaultProtos ++ userProtos
     val dispatchTbl: Map[String, FileAccessProtocol] =

@@ -43,7 +43,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     }
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig.create(dirs(0), dirs(1), stdout, stderr, Vector(DxProtocol))
+    EvalConfig.make(dirs(0), dirs(1), stdout, stderr, Vector(DxProtocol))
   }
 
   private val ioSupp = new IoSupp(opts, evalCfg, None)
