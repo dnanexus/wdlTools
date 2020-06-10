@@ -3,7 +3,7 @@ package wdlTools.util
 import java.io.{FileNotFoundException, IOException}
 
 import scala.jdk.CollectionConverters._
-import java.net.URL
+import java.net.{MalformedURLException, URI, URL}
 import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
@@ -27,6 +27,54 @@ object Util {
     config.getString("wdlTools.version")
   }
 
+  /**
+    * Convert a path or URI string to a `java.net.URI`. Handles the following types of URIs:
+    *
+    * foo.txt                  : relative path, converts to file:///path/to/foo.txt
+    * /path/to/foo.txt         : absolute path, converts to file:///path/to/foo.txt
+    * https://foo.com/bar.txt  : URL with a 'standard' protocol
+    * dx://file-XXX            : URI with custom scheme - converted directly to URI, so keep in mind that
+    *                            'file-XXX' will actually be in the 'authority' field
+    *
+    * Note that a URI of the form 'file://foo.txt' (where 'foo.txt' is intended to be a relative path) is
+    * invalid and will cause a MalformedURIException
+    *
+    * @param pathOrUri the path or URI to convert
+    * @return a URI
+    */
+  def getUri(pathOrUri: String): URI = {
+    if (pathOrUri.contains("://")) {
+      val uri = URI.create(pathOrUri)
+      // ensure the URI has a scheme
+      val scheme =
+        try {
+          uri.getScheme
+        } catch {
+          case _: NullPointerException =>
+            throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
+        }
+      if (scheme == null || scheme.trim.isEmpty) {
+        throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
+      }
+      if (scheme == "file") {
+        // for file URIs, ensure there is a path
+        val path =
+          try {
+            uri.getPath
+          } catch {
+            case _: NullPointerException =>
+              throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
+          }
+        if (path == null || path.trim.isEmpty) {
+          throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
+        }
+      }
+      uri
+    } else {
+      Paths.get(pathOrUri).toAbsolutePath.toUri
+    }
+  }
+
   def getUrl(pathOrUrl: String,
              searchPath: Vector[Path] = Vector.empty,
              mustExist: Boolean = true): URL = {
@@ -35,11 +83,11 @@ object Util {
     } else {
       val path: Path = Paths.get(pathOrUrl)
       val resolved: Option[Path] = if (Files.exists(path)) {
-        Some(path)
+        Some(path.toRealPath())
       } else if (searchPath.nonEmpty) {
         // search in all directories where imports may be found
         searchPath.map(d => d.resolve(pathOrUrl)).collectFirst {
-          case fp if Files.exists(fp) => fp
+          case fp if Files.exists(fp) => fp.toRealPath()
         }
       } else None
       val result = resolved.getOrElse {
@@ -51,12 +99,17 @@ object Util {
           path
         }
       }
-      new URL(s"file://${result.toAbsolutePath}")
+      new URL(s"file://${result}")
     }
   }
 
   def pathToUrl(path: Path): URL = {
-    path.toUri.toURL
+    val absPath = if (Files.exists(path)) {
+      path.toRealPath()
+    } else {
+      path.toAbsolutePath
+    }
+    absPath.toUri.toURL
   }
 
   /**
@@ -71,7 +124,7 @@ object Util {
     * @return The Path to the local file
     */
   def getLocalPath(url: URL, parent: Option[Path] = None, existsOk: Boolean = true): Path = {
-    val resolved = url.getProtocol match {
+    val resolved: Path = url.getProtocol match {
       case null | "" | "file" =>
         val path = Paths.get(url.getPath)
         if (parent.isDefined) {
@@ -79,15 +132,20 @@ object Util {
         } else if (path.isAbsolute) {
           path
         } else {
-          Paths.get("").toAbsolutePath.resolve(path)
+          Paths.get("").resolve(path)
         }
       case _ =>
         parent.getOrElse(Paths.get("")).resolve(Paths.get(url.getPath).getFileName)
     }
-    if (!existsOk && Files.exists(resolved)) {
-      throw new Exception(s"File already exists: ${resolved}")
+    if (Files.exists(resolved)) {
+      if (!existsOk) {
+        throw new Exception(s"File already exists: ${resolved}")
+      } else {
+        resolved.toRealPath()
+      }
+    } else {
+      resolved.toAbsolutePath
     }
-    resolved
   }
 
   def getFilename(addr: String, dropExt: String = "", addExt: String = ""): String = {
@@ -148,7 +206,7 @@ object Util {
 
   def rmdir(dir: Path): Unit = {
     Files.walkFileTree(
-        dir,
+        dir.toRealPath(),
         new SimpleFileVisitor[Path] {
           override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
             Files.delete(file)
@@ -192,6 +250,28 @@ object Util {
   }
 
   /**
+    * Files.createDirectories does not handle links. This function searches starting from dir to find the
+    * first parent directory that exists, converts that to a real path, resolves the subdirectories, and
+    * then creates them.
+    * @param dir the directory path to create
+    * @return the fully resolved and existing Path
+    */
+  def createDirectories(dir: Path): Path = {
+    var parent: Path = dir
+    var subdirs: Vector[String] = Vector.empty
+    while (parent != null && !Files.exists(parent)) {
+      subdirs = subdirs :+ parent.getFileName.toString
+      parent = parent.getParent
+    }
+    if (parent == null) {
+      throw new RuntimeException(s"None of the parents of ${dir} exist")
+    }
+    val realDir = Paths.get(parent.toRealPath().toString, subdirs: _*)
+    Files.createDirectories(realDir)
+    realDir
+  }
+
+  /**
     * Write a String to a file.
     * @param contents the string to write
     * @param path the path of the file
@@ -201,8 +281,8 @@ object Util {
     if (!overwrite && Files.exists(path)) {
       throw new Exception(s"File already exists: ${path}")
     }
-    Files.createDirectories(path.getParent)
-    Files.write(path, contents.getBytes(DefaultEncoding))
+    val parent = createDirectories(path.getParent)
+    Files.write(parent.resolve(path.getFileName), contents.getBytes(DefaultEncoding))
   }
 
   /**
