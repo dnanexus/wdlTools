@@ -124,3 +124,17 @@ Int c = select_first([Some(1), b])
 ```
 
 This would make the typing of `select_first` accurate; it would only take an array of `T?`.
+
+Code like:
+```
+ # Convert an optional int to an int
+  Int a = 3
+  Int? b = a
+```
+
+would be written:
+```
+Int? b = Some(a)
+````
+
+I hope this approach would reduce the number of preventable runtime errors.
