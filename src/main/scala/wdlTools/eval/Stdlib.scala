@@ -381,12 +381,22 @@ case class Stdlib(opts: Options,
 
   // String read_string(String|File)
   //
+  // The read_string() function takes a file path which is expected to
+  // contain 1 line with 1 string on it. This function returns that
+  // string.
+  //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_string(args: Vector[V], text: TextSource): V_String = {
     val file = getWdlFile(args, text)
     val content = iosp.readFile(file.value, text)
-    V_String(content)
+    val lines = content.split("\n")
+    if (lines.isEmpty) {
+      // There are no lines in the file, should we throw an exception instead?
+      V_String("")
+    } else {
+      V_String(lines.head)
+    }
   }
 
   // Float read_float(String|File)
