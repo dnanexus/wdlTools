@@ -175,6 +175,12 @@ case class WdlV1Generator() {
       wdlType match {
         case T_Optional(inner) =>
           fromWdlType(inner, quantifier = Some(Literal(Symbols.Optional)))
+        case T_String    => Literal(Symbols.StringType)
+        case T_Boolean   => Literal(Symbols.BooleanType)
+        case T_Int       => Literal(Symbols.IntType)
+        case T_Float     => Literal(Symbols.FloatType)
+        case T_File      => Literal(Symbols.FileType)
+        case T_Directory => Literal(Symbols.DirectoryType)
         case T_Array(inner, nonEmpty) =>
           val quant = if (nonEmpty) {
             Some(Symbols.NonEmpty)
@@ -186,12 +192,8 @@ case class WdlV1Generator() {
           buildDataType(Symbols.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
         case T_Pair(left, right) =>
           buildDataType(Symbols.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case T_Struct(name, _) => Literal(name)
         case T_Object          => Literal(Symbols.ObjectType)
-        case T_String          => Literal(Symbols.StringType)
-        case T_Boolean         => Literal(Symbols.BooleanType)
-        case T_Int             => Literal(Symbols.IntType)
-        case T_Float           => Literal(Symbols.FloatType)
+        case T_Struct(name, _) => Literal(name)
         case other             => throw new Exception(s"Unrecognized type $other")
       }
     }

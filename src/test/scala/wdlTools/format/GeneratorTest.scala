@@ -30,4 +30,12 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val generator = code.WdlV1Generator()
     generator.generateDocument(tDoc)
   }
+
+  it should "handle object values in meta" in {
+    val beforeURL = getWdlUrl(fname = "meta_object_values.wdl", subdir = "before")
+    val doc = parser.parseDocument(beforeURL)
+    val (tDoc, _) = typeInfer.apply(doc)
+    val generator = code.WdlV1Generator()
+    generator.generateDocument(tDoc)
+  }
 }
