@@ -1274,9 +1274,10 @@ case class WdlV1Formatter(opts: Options) {
           )
           bodyFormatter.endLine()
         }
+
+        lineFormatter.beginLine()
       }
 
-      lineFormatter.beginLine()
       lineFormatter.append(Literal.fromEnd(Symbols.CommandClose, command.text))
     }
   }

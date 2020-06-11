@@ -901,9 +901,10 @@ case class WdlV1Generator() {
           )
           bodyFormatter.endLine()
         }
+
+        lineGenerator.beginLine()
       }
 
-      lineGenerator.beginLine()
       lineGenerator.append(Literal(Symbols.CommandClose))
     }
   }
