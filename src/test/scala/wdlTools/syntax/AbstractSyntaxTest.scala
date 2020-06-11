@@ -39,6 +39,20 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
     doc.workflow should not be empty
   }
 
+  it should "handle file with native app tasks" in {
+    val doc = ParseAll(opts.copy(followImports = true))
+      .parseDocument(getTaskSource("call_native_app.wdl"))
+    val imports = doc.elements.collect {
+      case x: ImportDoc => x
+    }
+    imports.size shouldBe 1
+    imports.head.doc shouldBe defined
+    val tasks = imports.head.doc.get.elements.collect {
+      case x: Task => x
+    }
+    tasks.size shouldBe 81
+  }
+
   it should "handle optionals" in {
     val doc = parser.parseDocument(getTaskSource("missing_type_bug.wdl"))
     doc.version.value shouldBe WdlVersion.V1

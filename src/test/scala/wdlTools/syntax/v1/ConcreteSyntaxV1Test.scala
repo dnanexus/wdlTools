@@ -649,10 +649,6 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     getDocument(getWorkflowSource("empty_call_input.wdl"))
   }
 
-  it should "parse a file with DxNI output" in {
-    getDocument(getTaskSource("dx_app_extern.wdl"))
-  }
-
   it should "allow trailing comma" in {
     val doc = getDocument(getWorkflowSource("extra_comma.wdl"))
     doc.workflow shouldBe defined
