@@ -325,6 +325,8 @@ case class WdlV1Formatter(opts: Options) {
         case TypeBoolean(text)         => Literal.fromStart(Symbols.BooleanType, text)
         case TypeInt(text)             => Literal.fromStart(Symbols.IntType, text)
         case TypeFloat(text)           => Literal.fromStart(Symbols.FloatType, text)
+        case TypeFile(text)            => Literal.fromStart(Symbols.FileType, text)
+        case TypeDirectory(text)       => Literal.fromStart(Symbols.DirectoryType, text)
         case other                     => throw new Exception(s"Unrecognized type $other")
       }
     }
