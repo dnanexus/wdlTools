@@ -143,14 +143,14 @@ object Util {
             case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
-        s"{ $m2 }"
+        s"{$m2}"
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
             case (k, v) => s"${k} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
-        s"object { $m2 }"
+        s"object {$m2}"
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
