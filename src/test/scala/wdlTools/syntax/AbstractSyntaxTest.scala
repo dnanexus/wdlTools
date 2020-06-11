@@ -50,7 +50,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
     val tasks = imports.head.doc.get.elements.collect {
       case x: Task => x
     }
-    tasks.size shouldBe 81
+    tasks.size shouldBe 75
   }
 
   it should "handle optionals" in {
