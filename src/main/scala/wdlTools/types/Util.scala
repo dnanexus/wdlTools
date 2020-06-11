@@ -138,18 +138,19 @@ object Util {
       case TAT.ExprArray(value, _, _) =>
         "[" + value.map(x => exprToString(x, callback)).mkString(", ") + "]"
       case TAT.ExprMap(value, _, _) =>
-        "{" + value
+        val m2 = value
           .map {
             case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
           }
-          .mkString(", ") + "}"
+          .mkString(", ")
+        s"{ $m2 }"
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
             case (k, v) => s"${k} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
-        s"object($m2)"
+        s"object { $m2 }"
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
