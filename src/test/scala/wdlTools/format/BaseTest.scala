@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.{WdlVersion, v1}
-import wdlTools.util.{BasicOptions, Util}
+import wdlTools.util.{BasicOptions, SourceCode, Util}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val opts = BasicOptions()
@@ -44,5 +44,14 @@ class BaseTest extends AnyFlatSpec with Matchers {
     val formatter = code.WdlV1Formatter(opts)
     val documents = formatter.formatDocuments(beforeURL)
     documents(beforeURL).mkString("\n") shouldBe expected
+  }
+
+  it should "format task with complex metadata" in {
+    val beforeURL = getWdlUrl(fname = "meta_object_values.wdl", subdir = "before")
+    val doc = parser.parseDocument(beforeURL)
+    val formatter = code.WdlV1Formatter(opts)
+    val lines = formatter.formatDocument(doc)
+    // test that it parses successfully
+    parser.parseDocument(SourceCode(None, lines))
   }
 }

@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.v1
 import wdlTools.types.{TypeInfer, TypeOptions}
-import wdlTools.util.Util
+import wdlTools.util.{SourceCode, Util}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions()
@@ -36,6 +36,21 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val doc = parser.parseDocument(beforeURL)
     val (tDoc, _) = typeInfer.apply(doc)
     val generator = code.WdlV1Generator()
-    generator.generateDocument(tDoc)
+    val gLines = generator.generateDocument(tDoc)
+    // test that it parses successfully
+    val gDoc = parser.parseDocument(SourceCode(None, gLines))
+    typeInfer.apply(gDoc)
+  }
+
+  it should "handle workflow with calls" in {
+    val beforeURL = getWdlUrl(fname = "wf_with_calL.wdl", subdir = "before")
+    val doc = parser.parseDocument(beforeURL)
+    val (tDoc, _) = typeInfer.apply(doc)
+    val generator = code.WdlV1Generator()
+    val gLines = generator.generateDocument(tDoc)
+    // test that it parses successfully
+    val gDoc = parser.parseDocument(SourceCode(None, gLines))
+    typeInfer.apply(gDoc)
+    // TODO: test that tDoc == gtDoc
   }
 }

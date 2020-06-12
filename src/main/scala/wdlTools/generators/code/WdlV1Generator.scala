@@ -1,14 +1,11 @@
 package wdlTools.generators.code
 
 import wdlTools.generators.code.BaseWdlGenerator._
-import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
 import wdlTools.syntax.WdlVersion
-
-import scala.collection.mutable
 
 case class WdlV1Generator() {
 
@@ -24,9 +21,9 @@ case class WdlV1Generator() {
     }
   }
 
-  private case class SizedSequence(sizeds: Vector[Sized],
-                                   wrapping: Wrapping = Wrapping.Never,
-                                   spacing: Spacing = Spacing.Off)
+  private case class Sequence(sizeds: Vector[Sized],
+                              wrapping: Wrapping = Wrapping.Never,
+                              spacing: Spacing = Spacing.Off)
       extends Composite {
     require(sizeds.nonEmpty)
 
@@ -34,7 +31,7 @@ case class WdlV1Generator() {
         if (spacing == Spacing.On) sizeds.length else 0
     )
 
-    override def formatContents(lineGenerator: LineGenerator): Unit = {
+    override def generateContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping).appendAll(sizeds)
     }
   }
@@ -49,7 +46,7 @@ case class WdlV1Generator() {
 
     override lazy val length: Int = body.map(_.length).getOrElse(0) + endLengths._1 + endLengths._2
 
-    override def formatContents(lineGenerator: LineGenerator): Unit = {
+    override def generateContents(lineGenerator: LineGenerator): Unit = {
       if (ends.isDefined) {
         val (prefix, suffix) = ends.get
         val wrapAndIndentEnds = wrapping != Wrapping.Never && endLengths._1 > lineGenerator.lengthRemaining
@@ -60,24 +57,25 @@ case class WdlV1Generator() {
         if (body.nonEmpty && (wrapping == Wrapping.Always || length > lineGenerator.lengthRemaining)) {
           lineGenerator.append(prefix)
 
-          val bodyFormatter = lineGenerator
+          val bodyGenerator = lineGenerator
             .derive(increaseIndent = wrapAndIndentEnds,
+                    continuing = true,
                     newSpacing = Spacing.On,
                     newWrapping = wrapping)
-          bodyFormatter.endLine(continue = true)
-          bodyFormatter.beginLine()
-          bodyFormatter.append(body.get)
+          bodyGenerator.endLine(continue = true)
+          bodyGenerator.beginLine()
+          bodyGenerator.append(body.get)
 
           lineGenerator.endLine(continue = wrapAndIndentEnds)
           lineGenerator.beginLine()
           lineGenerator.append(suffix)
         } else {
-          val adjacentFormatter = lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping)
-          adjacentFormatter.appendPrefix(prefix)
+          val adjacentGenerator = lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping)
+          adjacentGenerator.appendPrefix(prefix)
           if (body.nonEmpty) {
-            adjacentFormatter.append(body.get)
+            adjacentGenerator.append(body.get)
           }
-          adjacentFormatter.appendSuffix(suffix)
+          adjacentGenerator.appendSuffix(suffix)
         }
       } else if (body.isDefined) {
         lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping).append(body.get)
@@ -95,12 +93,12 @@ case class WdlV1Generator() {
 
     override lazy val body: Option[Composite] = if (items.nonEmpty) {
       Some(
-          SizedSequence(
+          Sequence(
               items.zipWithIndex.map {
                 case (item, i) if i < items.size - 1 =>
                   if (delimiter.isDefined) {
                     val delimiterLiteral = Literal(delimiter.get)
-                    SizedSequence(Vector(item, delimiterLiteral))
+                    Sequence(Vector(item, delimiterLiteral))
                   } else {
                     item
                   }
@@ -123,8 +121,8 @@ case class WdlV1Generator() {
 
     override def length: Int = key.length + delimiterLiteral.length + value.length + 1
 
-    override def formatContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.appendAll(Vector(SizedSequence(Vector(key, delimiterLiteral)), value))
+    override def generateContents(lineGenerator: LineGenerator): Unit = {
+      lineGenerator.appendAll(Vector(Sequence(Vector(key, delimiterLiteral)), value))
     }
   }
 
@@ -139,21 +137,21 @@ case class WdlV1Generator() {
       if (inner1.isDefined) {
         // making the assumption that the open token comes directly after the name
         val openLiteral = Literal(Symbols.TypeParamOpen)
-        val prefix = SizedSequence(Vector(nameLiteral, openLiteral))
+        val prefix = Sequence(Vector(nameLiteral, openLiteral))
         // making the assumption that the close token comes directly before the quantifier (if any)
         val closeLiteral = if (quantifierLiteral.isDefined) {
           Literal(Symbols.TypeParamClose)
         } else {
           Literal(Symbols.TypeParamClose)
         }
-        val suffix = SizedSequence(Vector(Some(closeLiteral), quantifierLiteral).flatten)
+        val suffix = Sequence(Vector(Some(closeLiteral), quantifierLiteral).flatten)
         Container(
             Vector(inner1, inner2).flatten,
             Some(Symbols.ArrayDelimiter),
             Some((prefix, suffix))
         )
       } else if (quantifier.isDefined) {
-        SizedSequence(Vector(nameLiteral, quantifierLiteral.get))
+        Sequence(Vector(nameLiteral, quantifierLiteral.get))
       } else {
         nameLiteral
       }
@@ -213,7 +211,7 @@ case class WdlV1Generator() {
 
     override lazy val body: Option[Composite] = {
       val operLiteral = Literal(oper)
-      Some(SizedSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
+      Some(Sequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
     }
   }
 
@@ -230,7 +228,7 @@ case class WdlV1Generator() {
       with Composite {
 
     override lazy val body: Option[Composite] = Some(
-        SizedSequence(
+        Sequence(
             options.getOrElse(Vector.empty) ++ Vector(value),
             wrapping = wrapping,
             spacing = Spacing.On
@@ -243,7 +241,7 @@ case class WdlV1Generator() {
       .map(_.length)
       .sum + (if (quoting) 2 else 0)
 
-    override def formatContents(lineGenerator: LineGenerator): Unit = {
+    override def generateContents(lineGenerator: LineGenerator): Unit = {
       val unspacedFormatter =
         lineGenerator.derive(newWrapping = Wrapping.Never, newSpacing = Spacing.Off)
       if (quoting) {
@@ -298,7 +296,7 @@ case class WdlV1Generator() {
 
     def unary(oper: String, value: Expr): Sized = {
       val operSized = Literal(oper)
-      SizedSequence(Vector(operSized, nested(value, inOperation = true)))
+      Sequence(Vector(operSized, nested(value, inOperation = true)))
     }
 
     def operation(oper: String, lhs: Expr, rhs: Expr): Sized = {
@@ -321,7 +319,7 @@ case class WdlV1Generator() {
       val exprSized = nested(value, inPlaceholder = true)
       val eqLiteral = Literal(Symbols.Assignment)
       val nameLiteral = Literal(name)
-      SizedSequence(Vector(nameLiteral, eqLiteral, exprSized))
+      Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
     expr match {
@@ -422,7 +420,7 @@ case class WdlV1Generator() {
           case ExprIdentifier(id, _, _)    => Literal(id)
           case ExprAt(array, index, _, _) =>
             val arraySized = nested(array, inPlaceholder = inStringOrCommand)
-            val prefix = SizedSequence(
+            val prefix = Sequence(
                 Vector(arraySized, Literal(Symbols.IndexOpen))
             )
             val suffix = Literal(Symbols.IndexClose)
@@ -447,7 +445,7 @@ case class WdlV1Generator() {
                 wrapping = Wrapping.AsNeeded
             )
           case ExprApply(funcName, _, elements, _, _) =>
-            val prefix = SizedSequence(
+            val prefix = Sequence(
                 Vector(Literal(funcName), Literal(Symbols.FunctionCallOpen))
             )
             val suffix = Literal(Symbols.FunctionCallClose)
@@ -459,7 +457,7 @@ case class WdlV1Generator() {
           case ExprGetName(e, id, _, _) =>
             val exprSized = nested(e, inPlaceholder = inStringOrCommand)
             val idLiteral = Literal(id)
-            SizedSequence(
+            Sequence(
                 Vector(exprSized, Literal(Symbols.Access), idLiteral)
             )
           case other => throw new Exception(s"Unrecognized expression $other")
@@ -658,7 +656,7 @@ case class WdlV1Generator() {
     private val rhs = buildMeta(value)
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.appendAll(Vector(SizedSequence(lhs), rhs))
+      lineGenerator.appendAll(Vector(Sequence(lhs), rhs))
     }
   }
 
@@ -711,12 +709,13 @@ case class WdlV1Generator() {
     }.toVector
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
-      KeyValue(
+      val kv = KeyValue(
           key,
           Container(value,
                     delimiter = Some(s"${Symbols.ArrayDelimiter}"),
                     wrapping = Wrapping.Always)
       )
+      kv.generateContents(lineGenerator)
     }
   }
 
@@ -839,17 +838,17 @@ case class WdlV1Generator() {
           }
           lineGenerator.endLine()
 
-          val bodyFormatter =
+          val bodyGenerator =
             lineGenerator.derive(increaseIndent = true, newSpacing = Spacing.Off)
-          bodyFormatter.beginLine()
-          bodyFormatter.append(
+          bodyGenerator.beginLine()
+          bodyGenerator.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
                   inStringOrCommand = true
               )
           )
-          bodyFormatter.endLine()
+          bodyGenerator.endLine()
         } else {
           val (expr, indent) = command.parts.head match {
             case s: ValueString =>
@@ -862,10 +861,10 @@ case class WdlV1Generator() {
           }
           lineGenerator.endLine()
 
-          val bodyFormatter =
+          val bodyGenerator =
             lineGenerator.derive(increaseIndent = true, newSpacing = Spacing.Off)
-          bodyFormatter.beginLine()
-          bodyFormatter.append(
+          bodyGenerator.beginLine()
+          bodyGenerator.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
@@ -876,12 +875,12 @@ case class WdlV1Generator() {
           // Function to replace indenting in command block expressions with the current
           // indent level of the formatter
           val indentRegexp = s"\n${indent}".r
-          val replacement = s"\n${bodyFormatter.currentIndent}"
+          val replacement = s"\n${bodyGenerator.currentIndent}"
           def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
 
           if (numParts > 2) {
             command.parts.slice(1, command.parts.size - 1).foreach { expr =>
-              bodyFormatter.append(
+              bodyGenerator.append(
                   buildExpression(expr,
                                   placeholderOpen = Symbols.PlaceholderOpenTilde,
                                   inStringOrCommand = true,
@@ -889,7 +888,7 @@ case class WdlV1Generator() {
               )
             }
           }
-          bodyFormatter.append(
+          bodyGenerator.append(
               buildExpression(
                   command.parts.last match {
                     case ValueString(s, wdlType, text) =>
@@ -901,7 +900,7 @@ case class WdlV1Generator() {
                   stringModifier = Some(replaceIndent)
               )
           )
-          bodyFormatter.endLine()
+          bodyGenerator.endLine()
         }
 
         lineGenerator.beginLine()
@@ -918,7 +917,7 @@ case class WdlV1Generator() {
     private val rhs = buildExpression(expr)
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.appendAll(Vector(SizedSequence(lhs), rhs))
+      lineGenerator.appendAll(Vector(Sequence(lhs), rhs))
     }
   }
 
@@ -1023,25 +1022,5 @@ case class WdlV1Generator() {
   def generateDocument(document: Document,
                        headerComment: Vector[String] = Vector.empty): Vector[String] = {
     generateElement(document, headerComment)
-  }
-
-  object LineGenerator {
-    def apply(indenting: Indenting = Indenting.IfNotIndented,
-              indentStep: Int = 2,
-              initialIndentSteps: Int = 0,
-              indentation: String = " ",
-              wrapping: Wrapping = Wrapping.AsNeeded,
-              maxLineWidth: Int = 100): LineGenerator = {
-      val lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty
-      val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
-      new LineGenerator(indenting,
-                        indentStep,
-                        initialIndentSteps,
-                        indentation,
-                        wrapping,
-                        maxLineWidth,
-                        lines,
-                        currentLine)
-    }
   }
 }

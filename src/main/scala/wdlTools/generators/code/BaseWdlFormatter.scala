@@ -73,6 +73,11 @@ object BaseWdlFormatter {
       * @param lineFormatter the lineFormatter
       */
     def formatContents(lineFormatter: LineFormatter): Unit
+
+    /**
+      * Whether this Composite is a section, which may contain full-line comments.
+      */
+    def isSection: Boolean = false
   }
 
   class LineFormatter(
@@ -83,25 +88,16 @@ object BaseWdlFormatter {
       indentation: String = " ",
       wrapping: Wrapping = Wrapping.AsNeeded,
       maxLineWidth: Int = 100,
-      protected override val lines: mutable.Buffer[String],
-      protected override val currentLine: mutable.StringBuilder,
+      private val lines: mutable.Buffer[String],
+      private val currentLine: mutable.StringBuilder,
       private val currentLineComments: mutable.Map[Int, String] = mutable.HashMap.empty,
-      private val curIndentSteps: Int = 0,
-      private val curSpacing: Spacing = Spacing.On,
-      protected override val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
+      private var currentIndentSteps: Int = 0,
+      private var currentSpacing: Spacing = Spacing.On,
+      private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
       private val sections: mutable.Buffer[Multiline] = mutable.ArrayBuffer.empty,
       private val currentSourceLine: MutableHolder[Int] = MutableHolder[Int](0),
-      protected override val skipNextSpace: MutableHolder[Boolean] = MutableHolder[Boolean](false)
-  ) extends BaseLineFormatter(
-          indenting,
-          indentStep,
-          initialIndentSteps,
-          indentation,
-          wrapping,
-          maxLineWidth,
-          curIndentSteps,
-          curSpacing
-      ) {
+      private val skipNextSpace: MutableHolder[Boolean] = MutableHolder[Boolean](false)
+  ) {
 
     private val commentStart = "^#+".r
     private val whitespace = "[ \t\n\r]+".r
@@ -115,10 +111,18 @@ object BaseWdlFormatter {
       * @return
       */
     def derive(increaseIndent: Boolean = false,
+               continuing: Boolean = false,
                newIndenting: Indenting = indenting,
                newSpacing: Spacing = currentSpacing,
                newWrapping: Wrapping = wrapping): LineFormatter = {
-      val (newInitialIndentSteps, newCurrentIndentSteps) = deriveIndent(increaseIndent)
+      val indentSteps = if (continuing) currentIndentSteps else initialIndentSteps
+      val newInitialIndentSteps = indentSteps + (if (increaseIndent) 1 else 0)
+      val newCurrentIndentSteps =
+        if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
+          newInitialIndentSteps
+        } else {
+          currentIndentSteps
+        }
       new LineFormatter(comments,
                         newIndenting,
                         indentStep,
@@ -137,6 +141,22 @@ object BaseWdlFormatter {
                         skipNextSpace)
     }
 
+    def isLineBegun: Boolean = lineBegun.value
+
+    def atLineStart: Boolean = {
+      currentLine.length <= (currentIndentSteps * indentStep)
+    }
+
+    def currentIndent: String = indentation * (currentIndentSteps * indentStep)
+
+    def lengthRemaining: Int = {
+      if (atLineStart) {
+        maxLineWidth
+      } else {
+        maxLineWidth - currentLine.length
+      }
+    }
+
     def beginSection(section: Multiline): Unit = {
       sections.append(section)
       currentSourceLine.value = section.line
@@ -146,13 +166,40 @@ object BaseWdlFormatter {
       require(sections.nonEmpty)
       val popSection = sections.last
       if (section != popSection) {
-        throw new Exception(s"Ending the wrong session: ${section} != ${popSection}")
+        throw new Exception(s"Ending the wrong section: ${section} != ${popSection}")
       }
-      maybeAppendFullLineComments(popSection, isSection = true)
+      maybeAppendFullLineComments(popSection, isSectionEnd = true)
       sections.remove(sections.size - 1)
     }
 
-    override def endLine(continue: Boolean = false): Unit = {
+    def emptyLine(): Unit = {
+      require(!isLineBegun)
+      lines.append("")
+    }
+
+    def beginLine(): Unit = {
+      require(!isLineBegun)
+      currentLine.append(currentIndent)
+      lineBegun.value = true
+    }
+
+    private def dent(indenting: Indenting): Unit = {
+      indenting match {
+        case Indenting.Always =>
+          currentIndentSteps += 1
+        case Indenting.IfNotIndented if currentIndentSteps == initialIndentSteps =>
+          currentIndentSteps += 1
+        case Indenting.Dedent if currentIndentSteps > initialIndentSteps =>
+          currentIndentSteps -= 1
+        case Indenting.Reset =>
+          currentIndentSteps = initialIndentSteps
+        case Indenting.Never =>
+          currentIndentSteps = 0
+        case _ => ()
+      }
+    }
+
+    def endLine(continue: Boolean = false): Unit = {
       require(isLineBegun)
       if (currentLineComments.nonEmpty) {
         if (!atLineStart) {
@@ -165,7 +212,17 @@ object BaseWdlFormatter {
         )
         currentLineComments.clear()
       }
-      super.endLine(continue)
+      if (!atLineStart) {
+        lines.append(currentLine.toString)
+        if (continue) {
+          dent(indenting)
+        } else {
+          dent(Indenting.Reset)
+        }
+      }
+      currentLine.clear()
+      lineBegun.value = false
+      skipNextSpace.value = false
     }
 
     private def trimComment(comment: Comment): (String, Int, Boolean) = {
@@ -182,12 +239,12 @@ object BaseWdlFormatter {
     /**
       * Append one or more full-line comments.
       * @param ml the Multiline before which comments should be added
-      * @param isSection if true, comments are added between the previous source line and
+      * @param isSectionEnd if true, comments are added between the previous source line and
       * the end of the section; otherwise comments are added between the previous source
       * line and the beginning of `ml`
       */
-    private def maybeAppendFullLineComments(ml: Multiline, isSection: Boolean = false): Unit = {
-      val beforeLine = if (isSection) ml.endLine else ml.line
+    private def maybeAppendFullLineComments(ml: Multiline, isSectionEnd: Boolean = false): Unit = {
+      val beforeLine = if (isSectionEnd) ml.endLine else ml.line
       require(beforeLine >= currentSourceLine.value)
       require(beforeLine <= sections.last.endLine)
 
@@ -255,7 +312,10 @@ object BaseWdlFormatter {
         beginLine()
       }
 
-      currentSourceLine.value = ml.endLine
+      currentSourceLine.value = ml match {
+        case c: Composite if c.isSection && !isSectionEnd => ml.line
+        case _                                            => ml.endLine
+      }
     }
 
     /**
@@ -286,10 +346,32 @@ object BaseWdlFormatter {
         maybeAppendFullLineComments(span)
       }
 
-      beforeAppend(span)
+      if (wrapping == Wrapping.Always) {
+        endLine(continue = true)
+        beginLine()
+      } else {
+        val addSpace = currentLine.nonEmpty &&
+          currentSpacing == Spacing.On &&
+          !skipNextSpace.value &&
+          !currentLine.last.isWhitespace &&
+          currentLine.last != indentation.last
+        if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
+          endLine(continue = true)
+          beginLine()
+        } else if (addSpace) {
+          currentLine.append(" ")
+        }
+      }
 
       span match {
-        case c: Composite => c.formatContents(this)
+        case c: Composite =>
+          if (c.isSection) {
+            beginSection(c)
+          }
+          c.formatContents(this)
+          if (c.isSection) {
+            endSection(c)
+          }
         case a: Atom =>
           currentLine.append(a.toString)
           if (skipNextSpace.value) {
@@ -321,6 +403,10 @@ object BaseWdlFormatter {
     def appendSuffix(suffix: Span): Unit = {
       skipNextSpace.value = true
       append(suffix)
+    }
+
+    def toVector: Vector[String] = {
+      lines.toVector
     }
   }
 

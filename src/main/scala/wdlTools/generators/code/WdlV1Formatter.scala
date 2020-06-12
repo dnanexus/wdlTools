@@ -135,6 +135,16 @@ case class WdlV1Formatter(opts: Options) {
     override def column: Int = spans.head.column
 
     override def endColumn: Int = spans.last.endColumn
+
+    /**
+      * Whether this Composite is a section, which may contain full-line comments.
+      */
+    override lazy val isSection: Boolean = {
+      spans.exists {
+        case c: Composite => c.isSection
+        case _            => false
+      }
+    }
   }
 
   private abstract class Group(ends: Option[(Span, Span)] = None,
@@ -160,6 +170,7 @@ case class WdlV1Formatter(opts: Options) {
 
           val bodyFormatter = lineFormatter
             .derive(increaseIndent = wrapAndIndentEnds,
+                    continuing = true,
                     newSpacing = Spacing.On,
                     newWrapping = wrapping)
           bodyFormatter.endLine(continue = true)
@@ -211,6 +222,8 @@ case class WdlV1Formatter(opts: Options) {
     } else {
       None
     }
+
+    override val isSection: Boolean = true
   }
 
   private trait Bounded {
@@ -239,7 +252,8 @@ case class WdlV1Formatter(opts: Options) {
   private case class KeyValue(key: Span,
                               value: Span,
                               delimiter: String = Symbols.KeyValueDelimiter,
-                              override val bounds: TextSource)
+                              override val bounds: TextSource,
+                              override val isSection: Boolean = true)
       extends BoundedComposite {
     private val delimiterLiteral: Literal = Literal.fromPrev(delimiter, key)
 
@@ -583,6 +597,7 @@ case class WdlV1Formatter(opts: Options) {
             BoundedContainer(
                 Vector(nested(index, inPlaceholder = inStringOrCommand)),
                 Some(prefix, suffix),
+                // TODO: shouldn't need a delimiter - index must be exactly length 1
                 Some(Symbols.ArrayDelimiter),
                 bounds = text
             )
@@ -1064,7 +1079,8 @@ case class WdlV1Formatter(opts: Options) {
     }
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      KeyValue(key, CallInputArgsContainer(value), bounds = inputs.text)
+      val kv = KeyValue(key, CallInputArgsContainer(value), bounds = inputs.text)
+      kv.formatContents(lineFormatter)
     }
   }
 
