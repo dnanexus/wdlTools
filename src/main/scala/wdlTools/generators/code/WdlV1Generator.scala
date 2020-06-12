@@ -726,7 +726,7 @@ case class WdlV1Generator() {
           val alias = call.alias.get
           // assuming all parts of the clause are adjacent
           val tokens =
-            Vector(Literal(call.actualName), Literal(Symbols.As), Literal(alias))
+            Vector(Literal(call.fullyQualifiedName), Literal(Symbols.As), Literal(alias))
           Container(tokens)
         } else {
           Literal(call.actualName)
