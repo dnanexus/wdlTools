@@ -219,16 +219,20 @@ object TypedAbstractSyntax {
 
   case class CallAfter(name: String, text: TextSource) extends Element
 
-  // The name of the call may not contain dots. Examples:
+  // A call has three names - a fully-qualified name (FQN), an unqualified name
+  // (UQN), and an "actual" name. The UQN is the callee name without any namespace.
+  // The FQN is the callee name including dot-separated namespace(s). The actual
+  // name is the alias if there is one, else the UQN.
+  // Examples:
   //
-  // fully-qualified-name          actual-name
-  // -----                         ---
-  // call lib.concat as concat     concat
-  // call add                      add
-  // call a.b.c                    c
+  // fully-qualified-name      actual-name
+  // -----                     ---
+  // call lib.concat as foo    foo
+  // call add                  add
+  // call a.b.c                c
   //
-
-  case class Call(fullyQualifiedName: String,
+  case class Call(unqualifiedName: String,
+                  fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,
                   callee: WdlTypes.T_Callable,
                   alias: Option[String],

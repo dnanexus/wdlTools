@@ -875,24 +875,23 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     )
   }
 
-  //
   // 1. all the caller arguments have to exist with the correct types
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
   //    and arguments that have defaults can be skipped.
   private def applyCall(call: AST.Call, ctx: Context): TAT.Call = {
-    // The name of the call may not contain dots. Examples:
+    // The name of the call may or may not contain dots. Examples:
     //
     // call lib.concat as concat     concat
     // call add                      add
     // call a.b.c                    c
+    val unqualifiedName = call.name match {
+      case name if name contains "." => name.split("\\.").last
+      case name                      => name
+    }
     val actualName = call.alias match {
-      case None if !(call.name contains ".") =>
-        call.name
-      case None =>
-        val parts = call.name.split("\\.")
-        parts.last
       case Some(alias) => alias.name
+      case None        => unqualifiedName
     }
 
     // check that the call refers to a valid callee
@@ -986,14 +985,15 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     }
 
     TAT.Call(
-        fullyQualifiedName = call.name,
-        wdlType = wdlType,
-        callee = callee,
-        alias = alias,
-        afters = afters,
-        actualName = actualName,
-        inputs = callerInputs ++ missingInputs,
-        text = call.text
+        unqualifiedName,
+        call.name,
+        wdlType,
+        callee,
+        alias,
+        afters,
+        actualName,
+        callerInputs ++ missingInputs,
+        call.text
     )
   }
 
