@@ -53,4 +53,16 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     typeInfer.apply(gDoc)
     // TODO: test that tDoc == gtDoc
   }
+
+  it should "handle empty calls" in {
+    val beforeURL = getWdlUrl(fname = "empty_call.wdl", subdir = "before")
+    val doc = parser.parseDocument(beforeURL)
+    val (tDoc, _) = typeInfer.apply(doc)
+    val generator = code.WdlV1Generator()
+    val gLines = generator.generateDocument(tDoc)
+    // test that it parses successfully
+    val gDoc = parser.parseDocument(SourceCode(None, gLines))
+    typeInfer.apply(gDoc)
+    // TODO: test that tDoc == gtDoc
+  }
 }

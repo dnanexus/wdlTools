@@ -7,7 +7,7 @@ import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
 import wdlTools.syntax.WdlVersion
 
-case class WdlV1Generator() {
+case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private case class Literal(value: Any, quoting: Boolean = false) extends Sized {
     override lazy val length: Int = toString.length
@@ -699,12 +699,15 @@ case class WdlV1Generator() {
 
   private case class CallInputsStatement(inputs: Map[String, Expr]) extends BaseStatement {
     private val key = Literal(Symbols.Input)
-    private val value = inputs.map {
+    private val value = inputs.flatMap {
+      case (_, ValueNone(_, _)) if omitNullInputs => None
       case (name, expr) =>
         val nameToken = Literal(name)
         val exprSized = buildExpression(expr)
-        Container(
-            Vector(nameToken, Literal(Symbols.Assignment), exprSized)
+        Some(
+            Container(
+                Vector(nameToken, Literal(Symbols.Assignment), exprSized)
+            )
         )
     }.toVector
 
