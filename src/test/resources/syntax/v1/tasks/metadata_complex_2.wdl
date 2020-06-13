@@ -1,0 +1,41 @@
+version 1.0
+
+task suggestion_values_cgrep {
+  input {
+    String pattern
+    File in_file
+  }
+
+  command <<< Test / testOnly 0s
+    grep '~{pattern}' ~{in_file} | wc -l
+    cp ~{in_file} out_file
+  >>>
+
+  output {
+    Int count = read_int(stdout())
+    File out_file = "out_file"
+  }
+
+  meta {
+    in_file:
+      {
+        suggestions:
+        [
+          {
+            name:"file1",
+            value:
+            "dx://file-Fg5PgBQ0ffP7B8bg3xqB115G"
+          }, {
+            name:"file2",
+            project:"project-FGpfqjQ0ffPF1Q106JYP2j3v",
+            path:
+            "/test_data/f2.txt.gz"
+          }
+        ]
+    }
+    pattern: {
+      suggestions:
+      ["A", "B"]
+    }
+  }
+}
