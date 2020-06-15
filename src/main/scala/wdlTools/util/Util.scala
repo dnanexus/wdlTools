@@ -289,7 +289,7 @@ object Util {
     * Given a multi-line string, determine the largest w such that each line
     * begins with at least w whitespace characters.
     * @param s the string to trim
-    * @param ignoreEmpty ignore empty lines
+    * @param ignoreEmptyLines ignore empty lines
     * @param lineSep character to use to separate lines in the returned String
     * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
     *  is the number of lines trimmed from the beginning of the string,
@@ -304,7 +304,7 @@ object Util {
     *     stripLeadingWhitespace(s, true) => (1, 2, "hello\n goodbye")
     */
   def stripLeadingWhitespace(s: String,
-                             ignoreEmpty: Boolean = true,
+                             ignoreEmptyLines: Boolean = true,
                              lineSep: String = System.lineSeparator()): (Int, Int, String) = {
     val lines = s.split("\r\n?|\n")
     val wsRegex = "^([ \t]*)$".r
@@ -313,10 +313,10 @@ object Util {
       case ((lineOffset, content), wsRegex(txt)) =>
         if (content.isEmpty) {
           (lineOffset + 1, content)
-        } else if (ignoreEmpty) {
+        } else if (ignoreEmptyLines) {
           (lineOffset, content)
         } else {
-          (lineOffset, content :+ ("", txt))
+          (lineOffset, content :+ (txt, ""))
         }
       case ((lineOffset, content), nonWsRegex(ws, txt)) => (lineOffset, content :+ (ws, txt))
     }
