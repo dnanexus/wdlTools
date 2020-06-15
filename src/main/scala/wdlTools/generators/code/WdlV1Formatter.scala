@@ -268,30 +268,29 @@ case class WdlV1Formatter(opts: Options) {
     def buildDataType(name: String,
                       inner1: Option[Span] = None,
                       inner2: Option[Span] = None,
-                      quantifier: Option[String] = None,
+                      quantifiers: Vector[Span] = Vector.empty,
                       textSource: TextSource): Span = {
       val nameLiteral: Literal = Literal.fromStart(name, textSource)
-      val quantifierLiteral: Option[Literal] =
-        quantifier.map(sym => Literal.fromEnd(sym, textSource))
       if (inner1.isDefined) {
         // making the assumption that the open token comes directly after the name
         val openLiteral = Literal.fromPrev(Symbols.TypeParamOpen, nameLiteral)
         val prefix = SpanSequence(Vector(nameLiteral, openLiteral))
         // making the assumption that the close token comes directly before the quantifier (if any)
-        val closeLiteral = if (quantifierLiteral.isDefined) {
-          Literal.fromNext(Symbols.TypeParamClose, quantifierLiteral.get)
+        val suffix = if (quantifiers.nonEmpty) {
+          SpanSequence(
+              Vector(Literal.fromNext(Symbols.TypeParamClose, quantifiers.head)) ++ quantifiers
+          )
         } else {
           Literal.fromEnd(Symbols.TypeParamClose, textSource)
         }
-        val suffix = SpanSequence(Vector(Some(closeLiteral), quantifierLiteral).flatten)
         BoundedContainer(
             Vector(inner1, inner2).flatten,
             Some((prefix, suffix)),
             Some(Symbols.ArrayDelimiter),
             textSource
         )
-      } else if (quantifier.isDefined) {
-        SpanSequence(Vector(nameLiteral, quantifierLiteral.get))
+      } else if (quantifiers.nonEmpty) {
+        SpanSequence(Vector(nameLiteral) ++ quantifiers)
       } else {
         nameLiteral
       }
@@ -309,19 +308,20 @@ case class WdlV1Formatter(opts: Options) {
       }
     }
 
-    def fromWdlType(wdlType: Type, quantifier: Option[Literal] = None): Span = {
+    def fromWdlType(wdlType: Type, quantifiers: Vector[Span] = Vector.empty): Span = {
       wdlType match {
         case TypeOptional(inner, text) =>
-          fromWdlType(inner, quantifier = Some(Literal.fromEnd(Symbols.Optional, text)))
+          fromWdlType(inner, quantifiers = Vector(Literal.fromEnd(Symbols.Optional, text)))
         case TypeArray(inner, nonEmpty, text) =>
-          val quant = if (nonEmpty) {
-            Some(Symbols.NonEmpty)
-          } else {
-            None
+          val quant: Vector[Span] = (nonEmpty, quantifiers) match {
+            case (true, quant) if quant.nonEmpty =>
+              Vector(Literal.fromNext(Symbols.NonEmpty, quantifiers.head)) ++ quant
+            case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, text))
+            case (false, _) => quantifiers
           }
           buildDataType(Symbols.ArrayType,
                         Some(fromWdlType(inner)),
-                        quantifier = quant,
+                        quantifiers = quant,
                         textSource = text)
         case TypeMap(keyType, valueType, text) if isPrimitiveType(keyType) =>
           buildDataType(Symbols.MapType,

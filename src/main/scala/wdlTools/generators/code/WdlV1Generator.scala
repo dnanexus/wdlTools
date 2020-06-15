@@ -130,28 +130,23 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     def buildDataType(name: String,
                       inner1: Option[Sized] = None,
                       inner2: Option[Sized] = None,
-                      quantifier: Option[String] = None): Sized = {
+                      quantifiers: Vector[Sized] = Vector.empty): Sized = {
       val nameLiteral: Literal = Literal(name)
-      val quantifierLiteral: Option[Literal] =
-        quantifier.map(sym => Literal(sym))
       if (inner1.isDefined) {
-        // making the assumption that the open token comes directly after the name
         val openLiteral = Literal(Symbols.TypeParamOpen)
         val prefix = Sequence(Vector(nameLiteral, openLiteral))
-        // making the assumption that the close token comes directly before the quantifier (if any)
-        val closeLiteral = if (quantifierLiteral.isDefined) {
-          Literal(Symbols.TypeParamClose)
+        val suffix = if (quantifiers.nonEmpty) {
+          Sequence(Vector(Literal(Symbols.TypeParamClose)) ++ quantifiers)
         } else {
           Literal(Symbols.TypeParamClose)
         }
-        val suffix = Sequence(Vector(Some(closeLiteral), quantifierLiteral).flatten)
         Container(
             Vector(inner1, inner2).flatten,
             Some(Symbols.ArrayDelimiter),
             Some((prefix, suffix))
         )
-      } else if (quantifier.isDefined) {
-        Sequence(Vector(nameLiteral, quantifierLiteral.get))
+      } else if (quantifiers.nonEmpty) {
+        Sequence(Vector(nameLiteral) ++ quantifiers)
       } else {
         nameLiteral
       }
@@ -169,10 +164,10 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       }
     }
 
-    def fromWdlType(wdlType: T, quantifier: Option[Literal] = None): Sized = {
+    def fromWdlType(wdlType: T, quantifiers: Vector[Sized] = Vector.empty): Sized = {
       wdlType match {
         case T_Optional(inner) =>
-          fromWdlType(inner, quantifier = Some(Literal(Symbols.Optional)))
+          fromWdlType(inner, quantifiers = Vector(Literal(Symbols.Optional)))
         case T_String    => Literal(Symbols.StringType)
         case T_Boolean   => Literal(Symbols.BooleanType)
         case T_Int       => Literal(Symbols.IntType)
@@ -181,11 +176,13 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
         case T_Directory => Literal(Symbols.DirectoryType)
         case T_Array(inner, nonEmpty) =>
           val quant = if (nonEmpty) {
-            Some(Symbols.NonEmpty)
+            Vector(Literal(Symbols.NonEmpty))
           } else {
-            None
+            Vector.empty
           }
-          buildDataType(Symbols.ArrayType, Some(fromWdlType(inner)), quantifier = quant)
+          buildDataType(Symbols.ArrayType,
+                        Some(fromWdlType(inner)),
+                        quantifiers = quant ++ quantifiers)
         case T_Map(keyType, valueType) if isPrimitiveType(keyType) =>
           buildDataType(Symbols.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
         case T_Pair(left, right) =>
