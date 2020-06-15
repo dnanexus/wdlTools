@@ -34,7 +34,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   private lazy val evalCfg: EvalConfig = {
-    val baseDir = Paths.get("/tmp/evalTest")
+    val baseDir = Files.createTempDirectory("evalTest")
     val homeDir = baseDir.resolve("home")
     val tmpDir = baseDir.resolve("tmp")
     for (d <- Vector(baseDir, homeDir, tmpDir))

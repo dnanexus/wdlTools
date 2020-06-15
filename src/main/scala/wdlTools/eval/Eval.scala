@@ -538,7 +538,7 @@ case class Eval(opts: Options,
       }
       .mkString("")
     // strip off common leading whitespace
-    val (_, _, strippedCommandStr) = Util.stripLeadingWhitespace(commandStr, ignoreEmptyLast = true)
+    val (_, _, strippedCommandStr) = Util.stripLeadingWhitespace(commandStr)
     strippedCommandStr
   }
 }

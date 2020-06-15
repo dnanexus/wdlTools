@@ -5,9 +5,10 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import wdlTools.eval.{Context, Eval, EvalConfig}
 import wdlTools.generators.code
 import wdlTools.syntax.v1
-import wdlTools.types.{TypeInfer, TypeOptions}
+import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 import wdlTools.util.{SourceCode, Util}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
@@ -64,5 +65,36 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val gDoc = parser.parseDocument(SourceCode(None, gLines))
     typeInfer.apply(gDoc)
     // TODO: test that tDoc == gtDoc
+  }
+
+  it should "handle command block" in {
+    val beforeURL = getWdlUrl(fname = "python_heredoc.wdl", subdir = "before")
+
+    def evalCommand(tDoc: TAT.Document): String = {
+      val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1, Some(beforeURL))
+      tDoc.elements should not be empty
+      val task = tDoc.elements.head.asInstanceOf[TAT.Task]
+      val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
+      evaluator.applyCommand(task.command, ctx)
+    }
+
+    val expected = """python <<CODE
+                     |import os
+                     |import sys
+                     |print("We are inside a python docker image")
+                     |CODE""".stripMargin
+
+    // ensure the source doc command evaluates correctly
+    val doc = parser.parseDocument(beforeURL)
+    val (tDoc, _) = typeInfer.apply(doc)
+    evalCommand(tDoc) shouldBe expected
+
+    // generate, re-parse, and make sure the command still evaluates correctly
+    val generator = code.WdlV1Generator()
+    val gLines = generator.generateDocument(tDoc)
+    // test that it parses successfully
+    val gDoc = parser.parseDocument(SourceCode(None, gLines))
+    val (gtDoc, _) = typeInfer.apply(gDoc)
+    evalCommand(gtDoc) shouldBe expected
   }
 }

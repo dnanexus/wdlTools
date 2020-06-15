@@ -1,7 +1,7 @@
 package wdlTools.eval
 
 import java.net.{URI, URL}
-import java.nio.file.Path
+import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
 import wdlTools.syntax.TextSource
@@ -73,6 +73,13 @@ object EvalConfig {
         }
       }.toMap
     new EvalConfig(homeDir, tmpDir, stdout, stderr, dispatchTbl, encoding)
+  }
+
+  // an EvalConfig where all the paths point to /dev/null - only useful for
+  // testing where there are no I/O functions used
+  lazy val empty: EvalConfig = {
+    val devNull = Paths.get("/dev/null")
+    make(devNull, devNull, devNull, devNull)
   }
 }
 
