@@ -381,9 +381,6 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                     options = Some(Vector(option(Symbols.DefaultOption, default))),
                     inString = inStringOrCommand)
       case ExprPlaceholderSep(sep, value, _, _) =>
-        println(sep)
-        println(value)
-        println(Some(Vector(option(Symbols.SepOption, sep))))
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Symbols.SepOption, sep))),
