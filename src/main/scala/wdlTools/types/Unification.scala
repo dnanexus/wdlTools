@@ -16,7 +16,6 @@ case class Unification(conf: TypeOptions) {
   type TypeUnificationContext = Map[T_Var, T]
 
   private def isCoercibleTo2(left: T, right: T): Boolean = {
-    //System.out.println(s"isCoercibleTo2 ${left} ${right} regime=${regime}")
     (left, right) match {
       case (T_Boolean, T_Boolean)                                     => true
       case (T_Int, T_Int)                                             => true

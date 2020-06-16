@@ -380,6 +380,9 @@ object Util {
         // Otherwise, build it with newlines and proper field indents.
         val result = xs.map(x => s"\n$fieldIndent${nextDepth(x)}").toString()
         result.substring(0, result.length - 1) + "\n" + indent + ")"
+      case Some(x) =>
+        s"Some(\n$fieldIndent${prettyFormat(x, indentSize, maxElementWidth, depth + 1, callback)}\n$indent)"
+      case None => "None"
       // Product should cover case classes.
       case p: Product =>
         callback.map(_(p)) match {
