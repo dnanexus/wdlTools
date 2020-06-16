@@ -48,7 +48,7 @@ object TypeException {
     val messages = errors.map {
       case TypeError(docSourceUrl, textSource, msg) =>
         val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-        s"${msg} at ${urlPart} ${textSource}"
+        s"${msg}${urlPart} at ${textSource}"
     }
     messages.mkString("\n")
   }
