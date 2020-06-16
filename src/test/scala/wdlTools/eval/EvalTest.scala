@@ -322,7 +322,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 
-  it should "handle accessing pair values" tin {
+  it should "handle accessing pair values" in {
     val file = srcDir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctxEnd = evaluator.applyDeclarations(decls, Context(Map("i2" -> V_Null)))
