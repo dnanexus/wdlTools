@@ -266,10 +266,10 @@ case class WdlV1Formatter(opts: Options) {
 
   private object DataType {
     def buildDataType(name: String,
-                      inner1: Option[Span] = None,
-                      inner2: Option[Span] = None,
                       quantifiers: Vector[Span] = Vector.empty,
-                      textSource: TextSource): Span = {
+                      textSource: TextSource,
+                      inner1: Option[Span] = None,
+                      inner2: Option[Span] = None): Span = {
       val nameLiteral: Literal = Literal.fromStart(name, textSource)
       if (inner1.isDefined) {
         // making the assumption that the open token comes directly after the name
@@ -319,29 +319,29 @@ case class WdlV1Formatter(opts: Options) {
             case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, text))
             case (false, _) => quantifiers
           }
-          buildDataType(Symbols.ArrayType,
-                        Some(fromWdlType(inner)),
-                        quantifiers = quant,
-                        textSource = text)
+          buildDataType(Symbols.ArrayType, quant, text, Some(fromWdlType(inner)))
         case TypeMap(keyType, valueType, text) if isPrimitiveType(keyType) =>
           buildDataType(Symbols.MapType,
+                        quantifiers,
+                        text,
                         Some(fromWdlType(keyType)),
-                        Some(fromWdlType(valueType)),
-                        textSource = text)
+                        Some(fromWdlType(valueType)))
         case TypePair(left, right, text) =>
           buildDataType(Symbols.PairType,
+                        quantifiers,
+                        text,
                         Some(fromWdlType(left)),
-                        Some(fromWdlType(right)),
-                        textSource = text)
-        case TypeStruct(name, _, text) => Literal.fromStart(name, text)
-        case TypeObject(text)          => Literal.fromStart(Symbols.ObjectType, text)
-        case TypeString(text)          => Literal.fromStart(Symbols.StringType, text)
-        case TypeBoolean(text)         => Literal.fromStart(Symbols.BooleanType, text)
-        case TypeInt(text)             => Literal.fromStart(Symbols.IntType, text)
-        case TypeFloat(text)           => Literal.fromStart(Symbols.FloatType, text)
-        case TypeFile(text)            => Literal.fromStart(Symbols.FileType, text)
-        case TypeDirectory(text)       => Literal.fromStart(Symbols.DirectoryType, text)
-        case other                     => throw new Exception(s"Unrecognized type $other")
+                        Some(fromWdlType(right)))
+        case TypeStruct(name, _, text) => buildDataType(name, quantifiers, text)
+        case TypeObject(text)          => buildDataType(Symbols.ObjectType, quantifiers, text)
+        case TypeString(text)          => buildDataType(Symbols.StringType, quantifiers, text)
+        case TypeBoolean(text)         => buildDataType(Symbols.BooleanType, quantifiers, text)
+        case TypeInt(text)             => buildDataType(Symbols.IntType, quantifiers, text)
+        case TypeFloat(text)           => buildDataType(Symbols.FloatType, quantifiers, text)
+        case TypeFile(text)            => buildDataType(Symbols.FileType, quantifiers, text)
+        case TypeDirectory(text) =>
+          buildDataType(Symbols.DirectoryType, quantifiers, text)
+        case other => throw new Exception(s"Unrecognized type $other")
       }
     }
   }

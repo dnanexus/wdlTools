@@ -128,9 +128,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private object DataType {
     def buildDataType(name: String,
+                      quantifiers: Vector[Sized],
                       inner1: Option[Sized] = None,
-                      inner2: Option[Sized] = None,
-                      quantifiers: Vector[Sized] = Vector.empty): Sized = {
+                      inner2: Option[Sized] = None): Sized = {
       val nameLiteral: Literal = Literal(name)
       if (inner1.isDefined) {
         val openLiteral = Literal(Symbols.TypeParamOpen)
@@ -168,27 +168,31 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       wdlType match {
         case T_Optional(inner) =>
           fromWdlType(inner, quantifiers = Vector(Literal(Symbols.Optional)))
-        case T_String    => Literal(Symbols.StringType)
-        case T_Boolean   => Literal(Symbols.BooleanType)
-        case T_Int       => Literal(Symbols.IntType)
-        case T_Float     => Literal(Symbols.FloatType)
-        case T_File      => Literal(Symbols.FileType)
-        case T_Directory => Literal(Symbols.DirectoryType)
+        case T_String    => buildDataType(Symbols.StringType, quantifiers)
+        case T_Boolean   => buildDataType(Symbols.BooleanType, quantifiers)
+        case T_Int       => buildDataType(Symbols.IntType, quantifiers)
+        case T_Float     => buildDataType(Symbols.FloatType, quantifiers)
+        case T_File      => buildDataType(Symbols.FileType, quantifiers)
+        case T_Directory => buildDataType(Symbols.DirectoryType, quantifiers)
         case T_Array(inner, nonEmpty) =>
           val quant = if (nonEmpty) {
             Vector(Literal(Symbols.NonEmpty))
           } else {
             Vector.empty
           }
-          buildDataType(Symbols.ArrayType,
-                        Some(fromWdlType(inner)),
-                        quantifiers = quant ++ quantifiers)
+          buildDataType(Symbols.ArrayType, quant ++ quantifiers, Some(fromWdlType(inner)))
         case T_Map(keyType, valueType) if isPrimitiveType(keyType) =>
-          buildDataType(Symbols.MapType, Some(fromWdlType(keyType)), Some(fromWdlType(valueType)))
+          buildDataType(Symbols.MapType,
+                        quantifiers,
+                        Some(fromWdlType(keyType)),
+                        Some(fromWdlType(valueType)))
         case T_Pair(left, right) =>
-          buildDataType(Symbols.PairType, Some(fromWdlType(left)), Some(fromWdlType(right)))
-        case T_Object          => Literal(Symbols.ObjectType)
-        case T_Struct(name, _) => Literal(name)
+          buildDataType(Symbols.PairType,
+                        quantifiers,
+                        Some(fromWdlType(left)),
+                        Some(fromWdlType(right)))
+        case T_Object          => buildDataType(Symbols.ObjectType, quantifiers)
+        case T_Struct(name, _) => buildDataType(name, quantifiers)
         case other             => throw new Exception(s"Unrecognized type $other")
       }
     }

@@ -67,6 +67,18 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     // TODO: test that tDoc == gtDoc
   }
 
+  it should "handle optionals" in {
+    val beforeURL = getWdlUrl(fname = "optionals.wdl", subdir = "before")
+    val doc = parser.parseDocument(beforeURL)
+    val (tDoc, _) = typeInfer.apply(doc)
+    val generator = code.WdlV1Generator()
+    val gLines = generator.generateDocument(tDoc)
+    // test that it parses successfully
+    val gDoc = parser.parseDocument(SourceCode(None, gLines))
+    typeInfer.apply(gDoc)
+    // TODO: test that tDoc == gtDoc
+  }
+
   it should "handle command block" in {
     val beforeURL = getWdlUrl(fname = "python_heredoc.wdl", subdir = "before")
 
