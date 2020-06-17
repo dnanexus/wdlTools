@@ -42,7 +42,10 @@ case class Parsers(opts: Options = BasicOptions(),
   }
 
   def parseDocument(url: URL): Document = {
-    val sourceCode = SourceCode.loadFrom(url)
+    parseDocument(SourceCode.loadFrom(url))
+  }
+
+  def parseDocument(sourceCode: SourceCode): Document = {
     val parser = getParser(sourceCode)
     parser.parseDocument(sourceCode)
   }

@@ -6,12 +6,13 @@ import java.nio.file.{Path, Paths}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
-import wdlTools.syntax.{WdlVersion, v1}
+import wdlTools.syntax.{Parsers, WdlVersion}
 import wdlTools.util.{BasicOptions, SourceCode, Util}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private lazy val opts = BasicOptions()
-  private lazy val parser = v1.ParseAll(opts)
+  private val opts = BasicOptions()
+  private val parsers = Parsers(opts)
+  private val v1Parser = parsers.getParser(WdlVersion.V1)
 
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
@@ -22,7 +23,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   }
 
   it should "handle the runtime section correctly" in {
-    val doc = parser.parseDocument(getWdlUrl(fname = "simple.wdl", subdir = "after"))
+    val doc = v1Parser.parseDocument(getWdlUrl(fname = "simple.wdl", subdir = "after"))
     doc.version.value shouldBe WdlVersion.V1
   }
 
@@ -48,10 +49,10 @@ class BaseTest extends AnyFlatSpec with Matchers {
 
   it should "format task with complex metadata" in {
     val beforeURL = getWdlUrl(fname = "meta_object_values.wdl", subdir = "before")
-    val doc = parser.parseDocument(beforeURL)
+    val doc = v1Parser.parseDocument(beforeURL)
     val formatter = code.WdlV1Formatter(opts)
     val lines = formatter.formatDocument(doc)
     // test that it parses successfully
-    parser.parseDocument(SourceCode(None, lines))
+    v1Parser.parseDocument(SourceCode(None, lines))
   }
 }
