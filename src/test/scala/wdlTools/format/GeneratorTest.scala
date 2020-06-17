@@ -7,14 +7,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.{Context, Eval, EvalConfig}
 import wdlTools.generators.code
-import wdlTools.syntax.{Parsers, WdlVersion}
+import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 import wdlTools.util.{SourceCode, Util}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions()
   private val parsers = Parsers(opts)
-  private val v1Parser = parsers.getParser(WdlVersion.V1)
   private val typeInfer = TypeInfer(opts)
 
   def getWdlPath(fname: String, subdir: String): Path = {
@@ -40,12 +39,12 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       validate: Boolean = true
   ): (TAT.Document, Vector[String], Option[TAT.Document]) = {
     val beforeUrl = getWdlUrl(fname = fname, subdir = "before")
-    val doc = v1Parser.parseDocument(beforeUrl)
+    val doc = parsers.parseDocument(beforeUrl)
     val (tDoc, _) = typeInfer.apply(doc)
     val generator = code.WdlV1Generator()
     val gLines = generator.generateDocument(tDoc)
     val gtDoc = if (validate) {
-      val gDoc = v1Parser.parseDocument(SourceCode(None, gLines))
+      val gDoc = parsers.parseDocument(SourceCode(None, gLines))
       Some(typeInfer.apply(gDoc)._1)
     } else {
       None
@@ -91,5 +90,9 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val expected = Vector(expected1, expected2)
     evalCommand(tDoc) shouldBe expected
     evalCommand(gtDoc.get) shouldBe expected
+  }
+
+  it should "not wrap strings in command block" in {
+    generate("library_syscall.wdl")
   }
 }

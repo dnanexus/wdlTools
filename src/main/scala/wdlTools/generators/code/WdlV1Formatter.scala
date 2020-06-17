@@ -165,7 +165,9 @@ case class WdlV1Formatter(opts: Options) {
           lineFormatter.endLine(continue = true)
           lineFormatter.beginLine()
         }
-        if (body.nonEmpty && (wrapping == Wrapping.Always || length > lineFormatter.lengthRemaining)) {
+        if (body.nonEmpty && (
+                wrapping == Wrapping.Always || (wrapping != Wrapping.Never && length > lineFormatter.lengthRemaining)
+            )) {
           lineFormatter.append(prefix)
 
           val bodyFormatter = lineFormatter
@@ -1197,9 +1199,9 @@ case class WdlV1Formatter(opts: Options) {
     // However, we do need to try to indent it correclty. We do this by detecting the amount
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineFormatter's current indent level.
-    private val commandStartRegexp = "^(.*)[\n\r]+([ \\t]*)(.*)".r
+    private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
     private val commandEndRegexp = "\\s+$".r
-    private val commandSingletonRegexp = "^(.*)[\n\r]*[ \\t]*(.*?)\\s*$".r
+    private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter.appendAll(
@@ -1226,7 +1228,9 @@ case class WdlV1Formatter(opts: Options) {
           lineFormatter.endLine()
 
           val bodyFormatter =
-            lineFormatter.derive(increaseIndent = true, newSpacing = Spacing.Off)
+            lineFormatter.derive(increaseIndent = true,
+                                 newSpacing = Spacing.Off,
+                                 newWrapping = Wrapping.Never)
           bodyFormatter.beginLine()
           bodyFormatter.append(
               buildExpression(
@@ -1252,21 +1256,25 @@ case class WdlV1Formatter(opts: Options) {
           lineFormatter.endLine()
 
           val bodyFormatter =
-            lineFormatter.derive(increaseIndent = true, newSpacing = Spacing.Off)
+            lineFormatter.derive(increaseIndent = true,
+                                 newSpacing = Spacing.Off,
+                                 newWrapping = Wrapping.Never)
           bodyFormatter.beginLine()
-          bodyFormatter.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true
-              )
-          )
 
           // Function to replace indenting in command block expressions with the current
           // indent level of the formatter
           val indentRegexp = s"\n${indent}".r
           val replacement = s"\n${bodyFormatter.currentIndent}"
           def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
+
+          bodyFormatter.append(
+              buildExpression(
+                  expr,
+                  placeholderOpen = Symbols.PlaceholderOpenTilde,
+                  inStringOrCommand = true,
+                  stringModifier = Some(replaceIndent)
+              )
+          )
 
           if (numParts > 2) {
             command.parts.slice(1, command.parts.size - 1).foreach { expr =>

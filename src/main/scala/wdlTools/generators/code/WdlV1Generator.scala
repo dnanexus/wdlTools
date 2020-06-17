@@ -54,7 +54,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
           lineGenerator.endLine(continue = true)
           lineGenerator.beginLine()
         }
-        if (body.nonEmpty && (wrapping == Wrapping.Always || length > lineGenerator.lengthRemaining)) {
+        if (body.nonEmpty && (
+                wrapping == Wrapping.Always || (wrapping != Wrapping.Never && length > lineGenerator.lengthRemaining)
+            )) {
           lineGenerator.append(prefix)
 
           val bodyGenerator = lineGenerator
@@ -818,9 +820,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     // However, we do need to try to indent it correclty. We do this by detecting the amount
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineGenerator's current indent level.
-    private val commandStartRegexp = "^.*[\n\r]+([ \\t]*)(.*)".r
+    private val commandStartRegexp = "(?s)^.*?[\n\r]+([ \\t]*)(.*)".r
     private val commandEndRegexp = "\\s+$".r
-    private val commandSingletonRegexp = "^.*[\n\r]*[ \\t]*(.*?)\\s*$".r
+    private val commandSingletonRegexp = "(?s)^.*?[\n\r]*[ \\t]*(.*?)\\s*$".r
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator.appendAll(
@@ -843,7 +845,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
           lineGenerator.endLine()
 
           val bodyGenerator =
-            lineGenerator.derive(increaseIndent = true, newSpacing = Spacing.Off)
+            lineGenerator.derive(increaseIndent = true,
+                                 newSpacing = Spacing.Off,
+                                 newWrapping = Wrapping.Never)
           bodyGenerator.beginLine()
           bodyGenerator.append(
               buildExpression(
@@ -857,30 +861,33 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
           val (expr, indent) = command.parts.head match {
             case s: ValueString =>
               s.value match {
-                case commandStartRegexp(indent, body) =>
-                  (ValueString(body, null, null), indent)
-                case _ => (s, "")
+                case commandStartRegexp(indent, body) => (ValueString(body, null, null), indent)
+                case _                                => (s, "")
               }
             case other => (other, "")
           }
           lineGenerator.endLine()
 
           val bodyGenerator =
-            lineGenerator.derive(increaseIndent = true, newSpacing = Spacing.Off)
+            lineGenerator.derive(increaseIndent = true,
+                                 newSpacing = Spacing.Off,
+                                 newWrapping = Wrapping.Never)
           bodyGenerator.beginLine()
-          bodyGenerator.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true
-              )
-          )
 
           // Function to replace indenting in command block expressions with the current
           // indent level of the formatter
           val indentRegexp = s"\n${indent}".r
           val replacement = s"\n${bodyGenerator.currentIndent}"
           def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
+
+          bodyGenerator.append(
+              buildExpression(
+                  expr,
+                  placeholderOpen = Symbols.PlaceholderOpenTilde,
+                  inStringOrCommand = true,
+                  stringModifier = Some(replaceIndent)
+              )
+          )
 
           if (numParts > 2) {
             command.parts.slice(1, command.parts.size - 1).foreach { expr =>
@@ -897,7 +904,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                   command.parts.last match {
                     case ValueString(s, wdlType, text) =>
                       ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType, text)
-                    case other => other
+                    case other =>
+                      other
                   },
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
                   inStringOrCommand = true,
