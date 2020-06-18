@@ -36,14 +36,24 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
 
   private def generate(
       fname: String,
-      validate: Boolean = true
+      validateParse: Boolean = true,
+      validateContentSelf: Boolean = false,
+      validateContentFile: Boolean = false
   ): (TAT.Document, Vector[String], Option[TAT.Document]) = {
     val beforeUrl = getWdlUrl(fname = fname, subdir = "before")
-    val doc = parsers.parseDocument(beforeUrl)
+    val beforeSrc = SourceCode.loadFrom(beforeUrl)
+    val doc = parsers.parseDocument(beforeSrc)
     val (tDoc, _) = typeInfer.apply(doc)
     val generator = code.WdlV1Generator()
     val gLines = generator.generateDocument(tDoc)
-    val gtDoc = if (validate) {
+    if (validateContentSelf) {
+      gLines.mkString("\n") shouldBe beforeSrc.lines.mkString("\n")
+    } else if (validateContentFile) {
+      val afterUrl = getWdlUrl(fname = fname, subdir = "after")
+      val afterSrc = SourceCode.loadFrom(afterUrl)
+      gLines.mkString("\n") shouldBe afterSrc.lines.mkString("\n")
+    }
+    val gtDoc = if (validateParse) {
       val gDoc = parsers.parseDocument(SourceCode(None, gLines))
       Some(typeInfer.apply(gDoc)._1)
     } else {
@@ -94,5 +104,13 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
 
   it should "not wrap strings in command block" in {
     generate("library_syscall.wdl")
+  }
+
+  it should "correctly indent multi-line command that is a single ValueString" in {
+    generate("single_string_multiline_command.wdl", validateContentSelf = true)
+  }
+
+  it should "correctly indent single-line command" in {
+    generate("single_line_command.wdl", validateContentFile = true)
   }
 }

@@ -76,7 +76,9 @@ object BaseWdlGenerator {
       currentLine.length <= (currentIndentSteps * indentStep)
     }
 
-    def currentIndent: String = indentation * (currentIndentSteps * indentStep)
+    def getIndent(changeSteps: Int = 0): String = {
+      indentation * ((currentIndentSteps + changeSteps) * indentStep)
+    }
 
     def lengthRemaining: Int = {
       if (atLineStart) {
@@ -93,7 +95,7 @@ object BaseWdlGenerator {
 
     def beginLine(): Unit = {
       require(!isLineBegun)
-      currentLine.append(currentIndent)
+      currentLine.append(getIndent())
       lineBegun.value = true
     }
 

@@ -820,100 +820,105 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     // However, we do need to try to indent it correclty. We do this by detecting the amount
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineGenerator's current indent level.
-    private val commandStartRegexp = "(?s)^.*?[\n\r]+([ \\t]*)(.*)".r
-    private val commandEndRegexp = "\\s+$".r
-    private val commandSingletonRegexp = "(?s)^.*?[\n\r]*[ \\t]*(.*?)\\s*$".r
+    private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
+    private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
+    private val commandEndRegexp = "\n*\\s*$".r
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator.appendAll(
           Vector(Literal(Symbols.Command), Literal(Symbols.CommandOpen))
       )
       if (command.parts.nonEmpty) {
-        // The parser swallows anyting after the opening token ('{' or '<<<')
-        // as part of the comment block, so we need to parse out any in-line
-        // comment and append it separately
-        val numParts = command.parts.size
-        if (numParts == 1) {
-          val expr = command.parts.head match {
-            case s: ValueString =>
-              s.value match {
-                case commandSingletonRegexp(body) => ValueString(body, null, null)
-                case _                            => s
-              }
-            case other => other
-          }
-          lineGenerator.endLine()
+        lineGenerator.endLine()
 
-          val bodyGenerator =
-            lineGenerator.derive(increaseIndent = true,
-                                 newSpacing = Spacing.Off,
-                                 newWrapping = Wrapping.Never)
-          bodyGenerator.beginLine()
-          bodyGenerator.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true
-              )
-          )
-          bodyGenerator.endLine()
+        // The parser swallows anyting after the opening token ('{' or '<<<') as part of the comment
+        // block, so we need to parse out any in-line comment. Also determine whether we should try
+        // to trim off leading whitespace or just leave as-is.
+        val (headExpr: Expr, indent) = command.parts.head match {
+          case ValueString(value, wdlType, text) =>
+            value match {
+              case commandStartRegexp(first, rest) =>
+                first.trim match {
+                  case s
+                      if (
+                          s.isEmpty || s.startsWith("#")
+                      ) && rest.trim.isEmpty && command.parts.size == 1 =>
+                    // command block is empty
+                    (ValueString("", wdlType, text), None)
+                  case s if (s.isEmpty || s.startsWith("#")) && rest.trim.isEmpty =>
+                    // weird case, like there is a placeholder in the comment - we don't want to break
+                    // anything so we'll just format the whole block as-is
+                    (s, None)
+                  case s if s.isEmpty || s.startsWith("#") =>
+                    // opening line was empty or a comment
+                    val (ws, trimmedRest) = rest match {
+                      case leadingWhitespaceRegexp(ws, trimmedRest) => (Some(ws), trimmedRest)
+                      case _                                        => (None, rest)
+                    }
+                    // the first line will be indented, so we need to trim the indent from `rest`
+                    (ValueString(trimmedRest, wdlType, text), ws)
+                  case s if rest.trim.isEmpty =>
+                    // single-line expression
+                    (ValueString(s, wdlType, text), None)
+                  case s =>
+                    // opening line has some real content, so just trim any leading whitespace
+                    val ws = leadingWhitespaceRegexp
+                      .findFirstMatchIn(rest)
+                      .map(m => m.group(1))
+                    (ValueString(s"${s}\n${rest}", wdlType, text), ws)
+                }
+              case _ => throw new RuntimeException("sanity")
+            }
+          case other => (other, None)
+        }
+
+        def trimLast(last: Expr): Expr = {
+          last match {
+            case ValueString(s, wdlType, text) =>
+              // If the last part is just the whitespace before the close block, throw it out
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType, text)
+            case other =>
+              other
+          }
+        }
+
+        val newParts = if (command.parts.size == 1) {
+          Vector(trimLast(headExpr))
         } else {
-          val (expr, indent) = command.parts.head match {
-            case s: ValueString =>
-              s.value match {
-                case commandStartRegexp(indent, body) => (ValueString(body, null, null), indent)
-                case _                                => (s, "")
+          val last = Vector(trimLast(command.parts.last))
+          Vector(headExpr) ++ (
+              if (command.parts.size == 2) {
+                last
+              } else {
+                command.parts.slice(1, command.parts.size - 1) ++ last
               }
-            case other => (other, "")
-          }
-          lineGenerator.endLine()
+          )
+        }
 
-          val bodyGenerator =
-            lineGenerator.derive(increaseIndent = true,
-                                 newSpacing = Spacing.Off,
-                                 newWrapping = Wrapping.Never)
-          bodyGenerator.beginLine()
+        val bodyGenerator = lineGenerator.derive(increaseIndent = true,
+                                                 newSpacing = Spacing.Off,
+                                                 newWrapping = Wrapping.Never)
 
+        val replaceIndent = indent.map { ws =>
           // Function to replace indenting in command block expressions with the current
           // indent level of the formatter
-          val indentRegexp = s"\n${indent}".r
-          val replacement = s"\n${bodyGenerator.currentIndent}"
-          def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
+          val indentRegexp = s"\n${ws}".r
+          val replacement = s"\n${bodyGenerator.getIndent()}"
+          (s: String) => indentRegexp.replaceAllIn(s, replacement)
+        }
 
+        bodyGenerator.beginLine()
+        newParts.foreach { expr =>
           bodyGenerator.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
                   inStringOrCommand = true,
-                  stringModifier = Some(replaceIndent)
+                  stringModifier = replaceIndent
               )
           )
-
-          if (numParts > 2) {
-            command.parts.slice(1, command.parts.size - 1).foreach { expr =>
-              bodyGenerator.append(
-                  buildExpression(expr,
-                                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                                  inStringOrCommand = true,
-                                  stringModifier = Some(replaceIndent))
-              )
-            }
-          }
-          bodyGenerator.append(
-              buildExpression(
-                  command.parts.last match {
-                    case ValueString(s, wdlType, text) =>
-                      ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType, text)
-                    case other =>
-                      other
-                  },
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true,
-                  stringModifier = Some(replaceIndent)
-              )
-          )
-          bodyGenerator.endLine()
         }
+        bodyGenerator.endLine()
 
         lineGenerator.beginLine()
       }
