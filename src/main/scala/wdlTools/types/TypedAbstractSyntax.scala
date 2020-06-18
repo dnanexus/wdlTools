@@ -48,32 +48,42 @@ object TypedAbstractSyntax {
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
   //
+  sealed trait ExprPlaceholder extends Expr {
+    val value: Expr
+  }
   case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, wdlType: WdlType, text: TextSource)
-      extends Expr
+      extends ExprPlaceholder
   case class ExprPlaceholderDefault(default: Expr, value: Expr, wdlType: WdlType, text: TextSource)
-      extends Expr
+      extends ExprPlaceholder
   case class ExprPlaceholderSep(sep: Expr, value: Expr, wdlType: WdlType, text: TextSource)
-      extends Expr
+      extends ExprPlaceholder
 
   // operators on one argument
-  case class ExprUnaryPlus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprUnaryMinus(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprNegate(value: Expr, wdlType: WdlType, text: TextSource) extends Expr
+  sealed trait ExprOperator1 extends Expr {
+    val value: Expr
+  }
+  case class ExprUnaryPlus(value: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator1
+  case class ExprUnaryMinus(value: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator1
+  case class ExprNegate(value: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator1
 
   // operators on two arguments
-  case class ExprLor(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprLand(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprEqeq(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprLt(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprGte(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprNeq(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprLte(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprGt(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprAdd(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprSub(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprMod(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprMul(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprDivide(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends Expr
+  sealed trait ExprOperator2 extends Expr {
+    val a: Expr
+    val b: Expr
+  }
+  case class ExprLor(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprLand(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprEqeq(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprLt(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprGte(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprNeq(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprLte(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprGt(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprAdd(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprSub(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprMod(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprMul(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
+  case class ExprDivide(a: Expr, b: Expr, wdlType: WdlType, text: TextSource) extends ExprOperator2
 
   // Access an array element at [index]
   case class ExprAt(array: Expr, index: Expr, wdlType: WdlType, text: TextSource) extends Expr
