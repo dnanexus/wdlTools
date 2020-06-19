@@ -841,15 +841,15 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                 first.trim match {
                   case s
                       if (
-                          s.isEmpty || s.startsWith("#")
+                          s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
                     (ValueString("", wdlType, text), None)
-                  case s if (s.isEmpty || s.startsWith("#")) && rest.trim.isEmpty =>
+                  case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment - we don't want to break
                     // anything so we'll just format the whole block as-is
                     (s, None)
-                  case s if s.isEmpty || s.startsWith("#") =>
+                  case s if s.isEmpty || s.startsWith(Symbols.Comment) =>
                     // opening line was empty or a comment
                     val (ws, trimmedRest) = rest match {
                       case leadingWhitespaceRegexp(ws, trimmedRest) => (Some(ws), trimmedRest)

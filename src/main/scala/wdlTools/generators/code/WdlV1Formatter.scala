@@ -1199,9 +1199,12 @@ case class WdlV1Formatter(opts: Options) {
     // However, we do need to try to indent it correclty. We do this by detecting the amount
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineFormatter's current indent level.
-    private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
+    private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
+    private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
     private val commandEndRegexp = "\\s+$".r
-    private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
+    private val commentRegexp = "#+\\s*(.+)".r
+    //private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
+    //private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter.appendAll(
@@ -1211,95 +1214,98 @@ case class WdlV1Formatter(opts: Options) {
         // The parser swallows anyting after the opening token ('{' or '<<<')
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately
-        val numParts = command.parts.size
-        if (numParts == 1) {
-          val (expr, comment) = command.parts.head match {
-            case s: ValueString =>
-              s.value match {
-                case commandSingletonRegexp(comment, body) =>
-                  (ValueString(body, s.text), comment.trim)
-                case _ => (s, "")
-              }
-            case other => (other, "")
-          }
-          if (comment.nonEmpty && comment.startsWith(Symbols.Comment)) {
-            lineFormatter.addInlineComment(command.text.line, comment)
-          }
-          lineFormatter.endLine()
+        val (headExpr: Expr, indent, comment) = command.parts.head match {
+          case ValueString(value, text) =>
+            value match {
+              case commandStartRegexp(first, rest) =>
+                first.trim match {
+                  case s
+                      if (
+                          s.isEmpty || s.startsWith(Symbols.Comment)
+                      ) && rest.trim.isEmpty && command.parts.size == 1 =>
+                    // command block is empty
+                    (ValueString("", text), None, Some(s))
+                  case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
+                    // weird case, like there is a placeholder in the comment - we don't want to break
+                    // anything so we'll just format the whole block as-is
+                    (s, None, None)
+                  case s if s.isEmpty || s.startsWith(Symbols.Comment) =>
+                    // opening line was empty or a comment
+                    val (ws, trimmedRest) = rest match {
+                      case leadingWhitespaceRegexp(ws, trimmedRest) => (Some(ws), trimmedRest)
+                      case _                                        => (None, rest)
+                    }
+                    // the first line will be indented, so we need to trim the indent from `rest`
+                    (ValueString(trimmedRest, text), ws, Some(s))
+                  case s if rest.trim.isEmpty =>
+                    // single-line expression
+                    (ValueString(s, text), None, None)
+                  case s =>
+                    // opening line has some real content, so just trim any leading whitespace
+                    val ws = leadingWhitespaceRegexp
+                      .findFirstMatchIn(rest)
+                      .map(m => m.group(1))
+                    (ValueString(s"${s}\n${rest}", text), ws, None)
+                }
+              case _ => throw new RuntimeException("sanity")
+            }
+          case other => (other, None, None)
+        }
 
-          val bodyFormatter =
-            lineFormatter.derive(increaseIndent = true,
-                                 newSpacing = Spacing.Off,
-                                 newWrapping = Wrapping.Never)
-          bodyFormatter.beginLine()
-          bodyFormatter.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true
-              )
-          )
-          bodyFormatter.endLine()
+        def trimLast(last: Expr): Expr = {
+          last match {
+            case ValueString(s, text) =>
+              // If the last part is just the whitespace before the close block, throw it out
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""), text)
+            case other =>
+              other
+          }
+        }
+
+        val newParts = if (command.parts.size == 1) {
+          Vector(trimLast(headExpr))
         } else {
-          val (expr, comment, indent) = command.parts.head match {
-            case s: ValueString =>
-              s.value match {
-                case commandStartRegexp(comment, indent, body) =>
-                  (ValueString(body, s.text), comment.trim, indent)
-                case _ => (s, "", "")
+          val last = Vector(trimLast(command.parts.last))
+          Vector(headExpr) ++ (
+              if (command.parts.size == 2) {
+                last
+              } else {
+                command.parts.slice(1, command.parts.size - 1) ++ last
               }
-            case other => (other, "", "")
-          }
-          if (comment.nonEmpty && comment.startsWith(Symbols.Comment)) {
-            lineFormatter.addInlineComment(command.text.line, comment)
-          }
-          lineFormatter.endLine()
+          )
+        }
 
-          val bodyFormatter =
-            lineFormatter.derive(increaseIndent = true,
-                                 newSpacing = Spacing.Off,
-                                 newWrapping = Wrapping.Never)
-          bodyFormatter.beginLine()
+        comment match {
+          case Some(commentRegexp(commentContent)) =>
+            lineFormatter.addInlineComment(command.text.line, commentContent)
+          case _ => ()
+        }
+        lineFormatter.endLine()
 
+        val bodyFormatter = lineFormatter.derive(increaseIndent = true,
+                                                 newSpacing = Spacing.Off,
+                                                 newWrapping = Wrapping.Never)
+
+        val replaceIndent = indent.map { ws =>
           // Function to replace indenting in command block expressions with the current
           // indent level of the formatter
-          val indentRegexp = s"\n${indent}".r
-          val replacement = s"\n${bodyFormatter.currentIndent}"
-          def replaceIndent(s: String): String = indentRegexp.replaceAllIn(s, replacement)
+          val indentRegexp = s"\n${ws}".r
+          val replacement = s"\n${bodyFormatter.getIndent()}"
+          (s: String) => indentRegexp.replaceAllIn(s, replacement)
+        }
 
+        bodyFormatter.beginLine()
+        newParts.foreach { expr =>
           bodyFormatter.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
                   inStringOrCommand = true,
-                  stringModifier = Some(replaceIndent)
+                  stringModifier = replaceIndent
               )
           )
-
-          if (numParts > 2) {
-            command.parts.slice(1, command.parts.size - 1).foreach { expr =>
-              bodyFormatter.append(
-                  buildExpression(expr,
-                                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                                  inStringOrCommand = true,
-                                  stringModifier = Some(replaceIndent))
-              )
-            }
-          }
-          bodyFormatter.append(
-              buildExpression(
-                  command.parts.last match {
-                    case ValueString(s, text) =>
-                      ValueString(commandEndRegexp.replaceFirstIn(s, ""), text)
-                    case other => other
-                  },
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true,
-                  stringModifier = Some(replaceIndent)
-              )
-          )
-          bodyFormatter.endLine()
         }
+        bodyFormatter.endLine()
 
         lineFormatter.beginLine()
       }

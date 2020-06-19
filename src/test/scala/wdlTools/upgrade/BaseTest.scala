@@ -29,8 +29,6 @@ class BaseTest extends AnyFlatSpec with Matchers {
     val expected = Util.readFromFile(afterPath)
     val upgrader = code.Upgrader(opts)
     val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1)
-    println(documents(beforeURL).mkString("\n"))
-    println(expected)
     documents(beforeURL).mkString("\n") shouldBe expected
   }
 }
