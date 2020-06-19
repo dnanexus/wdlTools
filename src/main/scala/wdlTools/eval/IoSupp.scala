@@ -1,6 +1,6 @@
 package wdlTools.eval
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, IOException}
 import java.net.{HttpURLConnection, URI, URL}
 import java.nio.charset.Charset
 import java.nio.file._
@@ -52,6 +52,23 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
         throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}",
                                 text,
                                 docSourceUrl)
+    }
+  }
+
+  // Create an empty file if the given path does not already exist - used by stdout() and stderr()
+  def ensureFileExists(path: Path, name: String, text: TextSource): Unit = {
+    val file = path.toFile
+    if (!file.exists()) {
+      try {
+        file.createNewFile()
+      } catch {
+        case e: IOException =>
+          throw new EvalException(
+              s"${name} file ${file} does not exist and cannot be created: ${e.getMessage}",
+              text,
+              docSourceUrl
+          )
+      }
     }
   }
 

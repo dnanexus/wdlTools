@@ -7,7 +7,6 @@ import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
 import kantan.csv._
 import kantan.csv.ops._
 import spray.json._
-
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.WdlTypes._
@@ -221,12 +220,14 @@ case class Stdlib(opts: Options,
   // since: draft-1
   protected def stdout(args: Vector[V], text: TextSource): V_File = {
     assert(args.isEmpty)
+    iosp.ensureFileExists(evalCfg.stdout, "stdout", text)
     V_File(evalCfg.stdout.toString)
   }
 
   // since: draft-1
   protected def stderr(args: Vector[V], text: TextSource): V_File = {
     assert(args.isEmpty)
+    iosp.ensureFileExists(evalCfg.stderr, "stderr", text)
     V_File(evalCfg.stdout.toString)
   }
 

@@ -325,4 +325,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     evaluator.applyDeclarations(decls, Context(Map("i2" -> V_Null)))
   }
+
+  it should "handle empty stdout/stderr" in {
+    val file = srcDir.resolve("empty_stdout.wdl")
+    parseAndTypeCheck(file)
+  }
 }

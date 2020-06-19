@@ -45,6 +45,7 @@ trait FileAccessProtocol {
   * @param homeDir  the root directory for relative paths, and the root directory for search (glob).
   * @param tmpDir   directory for placing temporary files.
   * @param stdout   the file that has a copy of standard output. This is used in the command section.
+  *                 Must resolve to a file that either exists or is creatable.
   * @param stderr   as above for standard error.
   * @param protocols  protocols for accessing files. By default local-file and http protocols are provided.
   * @param encoding the encoding to use when reading files.
