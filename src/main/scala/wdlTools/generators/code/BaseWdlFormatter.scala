@@ -340,7 +340,7 @@ object BaseWdlFormatter {
       currentLineComments(line) = text
     }
 
-    def append(span: Span): Unit = {
+    def append(span: Span, continue: Boolean = true): Unit = {
       require(isLineBegun)
 
       if (atLineStart && sections.nonEmpty) {
@@ -348,7 +348,7 @@ object BaseWdlFormatter {
       }
 
       if (wrapping == Wrapping.Always) {
-        endLine(continue = true)
+        endLine(continue = continue)
         beginLine()
       } else {
         val addSpace = currentLine.nonEmpty &&
@@ -357,7 +357,7 @@ object BaseWdlFormatter {
           !currentLine.last.isWhitespace &&
           currentLine.last != indentation.last
         if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
-          endLine(continue = true)
+          endLine(continue = continue)
           beginLine()
         } else if (addSpace) {
           currentLine.append(" ")
@@ -387,8 +387,8 @@ object BaseWdlFormatter {
       }
     }
 
-    def appendAll(spans: Vector[Span]): Unit = {
-      spans.foreach(append)
+    def appendAll(spans: Vector[Span], continue: Boolean = true): Unit = {
+      spans.foreach(span => append(span, continue))
     }
 
     // TODO: these two methods are a hack - they are currently needed to handle the case of

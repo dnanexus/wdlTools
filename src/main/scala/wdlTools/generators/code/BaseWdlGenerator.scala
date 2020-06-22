@@ -130,10 +130,24 @@ object BaseWdlGenerator {
       skipNextSpace.value = false
     }
 
-    def append(sized: Sized): Unit = {
+    /**
+      * Append a single `sized`.
+      * @param sized the `sized` to append
+      * @param continue whether to continue the current indenting
+      * # true
+      * Int i = 1 +
+      *   (2 * 3) -
+      *   (4 / 5)
+      * # false
+      * {
+      *   x: 1,
+      *   y: 2
+      * }
+      */
+    def append(sized: Sized, continue: Boolean = true): Unit = {
       require(isLineBegun)
       if (wrapping == Wrapping.Always) {
-        endLine(continue = true)
+        endLine(continue = continue)
         beginLine()
       } else {
         val addSpace = currentLine.nonEmpty &&
@@ -142,7 +156,7 @@ object BaseWdlGenerator {
           !currentLine.last.isWhitespace &&
           currentLine.last != indentation.last
         if (wrapping != Wrapping.Never && lengthRemaining < sized.length + (if (addSpace) 1 else 0)) {
-          endLine(continue = true)
+          endLine(continue = continue)
           beginLine()
         } else if (addSpace) {
           currentLine.append(" ")
@@ -158,8 +172,8 @@ object BaseWdlGenerator {
       }
     }
 
-    def appendAll(spans: Vector[Sized]): Unit = {
-      spans.foreach(append)
+    def appendAll(sizeds: Vector[Sized], continue: Boolean = true): Unit = {
+      sizeds.foreach(sized => append(sized, continue))
     }
 
     // TODO: these two methods are a hack - they are currently needed to handle the case of

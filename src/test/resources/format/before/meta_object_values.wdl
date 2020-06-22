@@ -1,9 +1,5 @@
 version 1.0
 
-# adding a choices attr to the parameter_meta section for an input variable
-# should propogate that var to the interface
-
-# Correct
 task suggestion_values_cgrep {
     input {
         String pattern

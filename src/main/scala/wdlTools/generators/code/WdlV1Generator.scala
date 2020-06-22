@@ -23,7 +23,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private case class Sequence(sizeds: Vector[Sized],
                               wrapping: Wrapping = Wrapping.Never,
-                              spacing: Spacing = Spacing.Off)
+                              spacing: Spacing = Spacing.Off,
+                              continue: Boolean = true)
       extends Composite {
     require(sizeds.nonEmpty)
 
@@ -32,7 +33,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     )
 
     override def generateContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping).appendAll(sizeds)
+      lineGenerator
+        .derive(newSpacing = spacing, newWrapping = wrapping)
+        .appendAll(sizeds, continue)
     }
   }
 
@@ -49,26 +52,21 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     override def generateContents(lineGenerator: LineGenerator): Unit = {
       if (ends.isDefined) {
         val (prefix, suffix) = ends.get
-        val wrapAndIndentEnds = wrapping != Wrapping.Never && endLengths._1 > lineGenerator.lengthRemaining
-        if (wrapAndIndentEnds) {
-          lineGenerator.endLine(continue = true)
-          lineGenerator.beginLine()
-        }
         if (body.nonEmpty && (
                 wrapping == Wrapping.Always || (wrapping != Wrapping.Never && length > lineGenerator.lengthRemaining)
             )) {
           lineGenerator.append(prefix)
+          lineGenerator.endLine()
 
           val bodyGenerator = lineGenerator
-            .derive(increaseIndent = wrapAndIndentEnds,
+            .derive(increaseIndent = true,
                     continuing = true,
                     newSpacing = Spacing.On,
                     newWrapping = wrapping)
-          bodyGenerator.endLine(continue = true)
           bodyGenerator.beginLine()
           bodyGenerator.append(body.get)
+          bodyGenerator.endLine()
 
-          lineGenerator.endLine(continue = wrapAndIndentEnds)
           lineGenerator.beginLine()
           lineGenerator.append(suffix)
         } else {
@@ -90,7 +88,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
   private case class Container(items: Vector[Sized],
                                delimiter: Option[String] = None,
                                ends: Option[(Sized, Sized)] = None,
-                               override val wrapping: Wrapping = Wrapping.AsNeeded)
+                               override val wrapping: Wrapping = Wrapping.AsNeeded,
+                               continue: Boolean = true)
       extends Group(ends = ends, wrapping = wrapping) {
 
     override lazy val body: Option[Composite] = if (items.nonEmpty) {
@@ -107,7 +106,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                 case (item, _) => item
               },
               wrapping = wrapping,
-              spacing = Spacing.On
+              spacing = Spacing.On,
+              continue = continue
           )
       )
     } else {
@@ -124,7 +124,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     override def length: Int = key.length + delimiterLiteral.length + value.length + 1
 
     override def generateContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.appendAll(Vector(Sequence(Vector(key, delimiterLiteral)), value))
+      lineGenerator
+        .derive(newWrapping = Wrapping.Never, newSpacing = Spacing.On)
+        .appendAll(Vector(Sequence(Vector(key, delimiterLiteral)), value))
     }
   }
 
@@ -619,7 +621,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
         Container(
             value.map(buildMeta),
             Some(Symbols.ArrayDelimiter),
-            Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose))
+            Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
+            continue = false
         )
       case MetaValueObject(value, _) =>
         Container(
@@ -628,7 +631,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             }.toVector,
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ObjectOpen), Literal(Symbols.ObjectClose)),
-            Wrapping.Always
+            Wrapping.Always,
+            continue = false
         )
     }
   }
@@ -659,11 +663,12 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     private val rhs = buildMeta(value)
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator.appendAll(Vector(Sequence(lhs), rhs))
+      lineGenerator.derive(newWrapping = Wrapping.Never).appendAll(Vector(Sequence(lhs), rhs))
     }
   }
 
-  private case class MetaBlock(kvs: Map[String, MetaValue]) extends BlockStatement(Symbols.Meta) {
+  private case class MetaBlock(keyword: String, kvs: Map[String, MetaValue])
+      extends BlockStatement(keyword) {
     override def body: Option[Statement] =
       Some(Section(kvs.map {
         case (k, v) => MetaKVStatement(k, v)
@@ -807,8 +812,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             inputs,
             bodySection,
             outputs,
-            workflow.meta.map(meta => MetaBlock(meta.kvs)),
-            workflow.parameterMeta.map(paramMeta => MetaBlock(paramMeta.kvs))
+            workflow.meta.map(meta => MetaBlock(Symbols.Meta, meta.kvs)),
+            workflow.parameterMeta.map(paramMeta => MetaBlock(Symbols.ParameterMeta, paramMeta.kvs))
         ).flatten
       }
       Some(Section(statements, emtpyLineBetweenStatements = true))
@@ -973,8 +978,8 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             Some(CommandBlock(task.command)),
             outputs,
             task.runtime.map(RuntimeBlock),
-            task.meta.map(meta => MetaBlock(meta.kvs)),
-            task.parameterMeta.map(paramMeta => MetaBlock(paramMeta.kvs))
+            task.meta.map(meta => MetaBlock(Symbols.Meta, meta.kvs)),
+            task.parameterMeta.map(paramMeta => MetaBlock(Symbols.ParameterMeta, paramMeta.kvs))
         ).flatten
       }
       Some(Section(statements, emtpyLineBetweenStatements = true))

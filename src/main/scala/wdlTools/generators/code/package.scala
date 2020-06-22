@@ -7,7 +7,11 @@ object Indenting extends Enumeration {
 
 object Wrapping extends Enumeration {
   type Wrapping = Value
-  val Always, AsNeeded, Never = Value
+  val Never, // Never wrap adjacent statements
+  AsNeeded, // Wrap adjacent statements as needed (i.e. when the statement
+  // is longer than the maximum line length)
+  Always // Always wrap
+  = Value
 }
 
 object Spacing extends Enumeration {

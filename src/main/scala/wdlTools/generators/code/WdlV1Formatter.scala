@@ -116,7 +116,8 @@ case class WdlV1Formatter(opts: Options) {
 
   private case class SpanSequence(spans: Vector[Span],
                                   wrapping: Wrapping = Wrapping.Never,
-                                  spacing: Spacing = Spacing.Off)
+                                  spacing: Spacing = Spacing.Off,
+                                  continue: Boolean = true)
       extends Composite {
     require(spans.nonEmpty)
 
@@ -125,7 +126,9 @@ case class WdlV1Formatter(opts: Options) {
     )
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping).appendAll(spans)
+      lineFormatter
+        .derive(newSpacing = spacing, newWrapping = wrapping)
+        .appendAll(spans, continue)
     }
 
     override def line: Int = spans.head.line
@@ -201,7 +204,8 @@ case class WdlV1Formatter(opts: Options) {
   private abstract class Container(items: Vector[Span],
                                    delimiter: Option[String] = None,
                                    ends: Option[(Span, Span)] = None,
-                                   override val wrapping: Wrapping = Wrapping.AsNeeded)
+                                   override val wrapping: Wrapping = Wrapping.AsNeeded,
+                                   continue: Boolean = true)
       extends Group(ends = ends, wrapping = wrapping) {
 
     override lazy val body: Option[Composite] = if (items.nonEmpty) {
@@ -218,7 +222,8 @@ case class WdlV1Formatter(opts: Options) {
                 case (item, _) => item
               },
               wrapping = wrapping,
-              spacing = Spacing.On
+              spacing = Spacing.On,
+              continue = continue
           )
       )
     } else {
@@ -247,8 +252,13 @@ case class WdlV1Formatter(opts: Options) {
       ends: Option[(Span, Span)] = None,
       delimiter: Option[String] = None,
       override val bounds: TextSource,
-      override val wrapping: Wrapping = Wrapping.Never
-  ) extends Container(items, delimiter = delimiter, ends = ends, wrapping = wrapping)
+      override val wrapping: Wrapping = Wrapping.Never,
+      continue: Boolean = true
+  ) extends Container(items,
+                        delimiter = delimiter,
+                        ends = ends,
+                        wrapping = wrapping,
+                        continue = continue)
       with BoundedComposite
 
   private case class KeyValue(key: Span,
@@ -262,7 +272,9 @@ case class WdlV1Formatter(opts: Options) {
     override def length: Int = key.length + delimiterLiteral.length + value.length + 1
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      lineFormatter.appendAll(Vector(SpanSequence(Vector(key, delimiterLiteral)), value))
+      lineFormatter
+        .derive(newWrapping = Wrapping.Never, newSpacing = Spacing.On)
+        .appendAll(Vector(SpanSequence(Vector(key, delimiterLiteral)), value))
     }
   }
 
@@ -946,7 +958,8 @@ case class WdlV1Formatter(opts: Options) {
             Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text),
                  Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
             Some(Symbols.ArrayDelimiter),
-            text
+            text,
+            continue = false
         )
       case MetaValueObject(value, text) =>
         BoundedContainer(
@@ -958,7 +971,8 @@ case class WdlV1Formatter(opts: Options) {
                  Literal.fromEnd(Symbols.ObjectClose, text)),
             Some(Symbols.ArrayDelimiter),
             bounds = text,
-            Wrapping.Always
+            Wrapping.Always,
+            continue = false
         )
     }
   }
@@ -971,7 +985,7 @@ case class WdlV1Formatter(opts: Options) {
     private val rhs = buildMeta(value)
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      lineFormatter.appendAll(Vector(SpanSequence(lhs), rhs))
+      lineFormatter.derive(newWrapping = Wrapping.Never).appendAll(Vector(SpanSequence(lhs), rhs))
     }
   }
 

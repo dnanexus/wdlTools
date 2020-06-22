@@ -67,7 +67,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "handle object values in meta" in {
-    generate("meta_object_values.wdl")
+    generate("meta_object_values.wdl", validateContentFile = true)
   }
 
   it should "handle workflow with calls" in {
