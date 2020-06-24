@@ -48,10 +48,9 @@ object AbstractSyntax {
   case class ExprCompoundString(value: Vector[Expr], text: TextSource) extends Expr
   case class ExprPair(l: Expr, r: Expr, text: TextSource) extends Expr
   case class ExprArray(value: Vector[Expr], text: TextSource) extends Expr
-  case class ExprMapItem(key: Expr, value: Expr, text: TextSource) extends Expr
-  case class ExprMap(value: Vector[ExprMapItem], text: TextSource) extends Expr
-  case class ExprObjectMember(key: String, value: Expr, text: TextSource) extends Expr
-  case class ExprObject(value: Vector[ExprObjectMember], text: TextSource) extends Expr
+  case class ExprMember(key: Expr, value: Expr, text: TextSource) extends Expr
+  case class ExprMap(value: Vector[ExprMember], text: TextSource) extends Expr
+  case class ExprObject(value: Vector[ExprMember], text: TextSource) extends Expr
 
   // These are expressions of kind:
   //

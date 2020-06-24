@@ -524,7 +524,7 @@ case class WdlV1Formatter(opts: Options) {
       case ExprMap(value, text) =>
         BoundedContainer(
             value.map {
-              case ExprMapItem(k, v, itemText) =>
+              case ExprMember(k, v, itemText) =>
                 KeyValue(nested(k), nested(v), bounds = itemText)
             },
             Some(Literal.fromStart(Symbols.MapOpen, text), Literal.fromEnd(Symbols.MapClose, text)),
@@ -535,8 +535,8 @@ case class WdlV1Formatter(opts: Options) {
       case ExprObject(value, text) =>
         BoundedContainer(
             value.map {
-              case ExprObjectMember(k, v, memberText) =>
-                KeyValue(Literal.fromStart(k, memberText), nested(v), bounds = memberText)
+              case ExprMember(k, v, memberText) =>
+                KeyValue(nested(k), nested(v), bounds = memberText)
             },
             Some(Literal.fromStart(Symbols.ObjectOpen, text),
                  Literal.fromEnd(Symbols.ObjectClose, text)),

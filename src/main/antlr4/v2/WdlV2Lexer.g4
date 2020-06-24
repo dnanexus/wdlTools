@@ -40,6 +40,7 @@ FILE: 'File';
 DIRECTORY: 'Directory';
 ARRAY: 'Array';
 MAP: 'Map';
+OBJECTLITERAL: 'Object';
 PAIR: 'Pair';
 AFTER: 'after';
 COMMAND: 'command'-> mode(Command);

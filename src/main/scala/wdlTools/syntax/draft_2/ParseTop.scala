@@ -403,22 +403,31 @@ string
                                 getTextSource(ctx),
                                 grammar.docSourceUrl)
 
-    val m: Vector[ExprMapItem] = Vector.tabulate(n / 2) { i =>
+    val m: Vector[ExprMember] = Vector.tabulate(n / 2) { i =>
       val key = elements(2 * i)
       val value = elements(2 * i + 1)
-      ExprMapItem(key,
-                  value,
-                  TextSource(key.text.line, key.text.col, value.text.endLine, value.text.endCol))
+      ExprMember(key,
+                 value,
+                 TextSource(key.text.line, key.text.col, value.text.endLine, value.text.endCol))
     }
     ExprMapLiteral(m, getTextSource(ctx))
   }
 
+  override def visitObject_literal_key(ctx: WdlDraft2Parser.Object_literal_keyContext): Expr = {
+    if (ctx.Identifier() != null) {
+      val idNode = ctx.Identifier()
+      ExprString(getIdentifierText(idNode, ctx), getTextSource(idNode))
+    } else if (ctx.string() != null) {
+      visitString(ctx.string())
+    } else {
+      throw new RuntimeException(s"Invalid object literal key ${ctx}")
+    }
+  }
+
   // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
   override def visitObject_literal(ctx: WdlDraft2Parser.Object_literalContext): Expr = {
-    val ids: Vector[TerminalNode] = ctx
-      .Identifier()
-      .asScala
-      .toVector
+    val ids: Vector[Expr] = ctx.object_literal_key.asScala.toVector
+      .map(visitObject_literal_key)
     val elements: Vector[Expr] = ctx
       .expr()
       .asScala
@@ -427,11 +436,8 @@ string
     val members = ids.zip(elements).map { pair =>
       val id = pair._1
       val expr = pair._2
-      val textSource = TextSource(id.getSymbol.getLine,
-                                  id.getSymbol.getCharPositionInLine,
-                                  expr.text.endLine,
-                                  expr.text.endCol)
-      ExprObjectMember(id.getText, expr, textSource)
+      val textSource = TextSource(id.text.line, id.text.col, expr.text.endLine, expr.text.endCol)
+      ExprMember(id, expr, textSource)
     }
     ExprObjectLiteral(members, getTextSource(ctx))
   }

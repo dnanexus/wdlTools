@@ -295,7 +295,16 @@ case class Eval(opts: Options,
 
       case eObj: TAT.ExprObject =>
         V_Object(eObj.value.map {
-          case (k, v) => k -> apply(v, ctx)
+          case (k, v) =>
+            // an object literal key can be a string or identifier
+            val key = apply(k, ctx) match {
+              case V_String(s) => s
+              case _ =>
+                throw new EvalException(s"bad value ${k}, object literal key must be a string",
+                                        expr.text,
+                                        docSourceUrl)
+            }
+            key -> apply(v, ctx)
         })
 
       // ~{true="--yes" false="--no" boolean_value}
@@ -487,7 +496,7 @@ case class Eval(opts: Options,
       //
       // shortcut. The environment has a bindings for "x.a"
       case TAT.ExprGetName(TAT.ExprIdentifier(id, _: WdlTypes.T_Call, _), fieldName, _, _)
-          if (ctx.bindings contains s"$id.$fieldName") =>
+          if ctx.bindings contains s"$id.$fieldName" =>
         ctx.bindings(s"$id.$fieldName")
 
       // normal path, first, evaluate the expression "x" then access field "a"

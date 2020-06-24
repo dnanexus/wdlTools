@@ -40,7 +40,7 @@ object TypedAbstractSyntax {
   case class ExprPair(l: Expr, r: Expr, wdlType: WdlType, text: TextSource) extends Expr
   case class ExprArray(value: Vector[Expr], wdlType: WdlType, text: TextSource) extends Expr
   case class ExprMap(value: Map[Expr, Expr], wdlType: WdlType, text: TextSource) extends Expr
-  case class ExprObject(value: Map[String, Expr], wdlType: WdlType, text: TextSource) extends Expr
+  case class ExprObject(value: Map[Expr, Expr], wdlType: WdlType, text: TextSource) extends Expr
 
   // These are expressions of kind:
   //

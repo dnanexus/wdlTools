@@ -60,7 +60,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
 
   it should "parse GATK tasks" in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
     val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = parser.parseDocument(sourceCode)
 
@@ -69,7 +69,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
 
   it should "parse GATK joint genotyping workflow" taggedAs Edge in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
     val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = parser.parseDocument(sourceCode)
 

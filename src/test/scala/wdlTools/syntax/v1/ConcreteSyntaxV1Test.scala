@@ -516,7 +516,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
   it should "have real world GATK tasks" in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks-terra.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
     val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = getDocument(sourceCode)
 
@@ -526,7 +526,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
   it should "be able to handle GATK workflow" in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping-terra.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
     val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
     val doc = getDocument(sourceCode)
 
@@ -668,7 +668,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
           TypeMap(TypeString(_), TypeInt(_), _),
           Some(
               ExprMapLiteral(
-                  Vector(ExprMapItem(ExprString("hello", _), ExprInt(1, _), _)),
+                  Vector(ExprMember(ExprString("hello", _), ExprInt(1, _), _)),
                   _
               )
           ),
@@ -681,7 +681,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
           TypeObject(_),
           Some(
               ExprObjectLiteral(
-                  Vector(ExprObjectMember("foo", ExprInt(2, _), _)),
+                  Vector(ExprMember(ExprString("foo", _), ExprInt(2, _), _)),
                   _
               )
           ),

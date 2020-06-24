@@ -57,7 +57,11 @@ case class ParseAll(opts: Options,
           AST.ExprArray(vec.map(translateExpr), srcText)
         case CST.ExprMapLiteral(m, srcText) =>
           AST.ExprMap(m.map { item =>
-            AST.ExprMapItem(translateExpr(item.key), translateExpr(item.value), item.text)
+            AST.ExprMember(translateExpr(item.key), translateExpr(item.value), item.text)
+          }, srcText)
+        case CST.ExprObjectLiteral(m, srcText) =>
+          AST.ExprObject(m.map { member =>
+            AST.ExprMember(translateExpr(member.key), translateExpr(member.value), member.text)
           }, srcText)
 
         // operators on one argument

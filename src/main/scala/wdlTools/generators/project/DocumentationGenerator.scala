@@ -136,7 +136,9 @@ case class DocumentationGenerator(opts: Options) {
         value match {
           case ExprObject(value, text) =>
             DocumentationGenerator.MapValueDocumentation(
-                value.map(v => v.key -> getValueDocumentation(v.value, text.line)).toMap,
+                value
+                  .map(v => exprToString(v.key) -> getValueDocumentation(v.value, text.line))
+                  .toMap,
                 comment
             )
           case ExprMap(value, text) =>

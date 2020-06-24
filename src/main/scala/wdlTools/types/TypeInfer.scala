@@ -317,8 +317,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
 
       case AST.ExprObject(members, text) =>
         val members2 = members.map {
-          case AST.ExprObjectMember(key, value, _) =>
-            key -> applyExpr(value, bindings, ctx)
+          case AST.ExprMember(key, value, _) =>
+            applyExpr(key, bindings, ctx) -> applyExpr(value, bindings, ctx)
         }.toMap
         TAT.ExprObject(members2, T_Object, text)
 
@@ -327,7 +327,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), text)
 
       case AST.ExprMap(value, text) =>
-        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMapItem =>
+        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
           applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
