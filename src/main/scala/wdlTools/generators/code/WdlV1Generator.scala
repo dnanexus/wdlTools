@@ -364,7 +364,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       case ExprObject(value, _, _) =>
         Container(
             value.map {
-              case (k, v) => KeyValue(Literal(k), nested(v))
+              case (k, v) => KeyValue(nested(k), nested(v))
             }.toVector,
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ObjectOpen), Literal(Symbols.ObjectClose)),

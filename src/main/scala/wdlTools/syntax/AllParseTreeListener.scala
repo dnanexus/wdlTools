@@ -118,6 +118,8 @@ class AllParseTreeListener
   def exitIfthenelse(ctx: ParserRuleContext): Unit = {}
   def enterGet_name(ctx: ParserRuleContext): Unit = {}
   def exitGet_name(ctx: ParserRuleContext): Unit = {}
+  def enterObject_literal_key(ctx: ParserRuleContext): Unit = {}
+  def exitObject_literal_key(ctx: ParserRuleContext): Unit = {}
   def enterObject_literal(ctx: ParserRuleContext): Unit = {}
   def exitObject_literal(ctx: ParserRuleContext): Unit = {}
   def enterStruct_literal(ctx: ParserRuleContext): Unit = {
@@ -527,6 +529,12 @@ class AllParseTreeListener
   }
   override def exitGet_name(ctx: WdlDraft2Parser.Get_nameContext): Unit = {
     exitGet_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterObject_literal_key(ctx: WdlDraft2Parser.Object_literal_keyContext): Unit = {
+    enterObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitObject_literal_key(ctx: WdlDraft2Parser.Object_literal_keyContext): Unit = {
+    exitObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterObject_literal(ctx: WdlDraft2Parser.Object_literalContext): Unit = {
     enterObject_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1090,6 +1098,12 @@ class AllParseTreeListener
   override def exitGet_name(ctx: WdlV1Parser.Get_nameContext): Unit = {
     exitGet_name(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterObject_literal_key(ctx: WdlV1Parser.Object_literal_keyContext): Unit = {
+    enterObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitObject_literal_key(ctx: WdlV1Parser.Object_literal_keyContext): Unit = {
+    exitObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterObject_literal(ctx: WdlV1Parser.Object_literalContext): Unit = {
     enterObject_literal(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1643,6 +1657,18 @@ class AllParseTreeListener
   }
   override def exitUnarysigned(ctx: WdlV2Parser.UnarysignedContext): Unit = {
     exitUnarysigned(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterObject_literal_key(ctx: WdlV2Parser.Object_literal_keyContext): Unit = {
+    enterObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitObject_literal_key(ctx: WdlV2Parser.Object_literal_keyContext): Unit = {
+    exitObject_literal_key(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterObject_literal(ctx: WdlV2Parser.Object_literalContext): Unit = {
+    enterObject_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitObject_literal(ctx: WdlV2Parser.Object_literalContext): Unit = {
+    exitObject_literal(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMap_literal(ctx: WdlV2Parser.Map_literalContext): Unit = {
     enterMap_literal(ctx.asInstanceOf[ParserRuleContext])

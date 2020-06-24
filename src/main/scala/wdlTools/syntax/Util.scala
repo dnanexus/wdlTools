@@ -34,20 +34,18 @@ object Util {
       case ExprPair(l, r, _) => s"(${exprToString(l, callback)}, ${exprToString(r, callback)})"
       case ExprArray(value: Vector[Expr], _) =>
         "[" + value.map(x => exprToString(x, callback)).mkString(", ") + "]"
-      case ExprMap(value: Vector[ExprMapItem], _) =>
+      case ExprMember(key, value, _) =>
+        s"${exprToString(key, callback)} : ${exprToString(value, callback)}"
+      case ExprMap(value: Vector[ExprMember], _) =>
         val m = value
           .map(x => exprToString(x, callback))
           .mkString(", ")
         "{ " + m + " }"
-      case ExprMapItem(key, value, _) =>
-        s"${exprToString(key, callback)} : ${exprToString(value, callback)}"
-      case ExprObject(value: Vector[ExprObjectMember], _) =>
+      case ExprObject(value: Vector[ExprMember], _) =>
         val m = value
           .map(x => exprToString(x, callback))
           .mkString(", ")
         s"object($m)"
-      case ExprObjectMember(key, value, _) =>
-        s"${key} : ${exprToString(value, callback)}"
       // ~{true="--yes" false="--no" boolean_value}
       case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
         s"{true=${exprToString(t, callback)} false=${exprToString(f, callback)} ${exprToString(value, callback)}"

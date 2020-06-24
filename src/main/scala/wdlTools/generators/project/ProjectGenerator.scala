@@ -83,7 +83,17 @@ case class ProjectGenerator(opts: Options,
       case ValueBoolean(value, text) => MetaValueBoolean(value, text)
       case ExprArray(value, text)    => MetaValueArray(value.map(exprToMetaValue), text)
       case ExprObject(value, text) =>
-        MetaValueObject(value.map(x => MetaKV(x.key, exprToMetaValue(x.value), x.text)), text)
+        MetaValueObject(
+            value.map {
+              case ExprMember(key, value, text) =>
+                val keyStr = exprToMetaValue(key) match {
+                  case MetaValueString(s, _) => s
+                  case _                     => throw new Exception(s"Invalid meta object key ${key}")
+                }
+                MetaKV(keyStr, exprToMetaValue(value), text)
+            },
+            text
+        )
       case other => throw new Exception(s"Invalid meta value ${other}")
     }
   }

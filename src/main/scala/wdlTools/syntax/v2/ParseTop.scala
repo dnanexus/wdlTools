@@ -332,14 +332,43 @@ string
                                 getTextSource(ctx),
                                 grammar.docSourceUrl)
 
-    val m: Vector[ExprMapItem] = Vector.tabulate(n / 2) { i =>
+    val m: Vector[ExprMember] = Vector.tabulate(n / 2) { i =>
       val key = elements(2 * i)
       val value = elements(2 * i + 1)
-      ExprMapItem(key,
-                  value,
-                  TextSource(key.text.line, key.text.col, value.text.endLine, value.text.endCol))
+      ExprMember(key,
+                 value,
+                 TextSource(key.text.line, key.text.col, value.text.endLine, value.text.endCol))
     }
     ExprMapLiteral(m, getTextSource(ctx))
+  }
+
+  override def visitObject_literal_key(ctx: WdlV2Parser.Object_literal_keyContext): Expr = {
+    if (ctx.Identifier() != null) {
+      val idNode = ctx.Identifier()
+      ExprString(getIdentifierText(idNode, ctx), getTextSource(idNode))
+    } else if (ctx.string() != null) {
+      visitString(ctx.string())
+    } else {
+      throw new RuntimeException(s"Invalid object literal key ${ctx}")
+    }
+  }
+
+  // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  override def visitObject_literal(ctx: WdlV2Parser.Object_literalContext): Expr = {
+    val ids: Vector[Expr] = ctx.object_literal_key.asScala.toVector
+      .map(visitObject_literal_key)
+    val elements: Vector[Expr] = ctx
+      .expr()
+      .asScala
+      .map(x => visitExpr(x))
+      .toVector
+    val members = ids.zip(elements).map { pair =>
+      val id = pair._1
+      val expr = pair._2
+      val textSource = TextSource(id.text.line, id.text.col, expr.text.endLine, expr.text.endCol)
+      ExprMember(id, expr, textSource)
+    }
+    ExprObjectLiteral(members, getTextSource(ctx))
   }
 
   // | NOT expr #negate
@@ -519,6 +548,7 @@ string
       case array_literal: WdlV2Parser.Array_literalContext => visitArray_literal(array_literal)
       case pair_literal: WdlV2Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlV2Parser.Map_literalContext     => visitMap_literal(map_literal)
+      case obj_literal: WdlV2Parser.Object_literalContext  => visitObject_literal(obj_literal)
       case negate: WdlV2Parser.NegateContext               => visitNegate(negate)
       case unarysigned: WdlV2Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlV2Parser.AtContext                       => visitAt(at)
