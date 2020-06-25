@@ -4,11 +4,32 @@ import sbtassembly.AssemblyPlugin.autoImport._
 scalaVersion := "2.13.2"
 name := "wdlTools"
 organization := "com.dnanexus"
-// temporarily depend on scalate master until 1.9.6 is released (this is a scala 2.13.2 compatibility issue)
+homepage := Some(url("https://github.com/dnanexus-rnd/wdlTools"))
+scmInfo := Some(
+    ScmInfo(url("https://github.com/dnanexus-rnd/wdlTools"),
+            "git@github.com:dnanexus-rnd/wdlTools.git")
+)
+licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))
+publishMavenStyle := true
+
 val root = project.in(file("."))
 
+// disable publish with scala version, otherwise artifact name will include scala version
+// e.g wdlTools_2.11
+crossPaths := false
+
+// add sonatype repository settings
+// snapshot versions publish to sonatype snapshot repository
+// other versions publish to sonatype staging repository
+publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+)
+
 // reduce the maximum number of errors shown by the Scala compiler
-maxErrors := 7
+maxErrors := 20
 
 //coverageEnabled := true
 
