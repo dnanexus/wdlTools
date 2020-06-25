@@ -147,7 +147,7 @@ object Util {
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
-            case (k, v) => s"${k} : ${exprToString(v, callback)}"
+            case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
         s"object {$m2}"
