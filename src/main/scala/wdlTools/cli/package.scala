@@ -14,8 +14,7 @@ import org.rogach.scallop.{
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.Verbosity._
-import wdlTools.util.{BasicOptions, Options, Util}
+import wdlTools.util.{BasicOptions, Logger, Options, TraceLevel, Util}
 
 import scala.util.Try
 
@@ -75,14 +74,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * The verbosity level
       * @return
       */
-    def verbosity: Verbosity = {
-      if (this.verbose.getOrElse(default = false)) {
-        Verbose
-      } else if (this.quiet.getOrElse(default = false)) {
-        Quiet
-      } else {
-        Normal
-      }
+    def logger: Logger = {
+      val quiet = this.quiet.getOrElse(default = false)
+      val verbose = this.verbose.getOrElse(default = false)
+      Logger(quiet, if (verbose) TraceLevel.Verbose else TraceLevel.None)
     }
 
     def getOptions: Options
@@ -129,7 +124,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       BasicOptions(
           this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
           followImports = followImports(),
-          verbosity = verbosity,
+          logger = logger,
           antlr4Trace = antlr4Trace()
       )
     }
@@ -176,7 +171,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     def getOptions: TypeOptions = {
       TypeOptions(
           this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
-          verbosity = verbosity,
+          logger = logger,
           antlr4Trace = antlr4Trace(),
           typeChecking = regime()
       )
@@ -263,7 +258,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       TypeOptions(
           this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
           followImports = followImports(),
-          verbosity = verbosity,
+          logger = logger,
           antlr4Trace = antlr4Trace(),
           typeChecking = TypeCheckingRegime.Strict
       )
@@ -326,7 +321,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       BasicOptions(
           Vector(Util.getLocalPath(url()).getParent),
           followImports = typed(),
-          verbosity = verbosity,
+          logger = logger,
           antlr4Trace = antlr4Trace()
       )
     }
@@ -392,7 +387,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       trailArg[String](descr = "The project name - this will also be the name of the workflow")
 
     def getOptions: Options = {
-      BasicOptions(verbosity = verbosity)
+      BasicOptions(logger = logger)
     }
   }
   addSubcommand(generate)

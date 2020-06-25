@@ -4,7 +4,7 @@ import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.util.{Logger, Options}
 
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
@@ -18,7 +18,7 @@ object TypeCheckingRegime extends Enumeration {
   */
 case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        followImports: Boolean = true,
-                       verbosity: Verbosity.Verbosity = Verbosity.Normal,
+                       logger: Logger = Logger.Normal,
                        antlr4Trace: Boolean = false,
                        typeChecking: TypeCheckingRegime.TypeCheckingRegime =
                          TypeCheckingRegime.Moderate,

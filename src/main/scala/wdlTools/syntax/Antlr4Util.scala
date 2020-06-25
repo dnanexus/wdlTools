@@ -16,7 +16,7 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.{Options, Verbosity}
+import wdlTools.util.Options
 
 object Antlr4Util {
   def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
@@ -226,10 +226,8 @@ object Antlr4Util {
       // check if any errors were found
       val errors: Vector[SyntaxError] = errListener.getErrors
       if (errors.nonEmpty) {
-        if (opts.verbosity > Verbosity.Quiet) {
-          for (err <- errors) {
-            System.out.println(err)
-          }
+        if (!opts.logger.quiet) {
+          errors.foreach(err => opts.logger.warning(err.toString))
         }
         throw new SyntaxException(errors)
       }

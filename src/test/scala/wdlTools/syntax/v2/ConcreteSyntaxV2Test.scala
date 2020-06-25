@@ -4,16 +4,14 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{WdlVersion}
+import wdlTools.syntax.WdlVersion
 import wdlTools.syntax.v2.ConcreteSyntax._
-import wdlTools.util.Verbosity._
-import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)
   private val opts = BasicOptions(
-      antlr4Trace = false,
-      verbosity = Quiet,
+      logger = Logger.Quiet,
       localDirectories = Vector(sourcePath)
   )
 

@@ -8,7 +8,7 @@ import org.openwdl.wdl.parser.v1.{WdlV1Parser, WdlV1ParserBaseVisitor}
 import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.syntax.{CommentMap, SyntaxException, TextSource, WdlVersion}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.Options
 
 import scala.jdk.CollectionConverters._
 
@@ -990,9 +990,8 @@ task_input
         val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
         val text = decl.text
         val docPart = grammar.docSourceUrl.map(url => s" in ${url}").getOrElse("")
-        Util.warning(
-            s"Warning: '${varName}' appears in both input and output sections at ${text}${docPart}",
-            opts.verbosity
+        opts.logger.warning(
+            s"Warning: '${varName}' appears in both input and output sections at ${text}${docPart}"
         )
       }
     }

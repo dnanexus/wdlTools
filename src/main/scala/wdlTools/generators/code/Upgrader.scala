@@ -22,7 +22,7 @@ case class Upgrader(opts: Options) {
     val formatter = WdlV1Formatter(
         BasicOptions(
             opts.localDirectories,
-            verbosity = opts.verbosity,
+            logger = opts.logger,
             antlr4Trace = opts.antlr4Trace
         )
     )

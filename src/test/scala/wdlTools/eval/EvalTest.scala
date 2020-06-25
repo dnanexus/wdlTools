@@ -7,16 +7,15 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Verbosity, Util => UUtil}
+import wdlTools.util.{Logger, Util => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val opts =
     TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
-                antlr4Trace = false,
                 localDirectories = Vector(srcDir),
-                verbosity = Verbosity.Normal)
+                logger = Logger.Normal)
   private val parsers = Parsers(opts)
   private val typeInfer = TypeInfer(opts)
   private val linesep = System.lineSeparator()
@@ -71,8 +70,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("k0") shouldBe V_Int(-1)
     bindings("k1") shouldBe V_Int(1)
 
-    bindings("b1") shouldBe V_Boolean(true || false)
-    bindings("b2") shouldBe V_Boolean(true && false)
+    bindings("b1") shouldBe V_Boolean(true)
+    bindings("b2") shouldBe V_Boolean(false)
     bindings("b3") shouldBe V_Boolean(10 == 3)
     bindings("b4") shouldBe V_Boolean(4 < 8)
     bindings("b5") shouldBe V_Boolean(4 >= 8)

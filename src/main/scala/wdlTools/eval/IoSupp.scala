@@ -6,7 +6,7 @@ import java.nio.charset.Charset
 import java.nio.file._
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, Util, Verbosity}
+import wdlTools.util.{Options, Util}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
@@ -30,7 +30,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
           "file"
       }
 
-    if (opts.verbosity >= Verbosity.Verbose) {
+    if (opts.logger.isVerbose) {
       System.out.println(s"uri ${uri} has protocol ${protocol}")
     }
 
@@ -105,7 +105,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
     * @return the list of globbed paths
     */
   def glob(pattern: String): Vector[String] = {
-    if (opts.verbosity == Verbosity.Verbose) {
+    if (opts.logger.isVerbose) {
       System.out.println(s"glob(${pattern})")
     }
     val baseDir = evalCfg.homeDir
@@ -125,7 +125,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
           .toVector
         files.sorted
       }
-    if (opts.verbosity == Verbosity.Verbose) {
+    if (opts.logger.isVerbose) {
       System.out.println(s"""glob results=${retval.mkString("\n")}""")
     }
     retval

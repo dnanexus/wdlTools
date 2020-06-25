@@ -9,9 +9,11 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import com.typesafe.config.ConfigFactory
-import Verbosity._
 
+import scala.concurrent.{Await, Future, TimeoutException, blocking, duration}
+import scala.concurrent.ExecutionContext.Implicits._
 import scala.io.{Codec, Source}
+import scala.sys.process.{Process, ProcessLogger}
 
 object Util {
   // the spec states that WDL files must use UTF8 encoding
@@ -415,6 +417,44 @@ object Util {
     }
   }
 
+  // Run a child process and collect stdout and stderr into strings
+  def execCommand(cmdLine: String,
+                  timeout: Option[Int] = None,
+                  quiet: Boolean = false): (String, String) = {
+    val cmds = Seq("/bin/sh", "-c", cmdLine)
+    val outStream = new StringBuilder()
+    val errStream = new StringBuilder()
+    val logger = ProcessLogger(
+        (o: String) => { outStream.append(o ++ "\n") },
+        (e: String) => { errStream.append(e ++ "\n") }
+    )
+
+    val p: Process = Process(cmds).run(logger, connectInput = false)
+    timeout match {
+      case None =>
+        // blocks, and returns the exit code. Does NOT connect
+        // the standard in of the child job to the parent
+        val retcode = p.exitValue()
+        if (retcode != 0) {
+          if (!quiet) {
+            System.err.println(s"STDOUT: ${outStream.toString()}")
+            System.err.println(s"STDERR: ${errStream.toString()}")
+          }
+          throw new Exception(s"Error running command ${cmdLine}")
+        }
+      case Some(nSec) =>
+        val f = Future(blocking(p.exitValue()))
+        try {
+          Await.result(f, duration.Duration(nSec, "sec"))
+        } catch {
+          case _: TimeoutException =>
+            p.destroy()
+            throw new Exception(s"Timeout exceeded (${nSec} seconds)")
+        }
+    }
+    (outStream.toString(), errStream.toString())
+  }
+
   /**
     * Simple bi-directional Map class.
     * @param keys map keys
@@ -448,20 +488,9 @@ object Util {
     }
   }
 
-  def warning(msg: String, verbose: Verbosity): Unit = {
-    if (verbose == Quiet) {
-      return
-    }
-    System.err.println(Console.YELLOW + msg + Console.RESET)
-  }
-
   def error(msg: String): Unit = {
     System.err.println(Console.RED + msg + Console.RED)
   }
-
-  // ignore a value without causing a compilation error
-  // TODO: log this if antlr4Trace is turned on
-  def ignore[A](x: A): Unit = {}
 
   /**
     * A wrapper around a primitive that enables passing a mutable variable by reference.

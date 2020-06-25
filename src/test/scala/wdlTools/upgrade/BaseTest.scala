@@ -7,10 +7,10 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{BasicOptions, Util, Verbosity}
+import wdlTools.util.{BasicOptions, Logger, Util}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private lazy val opts = BasicOptions(verbosity = Verbosity.Verbose)
+  private lazy val opts = BasicOptions(logger = Logger.Verbose)
 
   def getBeforePath(fname: String): Path = {
     Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath)

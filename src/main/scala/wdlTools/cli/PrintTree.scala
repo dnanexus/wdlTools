@@ -21,7 +21,7 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
       }
       val typeChecker = TypeInfer(
           TypeOptions(localDirectories = opts.localDirectories,
-                      verbosity = opts.verbosity,
+                      logger = opts.logger,
                       antlr4Trace = opts.antlr4Trace)
       )
       println(Util.prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports)))

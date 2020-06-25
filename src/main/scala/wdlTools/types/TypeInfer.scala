@@ -959,9 +959,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
           case None if conf.allowNonWorkflowInputs =>
-            UUtil.warning(
-                s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
-                conf.verbosity
+            conf.logger.warning(
+                s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
             )
             Some(argName -> TAT.ValueNone(wdlType, call.text))
           case None =>

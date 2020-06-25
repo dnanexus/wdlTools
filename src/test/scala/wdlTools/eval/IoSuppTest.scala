@@ -8,15 +8,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
-import wdlTools.util.{Util, Verbosity}
+import wdlTools.util.{Logger, Util}
 
 class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval").getPath)
   private val opts =
     TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
-                antlr4Trace = false,
                 localDirectories = Vector(srcDir),
-                verbosity = Verbosity.Normal)
+                logger = Logger.Normal)
 
   private def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {

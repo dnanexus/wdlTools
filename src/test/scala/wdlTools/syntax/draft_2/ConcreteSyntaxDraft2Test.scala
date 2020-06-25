@@ -6,16 +6,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.util.Verbosity.Quiet
-import wdlTools.util.{BasicOptions, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
 
 class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val opts = BasicOptions(
-      antlr4Trace = false,
-      verbosity = Quiet,
+      logger = Logger.Quiet,
       localDirectories = Vector(tasksDir, workflowsDir)
   )
 
@@ -242,7 +240,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = opts.copy(verbosity = Quiet)
+    val confQuiet = opts.copy(logger = Logger.Quiet)
     assertThrows[Exception] {
       getDocument(getTaskSource("wrong_comment_style.wdl"), confQuiet)
     }

@@ -7,16 +7,14 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Verbosity, Util => UUtil}
+import wdlTools.util.{Logger, Util => UUtil}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
-      antlr4Trace = false,
       localDirectories = Vector(
           Paths.get(getClass.getResource("/types/v1").getPath)
       ),
-      verbosity = Verbosity.Quiet,
-      followImports = true
+      logger = Logger.Normal
   )
   private val parser = Parsers(opts)
 
@@ -92,7 +90,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       checker.apply(doc)
     } catch {
       case e: Throwable =>
-        UUtil.error(s"Type error in file ${file.toString}")
+        opts.logger.error(s"Type error in file ${file.toString}")
         throw e
     }
   }
@@ -203,10 +201,8 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "handle several struct definitions" taggedAs Edge in {
     val opts2 = TypeOptions(
-        antlr4Trace = false,
         localDirectories = Vector(structsDir),
-        verbosity = Verbosity.Quiet,
-        followImports = true
+        logger = Logger.Normal
     )
     val checker = TypeInfer(opts2)
     val sourceFile = UUtil.pathToUrl(structsDir.resolve("file3.wdl"))
