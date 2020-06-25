@@ -110,8 +110,11 @@ object Util {
     *                 Some(string), string is returned rather than the default formatting. This
     *                 can be used to provide custom formatting for some or all parts of a nested
     *                 expression.
+    * @param disableQuoting whether to disable quoting of strings
     */
-  def exprToString(expr: TAT.Expr, callback: Option[TAT.Expr => Option[String]] = None): String = {
+  def exprToString(expr: TAT.Expr,
+                   callback: Option[TAT.Expr => Option[String]] = None,
+                   disableQuoting: Boolean = false): String = {
     if (callback.isDefined) {
       val s = callback.get(expr)
       if (s.isDefined) {
@@ -125,10 +128,16 @@ object Util {
       case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
       case TAT.ValueInt(value, _, _)              => value.toString
       case TAT.ValueFloat(value, _, _)            => value.toString
-      case TAT.ValueString(value, _, _)           => s""""$value"""" // add double quotes around value
-      case TAT.ValueFile(value, _, _)             => s""""$value"""" // -"-
-      case TAT.ValueDirectory(value, _, _)        => s""""$value"""" // -"-
-      case TAT.ExprIdentifier(id: String, _, _)   => id
+
+      // add double quotes around string-like value unless disableQuoting = true
+      case TAT.ValueString(value, _, _) =>
+        if (disableQuoting) value else s""""$value""""
+      case TAT.ValueFile(value, _, _) =>
+        if (disableQuoting) value else s""""$value""""
+      case TAT.ValueDirectory(value, _, _) =>
+        if (disableQuoting) value else s""""$value""""
+
+      case TAT.ExprIdentifier(id: String, _, _) => id
 
       case TAT.ExprCompoundString(value, _, _) =>
         val vec = value.map(x => exprToString(x, callback)).mkString(", ")
@@ -147,7 +156,8 @@ object Util {
       case TAT.ExprObject(value, _, _) =>
         val m2 = value
           .map {
-            case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
+            case (k, v) =>
+              s"${exprToString(k, callback, disableQuoting = true)} : ${exprToString(v, callback)}"
           }
           .mkString(", ")
         s"object {$m2}"
