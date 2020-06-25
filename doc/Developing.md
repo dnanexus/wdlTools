@@ -101,7 +101,7 @@ Then you can add the dependency on the wdlTools SNAPSHOT version to your build.s
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.dnanexus" %% "wdlTools" % "0.1.0-SNAPSHOT",
+  "com.dnanexus" %% "wdlTools" % "0.1.0",
   ...
 )
 ```
