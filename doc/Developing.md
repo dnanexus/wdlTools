@@ -91,20 +91,22 @@ $ java -jar target/scala-2.13/wdlTools.jar ...
 
 ### Publishing to the local Ivy repository
 
-Currently, wdlTools is in pre-release. To enable development of libraries the depend on wdlTools (e.g. dxWDL), you can publish the wdlTools JAR to the local Ivy repository:
+To enable development of libraries the depend on wdlTools (e.g. dxWDL), you can publish the wdlTools JAR to the local Ivy repository:
 
 ```
 $ sbt publishLocal
 ```
 
-Then you can add the dependency on the wdlTools SNAPSHOT version to your build.sbt:
+### Releasing to Maven Central
 
-```scala
-libraryDependencies ++= Seq(
-  "com.dnanexus" %% "wdlTools" % "0.1.0",
-  ...
-)
-```
+1. Tag the release
+    ```
+    $ git tag -a "vX.Y.Z" -m "tag release vX.Y.Z"
+    ```
+2. Publish
+    ```
+    $ sbt publishSigned
+    ```
 
 ### Other sbt tips
 
