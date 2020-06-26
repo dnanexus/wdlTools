@@ -19,7 +19,7 @@ case class Docgen(conf: WdlToolsConf) extends Command {
     val title = conf.docgen.title.getOrElse(outputDir.getFileName.toString)
     val docgen = DocumentationGenerator(opts)
     val pages = docgen.apply(url, title)
-    Util.writeContentsToFiles(pages.map {
+    Util.writeFilesContents(pages.map {
       case (filename, contents) => outputDir.resolve(filename) -> contents
     }, overwrite)
   }

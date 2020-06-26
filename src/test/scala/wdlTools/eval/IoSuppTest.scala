@@ -74,7 +74,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     val p = Files.createTempFile("Y", ".txt")
     try {
       val buf = "hello bunny"
-      Util.writeStringToFile(buf, p, overwrite = true)
+      Util.writeFileContent(p, buf)
       val len = ioSupp.size(p.toString, dummyTextSource)
       len shouldBe buf.length
       val data = ioSupp.readFile(p.toString, dummyTextSource)
@@ -88,7 +88,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     val p = Files.createTempFile("Y", ".txt")
     val buf = "make Shasta full"
     try {
-      Util.writeStringToFile(buf, p, overwrite = true)
+      Util.writeFileContent(p, buf)
       val stdlib = Stdlib(opts, evalCfg, WdlVersion.V1, None)
       val retval = stdlib.call("size", Vector(WdlValues.V_String(p.toString)), dummyTextSource)
       inside(retval) {

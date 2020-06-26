@@ -1,14 +1,19 @@
 package wdlTools.util
 
-import java.io.{FileNotFoundException, IOException}
-
-import scala.jdk.CollectionConverters._
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileNotFoundException, IOException}
 import java.net.{MalformedURLException, URI, URL}
 import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
-
-import com.typesafe.config.ConfigFactory
+import java.nio.file.{
+  FileAlreadyExistsException,
+  FileVisitResult,
+  Files,
+  Path,
+  Paths,
+  SimpleFileVisitor
+}
+import java.util.Base64
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 
 import scala.concurrent.{Await, Future, TimeoutException, blocking, duration}
 import scala.concurrent.ExecutionContext.Implicits._
@@ -19,15 +24,6 @@ object Util {
   // the spec states that WDL files must use UTF8 encoding
   val DefaultEncoding: Charset = Codec.UTF8.charSet
   val DefaultLineSeparator: String = "\n"
-
-  /**
-    * The current wdlTools version.
-    * @return
-    */
-  def getVersion: String = {
-    val config = ConfigFactory.load("application.conf")
-    config.getString("wdlTools.version")
-  }
 
   /**
     * Convert a path or URI string to a `java.net.URI`. Handles the following types of URIs:
@@ -167,20 +163,23 @@ object Util {
   }
 
   /**
-    * Reads the lines from a file and concatenates the lines using the system line separator.
-    * @param path the path to the file
-    * @return
+    * Reads the entire contents of a file as a string. Line endings are not stripped or
+    * converted.
+    * @param path file path
+    * @return file contents as a string
     */
-  def readFromFile(path: Path): String = {
+  def readFileContent(path: Path): String = {
     new String(Files.readAllBytes(path), DefaultEncoding)
   }
 
   /**
-    * Reads the lines from a file
+    * Reads all the lines from a file and returns them as a Vector of strings. Lines have
+    * line-ending characters ([\r\n]) stripped off. Notably, there is no way to know if
+    * the last line originaly ended with a newline.
     * @param path the path to the file
     * @return a Seq of the lines from the file
     */
-  def readLinesFromFile(path: Path): Vector[String] = {
+  def readFileLines(path: Path): Vector[String] = {
     val source = Source.fromFile(path.toString, DefaultEncoding.name)
     try {
       source.getLines.toVector
@@ -196,30 +195,26 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeLinesToFiles(docs: Map[URL, Seq[String]],
-                        outputDir: Option[Path],
-                        overwrite: Boolean = false): Unit = {
+  def writeUrlLines(docs: Map[URL, Seq[String]],
+                    outputDir: Option[Path],
+                    overwrite: Boolean = false): Unit = {
     docs.foreach {
       case (url, lines) =>
         val outputPath = Util.getLocalPath(url, outputDir, overwrite)
-        Files.write(outputPath, lines.asJava, DefaultEncoding)
+        writeFileContent(outputPath, lines.mkString("\n"), overwrite)
     }
   }
 
-  def rmdir(dir: Path): Unit = {
-    Files.walkFileTree(
-        dir.toRealPath(),
-        new SimpleFileVisitor[Path] {
-          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-            Files.delete(file)
-            FileVisitResult.CONTINUE
-          }
-          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-            Files.delete(dir)
-            FileVisitResult.CONTINUE
-          }
-        }
-    )
+  /**
+    * Write a collection of documents, which is a map of Paths to contents, to disk by converting
+    * each URI to a local path.
+    * @param docs the documents to write
+    * @param overwrite whether it is okay to overwrite an existing file
+    */
+  def writeFilesContents(docs: Map[Path, String], overwrite: Boolean): Unit = {
+    docs.foreach {
+      case (outputPath, content) => writeFileContent(outputPath, content, overwrite)
+    }
   }
 
   /**
@@ -229,10 +224,10 @@ object Util {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def writeContentsToFiles(docs: Map[URL, String],
-                           outputDir: Option[Path],
-                           overwrite: Boolean): Unit = {
-    writeContentsToFiles(docs.map {
+  def writeUrlContents(docs: Map[URL, String],
+                       outputDir: Option[Path],
+                       overwrite: Boolean): Unit = {
+    writeFilesContents(docs.map {
       case (url, contents) =>
         val outputPath = Util.getLocalPath(url, outputDir, overwrite)
         outputPath -> contents
@@ -240,15 +235,17 @@ object Util {
   }
 
   /**
-    * Write a collection of documents, which is a map of Paths to contents, to disk by converting
-    * each URI to a local path.
-    * @param docs the documents to write
-    * @param overwrite whether it is okay to overwrite an existing file
+    * Write a String to a file.
+    * @param content the string to write
+    * @param path the path of the file
+    * @param overwrite whether to overwrite an existing file
     */
-  def writeContentsToFiles(docs: Map[Path, String], overwrite: Boolean): Unit = {
-    docs.foreach {
-      case (outputPath, contents) => writeStringToFile(contents, outputPath, overwrite)
+  def writeFileContent(path: Path, content: String, overwrite: Boolean = true): Unit = {
+    if (!overwrite && Files.exists(path)) {
+      throw new Exception(s"File already exists: ${path}")
     }
+    val parent = createDirectories(path.getParent)
+    Files.write(parent.resolve(path.getFileName), content.getBytes(DefaultEncoding))
   }
 
   /**
@@ -259,6 +256,13 @@ object Util {
     * @return the fully resolved and existing Path
     */
   def createDirectories(dir: Path): Path = {
+    if (Files.exists(dir)) {
+      if (Files.isDirectory(dir)) {
+        return dir.toRealPath()
+      } else {
+        throw new FileAlreadyExistsException(dir.toString)
+      }
+    }
     var parent: Path = dir
     var subdirs: Vector[String] = Vector.empty
     while (parent != null && !Files.exists(parent)) {
@@ -273,18 +277,68 @@ object Util {
     realDir
   }
 
-  /**
-    * Write a String to a file.
-    * @param contents the string to write
-    * @param path the path of the file
-    * @param overwrite whether to overwrite an existing file
-    */
-  def writeStringToFile(contents: String, path: Path, overwrite: Boolean): Unit = {
-    if (!overwrite && Files.exists(path)) {
-      throw new Exception(s"File already exists: ${path}")
+  def deleteRecursive(path: Path): Unit = {
+    if (Files.exists(path)) {
+      if (Files.isDirectory(path)) {
+        Files.walkFileTree(
+            path.toRealPath(),
+            new SimpleFileVisitor[Path] {
+              override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+                Files.delete(file)
+                FileVisitResult.CONTINUE
+              }
+
+              override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+                Files.delete(dir)
+                FileVisitResult.CONTINUE
+              }
+            }
+        )
+      } else {
+        Files.delete(path)
+      }
     }
-    val parent = createDirectories(path.getParent)
-    Files.write(parent.resolve(path.getFileName), contents.getBytes(DefaultEncoding))
+  }
+
+  // From: https://gist.github.com/owainlewis/1e7d1e68a6818ee4d50e
+  // By: owainlewis
+  def gzipCompress(input: Array[Byte]): Array[Byte] = {
+    val bos = new ByteArrayOutputStream(input.length)
+    val gzip = new GZIPOutputStream(bos)
+    gzip.write(input)
+    gzip.close()
+    val compressed = bos.toByteArray
+    bos.close()
+    compressed
+  }
+
+  def gzipDecompress(compressed: Array[Byte]): String = {
+    val inputStream = new GZIPInputStream(new ByteArrayInputStream(compressed))
+    scala.io.Source.fromInputStream(inputStream).mkString
+  }
+
+  def gzipAndBase64Encode(buf: String): String = {
+    val bytes = buf.getBytes
+    val gzBytes = gzipCompress(bytes)
+    Base64.getEncoder.encodeToString(gzBytes)
+  }
+
+  def base64DecodeAndGunzip(buf64: String): String = {
+    val ba: Array[Byte] = Base64.getDecoder.decode(buf64.getBytes)
+    gzipDecompress(ba)
+  }
+
+  // Add a suffix to a filename, before the regular suffix. For example:
+  //  xxx.wdl -> xxx.simplified.wdl
+  def replaceFileSuffix(src: Path, suffix: String): String = {
+    val fName = src.toFile.getName
+    val index = fName.lastIndexOf('.')
+    if (index == -1) {
+      fName + suffix
+    } else {
+      val prefix = fName.substring(0, index)
+      prefix + suffix
+    }
   }
 
   /**

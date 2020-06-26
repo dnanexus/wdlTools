@@ -28,7 +28,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   }
 
   def getWdlSource(fname: String, subdir: String): String = {
-    Util.readFromFile(getWdlPath(fname, subdir))
+    Util.readFileContent(getWdlPath(fname, subdir))
   }
 
   it should "reformat simple WDL" in {

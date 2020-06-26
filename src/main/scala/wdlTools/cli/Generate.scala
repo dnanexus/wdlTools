@@ -34,6 +34,6 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val tasks =
       args.task.map(_.map(taskName => TaskModel(Some(taskName))).toVector).getOrElse(Vector.empty)
     val generatedFiles = generator.apply(workflow, tasks)
-    Util.writeContentsToFiles(generatedFiles, Some(outputDir), args.overwrite())
+    Util.writeUrlContents(generatedFiles, Some(outputDir), args.overwrite())
   }
 }

@@ -130,7 +130,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   }
 
-  version(s"wdlTools ${Util.getVersion}")
+  version(s"wdlTools ${wdlTools.getVersion}")
   banner("""Usage: wdlTools <COMMAND> [OPTIONS]
            |Options:
            |""".stripMargin)

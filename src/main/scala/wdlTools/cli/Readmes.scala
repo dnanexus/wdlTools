@@ -18,8 +18,8 @@ case class Readmes(conf: WdlToolsConf) extends Command {
       (doc, results) =>
         results ++ ReadmeGenerator(conf.readmes.developerReadmes(), renderer).apply(doc)
     }
-    Util.writeContentsToFiles(readmes,
-                              outputDir = conf.readmes.outputDir.toOption,
-                              overwrite = conf.readmes.overwrite())
+    Util.writeUrlContents(readmes,
+                          outputDir = conf.readmes.outputDir.toOption,
+                          overwrite = conf.readmes.overwrite())
   }
 }

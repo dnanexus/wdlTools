@@ -26,7 +26,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
 
   it should "Upgrade draft-2 to v1.0" in {
     val (beforeURL, afterPath) = getBeforeAfterPair("simple.wdl")
-    val expected = Util.readFromFile(afterPath)
+    val expected = Util.readFileContent(afterPath)
     val upgrader = code.Upgrader(opts)
     val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1)
     documents(beforeURL).mkString("\n") shouldBe expected

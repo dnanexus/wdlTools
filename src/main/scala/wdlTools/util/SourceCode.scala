@@ -38,7 +38,7 @@ object SourceCode {
     val lines = url.getProtocol match {
       case "http"  => fetchHttpAddress(url)
       case "https" => fetchHttpAddress(url)
-      case "file"  => Util.readLinesFromFile(Paths.get(url.getPath))
+      case "file"  => Util.readFileLines(Paths.get(url.getPath))
       case _       => throw new Exception(s"unknown protocol in URL ${url}")
     }
 
