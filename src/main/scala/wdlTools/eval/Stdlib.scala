@@ -147,7 +147,8 @@ case class Stdlib(opts: Options,
       "floor" -> floor,
       "ceil" -> ceil,
       "round" -> round,
-      "glob" -> glob
+      "glob" -> glob,
+      "sep" -> sep
   )
 
   // choose the standard library prototypes according to the WDL version
@@ -920,5 +921,11 @@ case class Stdlib(opts: Options,
     V_Array(filenames.map { filepath =>
       V_File(filepath)
     })
+  }
+
+  protected def sep(args: Vector[V], text: TextSource): V_String = {
+    val separator = getWdlString(args(0), text)
+    val strings = getWdlVector(args(1), text).map(x => getWdlString(x, text))
+    V_String(strings.mkString(separator))
   }
 }

@@ -193,7 +193,8 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
       T_Function1("ceil", T_Float, T_Int),
       T_Function1("round", T_Float, T_Int),
       // not mentioned in the specification
-      T_Function1("glob", T_String, T_Array(T_File))
+      T_Function1("glob", T_String, T_Array(T_File)),
+      T_Function2("sep", T_String, T_Array(T_String), T_String)
   )
 
   // choose the standard library prototypes according to the WDL version
