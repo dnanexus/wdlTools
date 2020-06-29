@@ -1,44 +1,23 @@
 package wdlTools.eval
 
-import java.io.{ByteArrayOutputStream, IOException}
-import java.net.{HttpURLConnection, URI, URL}
-import java.nio.charset.Charset
+import java.io.IOException
+import java.net.{URI, URL}
 import java.nio.file._
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{FileAccessProtocol, Options, Util}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
 case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
-
-  /** Figure out which scheme should be used
-    *
-    *  For S3              s3://
-    *  For google cloud    gs://
-    *  For dnanexus        dx://
-    *
-    */
   def getProtocol(uri: URI, text: TextSource): FileAccessProtocol = {
-    val protocol =
-      try {
-        uri.getScheme
-      } catch {
-        case _: NullPointerException =>
-          "file"
-      }
-
-    if (opts.logger.isVerbose) {
-      System.out.println(s"uri ${uri} has protocol ${protocol}")
-    }
-
-    evalCfg.protocols.get(protocol) match {
-      case None =>
-        throw new EvalException(s"Protocol ${protocol} not supported", text, docSourceUrl)
-      case Some(proto) =>
-        proto
+    try {
+      FileAccessProtocol.getProtocol(uri, evalCfg.protocols, opts.logger)
+    } catch {
+      case e: FileAccessProtocol.NoSuchProtocolException =>
+        throw new EvalException(e.getMessage, text, docSourceUrl)
     }
   }
 
@@ -72,6 +51,41 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
     }
   }
 
+  // Download `pathOrUri` to `dest`. If `pathOrUri` is already a local file, this
+  // is a copy operation (unless `pathOrUri and `dest` are the same, in which case
+  // this is a noop).
+  def downloadFile(pathOrUri: String,
+                   dest: Path,
+                   overwrite: Boolean = false,
+                   text: TextSource): Path = {
+    val (realPath, isDirectory) = if (!Files.exists(dest)) {
+      Util.createDirectories(dest.getParent)
+      (dest, false)
+    } else if (Files.isDirectory(dest)) {
+      (dest.toRealPath(), true)
+    } else if (overwrite) {
+      opts.logger.warning(s"Deleting existing file ${dest}")
+      Files.delete(dest)
+      (dest, false)
+    } else {
+      throw new EvalException(
+          s"File ${dest} already exists and overwrite = false",
+          text,
+          docSourceUrl
+      )
+    }
+    val uri = Util.getUri(pathOrUri)
+    val proto = getProtocol(uri, text)
+    try {
+      proto.downloadFile(uri, realPath, isDirectory)
+    } catch {
+      case e: Throwable =>
+        throw new EvalException(s"error downloading file ${uri}, msg=${e.getMessage}",
+                                text,
+                                docSourceUrl)
+    }
+  }
+
   // Read the contents of the file/URL and return a string
   def readFile(pathOrUri: String, text: TextSource): String = {
     val uri = Util.getUri(pathOrUri)
@@ -80,7 +94,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
       proto.readFile(uri)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error read file ${pathOrUri}, msg=${e.getMessage}",
+        throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}",
                                 text,
                                 docSourceUrl)
     }
@@ -134,92 +148,5 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
   def mkTempFile(): Path = {
     val rndName = Random.alphanumeric.take(8).mkString("")
     evalCfg.tmpDir.resolve(rndName)
-  }
-}
-
-object IoSupp {
-  val MiB = BigDecimal(1024 * 1024)
-  val MaxFileSizeMiB = BigDecimal(256)
-
-  case class LocalFiles(encoding: Charset) extends FileAccessProtocol {
-    val prefixes = Vector("", "file")
-
-    def size(uri: URI): Long = {
-      val p = Paths.get(uri.getPath)
-      if (!Files.exists(p)) {
-        throw new FileSystemNotFoundException(s"File ${p} not found")
-      }
-      try {
-        p.toFile.length()
-      } catch {
-        case t: Throwable =>
-          throw new Exception(s"Error getting size of file ${uri}: ${t.getMessage}")
-      }
-    }
-
-    def readFile(uri: URI): String = {
-      // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(uri)) / MiB
-      if (fileSizeMiB > MaxFileSizeMiB) {
-        throw new Exception(
-            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
-        )
-      }
-      new String(Files.readAllBytes(Paths.get(uri.getPath)), encoding)
-    }
-  }
-
-  case class HttpProtocol(encoding: Charset) extends FileAccessProtocol {
-    val prefixes = Vector("http", "https")
-
-    // A url
-    // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
-    //
-    def size(uri: URI): Long = {
-      val url = uri.toURL
-      var conn: HttpURLConnection = null
-      try {
-        conn = url.openConnection().asInstanceOf[HttpURLConnection]
-        conn.setRequestMethod("HEAD")
-        conn.getContentLengthLong
-      } catch {
-        case t: Throwable =>
-          throw new Exception(s"Error getting size of URL ${url}: ${t.getMessage}")
-      } finally {
-        if (conn != null) {
-          conn.disconnect()
-        }
-      }
-    }
-
-    def readFile(uri: URI): String = {
-      // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(uri)) / MiB
-      if (fileSizeMiB > MaxFileSizeMiB)
-        throw new Exception(
-            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
-        )
-
-      val url = uri.toURL
-      val is = url.openStream()
-      val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
-
-      try {
-        // read all the bytes from the URL
-        var nRead = 0
-        val data = new Array[Byte](16384)
-
-        while (nRead > 0) {
-          nRead = is.read(data, 0, data.length)
-          if (nRead > 0)
-            buffer.write(data, 0, nRead)
-        }
-
-        new String(buffer.toByteArray, encoding)
-      } finally {
-        is.close()
-        buffer.close()
-      }
-    }
   }
 }

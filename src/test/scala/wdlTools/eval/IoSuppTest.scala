@@ -8,7 +8,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
-import wdlTools.util.{Logger, Util}
+import wdlTools.util.{FileAccessProtocol, Logger, Util}
 
 class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval").getPath)
@@ -31,6 +31,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     val prefixes = Vector("dx")
     def size(uri: URI): Long = ???
     def readFile(uri: URI): String = ???
+    override def downloadFile(uri: URI, dest: Path, isDirectory: Boolean): Path = ???
   }
 
   private lazy val evalCfg: EvalConfig = {
@@ -45,7 +46,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     EvalConfig.make(dirs(0), dirs(1), stdout, stderr, Vector(DxProtocol))
   }
 
-  private val ioSupp = new IoSupp(opts, evalCfg, None)
+  private val ioSupp = IoSupp(opts, evalCfg, None)
   private val dummyTextSource = TextSource(0, 0, 0, 0)
 
   it should "Figure out protocols" in {

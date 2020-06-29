@@ -1,10 +1,11 @@
 package wdlTools.eval
 
-import java.net.{URI, URL}
+import java.net.URL
 import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
 import wdlTools.syntax.TextSource
+import wdlTools.util.{FileAccessProtocol, Logger}
 
 import scala.io.Codec
 
@@ -18,26 +19,6 @@ case class Context(bindings: Map[String, WdlValues.V]) {
 // There is a standard library implementation for each WDL version.
 trait StandardLibraryImpl {
   def call(funcName: String, args: Vector[WdlValues.V], text: TextSource): WdlValues.V
-}
-
-// A protocol defined by the user. Intended for allowing access to
-// private/public clouds such as S3, Azure, or dnanexus. This has to be a web
-// protocol, meaning that the prefix has to include "://". Anything
-// else is considered a local file.
-//
-// PREFIX
-//   For S3              s3://
-//   For google cloud    gs://
-//   For dnanexus        dx://
-//
-trait FileAccessProtocol {
-  val prefixes: Vector[String]
-
-  // Get the size of the file in bytes
-  def size(uri: URI): Long
-
-  // Read the entire file into a string
-  def readFile(uri: URI): String
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
@@ -64,8 +45,11 @@ object EvalConfig {
            stdout: Path,
            stderr: Path,
            userProtos: Vector[FileAccessProtocol] = Vector.empty,
-           encoding: Charset = Codec.default.charSet): EvalConfig = {
-    val defaultProtos = Vector(IoSupp.LocalFiles(encoding), IoSupp.HttpProtocol(encoding))
+           encoding: Charset = Codec.default.charSet,
+           logger: Logger = Logger.Quiet): EvalConfig = {
+    val defaultProtos =
+      Vector(FileAccessProtocol.LocalFiles(encoding, logger),
+             FileAccessProtocol.HttpProtocol(encoding, logger))
     val allProtos = defaultProtos ++ userProtos
     val dispatchTbl: Map[String, FileAccessProtocol] =
       allProtos.flatMap { proto =>
