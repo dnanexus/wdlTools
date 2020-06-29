@@ -4,11 +4,12 @@ import java.net.URL
 import java.nio.file.Files
 
 import spray.json._
-import wdlTools.eval.IoSupp
+import wdlTools.eval.{EvalConfig, IoSupp}
 import wdlTools.syntax.TextSource
-import wdlTools.util.{TraceLevel, Util}
+import wdlTools.util.{Options, TraceLevel, Util}
 
-case class DockerUtils(ioSupp: IoSupp, docSourceUrl: Option[URL]) {
+case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
+  private val ioSupp = IoSupp(opts, evalCfg, docSourceUrl)
   private val logger = ioSupp.opts.logger
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
