@@ -5,8 +5,8 @@ import java.nio.file.{Files, Path}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval.{EvalConfig, IoSupp}
-import wdlTools.util.{BasicOptions, Logger}
+import wdlTools.eval.EvalConfig
+import wdlTools.util.{BasicOptions, Logger, StringFileSource}
 
 class ExecTest extends AnyFlatSpec with Matchers with Inside {
   private def safeMkdir(path: Path): Unit = {
@@ -30,10 +30,11 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
     val stderr = baseDir.resolve("stderr")
     EvalConfig.make(dirs(0), dirs(1), stdout, stderr)
   }
+
   private val opts = BasicOptions(logger = Logger.Quiet)
-  private val ioSupp = IoSupp(opts, evalCfg, None)
+  private val dummyFileSource = StringFileSource("foo")
+  private val dockerUtils = DockerUtils(opts, evalCfg, dummyFileSource)
   //private val dummyTextSource = TextSource(0, 0, 0, 0)
-  private val dockerUtils = DockerUtils(ioSupp, None)
 
   it should "read a docker manifest file" in {
     val buf = """|[

@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import java.net.URL
+import wdlTools.util.FileSource
 
 sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
@@ -77,15 +77,15 @@ object TextSource {
 
 // A syntax error that occured when parsing a document. It is generated
 // by the ANTLR machinery and we transform it into this format.
-final case class SyntaxError(docSourceUrl: Option[URL],
+final case class SyntaxError(fileSource: FileSource,
                              symbol: String,
                              textSource: TextSource,
                              reason: String)
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
-    this(SyntaxException.formatMessage(msg, text, docSourceUrl))
+  def this(msg: String, text: TextSource, docSource: FileSource) = {
+    this(SyntaxException.formatMessage(msg, text, docSource))
   }
   def this(errors: Seq[SyntaxError]) = {
     this(SyntaxException.formatMessageFromErrorList(errors))
@@ -93,17 +93,15 @@ final class SyntaxException(message: String) extends Exception(message) {
 }
 
 object SyntaxException {
-  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
-    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-    s"${msg} at ${text}${urlPart}"
+  def formatMessage(msg: String, text: TextSource, docSource: FileSource): String = {
+    s"${msg} at ${text} in ${docSource}"
   }
 
   def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
     // make one big report on all the syntax errors
     val messages = errors.map {
-      case SyntaxError(docSourceUrl, symbol, textSource, msg) =>
-        val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-        s"${msg} at ${symbol}${urlPart} ${textSource}"
+      case SyntaxError(docSource, symbol, textSource, msg) =>
+        s"${msg} at ${symbol} in ${docSource.toString} ${textSource}"
     }
     messages.mkString("\n")
   }

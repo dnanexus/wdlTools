@@ -22,7 +22,7 @@ case class ParseTop(opts: Options, grammar: WdlDraft2Grammar)
     extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
-      throw new SyntaxException("missing identifier", getTextSource(ctx), grammar.docSourceUrl)
+      throw new SyntaxException("missing identifier", getTextSource(ctx), grammar.docSource)
     }
     identifier.getText
   }
@@ -89,7 +89,7 @@ type_base
       return TypeFloat(getTextSource(ctx))
     throw new SyntaxException("sanity: unrecgonized type case",
                               getTextSource(ctx),
-                              grammar.docSourceUrl)
+                              grammar.docSource)
   }
 
   /*
@@ -115,9 +115,7 @@ wdl_type
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getTextSource(ctx))
     }
-    throw new SyntaxException("Not an integer nor a float",
-                              getTextSource(ctx),
-                              grammar.docSourceUrl)
+    throw new SyntaxException("Not an integer nor a float", getTextSource(ctx), grammar.docSource)
   }
 
   /* expression_placeholder_option
@@ -136,7 +134,7 @@ wdl_type
       else
         throw new SyntaxException("sanity: not a string or a number",
                                   getTextSource(ctx),
-                                  grammar.docSourceUrl)
+                                  grammar.docSource)
 
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
@@ -150,7 +148,7 @@ wdl_type
     }
     throw new SyntaxException(s"Not one of three known variants of a placeholder",
                               getTextSource(ctx),
-                              grammar.docSourceUrl)
+                              grammar.docSource)
   }
 
   // These are full expressions of the same kind
@@ -179,9 +177,7 @@ wdl_type
         case ExprPlaceholderPartSep(sep, _) =>
           return ExprPlaceholderSep(sep, expr, source)
         case _ =>
-          throw new SyntaxException("invalid place holder",
-                                    getTextSource(ctx),
-                                    grammar.docSourceUrl)
+          throw new SyntaxException("invalid place holder", getTextSource(ctx), grammar.docSource)
       }
     }
 
@@ -195,15 +191,13 @@ wdl_type
         case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
           throw new SyntaxException("invalid boolean place holder",
                                     getTextSource(ctx),
-                                    grammar.docSourceUrl)
+                                    grammar.docSource)
         case (_, _) =>
-          throw new SyntaxException("invalid place holder",
-                                    getTextSource(ctx),
-                                    grammar.docSourceUrl)
+          throw new SyntaxException("invalid place holder", getTextSource(ctx), grammar.docSource)
       }
     }
 
-    throw new SyntaxException("invalid place holder", getTextSource(ctx), grammar.docSourceUrl)
+    throw new SyntaxException("invalid place holder", getTextSource(ctx), grammar.docSource)
   }
 
   /* string_part
@@ -287,7 +281,7 @@ string
     }
     throw new SyntaxException("Not one of four supported variants of primitive_literal",
                               getTextSource(ctx),
-                              grammar.docSourceUrl)
+                              grammar.docSource)
   }
 
   override def visitLor(ctx: WdlDraft2Parser.LorContext): Expr = {
@@ -401,7 +395,7 @@ string
     if (n % 2 != 0)
       throw new SyntaxException("the expressions in a map must come in pairs",
                                 getTextSource(ctx),
-                                grammar.docSourceUrl)
+                                grammar.docSource)
 
     val m: Vector[ExprMember] = Vector.tabulate(n / 2) { i =>
       val key = elements(2 * i)
@@ -457,7 +451,7 @@ string
     else if (ctx.MINUS() != null)
       ExprUnaryMinus(expr, getTextSource(ctx))
     else
-      throw new SyntaxException("sanity", getTextSource(ctx), grammar.docSourceUrl)
+      throw new SyntaxException("sanity", getTextSource(ctx), grammar.docSource)
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -589,7 +583,7 @@ string
       visitChildren(ctx).asInstanceOf[Expr]
     } catch {
       case _: NullPointerException =>
-        throw new SyntaxException("bad expression", getTextSource(ctx), grammar.docSourceUrl)
+        throw new SyntaxException("bad expression", getTextSource(ctx), grammar.docSource)
     }
   }
 
@@ -636,7 +630,7 @@ unbound_decls
     if (ctx.wdl_type() == null)
       throw new SyntaxException("type missing in declaration",
                                 getTextSource(ctx),
-                                grammar.docSourceUrl)
+                                grammar.docSource)
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None, getTextSource(ctx))
@@ -651,7 +645,7 @@ bound_decls
     if (ctx.wdl_type() == null)
       throw new SyntaxException("type missing in declaration",
                                 getTextSource(ctx),
-                                grammar.docSourceUrl)
+                                grammar.docSource)
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
     if (ctx.expr() == null)
@@ -671,7 +665,7 @@ any_decls
       return visitUnbound_decls(ctx.unbound_decls())
     if (ctx.bound_decls() != null)
       return visitBound_decls(ctx.bound_decls())
-    throw new SyntaxException("bad declaration format", getTextSource(ctx), grammar.docSourceUrl)
+    throw new SyntaxException("bad declaration format", getTextSource(ctx), grammar.docSource)
   }
 
   /* meta_kv
@@ -815,7 +809,7 @@ any_decls
         throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it cannot appear more than once",
             getTextSource(ctx),
-            grammar.docSourceUrl
+            grammar.docSource
         )
     }
   }
@@ -830,7 +824,7 @@ any_decls
         throw new SyntaxException(
             s"section ${sectionName} appears ${n} times, it must appear exactly once",
             getTextSource(ctx),
-            grammar.docSourceUrl
+            grammar.docSource
         )
     }
   }
@@ -855,7 +849,7 @@ any_decls
     if (both.nonEmpty)
       throw new SyntaxException(s"${both} appears in both input and output sections",
                                 getTextSource(ctx),
-                                grammar.docSourceUrl)
+                                grammar.docSource)
 
     val ioVarNames = inputVarNames ++ outputVarNames
 
@@ -865,7 +859,7 @@ any_decls
           throw new SyntaxException(
               s"parameter ${k} does not appear in the input or output sections",
               getTextSource(ctx),
-              grammar.docSourceUrl
+              grammar.docSource
           )
     }
   }
@@ -1205,7 +1199,7 @@ document_element
       else
         Some(visitWorkflow(ctx.workflow()))
 
-    Document(grammar.docSourceUrl, grammar.docSource, elems, workflow, getTextSource(ctx), comments)
+    Document(grammar.docSource, elems, workflow, getTextSource(ctx), comments)
   }
 
   def visitExprDocument(ctx: WdlDraft2Parser.Expr_documentContext): Expr = {

@@ -1,8 +1,7 @@
 package wdlTools.types
 
-import java.net.URL
-
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
+import wdlTools.util.FileSource
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
@@ -274,8 +273,7 @@ object TypedAbstractSyntax {
       extends Element
       with Callable
 
-  case class Document(sourceUrl: Option[URL],
-                      sourceCode: String,
+  case class Document(source: FileSource,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

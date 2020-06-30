@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import java.net.URL
+import wdlTools.util.FileSource
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
@@ -197,8 +197,7 @@ object AbstractSyntax {
                       text: TextSource)
       extends Element
 
-  case class Document(sourceUrl: Option[URL],
-                      sourceCode: String,
+  case class Document(source: FileSource,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

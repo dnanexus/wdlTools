@@ -1,36 +1,34 @@
 package wdlTools.eval
 
 import java.io.IOException
-import java.net.{URI, URL}
 import java.nio.file._
 
 import wdlTools.syntax.TextSource
-import wdlTools.util.{FileAccessProtocol, Options, Util}
+import wdlTools.util.{FileSource, NoSuchProtocolException, Options, Util}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
-  def getProtocol(uri: URI, text: TextSource): FileAccessProtocol = {
+case class IoSupp(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
+  def getFileSource(uri: String, text: TextSource): FileSource = {
     try {
-      FileAccessProtocol.getProtocol(uri, evalCfg.protocols, opts.logger)
+      evalCfg.fileResolver.resolve(uri)
     } catch {
-      case e: FileAccessProtocol.NoSuchProtocolException =>
-        throw new EvalException(e.getMessage, text, docSourceUrl)
+      case e: NoSuchProtocolException =>
+        throw new EvalException(e.getMessage, text, docSource)
     }
   }
 
   def size(pathOrUri: String, text: TextSource): Long = {
-    val uri = Util.getUri(pathOrUri)
-    val proto = getProtocol(uri, text)
+    val file = getFileSource(pathOrUri, text)
     try {
-      proto.size(uri)
+      file.size
     } catch {
       case e: Throwable =>
         throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}",
                                 text,
-                                docSourceUrl)
+                                docSource)
     }
   }
 
@@ -45,7 +43,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
           throw new EvalException(
               s"${name} file ${file} does not exist and cannot be created: ${e.getMessage}",
               text,
-              docSourceUrl
+              docSource
           )
       }
     }
@@ -58,45 +56,43 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
                    dest: Path,
                    overwrite: Boolean = false,
                    text: TextSource): Path = {
-    val (realPath, isDirectory) = if (!Files.exists(dest)) {
+    val realPath = if (!Files.exists(dest)) {
       Util.createDirectories(dest.getParent)
-      (dest, false)
+      dest
     } else if (Files.isDirectory(dest)) {
-      (dest.toRealPath(), true)
+      dest.toRealPath()
     } else if (overwrite) {
       opts.logger.warning(s"Deleting existing file ${dest}")
       Files.delete(dest)
-      (dest, false)
+      dest
     } else {
       throw new EvalException(
           s"File ${dest} already exists and overwrite = false",
           text,
-          docSourceUrl
+          docSource
       )
     }
-    val uri = Util.getUri(pathOrUri)
-    val proto = getProtocol(uri, text)
+    val file = getFileSource(pathOrUri, text)
     try {
-      proto.downloadFile(uri, realPath, isDirectory)
+      file.localize(realPath)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error downloading file ${uri}, msg=${e.getMessage}",
+        throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}",
                                 text,
-                                docSourceUrl)
+                                docSource)
     }
   }
 
-  // Read the contents of the file/URL and return a string
+  // Read the contents of the file/URI and return a string
   def readFile(pathOrUri: String, text: TextSource): String = {
-    val uri = Util.getUri(pathOrUri)
-    val proto = getProtocol(uri, text)
+    val file = getFileSource(pathOrUri, text)
     try {
-      proto.readFile(uri)
+      file.readString
     } catch {
       case e: Throwable =>
         throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}",
                                 text,
-                                docSourceUrl)
+                                docSource)
     }
   }
 
@@ -110,7 +106,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
       case t: Throwable =>
         throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}",
                                 text,
-                                docSourceUrl)
+                                docSource)
     }
   }
 

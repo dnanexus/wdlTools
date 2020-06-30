@@ -1,6 +1,5 @@
 package wdlTools.eval
 
-import java.net.URL
 import java.nio.file.{Path, Paths}
 
 import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
@@ -10,19 +9,16 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
+import wdlTools.util.{FileSource, Options}
 
 import scala.io.Source
 
-case class Stdlib(opts: Options,
-                  evalCfg: EvalConfig,
-                  version: WdlVersion,
-                  docSourceUrl: Option[URL])
+case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion, docSource: FileSource)
     extends StandardLibraryImpl {
   type FunctionImpl = (Vector[WdlValues.V], TextSource) => V
 
-  protected val coercion: Coercion = Coercion(docSourceUrl)
-  protected val iosp: IoSupp = IoSupp(opts, evalCfg, docSourceUrl)
+  protected val coercion: Coercion = Coercion(docSource)
+  protected val iosp: IoSupp = IoSupp(opts, evalCfg, docSource)
 
   private val draft2FuncTable: Map[String, FunctionImpl] = Map(
       "stdout" -> stdout,
@@ -161,7 +157,7 @@ case class Stdlib(opts: Options,
 
   def call(funcName: String, args: Vector[V], text: TextSource): V = {
     if (!(funcTable contains funcName))
-      throw new EvalException(s"stdlib function ${funcName} not implemented", text, docSourceUrl)
+      throw new EvalException(s"stdlib function ${funcName} not implemented", text, docSource)
     val impl = funcTable(funcName)
     try {
       impl(args, text)
@@ -172,7 +168,7 @@ case class Stdlib(opts: Options,
         val msg = s"""|calling stdlib function ${funcName} with arguments ${args}
                       |${e.getMessage}
                       |""".stripMargin
-        throw new EvalException(msg, text, docSourceUrl)
+        throw new EvalException(msg, text, docSource)
     }
   }
 
@@ -200,21 +196,21 @@ case class Stdlib(opts: Options,
   protected def getWdlVector(value: V, text: TextSource): Vector[V] = {
     value match {
       case V_Array(ar) => ar
-      case other       => throw new EvalException(s"${other} should be an array", text, docSourceUrl)
+      case other       => throw new EvalException(s"${other} should be an array", text, docSource)
     }
   }
 
   protected def getWdlMap(value: V, text: TextSource): Map[V, V] = {
     value match {
       case V_Map(m) => m
-      case other    => throw new EvalException(s"${other} should be a map", text, docSourceUrl)
+      case other    => throw new EvalException(s"${other} should be a map", text, docSource)
     }
   }
 
   protected def getWdlPair(value: V, text: TextSource): (V, V) = {
     value match {
       case V_Pair(l, r) => (l, r)
-      case other        => throw new EvalException(s"${other} should be a pair", text, docSourceUrl)
+      case other        => throw new EvalException(s"${other} should be a pair", text, docSource)
     }
   }
 
@@ -254,7 +250,7 @@ case class Stdlib(opts: Options,
     val reader = content.asCsvReader[Vector[String]](tsvConf)
     V_Array(reader.map {
       case Left(err) =>
-        throw new EvalException(s"Invalid tsv file ${file}: ${err}", text, docSourceUrl)
+        throw new EvalException(s"Invalid tsv file ${file}: ${err}", text, docSource)
       case Right(row) => V_Array(row.map(x => V_String(x)))
     }.toVector)
   }
@@ -271,7 +267,7 @@ case class Stdlib(opts: Options,
         reader
           .map {
             case Left(err) =>
-              throw new EvalException(s"Invalid tsv file ${file}: ${err}", text, docSourceUrl)
+              throw new EvalException(s"Invalid tsv file ${file}: ${err}", text, docSource)
             case Right((key, value)) => V_String(key) -> V_String(value)
           }
           .toVector
@@ -301,7 +297,7 @@ case class Stdlib(opts: Options,
         throw new EvalException(
             s"read_object : file ${file.toString} must contain exactly two lines",
             text,
-            docSourceUrl
+            docSource
         )
     }
   }
@@ -325,7 +321,7 @@ case class Stdlib(opts: Options,
     if (lines.size < 2) {
       throw new EvalException(s"read_object : file ${file.toString} must contain at least two",
                               text,
-                              docSourceUrl)
+                              docSource)
     }
     val keys = lines.head
     V_Array(lines.tail.map(values => kvToObject(keys, values, text)))
@@ -340,7 +336,7 @@ case class Stdlib(opts: Options,
              |must be the same as the number of values (${values.size})""".stripMargin
             .replace("\t", " "),
           text,
-          docSourceUrl
+          docSource
       )
     }
     // Note all the values are going to be strings here. This probably isn't what the user wants.
@@ -362,7 +358,7 @@ case class Stdlib(opts: Options,
       Serialize.fromJson(content.parseJson)
     } catch {
       case e: JsonSerializationException =>
-        throw new EvalException(e.getMessage, text, docSourceUrl)
+        throw new EvalException(e.getMessage, text, docSource)
     }
   }
 
@@ -377,7 +373,7 @@ case class Stdlib(opts: Options,
       V_Int(content.trim.toInt)
     } catch {
       case _: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to an integer", text, docSourceUrl)
+        throw new EvalException(s"could not convert (${content}) to an integer", text, docSource)
     }
   }
 
@@ -412,7 +408,7 @@ case class Stdlib(opts: Options,
       V_Float(content.trim.toDouble)
     } catch {
       case _: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to a float", text, docSourceUrl)
+        throw new EvalException(s"could not convert (${content}) to a float", text, docSource)
     }
   }
 
@@ -427,7 +423,7 @@ case class Stdlib(opts: Options,
       case "false" => V_Boolean(false)
       case "true"  => V_Boolean(true)
       case _ =>
-        throw new EvalException(s"could not convert (${content}) to a boolean", text, docSourceUrl)
+        throw new EvalException(s"could not convert (${content}) to a boolean", text, docSource)
     }
   }
 
@@ -444,7 +440,7 @@ case class Stdlib(opts: Options,
         case other =>
           throw new EvalException(s"write_lines: element ${other} should be a string",
                                   text,
-                                  docSourceUrl)
+                                  docSource)
       }
       // note: '\n' line endings explicitly specified in the spec
       .mkString("\n")
@@ -469,11 +465,11 @@ case class Stdlib(opts: Options,
             val row = a.map {
               case V_String(s) => s
               case other =>
-                throw new EvalException(s"${other} should be a string", text, docSourceUrl)
+                throw new EvalException(s"${other} should be a string", text, docSource)
             }
             writer.write(row)
           case other =>
-            throw new EvalException(s"${other} should be an array", text, docSourceUrl)
+            throw new EvalException(s"${other} should be an array", text, docSource)
         }
     } finally {
       writer.close()
@@ -495,7 +491,7 @@ case class Stdlib(opts: Options,
         .foreach {
           case (V_String(key), V_String(value)) => writer.write((key, value))
           case (k, v) =>
-            throw new EvalException(s"${k} ${v} should both be strings", text, docSourceUrl)
+            throw new EvalException(s"${k} ${v} should both be strings", text, docSource)
         }
     } finally {
       writer.close()
@@ -536,7 +532,7 @@ case class Stdlib(opts: Options,
     val objs = coercion.coerceTo(T_Array(T_Object), args.head, text).asInstanceOf[V_Array]
     val objArray = objs.value.asInstanceOf[Vector[V_Object]]
     if (objArray.isEmpty) {
-      throw new EvalException("write_objects: empty input array", text, docSourceUrl)
+      throw new EvalException("write_objects: empty input array", text, docSource)
     }
 
     // check that all objects have the same keys
@@ -547,7 +543,7 @@ case class Stdlib(opts: Options,
         throw new EvalException(
             "write_objects: the keys are not the same for all objects in the array",
             text,
-            docSourceUrl
+            docSource
         )
     }
 
@@ -572,7 +568,7 @@ case class Stdlib(opts: Options,
         Serialize.toJson(args.head)
       } catch {
         case e: JsonSerializationException =>
-          throw new EvalException(e.getMessage, text, docSourceUrl)
+          throw new EvalException(e.getMessage, text, docSource)
       }
     val tmpFile: Path = iosp.mkTempFile()
     iosp.writeFile(tmpFile, jsv.prettyPrint, text)
@@ -603,7 +599,7 @@ case class Stdlib(opts: Options,
       case e: EvalException =>
         throw e
       case e: Throwable =>
-        throw new EvalException(s"size(${arg}  msg=${e.getMessage})", text, docSourceUrl)
+        throw new EvalException(s"size(${arg}  msg=${e.getMessage})", text, docSource)
     }
   }
 
@@ -619,7 +615,7 @@ case class Stdlib(opts: Options,
       case "mib" => 1024d * 1024d
       case "gib" => 1024d * 1024d * 1024d
       case "tib" => 1024d * 1024d * 1024d * 1024d
-      case _     => throw new EvalException(s"Unknown unit ${sUnit}", text, docSourceUrl)
+      case _     => throw new EvalException(s"Unknown unit ${sUnit}", text, docSource)
     }
   }
 
@@ -639,7 +635,7 @@ case class Stdlib(opts: Options,
         val nBytes = sizeCore(args.head, text)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
-        throw new EvalException("size: called with wrong number of arguments", text, docSourceUrl)
+        throw new EvalException("size: called with wrong number of arguments", text, docSource)
     }
   }
 
@@ -821,7 +817,7 @@ case class Stdlib(opts: Options,
   }
 
   private def getStringVector(arg: V, text: TextSource): Vector[String] = {
-    getWdlVector(arg, text).map(vw => Serialize.primitiveValueToString(vw, text, docSourceUrl))
+    getWdlVector(arg, text).map(vw => Serialize.primitiveValueToString(vw, text, docSource))
   }
 
   // X select_first(Array[X?])
@@ -838,7 +834,7 @@ case class Stdlib(opts: Options,
       case x             => Some(x)
     }
     if (values.isEmpty)
-      throw new EvalException("select_first: found no non-null elements", text, docSourceUrl)
+      throw new EvalException("select_first: found no non-null elements", text, docSource)
     values.head
   }
 
@@ -872,7 +868,7 @@ case class Stdlib(opts: Options,
       case V_File(s)   => s
       case V_String(s) => s
       case other =>
-        throw new EvalException(s"${other} must be a string or a file type", text, docSourceUrl)
+        throw new EvalException(s"${other} must be a string or a file type", text, docSource)
     }
     Paths.get(filePath).getFileName.toString
   }
@@ -892,7 +888,7 @@ case class Stdlib(opts: Options,
         val suff = getWdlString(args(1), text)
         V_String(s.stripSuffix(suff))
       case _ =>
-        throw new EvalException(s"basename: wrong number of arguments", text, docSourceUrl)
+        throw new EvalException(s"basename: wrong number of arguments", text, docSource)
     }
   }
 

@@ -9,15 +9,15 @@ import wdlTools.util.{Util => UUtil}
 
 /**
   * Type inference
-  * @param conf options
+  * @param opts options
   * @param errorHandler optional error handler function. If defined, it is called every time a type-checking
   *                     error is encountered. If it returns false, type inference will proceed even if it
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
-  private val unify = Unification(conf)
-  private val regime = conf.typeChecking
+case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
+  private val unify = Unification(opts)
+  private val regime = opts.typeChecking
   private var errors = Vector.empty[TypeError]
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -50,7 +50,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   }
 
   private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
-    errors = errors :+ TypeError(ctx.docSourceUrl, textSource, reason)
+    errors = errors :+ TypeError(ctx.docSource, textSource, reason)
   }
 
   // The add operation is overloaded.
@@ -386,7 +386,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         if (se.wdlType != T_String)
           throw new TypeException(s"separator ${exprToString(se)} must have string type",
                                   text,
-                                  ctx.docSourceUrl)
+                                  ctx.docSource)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
           case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
@@ -674,7 +674,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     tDecls.map { tDecl =>
       tDecl.expr match {
         case None =>
-          throw new TypeException("Outputs must have expressions", tDecl.text, ctx.docSourceUrl)
+          throw new TypeException("Outputs must have expressions", tDecl.text, ctx.docSource)
         case Some(expr) =>
           TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.text)
       }
@@ -717,7 +717,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           throw new TypeException(
               s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
               text,
-              ctx.docSourceUrl
+              ctx.docSource
           )
         }
         id -> tExpr
@@ -958,8 +958,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     val missingInputs = callee.input.flatMap {
       case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
-          case None if conf.allowNonWorkflowInputs =>
-            conf.logger.warning(
+          case None if opts.allowNonWorkflowInputs =>
+            opts.logger.warning(
                 s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
             )
             Some(argName -> TAT.ValueNone(wdlType, call.text))
@@ -1181,8 +1181,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
     val initCtx = Context(
         version = doc.version.value,
-        stdlib = Stdlib(conf, doc.version.value),
-        docSourceUrl = doc.sourceUrl
+        stdlib = Stdlib(opts, doc.version.value),
+        docSource = doc.source
     )
 
     // translate each of the elements in the document
@@ -1216,7 +1216,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
               // will be named:
               //    stdlib
               //    C
-              UUtil.getFilename(addr, ".wdl")
+              UUtil.changeFileExt(opts.fileResolver.resolve(addr).fileName, dropExt = ".wdl")
             case Some(x) => x
           }
 
@@ -1269,8 +1269,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         (Some(tWf), ctxFinal)
     }
 
-    val tDoc = TAT.Document(doc.sourceUrl,
-                            doc.sourceCode,
+    val tDoc = TAT.Document(doc.source,
                             TAT.Version(doc.version.value, doc.version.text),
                             elements,
                             tWf,

@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
@@ -14,24 +14,24 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
   private val opts = BasicOptions(
-      logger = Logger.Quiet,
-      localDirectories = Vector(tasksDir, workflowsDir, structsDir)
+      fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir)),
+      logger = Logger.Quiet
   )
 
-  private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
+  private def getTaskSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
+  private def getWorkflowSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
-  private def getStructSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(structsDir.resolve(fname)))
+  private def getStructSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(structsDir.resolve(fname))
   }
 
-  private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlV1Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
+    ParseTop(conf, WdlV1Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {
@@ -515,8 +515,8 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   it should "have real world GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
-    val doc = getDocument(sourceCode)
+    val FileSource = opts.fileResolver.resolve(url)
+    val doc = getDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1
     doc.elements.size shouldBe 19
@@ -525,8 +525,8 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
-    val doc = getDocument(sourceCode)
+    val FileSource = opts.fileResolver.resolve(url)
+    val doc = getDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1
   }

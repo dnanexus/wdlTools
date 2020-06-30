@@ -1,13 +1,11 @@
 package wdlTools.generators.project
 
-import java.net.URL
-
 import wdlTools.generators.Renderer
 import wdlTools.generators.project.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{FileSource, Options, StringFileSource, Util}
 
 object DocumentationGenerator {
   case class DocumentationComment(comments: Vector[Comment]) {
@@ -73,7 +71,7 @@ object DocumentationGenerator {
                                meta: Vector[KeyValueDocumentation],
                                comment: Option[DocumentationComment])
 
-  case class WdlDocumentation(sourceUrl: Option[URL],
+  case class WdlDocumentation(source: FileSource,
                               imports: Vector[ImportDocumentation],
                               structs: Vector[StructDocumentation],
                               workflow: Option[WorkflowDocumentation],
@@ -208,7 +206,10 @@ case class DocumentationGenerator(opts: Options) {
               imp.addr.value,
               imp.name
                 .map(_.value)
-                .getOrElse(Util.getFilename(imp.addr.value, ".wdl")),
+                .getOrElse(
+                    Util.changeFileExt(opts.fileResolver.resolve(imp.addr.value).fileName,
+                                       dropExt = ".wdl")
+                ),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
               getDocumentationComment(imp)
           )
@@ -289,37 +290,49 @@ case class DocumentationGenerator(opts: Options) {
         None
       }
 
-      Some(WdlDocumentation(doc.sourceUrl, imports, structs, workflow.headOption, tasks, overview))
+      Some(WdlDocumentation(doc.source, imports, structs, workflow.headOption, tasks, overview))
     } else {
       None
     }
   }
 
-  def apply(url: URL, title: String): Map[String, String] = {
-    val docs = Parsers(opts).getDocumentWalker[Map[URL, WdlDocumentation]](url, Map.empty).walk {
-      (doc, results) =>
-        val docs = generateDocumentation(doc)
-        if (docs.isDefined) {
-          results + (doc.sourceUrl.get -> docs.get)
-        } else {
-          results
+  def apply(docSource: FileSource, title: String): Vector[FileSource] = {
+    val docs =
+      Parsers(opts)
+        .getDocumentWalker[Map[FileSource, WdlDocumentation]](docSource, Map.empty)
+        .walk { (doc, results) =>
+          val docs = generateDocumentation(doc)
+          if (docs.isDefined) {
+            results + (doc.source -> docs.get)
+          } else {
+            results
+          }
         }
-    }
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
     val renderer: Renderer = Renderer()
-    val pages = docs.map {
-      case (url, doc) =>
-        Util.getFilename(url.getPath, ".wdl", ".md") ->
-          renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
-    } ++ (if (structs.nonEmpty) {
-            Map("structs.md" -> renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)))
-          } else {
-            Map.empty
-          })
-    pages ++ Map(
-        "index.md" ->
-          renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.keys.toVector))
+    val pages: Vector[FileSource] = docs.map {
+      case (source, doc) =>
+        val destFile = Util.changeFileExt(source.fileName, ".wdl", ".md")
+        StringFileSource(
+            renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc)),
+            Some(Util.getPath(destFile))
+        )
+    }.toVector ++ (
+        if (structs.nonEmpty) {
+          Vector(
+              StringFileSource(
+                  renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)),
+                  Some(Util.getPath("structs.md"))
+              )
+          )
+        } else {
+          Vector.empty
+        }
+    )
+    pages :+ StringFileSource(
+        renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.map(_.fileName))),
+        Some(Util.getPath("index.md"))
     )
   }
 }

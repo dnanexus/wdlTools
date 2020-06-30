@@ -1,18 +1,18 @@
 package wdlTools.cli
 
 import java.io.{FileOutputStream, PrintStream}
-import java.net.URL
 import java.nio.file.Files
 
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException}
 import wdlTools.types.{TypeError, TypeException, TypeInfer}
+import wdlTools.util.FileSource
 
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls
 
 case class TypeCheck(conf: WdlToolsConf) extends Command {
-  private def errorsToJson(errors: Map[URL, Vector[TypeError]]): JsObject = {
+  private def errorsToJson(errors: Map[FileSource, Vector[TypeError]]): JsObject = {
     def getError(err: TypeError): JsObject = {
       JsObject(
           Map(
@@ -25,15 +25,15 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       )
     }
     JsObject(Map("sources" -> JsArray(errors.map {
-      case (url, docErrors) =>
+      case (uri, docErrors) =>
         JsObject(
-            Map("source" -> JsString(url.toString),
+            Map("source" -> JsString(uri.toString),
                 "errors" -> JsArray(docErrors.map(err => getError(err))))
         )
     }.toVector)))
   }
 
-  private def printErrors(errors: Map[URL, Vector[TypeError]],
+  private def printErrors(errors: Map[FileSource, Vector[TypeError]],
                           printer: PrintStream,
                           effects: Boolean): Unit = {
     def colorMsg(msg: String, color: String): String = {
@@ -45,7 +45,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     }
     errors.foreach { item =>
       val (msg, docErrors) = item match {
-        case (url, docErrors) => (s"Type-check errors in ${url}", docErrors)
+        case (uri, docErrors) => (s"Type-check errors in ${uri}", docErrors)
       }
       val border1 = "=" * msg.length
       val border2 = "-" * msg.length
@@ -61,15 +61,15 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
   }
 
   override def apply(): Unit = {
-    val url = conf.check.url()
     val opts = conf.check.getOptions
+    val docSource = opts.fileResolver.resolve(conf.check.uri())
     val parsers = Parsers(opts)
-    var errors: Map[URL, Vector[TypeError]] = Map.empty
+    var errors: Map[FileSource, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
-      typeErrors.groupBy(_.docSourceUrl).foreach {
-        case (Some(url), docErrors) =>
-          errors += (url -> (errors.getOrElse(url, Vector.empty) ++ docErrors))
+      typeErrors.groupBy(_.docSource).foreach {
+        case (docSource, docErrors) =>
+          errors += (docSource -> (errors.getOrElse(docSource, Vector.empty) ++ docErrors))
         case other => throw new RuntimeException(s"Unexpected ${other}")
       }
       false
@@ -78,7 +78,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     val checker = TypeInfer(opts, errorHandler = Some(errorHandler))
 
     try {
-      checker.apply(parsers.parseDocument(url))
+      checker.apply(parsers.parseDocument(docSource))
     } catch {
       case e: SyntaxException => println(s"Failed to parse WDL document: ${e.getMessage}")
       case e: TypeException   => println(s"Failed to type-check WDL document: ${e.getMessage}")

@@ -1,7 +1,5 @@
 package wdlTools.syntax.draft_2
 
-import java.net.URL
-
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{
   SyntaxError,
@@ -12,7 +10,7 @@ import wdlTools.syntax.{
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import wdlTools.util.{Options, SourceCode}
+import wdlTools.util.{FileSource, Options, StringFileSource}
 
 // parse and follow imports
 case class ParseAll(opts: Options,
@@ -20,7 +18,7 @@ case class ParseAll(opts: Options,
                     errorHandler: Option[Vector[SyntaxError] => Boolean] = None)
     extends WdlParser(opts) {
 
-  private case class Translator(docSourceUrl: Option[URL] = None) {
+  private case class Translator(docSource: FileSource) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
         case CST.TypeOptional(t, srcText) =>
@@ -180,7 +178,7 @@ case class ParseAll(opts: Options,
         if (allIds contains kv.id)
           throw new SyntaxException(msg = s"key ${kv.id} defined twice in runtime section",
                                     kv.text,
-                                    docSourceUrl)
+                                    docSource)
         allIds = allIds + kv.id
       }
 
@@ -270,7 +268,7 @@ case class ParseAll(opts: Options,
       val elems: Vector[AST.DocumentElement] = doc.elements.map {
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (opts.followImports) {
-            followImport(getDocSourceUrl(importDoc.addr.value))
+            followImport(importDoc.addr.value)
           } else {
             None
           }
@@ -280,12 +278,12 @@ case class ParseAll(opts: Options,
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(WdlVersion.Draft_2, TextSource.empty)
-      AST.Document(doc.sourceUrl, doc.docSource, version, elems, aWf, doc.text, doc.comments)
+      AST.Document(doc.source, version, elems, aWf, doc.text, doc.comments)
     }
   }
 
-  override def canParse(sourceCode: SourceCode): Boolean = {
-    sourceCode.lines.foreach { line =>
+  override def canParse(fileSource: FileSource): Boolean = {
+    fileSource.readLines.foreach { line =>
       val trimmed = line.trim
       if (!(trimmed.isEmpty || trimmed.startsWith("#"))) {
         return trimmed.trim.startsWith("import") ||
@@ -296,8 +294,8 @@ case class ParseAll(opts: Options,
     false
   }
 
-  override def parseDocument(sourceCode: SourceCode): AST.Document = {
-    val grammar = WdlDraft2Grammar.newInstance(sourceCode, listenerFactories, opts)
+  override def parseDocument(fileSource: FileSource): AST.Document = {
+    val grammar = WdlDraft2Grammar.newInstance(fileSource, listenerFactories, opts)
     val visitor = ParseTop(opts, grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
@@ -305,19 +303,27 @@ case class ParseAll(opts: Options,
           .forall(eh => eh(errorListener.getErrors))) {
       throw new SyntaxException(errorListener.getErrors)
     }
-    val translator = Translator(sourceCode.url)
+    val translator = Translator(fileSource)
     translator.translateDocument(top)
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, listenerFactories, opts = opts))
-    val translator = Translator()
+    val docSource = StringFileSource(text)
+    val parser = ParseTop(
+        opts,
+        WdlDraft2Grammar.newInstance(docSource, listenerFactories, opts = opts)
+    )
+    val translator = Translator(docSource)
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val parser = ParseTop(opts, WdlDraft2Grammar.newInstance(text, listenerFactories, opts = opts))
-    val translator = Translator()
+    val docSource = StringFileSource(text)
+    val parser = ParseTop(
+        opts,
+        WdlDraft2Grammar.newInstance(docSource, listenerFactories, opts = opts)
+    )
+    val translator = Translator(docSource)
     translator.translateType(parser.parseWdlType)
   }
 }

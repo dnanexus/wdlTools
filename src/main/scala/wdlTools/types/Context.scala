@@ -1,9 +1,9 @@
 package wdlTools.types
 
-import java.net.URL
-import wdlTools.syntax.{AbstractSyntax => AST, WdlVersion}
+import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.util.FileSource
 
 // An entire context
 //
@@ -11,7 +11,7 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 // An additional variable holds a list of all imported namespaces.
 case class Context(version: WdlVersion,
                    stdlib: Stdlib,
-                   docSourceUrl: Option[URL] = None,
+                   docSource: FileSource,
                    inputs: Map[String, WdlTypes.T] = Map.empty,
                    outputs: Map[String, WdlTypes.T] = Map.empty,
                    declarations: Map[String, WdlTypes.T] = Map.empty,

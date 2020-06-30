@@ -1,16 +1,15 @@
 package wdlTools.exec
 
-import java.net.URL
 import java.nio.file.Files
 
 import spray.json._
 import wdlTools.eval.{EvalConfig, IoSupp}
 import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, TraceLevel, Util}
+import wdlTools.util.{FileSource, Options, TraceLevel, Util}
 
-case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
-  private val ioSupp = IoSupp(opts, evalCfg, docSourceUrl)
-  private val logger = ioSupp.opts.logger
+case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
+  private val ioSupp = IoSupp(opts, evalCfg, docSource)
+  private val logger = opts.logger
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
     sys.addShutdownHook({
@@ -44,9 +43,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[
           Thread.sleep(1000)
       }
     }
-    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries",
-                            text,
-                            docSourceUrl)
+    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries", text, docSource)
   }
 
   // Read the manifest file from a docker tarball, and get the repository name.

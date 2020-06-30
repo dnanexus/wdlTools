@@ -1,19 +1,14 @@
 package wdlTools.eval
 
-import java.net.URL
-
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{TextSource, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{FileSource, Options, Util}
 
-case class Eval(opts: Options,
-                evalCfg: EvalConfig,
-                wdlVersion: WdlVersion,
-                docSourceUrl: Option[URL]) {
+case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion, docSource: FileSource) {
   // choose the standard library implementation based on version
-  private val standardLibrary = Stdlib(opts, evalCfg, wdlVersion, docSourceUrl)
-  private val coercion = Coercion(docSourceUrl)
+  private val standardLibrary = Stdlib(opts, evalCfg, wdlVersion, docSource)
+  private val coercion = Coercion(docSource)
 
   private def getStringVal(value: V, text: TextSource): String = {
     value match {
@@ -22,7 +17,7 @@ case class Eval(opts: Options,
       case V_Float(x)   => x.toString
       case V_String(s)  => s
       case V_File(s)    => s
-      case other        => throw new EvalException(s"bad value ${other}", text, docSourceUrl)
+      case other        => throw new EvalException(s"bad value ${other}", text, docSource)
     }
   }
 
@@ -92,7 +87,7 @@ case class Eval(opts: Options,
       case (V_String(s1), V_String(s2)) => s1 < s2
       case (V_File(p1), V_File(p2))     => p1 < p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
+        throw new EvalException("bad value should be a boolean", text, docSource)
     }
   }
 
@@ -106,7 +101,7 @@ case class Eval(opts: Options,
       case (V_String(s1), V_String(s2)) => s1 <= s2
       case (V_File(p1), V_File(p2))     => p1 <= p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
+        throw new EvalException("bad value should be a boolean", text, docSource)
     }
   }
 
@@ -120,7 +115,7 @@ case class Eval(opts: Options,
       case (V_String(s1), V_String(s2)) => s1 > s2
       case (V_File(p1), V_File(p2))     => p1 > p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
+        throw new EvalException("bad value should be a boolean", text, docSource)
     }
   }
 
@@ -134,7 +129,7 @@ case class Eval(opts: Options,
       case (V_String(s1), V_String(s2)) => s1 >= s2
       case (V_File(p1), V_File(p2))     => p1 >= p2
       case (_, _) =>
-        throw new EvalException("bad value should be a boolean", text, docSourceUrl)
+        throw new EvalException("bad value should be a boolean", text, docSource)
     }
   }
 
@@ -158,7 +153,7 @@ case class Eval(opts: Options,
       case (V_File(s1), V_File(s2))   => V_File(s1 + s2)
 
       case (_, _) =>
-        throw new EvalException("cannot add these values", text, docSourceUrl)
+        throw new EvalException("cannot add these values", text, docSource)
     }
   }
 
@@ -169,7 +164,7 @@ case class Eval(opts: Options,
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
       case (V_Float(x1), V_Float(x2)) => V_Float(x1 - x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSource)
     }
   }
 
@@ -180,7 +175,7 @@ case class Eval(opts: Options,
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 % x2)
       case (V_Float(x1), V_Float(x2)) => V_Float(x1 % x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSource)
     }
   }
 
@@ -191,7 +186,7 @@ case class Eval(opts: Options,
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
       case (V_Float(x1), V_Float(x2)) => V_Float(x1 * x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSource)
     }
   }
 
@@ -199,22 +194,22 @@ case class Eval(opts: Options,
     (a, b) match {
       case (V_Int(n1), V_Int(n2)) =>
         if (n2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceUrl)
+          throw new EvalException("DivisionByZero", text, docSource)
         V_Int(n1 / n2)
       case (V_Float(x1), V_Int(n2)) =>
         if (n2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceUrl)
+          throw new EvalException("DivisionByZero", text, docSource)
         V_Float(x1 / n2)
       case (V_Int(n1), V_Float(x2)) =>
         if (x2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceUrl)
+          throw new EvalException("DivisionByZero", text, docSource)
         V_Float(n1 / x2)
       case (V_Float(x1), V_Float(x2)) =>
         if (x2 == 0)
-          throw new EvalException("DivisionByZero", text, docSourceUrl)
+          throw new EvalException("DivisionByZero", text, docSource)
         V_Float(x1 / x2)
       case (_, _) =>
-        throw new EvalException(s"Expressions must be integers or floats", text, docSourceUrl)
+        throw new EvalException(s"Expressions must be integers or floats", text, docSource)
     }
   }
 
@@ -225,16 +220,14 @@ case class Eval(opts: Options,
       case V_Struct(name, members) =>
         members.get(id) match {
           case None =>
-            throw new EvalException(s"Struct ${name} does not have member ${id}",
-                                    text,
-                                    docSourceUrl)
+            throw new EvalException(s"Struct ${name} does not have member ${id}", text, docSource)
           case Some(t) => t
         }
 
       case V_Object(members) =>
         members.get(id) match {
           case None =>
-            throw new EvalException(s"Object does not have member ${id}", text, docSourceUrl)
+            throw new EvalException(s"Object does not have member ${id}", text, docSource)
           case Some(t) => t
         }
 
@@ -243,7 +236,7 @@ case class Eval(opts: Options,
           case None =>
             throw new EvalException(s"Call object ${name} does not have member ${id}",
                                     text,
-                                    docSourceUrl)
+                                    docSource)
           case Some(t) => t
         }
 
@@ -251,12 +244,10 @@ case class Eval(opts: Options,
       case V_Pair(l, _) if id.toLowerCase() == "left"  => l
       case V_Pair(_, r) if id.toLowerCase() == "right" => r
       case V_Pair(_, _) =>
-        throw new EvalException(s"accessing a pair with (${id}) is illegal", text, docSourceUrl)
+        throw new EvalException(s"accessing a pair with (${id}) is illegal", text, docSource)
 
       case _ =>
-        throw new EvalException(s"member access (${id}) in expression is illegal",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"member access (${id}) in expression is illegal", text, docSource)
     }
   }
 
@@ -302,7 +293,7 @@ case class Eval(opts: Options,
               case _ =>
                 throw new EvalException(s"bad value ${k}, object literal key must be a string",
                                         expr.text,
-                                        docSourceUrl)
+                                        docSource)
             }
             key -> apply(v, ctx)
         })
@@ -315,7 +306,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
-                                    docSourceUrl)
+                                    docSource)
         }
 
       // ~{default="foo" optional_value}
@@ -335,9 +326,7 @@ case class Eval(opts: Options,
             }
             V_String(elements.mkString(sep2))
           case other =>
-            throw new EvalException(s"bad value ${other}, should be a string",
-                                    expr.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a string", expr.text, docSource)
         }
 
       // operators on one argument
@@ -346,9 +335,7 @@ case class Eval(opts: Options,
           case V_Float(f) => V_Float(f)
           case V_Int(k)   => V_Int(k)
           case other =>
-            throw new EvalException(s"bad value ${other}, should be a number",
-                                    expr.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a number", expr.text, docSource)
         }
 
       case e: TAT.ExprUnaryMinus =>
@@ -356,9 +343,7 @@ case class Eval(opts: Options,
           case V_Float(f) => V_Float(-1 * f)
           case V_Int(k)   => V_Int(-1 * k)
           case other =>
-            throw new EvalException(s"bad value ${other}, should be a number",
-                                    expr.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a number", expr.text, docSource)
         }
 
       case e: TAT.ExprNegate =>
@@ -367,7 +352,7 @@ case class Eval(opts: Options,
           case other =>
             throw new EvalException(s"bad value ${other}, should be a boolean",
                                     expr.text,
-                                    docSourceUrl)
+                                    docSource)
         }
 
       // operators on two arguments
@@ -378,13 +363,9 @@ case class Eval(opts: Options,
           case (V_Boolean(a1), V_Boolean(b1)) =>
             V_Boolean(a1 || b1)
           case (V_Boolean(_), other) =>
-            throw new EvalException(s"bad value ${other}, should be a boolean",
-                                    b.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a boolean", b.text, docSource)
           case (other, _) =>
-            throw new EvalException(s"bad value ${other}, should be a boolean",
-                                    a.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a boolean", a.text, docSource)
         }
 
       case TAT.ExprLand(a, b, _, _) =>
@@ -394,13 +375,9 @@ case class Eval(opts: Options,
           case (V_Boolean(a1), V_Boolean(b1)) =>
             V_Boolean(a1 && b1)
           case (V_Boolean(_), other) =>
-            throw new EvalException(s"bad value ${other}, should be a boolean",
-                                    b.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a boolean", b.text, docSource)
           case (other, _) =>
-            throw new EvalException(s"bad value ${other}, should be a boolean",
-                                    a.text,
-                                    docSourceUrl)
+            throw new EvalException(s"bad value ${other}, should be a boolean", a.text, docSource)
         }
 
       // recursive comparison
@@ -466,12 +443,12 @@ case class Eval(opts: Options,
             throw new EvalException(
                 s"array access out of bounds (size=${arraySize}, element accessed=${n})",
                 text,
-                docSourceUrl
+                docSource
             )
           case (_, _) =>
             throw new EvalException(s"array access requires an array and an integer",
                                     text,
-                                    docSourceUrl)
+                                    docSource)
         }
 
       // conditional:
@@ -482,7 +459,7 @@ case class Eval(opts: Options,
           case V_Boolean(true)  => apply(tBranch, ctx)
           case V_Boolean(false) => apply(fBranch, ctx)
           case _ =>
-            throw new EvalException(s"condition is not boolean", text, docSourceUrl)
+            throw new EvalException(s"condition is not boolean", text, docSource)
         }
 
       // Apply a standard library function to arguments. For example:
@@ -542,7 +519,7 @@ case class Eval(opts: Options,
     val commandStr = command.parts
       .map { expr =>
         val value = apply(expr, ctx)
-        val str = Serialize.primitiveValueToString(value, expr.text, docSourceUrl)
+        val str = Serialize.primitiveValueToString(value, expr.text, docSource)
         str
       }
       .mkString("")

@@ -1,8 +1,7 @@
 package wdlTools.syntax.draft_2
 
-import java.net.URL
-
 import wdlTools.syntax.{CommentMap, TextSource}
+import wdlTools.util.FileSource
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
@@ -176,8 +175,7 @@ object ConcreteSyntax {
                       text: TextSource)
       extends Element
 
-  case class Document(sourceUrl: Option[URL],
-                      docSource: String,
+  case class Document(source: FileSource,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       text: TextSource,

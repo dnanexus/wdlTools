@@ -1,7 +1,5 @@
 package wdlTools.linter
 
-import java.net.URL
-
 import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax
@@ -9,6 +7,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{ASTVisitor, AllParseTreeListener, Antlr4Util, TextSource, WdlVersion}
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.types
+import wdlTools.util.FileSource
 
 import scala.collection.mutable
 
@@ -30,7 +29,7 @@ object Rules {
       Grammar
   ) => LinterParserRule
 
-  class LinterParserRule(id: String, severity: Severity, docSourceUrl: Option[URL])
+  class LinterParserRule(id: String, severity: Severity, docSource: FileSource)
       extends AllParseTreeListener {
     private var events: Vector[LintEvent] = Vector.empty
 
@@ -43,12 +42,12 @@ object Rules {
     }
 
     protected def addEvent(textSource: TextSource, message: Option[String] = None): Unit = {
-      events :+= LintEvent(id, severity, textSource, docSourceUrl, message)
+      events :+= LintEvent(id, severity, textSource, docSource, message)
     }
   }
 
   abstract class HiddenTokensLinterParserRule(id: String, severity: Severity, grammar: Grammar)
-      extends LinterParserRule(id, severity, grammar.docSourceUrl) {
+      extends LinterParserRule(id, severity, grammar.docSource) {
     private val tokenIndexes: mutable.Set[Int] = mutable.HashSet.empty
 
     protected def addEvent(tok: Token): Unit = {
@@ -178,8 +177,7 @@ object Rules {
   // Note that most of these are caught by the type-checker, but it's
   // still good to be able to warn the user
 
-  class LinterAstRule(id: String, severity: Severity, docSourceUrl: Option[URL])
-      extends ASTVisitor {
+  class LinterAstRule(id: String, severity: Severity, docSource: FileSource) extends ASTVisitor {
     private var events: Vector[LintEvent] = Vector.empty
 
     def getEvents: Vector[LintEvent] = events
@@ -190,7 +188,7 @@ object Rules {
     }
 
     protected def addEventFromElement(element: Element, message: Option[String] = None): Unit = {
-      events :+= LintEvent(id, severity, element.text, docSourceUrl, message)
+      events :+= LintEvent(id, severity, element.text, docSource, message)
     }
   }
 
@@ -199,7 +197,7 @@ object Rules {
       Severity,
       WdlVersion,
       types.Context,
-      Option[URL]
+      FileSource
   ) => LinterAstRule
 
   // rules ported from miniwdl
@@ -213,8 +211,8 @@ object Rules {
 //                                typesContext: types.Context,
 //                                stdlib: types.Stdlib,
 //                                events: mutable.Buffer[LintEvent],
-//                                docSourceUrl: Option[URL])
-//      extends LinterAstRule(id, severity, docSourceUrl, events) {
+//                                docSource: FileSource)
+//      extends LinterAstRule(id, severity, docSourceUri, events) {
 //
 //    // TODO: This can probably be replaced by a call to one of the functions
 //    //  in types.Util
@@ -308,8 +306,8 @@ object Rules {
                                  severity: Severity,
                                  version: WdlVersion,
                                  typesContext: types.Context,
-                                 docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl) {
+                                 docSource: FileSource)
+      extends LinterAstRule(id, severity, docSource) {
     private val containerKeys = Set("docker", "container")
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
@@ -325,8 +323,8 @@ object Rules {
                               severity: Severity,
                               version: WdlVersion,
                               typesContext: types.Context,
-                              docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl) {
+                              docSource: FileSource)
+      extends LinterAstRule(id, severity, docSource) {
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.input.isEmpty || ctx.element.input.get.declarations.isEmpty) {
         addEvent(ctx)
@@ -338,8 +336,8 @@ object Rules {
                                severity: Severity,
                                version: WdlVersion,
                                typesContext: types.Context,
-                               docSourceUrl: Option[URL])
-      extends LinterAstRule(id, severity, docSourceUrl) {
+                               docSource: FileSource)
+      extends LinterAstRule(id, severity, docSource) {
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.output.isEmpty || ctx.element.output.get.declarations.isEmpty) {

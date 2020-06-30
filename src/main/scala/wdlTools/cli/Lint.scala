@@ -1,13 +1,13 @@
 package wdlTools.cli
 
 import java.io.{FileOutputStream, PrintStream}
-import java.net.URL
 import java.nio.file.{Files, Path}
 
 import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
 import wdlTools.linter.{LintEvent, Linter, Rules, Severity}
+import wdlTools.util.FileSource
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
@@ -16,8 +16,8 @@ case class Lint(conf: WdlToolsConf) extends Command {
   private val RULES_RESOURCE = "rules/lint_rules.json"
 
   override def apply(): Unit = {
-    val url = conf.lint.url()
     val opts = conf.lint.getOptions
+    val docSource = opts.fileResolver.resolve(conf.lint.uri())
     val rules =
       if (conf.lint.config.isDefined) {
         val (incl, excl) = rulesFromFile(conf.lint.config())
@@ -30,7 +30,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
         Rules.defaultRules
       }
     val linter = Linter(opts, rules)
-    val lint = linter.apply(url)
+    val lint = linter.apply(docSource)
 
     if (lint.nonEmpty) {
       // Load rule descriptions
@@ -134,7 +134,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
   }
 
-  private def eventsToJson(events: Map[URL, Vector[LintEvent]],
+  private def eventsToJson(events: Map[FileSource, Vector[LintEvent]],
                            rules: Map[String, JsValue]): JsObject = {
     def eventToJson(err: LintEvent): JsObject = {
       val rule = getFields(rules(err.ruleId))
@@ -153,9 +153,9 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
 
     JsObject(Map("sources" -> JsArray(events.map {
-      case (url, events) =>
+      case (uri, events) =>
         JsObject(
-            Map("source" -> JsString(url.toString), "events" -> JsArray(events.map(eventToJson)))
+            Map("source" -> JsString(uri.toString), "events" -> JsArray(events.map(eventToJson)))
         )
     }.toVector)))
   }
@@ -168,7 +168,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
   }
 
-  private def printEvents(events: Map[URL, Vector[LintEvent]],
+  private def printEvents(events: Map[FileSource, Vector[LintEvent]],
                           rules: Map[String, JsValue],
                           printer: PrintStream,
                           effects: Boolean): Unit = {
@@ -181,7 +181,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
     events.foreach { item =>
       val (msg, events) = item match {
-        case (url, events) => (s"Lint in ${url}", events)
+        case (uri, events) => (s"Lint in ${uri}", events)
       }
       val border1 = "=" * msg.length
       val border2 = "-" * msg.length

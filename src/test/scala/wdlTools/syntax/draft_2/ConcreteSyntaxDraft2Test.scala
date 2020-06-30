@@ -6,27 +6,27 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
 
 class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val opts = BasicOptions(
-      logger = Logger.Quiet,
-      localDirectories = Vector(tasksDir, workflowsDir)
+      fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir)),
+      logger = Logger.Quiet
   )
 
-  private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
+  private def getTaskSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
+  private def getWorkflowSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
-  private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlDraft2Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
+    ParseTop(conf, WdlDraft2Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {

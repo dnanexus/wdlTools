@@ -1,18 +1,19 @@
 package wdlTools.eval
 
-import java.net.URL
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.TextSource
 import wdlTools.types.WdlTypes
+import wdlTools.util.FileSource
 
-case class Coercion(docSourceUrl: Option[URL]) {
+case class Coercion(docSource: FileSource) {
 
   private def coerceToStruct(structName: String,
                              memberDefs: Map[String, WdlTypes.T],
                              members: Map[String, V],
                              text: TextSource): V_Struct = {
-    if (memberDefs.keys.toSet != members.keys.toSet)
-      throw new EvalException(s"struct ${structName} has wrong fields", text, docSourceUrl)
+    if (memberDefs.keys.toSet != members.keys.toSet) {
+      throw new EvalException(s"struct ${structName} has wrong fields", text, docSource)
+    }
 
     // coerce each member to the struct type
     val memValues: Map[String, V] = memberDefs.map {
@@ -38,7 +39,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
             case _: NumberFormatException =>
               throw new EvalException(s"string ${s} cannot be converted into an integer",
                                       text,
-                                      docSourceUrl)
+                                      docSource)
           }
         V_Int(n)
       case (WdlTypes.T_Float, V_Int(n))   => V_Float(n.toFloat)
@@ -51,7 +52,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
             case _: NumberFormatException =>
               throw new EvalException(s"string ${s} cannot be converted into an integer",
                                       text,
-                                      docSourceUrl)
+                                      docSource)
           }
         V_Float(x)
       case (WdlTypes.T_String, V_Boolean(b)) => V_String(b.toString)
@@ -74,7 +75,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
 
       case (WdlTypes.T_Array(t, nonEmpty), V_Array(vec)) =>
         if (nonEmpty && vec.isEmpty)
-          throw new EvalException("array is empty", text, docSourceUrl)
+          throw new EvalException("array is empty", text, docSource)
         V_Array(vec.map { x =>
           coerceTo(t, x, text)
         })
@@ -91,7 +92,7 @@ case class Coercion(docSourceUrl: Option[URL]) {
         if (name1 != name2)
           throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}",
                                   text,
-                                  docSourceUrl)
+                                  docSource)
         value
 
       // cast of an object to a struct. I think this is legal.
@@ -105,16 +106,14 @@ case class Coercion(docSourceUrl: Option[URL]) {
           case (other, _) =>
             throw new EvalException(s"${other} has to be a string for this to be a struct",
                                     text,
-                                    docSourceUrl)
+                                    docSource)
         }
         coerceToStruct(name, memberDefs, members2, text)
 
       case (WdlTypes.T_Object, V_Object(_)) => value
 
       case (t, other) =>
-        throw new EvalException(s"value ${other} cannot be coerced to type ${t}",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"value ${other} cannot be coerced to type ${t}", text, docSource)
     }
   }
 }

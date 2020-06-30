@@ -1,9 +1,7 @@
 package wdlTools.syntax
 
-import java.net.URL
-
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{Options, SourceCode, Util}
+import wdlTools.util.{FileSource, Options}
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
@@ -11,65 +9,53 @@ trait DocumentWalker[T] {
 
 abstract class WdlParser(opts: Options) {
   // cache of documents that have already been fetched and parsed.
-  private var docCache: Map[URL, Option[AbstractSyntax.Document]] = Map.empty
+  private var docCache: Map[String, Option[AbstractSyntax.Document]] = Map.empty
 
-  protected def followImport(url: URL): Option[AbstractSyntax.Document] = {
-    docCache.get(url) match {
+  protected def followImport(uri: String): Option[AbstractSyntax.Document] = {
+    docCache.get(uri) match {
       case None =>
-        val aDoc = Some(parseDocument(SourceCode.loadFrom(url)))
-        docCache += (url -> aDoc)
+        val aDoc = Some(parseDocument(opts.fileResolver.resolve(uri)))
+        docCache += (uri -> aDoc)
         aDoc
       case Some(aDoc) => aDoc
     }
   }
 
-  def canParse(sourceCode: SourceCode): Boolean
+  def canParse(fileSource: FileSource): Boolean
 
-  def parseDocument(url: URL): AbstractSyntax.Document = {
-    parseDocument(SourceCode.loadFrom(url))
-  }
-
-  def parseDocument(sourceCode: SourceCode): Document
+  def parseDocument(fileSource: FileSource): Document
 
   def parseExpr(text: String): Expr
 
   def parseType(text: String): Type
 
-  protected def getDocSourceUrl(addr: String): URL = {
-    Util.getUrl(addr, opts.localDirectories)
-  }
-
-  def getDocumentWalker[T](url: URL, start: T): Walker[T] = {
-    Walker[T](SourceCode.loadFrom(url), start)
-  }
-
-  case class Walker[T](sourceCode: SourceCode, start: T) extends DocumentWalker[T] {
-    def extractDependencies(document: Document): Map[URL, Document] = {
+  case class Walker[T](fileSource: FileSource, start: T) extends DocumentWalker[T] {
+    def extractDependencies(document: Document): Map[FileSource, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
-          Some(Util.getUrl(addr.value, opts.localDirectories) -> doc.get)
+          Some(opts.fileResolver.resolve(addr.value) -> doc.get)
         case _ => None
       }.toMap
     }
 
     def walk(visitor: (Document, T) => T): T = {
-      var visited: Set[Option[URL]] = Set.empty
+      var visited: Set[String] = Set.empty
       var results: T = start
 
-      def addDocument(url: Option[URL], doc: Document): Unit = {
-        if (!visited.contains(url)) {
-          visited += url
+      def addDocument(fileSource: FileSource, doc: Document): Unit = {
+        if (!visited.contains(fileSource.toString)) {
+          visited += fileSource.toString
           results = visitor(doc, results)
           if (opts.followImports) {
             extractDependencies(doc).foreach {
-              case (uri, doc) => addDocument(Some(uri), doc)
+              case (fileSource, doc) => addDocument(fileSource, doc)
             }
           }
         }
       }
 
-      val document = parseDocument(sourceCode)
-      addDocument(sourceCode.url, document)
+      val document = parseDocument(fileSource)
+      addDocument(fileSource, document)
       results
     }
   }

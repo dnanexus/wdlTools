@@ -1,12 +1,10 @@
 package wdlTools.generators.project
 
-import java.net.URL
-
 import spray.json.{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsValue}
 import wdlTools.syntax.AbstractSyntax._
 
 object TestsGenerator {
-  def apply(url: URL, wdlName: String, doc: Document): String = {
+  def apply(wdlName: String, doc: Document): String = {
     var data: Map[String, JsValue] = Map.empty
 
     def getDummyValue(value: Type): JsValue = {

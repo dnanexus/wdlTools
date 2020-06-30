@@ -1,6 +1,6 @@
 package wdlTools.cli
 
-import java.net.URL
+import java.net.URI
 import java.nio.file.{Path, Paths}
 
 import org.rogach.scallop.{
@@ -14,7 +14,8 @@ import org.rogach.scallop.{
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.{BasicOptions, Logger, Options, TraceLevel, Util}
+import wdlTools.util.Util.{FILE_SCHEME, getUriScheme}
+import wdlTools.util.{BasicOptions, FileSourceResolver, Logger, Options, TraceLevel}
 
 import scala.util.Try
 
@@ -51,8 +52,6 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   implicit val fileListConverter: ValueConverter[List[Path]] =
     listArgConverter[Path](Paths.get(_), exceptionHandler[List[Path]])
-  implicit val urlConverter: ValueConverter[URL] =
-    singleArgConverter[URL](Util.getUrl(_), exceptionHandler[URL])
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.withName, exceptionHandler[WdlVersion])
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
@@ -83,20 +82,29 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     def getOptions: Options
   }
 
+  private def getParent(pathOrUri: String): Path = {
+    (getUriScheme(pathOrUri) match {
+      case Some(FILE_SCHEME) => Paths.get(URI.create(pathOrUri))
+      case None              => Paths.get(pathOrUri)
+      case _                 => throw new Exception(s"${pathOrUri} is not a path or file:// URI")
+    }).getParent
+  }
+
   trait ParserOptions {
     def antlr4Trace: ScallopOption[Boolean]
     def localDir: ScallopOption[List[Path]]
 
     /**
       * The local directories to search for WDL imports.
-      * @param merge a Set of Paths to merge in with the local directories.
+      * @param pathOrUri a file path or URI, from which to get the parent directory to add to the paths
       * @return
       */
-    def localDirectories(merge: Set[Path] = Set.empty): Vector[Path] = {
+    def localDirectories(pathOrUri: String): Vector[Path] = {
+      val path = Set(getParent(pathOrUri))
       if (this.localDir.isDefined) {
-        (this.localDir().toSet ++ merge).toVector
+        (this.localDir().toSet ++ path).toVector
       } else {
-        merge
+        path
       }.toVector
     }
   }
@@ -117,12 +125,13 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "only format the main file",
         default = Some(true)
     )
-    val url: ScallopOption[URL] =
-      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or String (file:// or http(s)://) to the main WDL file")
 
     def getOptions: Options = {
+      val localDirs = this.localDirectories(uri())
       BasicOptions(
-          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
           followImports = followImports(),
           logger = logger,
           antlr4Trace = antlr4Trace()
@@ -146,8 +155,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
           descr =
             "directory in which to search for imports; ignored if --nofollow-imports is specified"
       )
-    val url: ScallopOption[URL] =
-      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or String (file:// or http(s)://) to the main WDL file")
 
     val regime: ScallopOption[TypeCheckingRegime] = opt[TypeCheckingRegime](
         descr = "Strictness of type checking",
@@ -169,8 +178,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
 
     def getOptions: TypeOptions = {
+      val localDirs = this.localDirectories(uri())
       TypeOptions(
-          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          FileSourceResolver.create(localDirs, logger = logger),
           logger = logger,
           antlr4Trace = antlr4Trace(),
           typeChecking = regime()
@@ -255,8 +265,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
 
     override def getOptions: TypeOptions = {
+      val localDirs = this.localDirectories(uri())
       TypeOptions(
-          this.localDirectories(Set(Util.getLocalPath(url()).getParent)),
+          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
           followImports = followImports(),
           logger = logger,
           antlr4Trace = antlr4Trace(),
@@ -308,8 +319,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     val antlr4Trace: ScallopOption[Boolean] = opt(
         descr = "enable trace logging of the ANTLR4 parser"
     )
-    val url: ScallopOption[URL] =
-      trailArg[URL](descr = "path or URL (file:// or http(s)://) to the main WDL file")
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or String (file:// or http(s)://) to the main WDL file")
 
     val typed: ScallopOption[Boolean] = toggle(
         descrYes = "Print the typed AST (document must pass type-checking)",
@@ -318,8 +329,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
 
     def getOptions: Options = {
+      val localDirs = Vector(getParent(uri()))
       BasicOptions(
-          Vector(Util.getLocalPath(url()).getParent),
+          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
           followImports = typed(),
           logger = logger,
           antlr4Trace = antlr4Trace()
@@ -387,7 +399,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       trailArg[String](descr = "The project name - this will also be the name of the workflow")
 
     def getOptions: Options = {
-      BasicOptions(logger = logger)
+      BasicOptions(fileResolver = FileSourceResolver.create(logger = logger), logger = logger)
     }
   }
   addSubcommand(generate)

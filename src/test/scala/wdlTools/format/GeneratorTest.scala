@@ -1,6 +1,5 @@
 package wdlTools.format
 
-import java.net.URL
 import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -9,7 +8,7 @@ import wdlTools.eval.{Context, Eval, EvalConfig}
 import wdlTools.generators.code
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
-import wdlTools.util.{SourceCode, Util}
+import wdlTools.util.{FileSource, LinesFileSource}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions()
@@ -20,12 +19,12 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
-  private def getWdlUrl(fname: String, subdir: String): URL = {
-    Util.pathToUrl(getWdlPath(fname, subdir))
+  private def getWdlSource(fname: String, subdir: String): FileSource = {
+    opts.fileResolver.fromPath(getWdlPath(fname, subdir))
   }
 
-  private def evalCommand(tDoc: TAT.Document, url: Option[URL] = None): Vector[String] = {
-    val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1, url)
+  private def evalCommand(tDoc: TAT.Document, docSource: FileSource): Vector[String] = {
+    val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1, docSource)
     tDoc.elements should not be empty
     tDoc.elements.collect {
       case task: TAT.Task =>
@@ -39,27 +38,25 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       validateParse: Boolean = true,
       validateContentSelf: Boolean = false,
       validateContentFile: Boolean = false
-  ): (TAT.Document, Vector[String], Option[TAT.Document]) = {
-    val beforeUrl = getWdlUrl(fname = fname, subdir = "before")
-    val beforeSrc = SourceCode.loadFrom(beforeUrl)
+  ): (FileSource, TAT.Document, FileSource, Option[TAT.Document]) = {
+    val beforeSrc = getWdlSource(fname = fname, subdir = "before")
     val doc = parsers.parseDocument(beforeSrc)
     val (tDoc, _) = typeInfer.apply(doc)
     val generator = code.WdlV1Generator()
-    val gLines = generator.generateDocument(tDoc)
+    val gLines = LinesFileSource(generator.generateDocument(tDoc))
     if (validateContentSelf) {
-      gLines.mkString("\n") shouldBe beforeSrc.lines.mkString("\n")
+      gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")
     } else if (validateContentFile) {
-      val afterUrl = getWdlUrl(fname = fname, subdir = "after")
-      val afterSrc = SourceCode.loadFrom(afterUrl)
-      gLines.mkString("\n") shouldBe afterSrc.lines.mkString("\n")
+      val afterSrc = getWdlSource(fname = fname, subdir = "after")
+      gLines.readLines.mkString("\n") shouldBe afterSrc.readLines.mkString("\n")
     }
     val gtDoc = if (validateParse) {
-      val gDoc = parsers.parseDocument(SourceCode(None, gLines))
+      val gDoc = parsers.parseDocument(gLines)
       Some(typeInfer.apply(gDoc)._1)
     } else {
       None
     }
-    (tDoc, gLines, gtDoc)
+    (beforeSrc, tDoc, gLines, gtDoc)
   }
 
   it should "handle deep nesting" in {
@@ -83,7 +80,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "handle command block" in {
-    val (tDoc, _, gtDoc) = generate("python_heredoc.wdl")
+    val (docSrc, tDoc, _, gtDoc) = generate("python_heredoc.wdl")
     val expected1 =
       """python <<CODE
         |import os
@@ -98,8 +95,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
         |print((dir_path_A == dir_path_B))
         |CODE""".stripMargin
     val expected = Vector(expected1, expected2)
-    evalCommand(tDoc) shouldBe expected
-    evalCommand(gtDoc.get) shouldBe expected
+    evalCommand(tDoc, docSrc) shouldBe expected
+    evalCommand(gtDoc.get, docSrc) shouldBe expected
   }
 
   it should "not wrap strings in command block" in {

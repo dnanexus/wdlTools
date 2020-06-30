@@ -1,7 +1,5 @@
 package wdlTools.syntax
 
-import java.net.URL
-
 import org.antlr.v4.runtime.tree.{ParseTreeListener, TerminalNode}
 import org.antlr.v4.runtime.{
   BaseErrorListener,
@@ -16,7 +14,7 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.Options
+import wdlTools.util.{FileSource, Options}
 
 object Antlr4Util {
   def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
@@ -41,7 +39,7 @@ object Antlr4Util {
 
   // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
   //
-  case class WdlAggregatingErrorListener(docSourceUrl: Option[URL]) extends BaseErrorListener {
+  case class WdlAggregatingErrorListener(docSource: FileSource) extends BaseErrorListener {
 
     private var errors = Vector.empty[SyntaxError]
 
@@ -62,7 +60,7 @@ object Antlr4Util {
           case _ =>
             offendingSymbol.toString
         }
-      val err = SyntaxError(docSourceUrl,
+      val err = SyntaxError(docSource,
                             symbolText,
                             TextSource(line, charPositionInLine, line, charPositionInLine),
                             msg)
@@ -120,11 +118,10 @@ object Antlr4Util {
       val lexer: Lexer,
       val parser: Parser,
       val listenerFactories: Vector[ParseTreeListenerFactory],
-      val docSourceUrl: Option[URL] = None,
-      val docSource: String,
+      val docSource: FileSource,
       val opts: Options
   ) {
-    val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSourceUrl)
+    val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSource)
     // setting up our own error handling
     lexer.removeErrorListeners()
     lexer.addErrorListener(errListener)

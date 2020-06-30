@@ -8,19 +8,19 @@ import scala.language.reflectiveCalls
 
 case class PrintTree(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val url = conf.printTree.url()
     val opts = conf.printTree.getOptions
+    val docSource = opts.fileResolver.resolve(conf.printTree.uri())
     val parsers = Parsers(opts)
-    val document = parsers.parseDocument(url)
+    val document = parsers.parseDocument(docSource)
     if (conf.printTree.typed()) {
       def ignoreImports(p: Product): Option[String] = {
         p match {
-          case d: TypedAbstractSyntax.Document if d.sourceUrl.get != url => Some("...")
-          case _                                                         => None
+          case d: TypedAbstractSyntax.Document if d.source != document.source => Some("...")
+          case _                                                              => None
         }
       }
       val typeChecker = TypeInfer(
-          TypeOptions(localDirectories = opts.localDirectories,
+          TypeOptions(fileResolver = opts.fileResolver,
                       logger = opts.logger,
                       antlr4Trace = opts.antlr4Trace)
       )
@@ -28,8 +28,8 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
     } else {
       def ignoreImports(p: Product): Option[String] = {
         p match {
-          case d: AbstractSyntax.Document if d.sourceUrl.get != url => Some("...")
-          case _                                                    => None
+          case d: AbstractSyntax.Document if d.source != document.source => Some("...")
+          case _                                                         => None
         }
       }
       println(Util.prettyFormat(document, callback = Some(ignoreImports)))

@@ -1,25 +1,24 @@
 package wdlTools.cli
 
-import java.net.URL
-
 import wdlTools.generators.Renderer
 import wdlTools.generators.project.ReadmeGenerator
 import wdlTools.syntax.Parsers
-import wdlTools.util.Util
+import wdlTools.util.FileSource
 
 import scala.language.reflectiveCalls
 
 case class Readmes(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val url = conf.readmes.url()
-    val parsers = Parsers(conf.readmes.getOptions)
+    val opts = conf.readmes.getOptions
+    val docSource = opts.fileResolver.resolve(conf.readmes.uri())
+    val parsers = Parsers(opts)
     val renderer = Renderer()
-    val readmes = parsers.getDocumentWalker[Map[URL, String]](url, Map.empty).walk {
+    val readmes = parsers.getDocumentWalker[Vector[FileSource]](docSource, Vector.empty).walk {
       (doc, results) =>
         results ++ ReadmeGenerator(conf.readmes.developerReadmes(), renderer).apply(doc)
     }
-    Util.writeUrlContents(readmes,
-                          outputDir = conf.readmes.outputDir.toOption,
-                          overwrite = conf.readmes.overwrite())
+    FileSource.localizeAll(readmes,
+                           outputDir = conf.readmes.outputDir.toOption,
+                           overwrite = conf.readmes.overwrite())
   }
 }

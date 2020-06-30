@@ -1,8 +1,7 @@
 package wdlTools.syntax.v1
 
-import java.net.URL
-
 import wdlTools.syntax.{CommentMap, TextSource, WdlVersion}
+import wdlTools.util.FileSource
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
@@ -184,8 +183,7 @@ object ConcreteSyntax {
       extends Element
 
   case class Version(value: WdlVersion = WdlVersion.V1, text: TextSource) extends Element
-  case class Document(sourceUrl: Option[URL],
-                      docSource: String,
+  case class Document(source: FileSource,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

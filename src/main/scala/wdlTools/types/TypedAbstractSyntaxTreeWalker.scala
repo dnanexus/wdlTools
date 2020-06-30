@@ -1,11 +1,9 @@
 package wdlTools.types
 
-import java.net.URL
-
 import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
+import wdlTools.util.{FileSource, Options}
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -135,9 +133,9 @@ class TypedAbstractSyntaxTreeVisitor {
 
 object TypedAbstractSyntaxTreeVisitor {
   case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
-    lazy val docSourceUrl: Option[URL] = element match {
-      case d: Document => d.sourceUrl
-      case _           => findAncestor[Document].get.element.sourceUrl
+    lazy val docSource: FileSource = element match {
+      case d: Document => d.source
+      case _           => findAncestor[Document].get.element.source
     }
 
     def createChildContext[C <: Element](element: C): VisitorContext[C] = {

@@ -1,13 +1,11 @@
 package wdlTools.generators.code
 
-import java.net.URL
-
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, TextSource, WdlVersion}
-import wdlTools.util.Options
+import wdlTools.util.{FileSource, Options}
 
 import scala.collection.BufferedIterator
 
@@ -713,11 +711,11 @@ case class WdlV1Formatter(opts: Options) {
   private case class ImportStatement(importDoc: ImportDoc)
       extends BoundedStatement(importDoc.text) {
     private val keywordToken = Literal.fromStart(Symbols.Import, importDoc.text)
-    // assuming URL comes directly after keyword
-    private val urlLiteral = Literal.fromPrev(importDoc.addr.value, keywordToken)
-    // assuming namespace comes directly after url
+    // assuming URI comes directly after keyword
+    private val uriLiteral = Literal.fromPrev(importDoc.addr.value, keywordToken)
+    // assuming namespace comes directly after uri
     private val nameTokens = importDoc.name.map { name =>
-      Literal.chainFromPrev(Vector(Symbols.As, name.value), urlLiteral)
+      Literal.chainFromPrev(Vector(Symbols.As, name.value), uriLiteral)
     }
     private val aliasTokens = importDoc.aliases.map { alias =>
       Literal.chainFromStart(Vector(Symbols.Alias, alias.id1, Symbols.As, alias.id2), alias.text)
@@ -726,7 +724,7 @@ case class WdlV1Formatter(opts: Options) {
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter
         .derive(newWrapping = Wrapping.Never)
-        .appendAll(Vector(keywordToken, urlLiteral))
+        .appendAll(Vector(keywordToken, uriLiteral))
       if (nameTokens.isDefined) {
         lineFormatter.appendAll(nameTokens.get)
       }
@@ -1456,10 +1454,10 @@ case class WdlV1Formatter(opts: Options) {
     formatElement(document, document.comments)
   }
 
-  def formatDocuments(url: URL): Map[URL, Vector[String]] = {
-    Parsers(opts).getDocumentWalker[Map[URL, Vector[String]]](url, Map.empty).walk {
+  def formatDocuments(docSource: FileSource): Map[FileSource, Vector[String]] = {
+    Parsers(opts).getDocumentWalker[Map[FileSource, Vector[String]]](docSource, Map.empty).walk {
       (doc, results) =>
-        results + (doc.sourceUrl.get -> formatDocument(doc))
+        results + (doc.source -> formatDocument(doc))
     }
   }
 }
