@@ -28,7 +28,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
 
   case object DxProtocol extends FileAccessProtocol {
     val prefixes = Vector("dx")
-    override def resolve(uri: String): FileSource = ???
+    override def resolve(uri: String, exists: Option[Boolean] = None): FileSource = ???
   }
 
   private lazy val evalCfg: EvalConfig = {
