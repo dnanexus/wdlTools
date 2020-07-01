@@ -128,11 +128,9 @@ trait FileAccessProtocol {
   /**
     * Resolve a URI
     * @param uri the file URI
-    * @param exists if Some(true), the FileSource must exist; if Some(false), the FileSource must not exist;
-    *               if None, no check is done for whether or not the FileSource exists
     * @return
     */
-  def resolve(uri: String, exists: Option[Boolean] = None): FileSource
+  def resolve(uri: String): FileSource
 }
 
 abstract class AbstractVirtualFileSource(name: Option[Path] = None,
@@ -210,6 +208,16 @@ case class LocalFileSource(override val localPath: Path,
     extends AbstractPhysicalFileSource(encoding) {
   override lazy val toString: String = localPath.toString
 
+  def checkExists(exists: Boolean): Unit = {
+    val existing = Files.exists(localPath)
+    if (exists && !existing) {
+      throw new FileNotFoundException(s"Path does not exist ${localPath}")
+    }
+    if (!exists && existing) {
+      throw new FileAlreadyExistsException(s"Path already exists ${localPath}")
+    }
+  }
+
   override lazy val size: Long = {
     if (!Files.exists(localPath)) {
       throw new FileSystemNotFoundException(s"File ${localPath} not found")
@@ -264,16 +272,16 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
       )
   }
 
-  def resolve(uri: String, exists: Option[Boolean] = None): FileSource = {
+  def resolve(uri: String): FileSource = {
     val path: Path = getUriScheme(uri) match {
       case Some(FILE_SCHEME) => Paths.get(URI.create(uri))
       case None              => Util.getPath(uri)
       case _                 => throw new Exception(s"${uri} is not a path or file:// URI")
     }
-    resolvePath(path, exists)
+    resolvePath(path)
   }
 
-  def resolvePath(path: Path, exists: Option[Boolean] = None): FileSource = {
+  def resolvePath(path: Path): FileSource = {
     val resolved: Path = if (Files.exists(path)) {
       path.toRealPath()
     } else if (path.isAbsolute) {
@@ -281,16 +289,8 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     } else if (searchPath.nonEmpty) {
       findInPath(path.toString)
     } else {
+      // it's a non-existant relative path - localize it to current working dir
       Util.absolutePath(path)
-    }
-    if (exists.nonEmpty) {
-      val existing = Files.exists(resolved)
-      if (exists.get && !existing) {
-        throw new FileNotFoundException(s"Path does not exist ${resolved}")
-      }
-      if (!exists.get && existing) {
-        throw new FileAlreadyExistsException(s"Path already exists ${resolved}")
-      }
     }
     LocalFileSource(resolved, logger, encoding)
   }
@@ -375,13 +375,8 @@ case class HttpFileAccessProtocol(logger: Logger = Logger.Quiet,
     extends FileAccessProtocol {
   val prefixes = Vector(Util.HTTP_SCHEME, Util.HTTPS_SCHEME)
 
-  override def resolve(uri: String, exists: Option[Boolean] = None): FileSource = {
-    val src = RemoteFileSource(URI.create(uri), encoding, logger)
-    // if the resource is required to exist check that it's accessible
-    if (exists.forall(b => b)) {
-      src.size
-    }
-    src
+  override def resolve(uri: String): FileSource = {
+    RemoteFileSource(URI.create(uri), encoding, logger)
   }
 }
 
