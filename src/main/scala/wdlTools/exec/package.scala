@@ -1,17 +1,16 @@
 package wdlTools.exec
 
-import wdlTools.syntax.TextSource
-import wdlTools.util.FileSource
+import wdlTools.syntax.SourceLocation
 
 // A runtime error
 final class ExecException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSource: FileSource) = {
-    this(ExecException.formatMessage(msg, text, docSource))
+  def this(msg: String, loc: SourceLocation) = {
+    this(ExecException.formatMessage(msg, loc))
   }
 }
 
 object ExecException {
-  def formatMessage(msg: String, text: TextSource, docSource: FileSource): String = {
-    s"${msg} at ${text} in ${docSource}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 }

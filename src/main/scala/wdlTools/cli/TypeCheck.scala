@@ -17,10 +17,10 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       JsObject(
           Map(
               "reason" -> JsString(err.reason),
-              "startLine" -> JsNumber(err.textSource.line),
-              "startCol" -> JsNumber(err.textSource.col),
-              "endLine" -> JsNumber(err.textSource.endLine),
-              "endCol" -> JsNumber(err.textSource.endCol)
+              "startLine" -> JsNumber(err.loc.line),
+              "startCol" -> JsNumber(err.loc.col),
+              "endLine" -> JsNumber(err.loc.endLine),
+              "endCol" -> JsNumber(err.loc.endCol)
           )
       )
     }
@@ -54,8 +54,8 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       printer.println(border1)
       printer.println(colorMsg("Line:Col | Description", AnsiColor.BOLD))
       printer.println(border2)
-      docErrors.sortWith(_.textSource < _.textSource).foreach { err =>
-        printer.println(f"${err.textSource}%-9s| ${err.reason}")
+      docErrors.sortWith(_.loc < _.loc).foreach { err =>
+        printer.println(f"${err.loc}%-9s| ${err.reason}")
       }
     }
   }
@@ -67,7 +67,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     var errors: Map[FileSource, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
-      typeErrors.groupBy(_.docSource).foreach {
+      typeErrors.groupBy(_.loc.source).foreach {
         case (docSource, docErrors) =>
           errors += (docSource -> (errors.getOrElse(docSource, Vector.empty) ++ docErrors))
         case other => throw new RuntimeException(s"Unexpected ${other}")

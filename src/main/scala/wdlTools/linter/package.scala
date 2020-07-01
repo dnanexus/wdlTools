@@ -1,8 +1,7 @@
 package wdlTools.linter
 
 import wdlTools.linter.Severity.Severity
-import wdlTools.syntax.TextSource
-import wdlTools.util.FileSource
+import wdlTools.syntax.SourceLocation
 
 object Severity extends Enumeration {
   type Severity = Value
@@ -12,8 +11,7 @@ object Severity extends Enumeration {
 
 case class LintEvent(ruleId: String,
                      severity: Severity,
-                     textSource: TextSource,
-                     docSource: FileSource,
+                     textSource: SourceLocation,
                      message: Option[String] = None)
     extends Ordered[LintEvent] {
   override def compare(that: LintEvent): Int = {

@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, Severity}
-import wdlTools.syntax.TextSource
+import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypeOptions
 import wdlTools.util.FileSource
 
@@ -29,28 +29,28 @@ class BaseTest extends AnyFlatSpec with Matchers {
     lints.size shouldBe 8
 
     lints(0) should matchPattern {
-      case LintEvent("P001", Severity.Error, TextSource(1, 7, 1, 9), docSource, _) =>
+      case LintEvent("P001", Severity.Error, SourceLocation(_, 1, 7, 1, 9), _) =>
     }
     lints(1) should matchPattern {
-      case LintEvent("P004", Severity.Error, TextSource(1, 26, 3, 3), docSource, _) =>
+      case LintEvent("P004", Severity.Error, SourceLocation(_, 1, 26, 3, 3), _) =>
     }
     lints(2) should matchPattern {
-      case LintEvent("A001", Severity.Error, TextSource(3, 2, 15, 1), docSource, _) =>
+      case LintEvent("A001", Severity.Error, SourceLocation(_, 3, 2, 15, 1), _) =>
     }
     lints(3) should matchPattern {
-      case LintEvent("A003", Severity.Error, TextSource(3, 2, 15, 1), docSource, _) =>
+      case LintEvent("A003", Severity.Error, SourceLocation(_, 3, 2, 15, 1), _) =>
     }
     lints(4) should matchPattern {
-      case LintEvent("P002", Severity.Error, TextSource(6, 3, 9, 12), docSource, _) =>
+      case LintEvent("P002", Severity.Error, SourceLocation(_, 6, 3, 9, 12), _) =>
     }
     lints(5) should matchPattern {
-      case LintEvent("P003", Severity.Error, TextSource(6, 3, 9, 12), docSource, _) =>
+      case LintEvent("P003", Severity.Error, SourceLocation(_, 6, 3, 9, 12), _) =>
     }
     lints(6) should matchPattern {
-      case LintEvent("P002", Severity.Error, TextSource(9, 33, 10, 4), docSource, _) =>
+      case LintEvent("P002", Severity.Error, SourceLocation(_, 9, 33, 10, 4), _) =>
     }
     lints(7) should matchPattern {
-      case LintEvent("P005", Severity.Error, TextSource(11, 3, 11, 7), docSource, _) =>
+      case LintEvent("P005", Severity.Error, SourceLocation(_, 11, 3, 11, 7), _) =>
     }
   }
 }

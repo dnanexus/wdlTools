@@ -161,6 +161,8 @@ object StringFileSource {
   def withName(name: String, content: String): StringFileSource = {
     StringFileSource(content, Some(Util.getPath(name)))
   }
+
+  lazy val empty: StringFileSource = StringFileSource("")
 }
 
 case class LinesFileSource(override val readLines: Vector[String],
@@ -188,11 +190,6 @@ object LinesFileSource {
 abstract class AbstractPhysicalFileSource(override val encoding: Charset)
     extends AbstractFileSource(encoding) {
 
-  /**
-    * Reads the entire file into a string.
-    *
-    * @return
-    */
   override lazy val readString: String = new String(readBytes, encoding)
 
   override lazy val readLines: Vector[String] = {
@@ -201,8 +198,8 @@ abstract class AbstractPhysicalFileSource(override val encoding: Charset)
 }
 
 case class LocalFileSource(override val localPath: Path,
-                           override val encoding: Charset,
-                           logger: Logger)
+                           logger: Logger,
+                           override val encoding: Charset)
     extends AbstractPhysicalFileSource(encoding) {
   override lazy val toString: String = localPath.toString
 
@@ -279,7 +276,7 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     } else {
       throw new FileNotFoundException(s"Path does not exist ${path}")
     }
-    LocalFileSource(resolved, encoding, logger)
+    LocalFileSource(resolved, logger, encoding)
   }
 }
 

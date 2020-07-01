@@ -234,7 +234,7 @@ object BaseWdlFormatter {
       }
       val preformatted = hashes.get.startsWith(Symbols.PreformattedComment)
       val rawText = text.substring(hashes.get.length)
-      (if (preformatted) rawText else rawText.trim, comment.text.line, preformatted)
+      (if (preformatted) rawText else rawText.trim, comment.loc.line, preformatted)
     }
 
     /**
@@ -253,8 +253,8 @@ object BaseWdlFormatter {
 
       if (lineComments.nonEmpty) {
         val sortedComments = lineComments.toSortedVector
-        val beforeDist = sortedComments.head.text.line - currentSourceLine.value
-        val afterDist = beforeLine - sortedComments.last.text.endLine
+        val beforeDist = sortedComments.head.loc.line - currentSourceLine.value
+        val afterDist = beforeLine - sortedComments.last.loc.endLine
 
         if (beforeDist > 1) {
           lines.append("")
@@ -331,8 +331,8 @@ object BaseWdlFormatter {
       currentLineComments ++= comments
         .filterWithin(range)
         .toSortedVector
-        .filter(comment => !currentLineComments.contains(comment.text.line))
-        .map(comment => comment.text.line -> trimComment(comment)._1)
+        .filter(comment => !currentLineComments.contains(comment.loc.line))
+        .map(comment => comment.loc.line -> trimComment(comment)._1)
     }
 
     def addInlineComment(line: Int, text: String): Unit = {

@@ -3,37 +3,35 @@ package wdlTools.eval
 import java.io.IOException
 import java.nio.file._
 
-import wdlTools.syntax.TextSource
+import wdlTools.syntax.SourceLocation
 import wdlTools.util.{FileSource, NoSuchProtocolException, Options, Util}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-case class IoSupp(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
-  def getFileSource(uri: String, text: TextSource): FileSource = {
+case class IoSupp(opts: Options, evalCfg: EvalConfig) {
+  def getFileSource(uri: String, loc: SourceLocation): FileSource = {
     try {
       evalCfg.fileResolver.resolve(uri)
     } catch {
       case e: NoSuchProtocolException =>
-        throw new EvalException(e.getMessage, text, docSource)
+        throw new EvalException(e.getMessage, loc)
     }
   }
 
-  def size(pathOrUri: String, text: TextSource): Long = {
-    val file = getFileSource(pathOrUri, text)
+  def size(pathOrUri: String, loc: SourceLocation): Long = {
+    val file = getFileSource(pathOrUri, loc)
     try {
       file.size
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}",
-                                text,
-                                docSource)
+        throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 
   // Create an empty file if the given path does not already exist - used by stdout() and stderr()
-  def ensureFileExists(path: Path, name: String, text: TextSource): Unit = {
+  def ensureFileExists(path: Path, name: String, loc: SourceLocation): Unit = {
     val file = path.toFile
     if (!file.exists()) {
       try {
@@ -42,8 +40,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
         case e: IOException =>
           throw new EvalException(
               s"${name} file ${file} does not exist and cannot be created: ${e.getMessage}",
-              text,
-              docSource
+              loc
           )
       }
     }
@@ -55,7 +52,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
   def downloadFile(pathOrUri: String,
                    dest: Path,
                    overwrite: Boolean = false,
-                   text: TextSource): Path = {
+                   loc: SourceLocation): Path = {
     val realPath = if (!Files.exists(dest)) {
       Util.createDirectories(dest.getParent)
       dest
@@ -68,45 +65,38 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
     } else {
       throw new EvalException(
           s"File ${dest} already exists and overwrite = false",
-          text,
-          docSource
+          loc
       )
     }
-    val file = getFileSource(pathOrUri, text)
+    val file = getFileSource(pathOrUri, loc)
     try {
       file.localize(realPath)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}",
-                                text,
-                                docSource)
+        throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 
   // Read the contents of the file/URI and return a string
-  def readFile(pathOrUri: String, text: TextSource): String = {
-    val file = getFileSource(pathOrUri, text)
+  def readFile(pathOrUri: String, loc: SourceLocation): String = {
+    val file = getFileSource(pathOrUri, loc)
     try {
       file.readString
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}",
-                                text,
-                                docSource)
+        throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(p: Path, content: String, text: TextSource): Unit = {
+  def writeFile(p: Path, content: String, loc: SourceLocation): Unit = {
     try {
       Files.write(p, content.getBytes(evalCfg.encoding))
     } catch {
       case t: Throwable =>
-        throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}",
-                                text,
-                                docSource)
+        throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}", loc)
     }
   }
 

@@ -1,7 +1,7 @@
 package wdlTools.types
 
-import wdlTools.syntax.TextSource
-import wdlTools.util.{FileSource, FileSourceResolver, Logger, Options}
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{FileSourceResolver, Logger, Options}
 
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
@@ -22,12 +22,12 @@ case class TypeOptions(fileResolver: FileSourceResolver = FileSourceResolver.cre
                        allowNonWorkflowInputs: Boolean = true)
     extends Options
 
-final case class TypeError(docSource: FileSource, textSource: TextSource, reason: String)
+final case class TypeError(loc: SourceLocation, reason: String)
 
 // Type error exception
 final class TypeException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSource: FileSource) = {
-    this(TypeException.formatMessage(msg, text, docSource))
+  def this(msg: String, loc: SourceLocation) = {
+    this(TypeException.formatMessage(msg, loc))
   }
   def this(errors: Seq[TypeError]) = {
     this(TypeException.formatMessageFromErrorList(errors))
@@ -35,14 +35,14 @@ final class TypeException(message: String) extends Exception(message) {
 }
 
 object TypeException {
-  def formatMessage(msg: String, text: TextSource, docSource: FileSource): String = {
-    s"${msg} at ${text} in ${docSource}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 
   def formatMessageFromErrorList(errors: Seq[TypeError]): String = {
     // make one big report on all the type errors
     val messages = errors.map {
-      case TypeError(docSource, textSource, msg) => s"${msg} in ${docSource} at ${textSource}"
+      case TypeError(locSource, msg) => s"${msg} at ${locSource}"
     }
     messages.mkString("\n")
   }

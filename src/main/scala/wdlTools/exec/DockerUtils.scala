@@ -4,11 +4,11 @@ import java.nio.file.Files
 
 import spray.json._
 import wdlTools.eval.{EvalConfig, IoSupp}
-import wdlTools.syntax.TextSource
-import wdlTools.util.{FileSource, Options, TraceLevel, Util}
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{Options, TraceLevel, Util}
 
-case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource) {
-  private val ioSupp = IoSupp(opts, evalCfg, docSource)
+case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
+  private val ioSupp = IoSupp(opts, evalCfg)
   private val logger = opts.logger
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
@@ -19,7 +19,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource
   }
 
   // pull a Docker image from a repository - requires Docker client to be installed
-  def pullImage(name: String, text: TextSource): String = {
+  def pullImage(name: String, loc: SourceLocation): String = {
     var retry_count = 5
     while (retry_count > 0) {
       try {
@@ -43,7 +43,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource
           Thread.sleep(1000)
       }
     }
-    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries", text, docSource)
+    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries", loc)
   }
 
   // Read the manifest file from a docker tarball, and get the repository name.
@@ -86,7 +86,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource
   // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using `IoSupp.downloadFile`
   // and loaded using `docker load`. Otherwise, it is assumed to be an image name and is pulled
   // with `pullImage`. Requires Docker client to be installed.
-  def getImage(nameOrUrl: String, text: TextSource): String = {
+  def getImage(nameOrUrl: String, loc: SourceLocation): String = {
     if (nameOrUrl.contains("://")) {
       // a tarball created with "docker save".
       // 1. download it
@@ -94,7 +94,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource
       // 2. load into the local docker cache
       // 3. figure out the image name
       logger.traceLimited(s"downloading docker tarball to ${DOCKER_TARBALLS_DIR}")
-      val localTar = ioSupp.downloadFile(nameOrUrl, DOCKER_TARBALLS_DIR, overwrite = true, text)
+      val localTar = ioSupp.downloadFile(nameOrUrl, DOCKER_TARBALLS_DIR, overwrite = true, loc)
       logger.traceLimited("figuring out the image name")
       val (mContent, _) = Util.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
       logger.traceLimited(
@@ -114,7 +114,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig, docSource: FileSource
       )
       repo
     } else {
-      pullImage(nameOrUrl, text)
+      pullImage(nameOrUrl, loc)
       nameOrUrl
     }
   }

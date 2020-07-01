@@ -17,10 +17,13 @@ import wdlTools.syntax
 import wdlTools.util.{FileSource, Options}
 
 object Antlr4Util {
-  def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
+  def getTextSource(source: FileSource,
+                    startToken: Token,
+                    maybeStopToken: Option[Token] = None): SourceLocation = {
     // TODO: for an ending token that containing newlines, the endLine and endCol will be wrong
     val stopToken = maybeStopToken.getOrElse(startToken)
-    syntax.TextSource(
+    syntax.SourceLocation(
+        source = source,
         line = startToken.getLine,
         col = startToken.getCharPositionInLine,
         endLine = stopToken.getLine,
@@ -28,13 +31,13 @@ object Antlr4Util {
     )
   }
 
-  def getTextSource(ctx: ParserRuleContext): TextSource = {
+  def getTextSource(source: FileSource, ctx: ParserRuleContext): SourceLocation = {
     val stop = ctx.getStop
-    getTextSource(ctx.getStart, Option(stop))
+    getTextSource(source, ctx.getStart, Option(stop))
   }
 
-  def getTextSource(symbol: TerminalNode): TextSource = {
-    getTextSource(symbol.getSymbol, None)
+  def getTextSource(source: FileSource, symbol: TerminalNode): SourceLocation = {
+    getTextSource(source, symbol.getSymbol, None)
   }
 
   // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
@@ -60,10 +63,11 @@ object Antlr4Util {
           case _ =>
             offendingSymbol.toString
         }
-      val err = SyntaxError(docSource,
-                            symbolText,
-                            TextSource(line, charPositionInLine, line, charPositionInLine),
-                            msg)
+      val err = SyntaxError(
+          symbolText,
+          SourceLocation(docSource, line, charPositionInLine, line, charPositionInLine),
+          msg
+      )
       errors = errors :+ err
     }
 
@@ -72,7 +76,9 @@ object Antlr4Util {
     def hasErrors: Boolean = errors.nonEmpty
   }
 
-  private case class CommentListener(tokenStream: BufferedTokenStream, channelIndex: Int)
+  private case class CommentListener(docSource: FileSource,
+                                     tokenStream: BufferedTokenStream,
+                                     channelIndex: Int)
       extends AllParseTreeListener {
     private var comments: Map[Int, Comment] = Map.empty
 
@@ -80,7 +86,7 @@ object Antlr4Util {
 
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
-        val source = Antlr4Util.getTextSource(tok, None)
+        val source = Antlr4Util.getTextSource(docSource, tok, None)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
@@ -141,6 +147,7 @@ object Antlr4Util {
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
     private val commentListener = CommentListener(
+        docSource,
         parser.getTokenStream.asInstanceOf[BufferedTokenStream],
         commentChannel
     )

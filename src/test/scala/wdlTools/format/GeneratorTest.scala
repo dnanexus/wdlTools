@@ -23,8 +23,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     opts.fileResolver.fromPath(getWdlPath(fname, subdir))
   }
 
-  private def evalCommand(tDoc: TAT.Document, docSource: FileSource): Vector[String] = {
-    val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1, docSource)
+  private def evalCommand(tDoc: TAT.Document): Vector[String] = {
+    val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1)
     tDoc.elements should not be empty
     tDoc.elements.collect {
       case task: TAT.Task =>
@@ -80,7 +80,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "handle command block" in {
-    val (docSrc, tDoc, _, gtDoc) = generate("python_heredoc.wdl")
+    val (_, tDoc, _, gtDoc) = generate("python_heredoc.wdl")
     val expected1 =
       """python <<CODE
         |import os
@@ -95,8 +95,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
         |print((dir_path_A == dir_path_B))
         |CODE""".stripMargin
     val expected = Vector(expected1, expected2)
-    evalCommand(tDoc, docSrc) shouldBe expected
-    evalCommand(gtDoc.get, docSrc) shouldBe expected
+    evalCommand(tDoc) shouldBe expected
+    evalCommand(gtDoc.get) shouldBe expected
   }
 
   it should "not wrap strings in command block" in {

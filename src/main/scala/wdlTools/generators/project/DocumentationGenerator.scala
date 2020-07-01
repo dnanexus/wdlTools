@@ -87,11 +87,11 @@ case class DocumentationGenerator(opts: Options) {
 
   def generateDocumentation(doc: Document): Option[WdlDocumentation] = {
     val sortedElements = (doc.elements ++ doc.workflow.map(Vector(_)).getOrElse(Vector.empty))
-      .sortWith(_.text < _.text)
+      .sortWith(_.loc < _.loc)
     if (sortedElements.nonEmpty) {
       def getDocumentationComment(element: Element): Option[DocumentationComment] = {
         val preceedingComments =
-          (1 until element.text.line).reverse
+          (1 until element.loc.line).reverse
             .map(doc.comments.get)
             .takeWhile(comment => comment.isDefined && comment.get.value.startsWith("###"))
             .reverse
@@ -105,7 +105,7 @@ case class DocumentationGenerator(opts: Options) {
       }
 
       def getMetaValueDocumentation(value: MetaValue, parentLine: Int): ValueDocumentation = {
-        val comment = if (value.text.line > parentLine) {
+        val comment = if (value.loc.line > parentLine) {
           getDocumentationComment(value)
         } else {
           None
@@ -126,7 +126,7 @@ case class DocumentationGenerator(opts: Options) {
           value: Expr,
           parentLine: Int
       ): ValueDocumentation = {
-        val comment = if (value.text.line > parentLine) {
+        val comment = if (value.loc.line > parentLine) {
           getDocumentationComment(value)
         } else {
           None
@@ -163,7 +163,7 @@ case class DocumentationGenerator(opts: Options) {
       def getMetaDocumentation(meta: MetaSection): Vector[KeyValueDocumentation] = {
         meta.kvs.map { kv =>
           KeyValueDocumentation(kv.id,
-                                getMetaValueDocumentation(kv.value, kv.text.line),
+                                getMetaValueDocumentation(kv.value, kv.loc.line),
                                 getDocumentationComment(kv))
         }
       }
@@ -186,7 +186,7 @@ case class DocumentationGenerator(opts: Options) {
               d.name,
               d.wdlType,
               default,
-              paramMeta.map(v => getMetaValueDocumentation(v, meta.get.text.line)),
+              paramMeta.map(v => getMetaValueDocumentation(v, meta.get.loc.line)),
               getDocumentationComment(d)
           )
         }
@@ -258,7 +258,7 @@ case class DocumentationGenerator(opts: Options) {
                     _.kvs.map(kv =>
                       KeyValueDocumentation(
                           kv.id,
-                          getValueDocumentation(kv.expr, kv.text.line),
+                          getValueDocumentation(kv.expr, kv.loc.line),
                           getDocumentationComment(kv)
                       )
                     )
@@ -269,7 +269,7 @@ case class DocumentationGenerator(opts: Options) {
                     _.kvs.map(kv =>
                       KeyValueDocumentation(
                           kv.id,
-                          getMetaValueDocumentation(kv.value, kv.text.line),
+                          getMetaValueDocumentation(kv.value, kv.loc.line),
                           getDocumentationComment(kv)
                       )
                     )
@@ -281,9 +281,9 @@ case class DocumentationGenerator(opts: Options) {
       }
 
       // find the first element in the document and see if there's a top-level comment above it
-      val firstElementLine = sortedElements.head.text.line
+      val firstElementLine = sortedElements.head.loc.line
       val topComments =
-        doc.comments.filterWithin((doc.version.text.endLine + 1) until firstElementLine)
+        doc.comments.filterWithin((doc.version.loc.endLine + 1) until firstElementLine)
       val overview = if (topComments.nonEmpty) {
         Some(DocumentationComment(topComments.toSortedVector))
       } else {

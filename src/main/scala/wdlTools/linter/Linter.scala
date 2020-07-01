@@ -32,11 +32,10 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
 
     def handleParserErrors(errors: Vector[SyntaxError]): Boolean = {
       // convert parser exception to LintEvent
-      errors.groupBy(_.fileSource).foreach {
+      errors.groupBy(_.loc.source).foreach {
         case (fileSource, docErrors) =>
-          val docEvents = docErrors.map(err =>
-            LintEvent("P000", Severity.Error, err.textSource, err.fileSource, Some(err.reason))
-          )
+          val docEvents = docErrors
+            .map(err => LintEvent("P000", Severity.Error, err.loc, Some(err.reason)))
           parserErrorEvents += (fileSource -> (parserErrorEvents
             .getOrElse(fileSource, Vector.empty) ++ docEvents))
       }
@@ -44,12 +43,10 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
     }
 
     def handleTypeErrors(errors: Vector[TypeError]): Boolean = {
-      errors.groupBy(_.docSource).foreach {
+      errors.groupBy(_.loc.source).foreach {
         case (uri, docErrors) =>
           val docEvents = docErrors
-            .map(err =>
-              LintEvent("T000", Severity.Error, err.textSource, err.docSource, Some(err.reason))
-            )
+            .map(err => LintEvent("T000", Severity.Error, err.loc, Some(err.reason)))
           typeErrorEvents += (uri -> (typeErrorEvents.getOrElse(uri, Vector.empty) ++ docEvents))
       }
       false
@@ -77,8 +74,7 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
                         id,
                         severity,
                         doc.version.value,
-                        typesContext,
-                        doc.source
+                        typesContext
                     )
                 }.toVector
                 val astWalker = LinterASTWalker(opts, astVisitors)

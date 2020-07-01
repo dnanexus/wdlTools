@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{TextSource, WdlVersion}
+import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
 import wdlTools.util.{FileAccessProtocol, FileSource, FileSourceResolver, Logger, StringFileSource}
 
@@ -43,7 +43,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     EvalConfig.make(dirs(0), dirs(1), stdout, stderr, userProtos = Vector(DxProtocol))
   }
 
-  private val dummyTextSource = TextSource(0, 0, 0, 0)
+  private val dummyTextSource = SourceLocation.empty
 
   it should "be able to get size of a local file" in {
     val p = Files.createTempFile("Y", ".txt")
@@ -51,7 +51,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
       val buf = "hello bunny"
       val docSrc = StringFileSource(buf, Some(p))
       docSrc.localize(overwrite = true)
-      val ioSupp = IoSupp(opts, evalCfg, docSrc)
+      val ioSupp = IoSupp(opts, evalCfg)
       val len = ioSupp.size(p.toString, dummyTextSource)
       len shouldBe buf.length
       val data = ioSupp.readFile(p.toString, dummyTextSource)
@@ -67,7 +67,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     try {
       val docSrc = StringFileSource(buf, Some(p))
       docSrc.localize(overwrite = true)
-      val stdlib = Stdlib(opts, evalCfg, WdlVersion.V1, docSrc)
+      val stdlib = Stdlib(opts, evalCfg, WdlVersion.V1)
       val retval = stdlib.call("size", Vector(WdlValues.V_String(p.toString)), dummyTextSource)
       inside(retval) {
         case WdlValues.V_Float(x) =>

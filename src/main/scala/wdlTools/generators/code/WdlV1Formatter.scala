@@ -4,7 +4,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{CommentMap, Parsers, TextSource, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, SourceLocation, WdlVersion}
 import wdlTools.util.{FileSource, Options}
 
 import scala.collection.BufferedIterator
@@ -48,7 +48,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private object Literal {
-    def fromStart(value: Any, textSource: TextSource, quoting: Boolean = false): Literal = {
+    def fromStart(value: Any, textSource: SourceLocation, quoting: Boolean = false): Literal = {
       Literal(value, quoting, textSource.line, (Some(textSource.col), None))
     }
 
@@ -59,7 +59,7 @@ case class WdlV1Formatter(opts: Options) {
       Literal(value, quoting, line, (Some(column), None))
     }
 
-    def fromEnd(value: Any, textSource: TextSource, quoted: Boolean = false): Literal = {
+    def fromEnd(value: Any, textSource: SourceLocation, quoted: Boolean = false): Literal = {
       Literal(value, quoted, textSource.endLine, (None, Some(textSource.endCol)))
     }
 
@@ -93,7 +93,7 @@ case class WdlV1Formatter(opts: Options) {
       }
     }
 
-    def chainFromStart(values: Vector[Any], start: TextSource): Vector[Literal] = {
+    def chainFromStart(values: Vector[Any], start: SourceLocation): Vector[Literal] = {
       var prev = Literal.fromStart(values.head, start)
       Vector(prev) ++ values.tail.map { v =>
         val next = Literal.fromPrev(v, prev)
@@ -232,7 +232,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private trait Bounded {
-    def bounds: TextSource
+    def bounds: SourceLocation
   }
 
   private trait BoundedComposite extends Composite with Bounded {
@@ -249,7 +249,7 @@ case class WdlV1Formatter(opts: Options) {
       items: Vector[Span],
       ends: Option[(Span, Span)] = None,
       delimiter: Option[String] = None,
-      override val bounds: TextSource,
+      override val bounds: SourceLocation,
       override val wrapping: Wrapping = Wrapping.Never,
       continue: Boolean = true
   ) extends Container(items,
@@ -262,7 +262,7 @@ case class WdlV1Formatter(opts: Options) {
   private case class KeyValue(key: Span,
                               value: Span,
                               delimiter: String = Symbols.KeyValueDelimiter,
-                              override val bounds: TextSource,
+                              override val bounds: SourceLocation,
                               override val isSection: Boolean = true)
       extends BoundedComposite {
     private val delimiterLiteral: Literal = Literal.fromPrev(delimiter, key)
@@ -279,7 +279,7 @@ case class WdlV1Formatter(opts: Options) {
   private object DataType {
     def buildDataType(name: String,
                       quantifiers: Vector[Span] = Vector.empty,
-                      textSource: TextSource,
+                      textSource: SourceLocation,
                       inner1: Option[Span] = None,
                       inner2: Option[Span] = None): Span = {
       val nameLiteral: Literal = Literal.fromStart(name, textSource)
@@ -363,7 +363,7 @@ case class WdlV1Formatter(opts: Options) {
                                rhs: Span,
                                grouped: Boolean = false,
                                inString: Boolean,
-                               override val bounds: TextSource)
+                               override val bounds: SourceLocation)
       extends Group(ends = if (grouped) {
         Some(Literal.fromStart(Symbols.GroupOpen, bounds),
              Literal.fromEnd(Symbols.GroupClose, bounds))
@@ -383,7 +383,7 @@ case class WdlV1Formatter(opts: Options) {
                                  close: String = Symbols.PlaceholderClose,
                                  options: Option[Vector[Span]] = None,
                                  inString: Boolean,
-                                 override val bounds: TextSource)
+                                 override val bounds: SourceLocation)
       extends Group(
           ends = Some(Literal.fromStart(open, bounds), Literal.fromEnd(close, bounds)),
           wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
@@ -402,7 +402,7 @@ case class WdlV1Formatter(opts: Options) {
 
   private case class CompoundString(spans: Vector[Span],
                                     quoting: Boolean,
-                                    override val bounds: TextSource)
+                                    override val bounds: SourceLocation)
       extends BoundedComposite {
     override lazy val length: Int = spans
       .map(_.length)
@@ -461,12 +461,12 @@ case class WdlV1Formatter(opts: Options) {
       )
     }
 
-    def unary(oper: String, value: Expr, textSource: TextSource): Span = {
+    def unary(oper: String, value: Expr, textSource: SourceLocation): Span = {
       val operSpan = Literal.fromStart(oper, textSource)
       SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
     }
 
-    def operation(oper: String, lhs: Expr, rhs: Expr, textSource: TextSource): Span = {
+    def operation(oper: String, lhs: Expr, rhs: Expr, textSource: SourceLocation): Span = {
       Operation(
           oper,
           nested(lhs,
@@ -649,7 +649,7 @@ case class WdlV1Formatter(opts: Options) {
           case other => throw new Exception(s"Unrecognized expression $other")
         }
         if (inStringOrCommand && !inPlaceholder) {
-          Placeholder(span, placeholderOpen, inString = inStringOrCommand, bounds = other.text)
+          Placeholder(span, placeholderOpen, inString = inStringOrCommand, bounds = other.loc)
         } else {
           span
         }
@@ -676,7 +676,7 @@ case class WdlV1Formatter(opts: Options) {
     override def endLine: Int = bounds.endLine
   }
 
-  private abstract class BoundedStatement(override val bounds: TextSource)
+  private abstract class BoundedStatement(override val bounds: SourceLocation)
       extends Statement
       with BoundedMultiline {
 
@@ -694,10 +694,10 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class VersionStatement(version: Version) extends Statement with BoundedMultiline {
-    override def bounds: TextSource = version.text
+    override def bounds: SourceLocation = version.loc
 
-    private val keywordToken = Literal.fromStart(Symbols.Version, version.text)
-    private val versionToken = Literal.fromEnd(WdlVersion.V1.name, version.text)
+    private val keywordToken = Literal.fromStart(Symbols.Version, version.loc)
+    private val versionToken = Literal.fromEnd(WdlVersion.V1.name, version.loc)
 
     override def format(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginLine()
@@ -708,9 +708,8 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class ImportStatement(importDoc: ImportDoc)
-      extends BoundedStatement(importDoc.text) {
-    private val keywordToken = Literal.fromStart(Symbols.Import, importDoc.text)
+  private case class ImportStatement(importDoc: ImportDoc) extends BoundedStatement(importDoc.loc) {
+    private val keywordToken = Literal.fromStart(Symbols.Import, importDoc.loc)
     // assuming URI comes directly after keyword
     private val uriLiteral = Literal.fromPrev(importDoc.addr.value, keywordToken)
     // assuming namespace comes directly after uri
@@ -718,7 +717,7 @@ case class WdlV1Formatter(opts: Options) {
       Literal.chainFromPrev(Vector(Symbols.As, name.value), uriLiteral)
     }
     private val aliasTokens = importDoc.aliases.map { alias =>
-      Literal.chainFromStart(Vector(Symbols.Alias, alias.id1, Symbols.As, alias.id2), alias.text)
+      Literal.chainFromStart(Vector(Symbols.Alias, alias.id1, Symbols.As, alias.id2), alias.loc)
     }
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
@@ -759,7 +758,7 @@ case class WdlV1Formatter(opts: Options) {
     override def endLine: Int = sortedStatements.last.endLine
   }
 
-  private abstract class InnerSection(val bounds: TextSource,
+  private abstract class InnerSection(val bounds: SourceLocation,
                                       emtpyLineBetweenStatements: Boolean = false)
       extends Section(emtpyLineBetweenStatements) {
     override def line: Int = bounds.line + 1
@@ -776,7 +775,7 @@ case class WdlV1Formatter(opts: Options) {
   private abstract class DeclarationBase(name: String,
                                          wdlType: Type,
                                          expr: Option[Expr] = None,
-                                         override val bounds: TextSource)
+                                         override val bounds: SourceLocation)
       extends BoundedStatement(bounds) {
 
     private val typeSpan = DataType.fromWdlType(wdlType)
@@ -798,7 +797,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class DeclarationStatement(decl: Declaration)
-      extends DeclarationBase(decl.name, decl.wdlType, decl.expr, decl.text)
+      extends DeclarationBase(decl.name, decl.wdlType, decl.expr, decl.loc)
 
   private case class DeclarationsSection(declarations: Vector[Declaration]) extends OpenSection {
     override val statements: Vector[Statement] = {
@@ -806,7 +805,7 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private abstract class BlockStatement(keyword: String, override val bounds: TextSource)
+  private abstract class BlockStatement(keyword: String, override val bounds: SourceLocation)
       extends Statement
       with BoundedMultiline {
 
@@ -838,7 +837,7 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class InputsBlock(inputs: Vector[Declaration], override val bounds: TextSource)
+  private case class InputsBlock(inputs: Vector[Declaration], override val bounds: SourceLocation)
       extends BlockStatement(Symbols.Input, bounds) {
     override def body: Option[Statement] = Some(DeclarationsSection(inputs))
   }
@@ -932,9 +931,10 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class StructMemberStatement(member: StructMember)
-      extends DeclarationBase(member.name, member.wdlType, bounds = member.text)
+      extends DeclarationBase(member.name, member.wdlType, bounds = member.loc)
 
-  private case class MembersSection(members: Vector[StructMember], override val bounds: TextSource)
+  private case class MembersSection(members: Vector[StructMember],
+                                    override val bounds: SourceLocation)
       extends InnerSection(bounds) {
     override val statements: Vector[Statement] = {
       members.map(StructMemberStatement)
@@ -975,7 +975,9 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class MetaKVStatement(id: String, value: MetaValue, override val bounds: TextSource)
+  private case class MetaKVStatement(id: String,
+                                     value: MetaValue,
+                                     override val bounds: SourceLocation)
       extends BoundedStatement(bounds) {
     private val idToken = Literal.fromStart(id, bounds)
     private val delimToken = Literal.fromPrev(Symbols.KeyValueDelimiter, idToken)
@@ -987,40 +989,40 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class MetadataSection(metaKV: Vector[MetaKV], override val bounds: TextSource)
+  private case class MetadataSection(metaKV: Vector[MetaKV], override val bounds: SourceLocation)
       extends InnerSection(bounds) {
     override val statements: Vector[Statement] = {
-      metaKV.map(kv => MetaKVStatement(kv.id, kv.value, kv.text))
+      metaKV.map(kv => MetaKVStatement(kv.id, kv.value, kv.loc))
     }
   }
 
   private case class StructBlock(struct: TypeStruct)
-      extends BlockStatement(Symbols.Struct, struct.text) {
+      extends BlockStatement(Symbols.Struct, struct.loc) {
     override def clause: Option[Span] = Some(
         Literal.fromPrev(struct.name, keywordLiteral)
     )
 
     override def body: Option[Statement] =
-      Some(MembersSection(struct.members, struct.text))
+      Some(MembersSection(struct.members, struct.loc))
   }
 
   private case class OutputsBlock(outputs: OutputSection)
-      extends BlockStatement(Symbols.Output, outputs.text) {
+      extends BlockStatement(Symbols.Output, outputs.loc) {
     override def body: Option[Statement] =
       Some(
           DeclarationsSection(outputs.declarations)
       )
   }
 
-  private case class MetaBlock(meta: MetaSection) extends BlockStatement(Symbols.Meta, meta.text) {
+  private case class MetaBlock(meta: MetaSection) extends BlockStatement(Symbols.Meta, meta.loc) {
     override def body: Option[Statement] =
-      Some(MetadataSection(meta.kvs, meta.text))
+      Some(MetadataSection(meta.kvs, meta.loc))
   }
 
   private case class ParameterMetaBlock(parameterMeta: ParameterMetaSection)
-      extends BlockStatement(Symbols.ParameterMeta, parameterMeta.text) {
+      extends BlockStatement(Symbols.ParameterMeta, parameterMeta.loc) {
     override def body: Option[Statement] =
-      Some(MetadataSection(parameterMeta.kvs, parameterMeta.text))
+      Some(MetadataSection(parameterMeta.kvs, parameterMeta.loc))
   }
 
   private def splitWorkflowElements(elements: Vector[WorkflowElement]): Vector[Statement] = {
@@ -1081,24 +1083,24 @@ case class WdlV1Formatter(opts: Options) {
     override def endColumn: Int = ends.map(_._2.endColumn).getOrElse(items.last.endColumn)
   }
 
-  private case class CallInputsStatement(inputs: CallInputs) extends BoundedStatement(inputs.text) {
-    private val key = Literal.fromStart(Symbols.Input, inputs.text)
+  private case class CallInputsStatement(inputs: CallInputs) extends BoundedStatement(inputs.loc) {
+    private val key = Literal.fromStart(Symbols.Input, inputs.loc)
     private val value = inputs.value.map { inp =>
-      val nameToken = Literal.fromStart(inp.name, inp.text)
+      val nameToken = Literal.fromStart(inp.name, inp.loc)
       val exprSpan = buildExpression(inp.expr)
       BoundedContainer(
           Vector(nameToken, Literal.between(Symbols.Assignment, nameToken, exprSpan), exprSpan),
-          bounds = inp.text
+          bounds = inp.loc
       )
     }
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      val kv = KeyValue(key, CallInputArgsContainer(value), bounds = inputs.text)
+      val kv = KeyValue(key, CallInputArgsContainer(value), bounds = inputs.loc)
       kv.formatContents(lineFormatter)
     }
   }
 
-  private case class CallBlock(call: Call) extends BlockStatement(Symbols.Call, call.text) {
+  private case class CallBlock(call: Call) extends BlockStatement(Symbols.Call, call.loc) {
     override def clause: Option[Span] = Some(
         if (call.alias.isDefined) {
           val alias = call.alias.get
@@ -1120,7 +1122,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class ScatterBlock(scatter: Scatter)
-      extends BlockStatement(Symbols.Scatter, scatter.text) {
+      extends BlockStatement(Symbols.Scatter, scatter.loc) {
 
     override def clause: Option[Span] = {
       // assuming all parts of the clause are adjacent
@@ -1142,7 +1144,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class ConditionalBlock(conditional: Conditional)
-      extends BlockStatement(Symbols.If, conditional.text) {
+      extends BlockStatement(Symbols.If, conditional.loc) {
     override def clause: Option[Span] = {
       val exprAtom = buildExpression(conditional.expr)
       val openToken = Literal.fromNext(Symbols.GroupOpen, exprAtom)
@@ -1160,7 +1162,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class WorkflowSections(workflow: Workflow)
-      extends InnerSection(workflow.text, emtpyLineBetweenStatements = true) {
+      extends InnerSection(workflow.loc, emtpyLineBetweenStatements = true) {
 
     override val statements: Vector[Statement] = {
       val bodyElements = splitWorkflowElements(workflow.body)
@@ -1176,7 +1178,7 @@ case class WdlV1Formatter(opts: Options) {
            ),
            bodyElements.tail)
         } else {
-          (workflow.input.map(inp => InputsBlock(inp.declarations, inp.text)), bodyElements)
+          (workflow.input.map(inp => InputsBlock(inp.declarations, inp.loc)), bodyElements)
         }
       } else {
         (None, bodyElements)
@@ -1199,14 +1201,14 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class WorkflowBlock(workflow: Workflow)
-      extends BlockStatement(Symbols.Workflow, workflow.text) {
+      extends BlockStatement(Symbols.Workflow, workflow.loc) {
 
     override def clause: Option[Span] = Some(Literal.fromPrev(workflow.name, keywordLiteral))
 
     override def body: Option[Statement] = Some(WorkflowSections(workflow))
   }
 
-  private case class CommandBlock(command: CommandSection) extends BoundedStatement(command.text) {
+  private case class CommandBlock(command: CommandSection) extends BoundedStatement(command.loc) {
     // The command block is considered "preformatted" in that we don't try to reformat it.
     // However, we do need to try to indent it correclty. We do this by detecting the amount
     // of indent used on the first non-empty line and remove that from every line and replace
@@ -1220,7 +1222,7 @@ case class WdlV1Formatter(opts: Options) {
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter.appendAll(
-          Literal.chainFromStart(Vector(Symbols.Command, Symbols.CommandOpen), command.text)
+          Literal.chainFromStart(Vector(Symbols.Command, Symbols.CommandOpen), command.loc)
       )
       if (command.parts.nonEmpty) {
         // The parser swallows anyting after the opening token ('{' or '<<<')
@@ -1289,7 +1291,7 @@ case class WdlV1Formatter(opts: Options) {
 
         comment match {
           case Some(commentRegexp(commentContent)) =>
-            lineFormatter.addInlineComment(command.text.line, commentContent)
+            lineFormatter.addInlineComment(command.loc.line, commentContent)
           case _ => ()
         }
         lineFormatter.endLine()
@@ -1322,11 +1324,11 @@ case class WdlV1Formatter(opts: Options) {
         lineFormatter.beginLine()
       }
 
-      lineFormatter.append(Literal.fromEnd(Symbols.CommandClose, command.text))
+      lineFormatter.append(Literal.fromEnd(Symbols.CommandClose, command.loc))
     }
   }
 
-  private case class KVStatement(id: String, expr: Expr, override val bounds: TextSource)
+  private case class KVStatement(id: String, expr: Expr, override val bounds: SourceLocation)
       extends BoundedStatement(bounds) {
     private val idToken = Literal.fromStart(id, bounds)
     private val delimToken = Literal.fromPrev(Symbols.KeyValueDelimiter, idToken)
@@ -1339,21 +1341,21 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class RuntimeMetadataSection(runtimeKV: Vector[RuntimeKV],
-                                            override val bounds: TextSource)
+                                            override val bounds: SourceLocation)
       extends InnerSection(bounds) {
     override val statements: Vector[Statement] = {
-      runtimeKV.map(kv => KVStatement(kv.id, kv.expr, kv.text))
+      runtimeKV.map(kv => KVStatement(kv.id, kv.expr, kv.loc))
     }
   }
 
   private case class RuntimeBlock(runtime: RuntimeSection)
-      extends BlockStatement(Symbols.Runtime, runtime.text) {
+      extends BlockStatement(Symbols.Runtime, runtime.loc) {
     override def body: Option[Statement] =
-      Some(RuntimeMetadataSection(runtime.kvs, runtime.text))
+      Some(RuntimeMetadataSection(runtime.kvs, runtime.loc))
   }
 
   private case class TaskSections(task: Task)
-      extends InnerSection(task.text, emtpyLineBetweenStatements = true) {
+      extends InnerSection(task.loc, emtpyLineBetweenStatements = true) {
 
     override val statements: Vector[Statement] = {
       val otherDecls = task.declarations match {
@@ -1372,7 +1374,7 @@ case class WdlV1Formatter(opts: Options) {
            ),
            None)
         } else {
-          (task.input.map(inp => InputsBlock(inp.declarations, inp.text)), otherDecls)
+          (task.input.map(inp => InputsBlock(inp.declarations, inp.loc)), otherDecls)
         }
       Vector(
           topSection,
@@ -1386,7 +1388,7 @@ case class WdlV1Formatter(opts: Options) {
     }
   }
 
-  private case class TaskBlock(task: Task) extends BlockStatement(Symbols.Task, task.text) {
+  private case class TaskBlock(task: Task) extends BlockStatement(Symbols.Task, task.loc) {
     override def clause: Option[Span] =
       Some(Literal.fromPrev(task.name, keywordLiteral))
 
@@ -1394,7 +1396,7 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   private case class DocumentSections(document: Document) extends Statement with BoundedMultiline {
-    override def bounds: TextSource = document.text
+    override def bounds: SourceLocation = document.loc
 
     override def format(lineFormatter: LineFormatter): Unit = {
       // the version statement must be the first line in the file

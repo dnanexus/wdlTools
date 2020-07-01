@@ -19,7 +19,7 @@ val wdl = new URL("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
 // print the source locations of all tasks in the document
 doc.elements.foreach {
-  case task: Task => println(s"Task ${task.name} is at ${task.text} in ${doc.source}")
+  case task: Task => println(s"Task ${task.name} is at ${task.loc} in ${doc.source}")
 }
 ```
 

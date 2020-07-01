@@ -49,8 +49,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, opts.fileResolver.fromPath(file))
+    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
 
     tDoc.workflow should not be empty
     val wf = tDoc.workflow.get
@@ -247,8 +246,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, opts.fileResolver.fromPath(file))
+    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
 
     tDoc.elements should not be empty
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]

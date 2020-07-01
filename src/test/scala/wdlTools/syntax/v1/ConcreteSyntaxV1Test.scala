@@ -4,7 +4,7 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource, WdlVersion}
+import wdlTools.syntax.{Comment, Edge, SyntaxException, SourceLocation, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
 
@@ -274,25 +274,26 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
     doc.comments(1) should matchPattern {
-      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, 1, 46)) =>
+      case Comment("# A task that counts how many lines a file has",
+                   SourceLocation(_, 1, 0, 1, 46)) =>
     }
     doc.comments(8) should matchPattern {
-      case Comment("# Just a random declaration", TextSource(8, 2, 8, 29)) =>
+      case Comment("# Just a random declaration", SourceLocation(_, 8, 2, 8, 29)) =>
     }
     doc.comments(11) should matchPattern {
-      case Comment("# comment after bracket", TextSource(11, 12, 11, 35)) =>
+      case Comment("# comment after bracket", SourceLocation(_, 11, 12, 11, 35)) =>
     }
     doc.comments(12) should matchPattern {
-      case Comment("# Int num_lines = read_int(stdout())", TextSource(12, 4, 12, 40)) =>
+      case Comment("# Int num_lines = read_int(stdout())", SourceLocation(_, 12, 4, 12, 40)) =>
     }
     doc.comments(13) should matchPattern {
-      case Comment("# end-of-line comment", TextSource(13, 23, 13, 44)) =>
+      case Comment("# end-of-line comment", SourceLocation(_, 13, 23, 13, 44)) =>
     }
     doc.comments(20) should matchPattern {
-      case Comment("# The comment below is empty", TextSource(20, 4, 20, 32)) =>
+      case Comment("# The comment below is empty", SourceLocation(_, 20, 4, 20, 32)) =>
     }
     doc.comments(21) should matchPattern {
-      case Comment("#", TextSource(21, 4, 21, 5)) =>
+      case Comment("#", SourceLocation(_, 21, 4, 21, 5)) =>
     }
 
     doc.version.value shouldBe WdlVersion.V1

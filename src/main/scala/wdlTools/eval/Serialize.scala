@@ -2,8 +2,7 @@ package wdlTools.eval
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.TextSource
-import wdlTools.util.FileSource
+import wdlTools.syntax.SourceLocation
 
 // The mapping of JSON type to WDL type is:
 // JSON Type 	WDL Type
@@ -58,7 +57,7 @@ object Serialize {
   }
 
   @scala.annotation.tailrec
-  def primitiveValueToString(wv: V, text: TextSource, docSource: FileSource): String = {
+  def primitiveValueToString(wv: V, loc: SourceLocation): String = {
     wv match {
       case V_Null           => "null"
       case V_Boolean(value) => value.toString
@@ -66,9 +65,9 @@ object Serialize {
       case V_Float(value)   => value.toString
       case V_String(value)  => value
       case V_File(value)    => value
-      case V_Optional(x)    => primitiveValueToString(x, text, docSource)
+      case V_Optional(x)    => primitiveValueToString(x, loc)
       case other =>
-        throw new EvalException(s"prefix: ${other} is not a primitive value", text, docSource)
+        throw new EvalException(s"prefix: ${other} is not a primitive value", loc)
     }
   }
 }

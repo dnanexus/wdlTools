@@ -55,11 +55,11 @@ case class ParseAll(opts: Options,
           AST.ExprArray(vec.map(translateExpr), srcText)
         case CST.ExprMapLiteral(m, srcText) =>
           AST.ExprMap(m.map { item =>
-            AST.ExprMember(translateExpr(item.key), translateExpr(item.value), item.text)
+            AST.ExprMember(translateExpr(item.key), translateExpr(item.value), item.loc)
           }, srcText)
         case CST.ExprObjectLiteral(m, srcText) =>
           AST.ExprObject(m.map { member =>
-            AST.ExprMember(translateExpr(member.key), translateExpr(member.value), member.text)
+            AST.ExprMember(translateExpr(member.key), translateExpr(member.value), member.loc)
           }, srcText)
 
         // string place holders
@@ -150,47 +150,47 @@ case class ParseAll(opts: Options,
               AST.MetaKV(fieldName, translateMetaValue(v), text)
           }, srcText)
         case other =>
-          throw new SyntaxException("illegal expression in meta section", other.text, docSource)
+          throw new SyntaxException("illegal expression in meta section", other.loc)
       }
     }
 
     def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.text)
+      AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.loc)
     }
 
     def translateInputSection(
         inp: CST.InputSection
     ): AST.InputSection = {
-      AST.InputSection(inp.declarations.map(translateDeclaration), inp.text)
+      AST.InputSection(inp.declarations.map(translateDeclaration), inp.loc)
     }
 
     def translateOutputSection(
         output: CST.OutputSection
     ): AST.OutputSection = {
-      AST.OutputSection(output.declarations.map(translateDeclaration), output.text)
+      AST.OutputSection(output.declarations.map(translateDeclaration), output.loc)
     }
 
     def translateCommandSection(
         cs: CST.CommandSection
     ): AST.CommandSection = {
-      AST.CommandSection(cs.parts.map(translateExpr), cs.text)
+      AST.CommandSection(cs.parts.map(translateExpr), cs.loc)
     }
 
     def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
       AST.Declaration(decl.name,
                       translateType(decl.wdlType),
                       decl.expr.map(translateExpr),
-                      decl.text)
+                      decl.loc)
     }
 
     def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.text)
+      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.loc)
     }
 
     def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.text)
+      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.loc)
     }
 
     def translateRuntimeSection(
@@ -200,9 +200,7 @@ case class ParseAll(opts: Options,
       runtime.kvs.foldLeft(Set.empty[String]) {
         case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
         case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section",
-                                    kv.text,
-                                    docSource)
+          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section", kv.loc)
       }
 
       AST.RuntimeSection(
@@ -210,7 +208,7 @@ case class ParseAll(opts: Options,
             case CST.RuntimeKV(id, expr, text) =>
               AST.RuntimeKV(id, translateExpr(expr), text)
           },
-          runtime.text
+          runtime.loc
       )
     }
 
@@ -232,7 +230,7 @@ case class ParseAll(opts: Options,
               inputs.map {
                 case CST.CallInputs(inputsMap, inputsText) =>
                   AST.CallInputs(inputsMap.map { inp =>
-                    AST.CallInput(inp.name, translateExpr(inp.expr), inp.text)
+                    AST.CallInput(inp.name, translateExpr(inp.expr), inp.loc)
                   }, inputsText)
               },
               text
@@ -254,7 +252,7 @@ case class ParseAll(opts: Options,
           wf.meta.map(translateMetaSection),
           wf.parameterMeta.map(translateParameterMetaSection),
           wf.body.map(translateWorkflowElement),
-          wf.text
+          wf.loc
       )
     }
 
@@ -265,13 +263,13 @@ case class ParseAll(opts: Options,
             case CST.StructMember(name, t, memberText) =>
               AST.StructMember(name, translateType(t), memberText)
           },
-          struct.text
+          struct.loc
       )
     }
 
     def translateImportDoc(importDoc: CST.ImportDoc,
                            importedDoc: Option[AST.Document]): AST.ImportDoc = {
-      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.text)
+      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.loc)
       val nameAbst = importDoc.name.map {
         case CST.ImportName(value, text) => AST.ImportName(value, text)
       }
@@ -280,7 +278,7 @@ case class ParseAll(opts: Options,
       }
 
       // Replace the original statement with a new one
-      AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.text)
+      AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.loc)
     }
 
     def translateTask(task: CST.Task): AST.Task = {
@@ -294,7 +292,7 @@ case class ParseAll(opts: Options,
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
           None,
-          task.text
+          task.loc
       )
     }
 
@@ -315,8 +313,8 @@ case class ParseAll(opts: Options,
         case other                     => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
-      val version = AST.Version(doc.version.value, doc.version.text)
-      AST.Document(doc.source, version, elems, aWf, doc.text, doc.comments)
+      val version = AST.Version(doc.version.value, doc.version.loc)
+      AST.Document(doc.source, version, elems, aWf, doc.loc, doc.comments)
     }
   }
 

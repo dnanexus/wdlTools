@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, StringFileSource}
 
 sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
@@ -39,10 +39,11 @@ object WdlVersion {
   * @param endLine: line (end-inclusive) on which the last token ends
   * @param endCol: column (end-exclusive) at which the last token ends
   */
-case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Ordered[TextSource] {
+case class SourceLocation(source: FileSource, line: Int, col: Int, endLine: Int, endCol: Int)
+    extends Ordered[SourceLocation] {
   lazy val lineRange: Range = line to endLine
 
-  def compare(that: TextSource): Int = {
+  def compare(that: SourceLocation): Int = {
     line - that.line match {
       case 0 =>
         col - that.col match {
@@ -58,15 +59,16 @@ case class TextSource(line: Int, col: Int, endLine: Int, endCol: Int) extends Or
   }
 
   override def toString: String = {
-    s"${line}:${col}-${endLine}:${endCol}"
+    s"${line}:${col}-${endLine}:${endCol} in ${source}"
   }
 }
 
-object TextSource {
-  val empty: TextSource = TextSource(0, 0, 0, 0)
+object SourceLocation {
+  val empty: SourceLocation = SourceLocation(StringFileSource.empty, 0, 0, 0, 0)
 
-  def fromSpan(start: TextSource, stop: TextSource): TextSource = {
-    TextSource(
+  def fromSpan(source: FileSource, start: SourceLocation, stop: SourceLocation): SourceLocation = {
+    SourceLocation(
+        source,
         start.line,
         start.col,
         stop.endLine,
@@ -77,15 +79,12 @@ object TextSource {
 
 // A syntax error that occured when parsing a document. It is generated
 // by the ANTLR machinery and we transform it into this format.
-final case class SyntaxError(fileSource: FileSource,
-                             symbol: String,
-                             textSource: TextSource,
-                             reason: String)
+final case class SyntaxError(symbol: String, loc: SourceLocation, reason: String)
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSource: FileSource) = {
-    this(SyntaxException.formatMessage(msg, text, docSource))
+  def this(msg: String, loc: SourceLocation) = {
+    this(SyntaxException.formatMessage(msg, loc))
   }
   def this(errors: Seq[SyntaxError]) = {
     this(SyntaxException.formatMessageFromErrorList(errors))
@@ -93,15 +92,15 @@ final class SyntaxException(message: String) extends Exception(message) {
 }
 
 object SyntaxException {
-  def formatMessage(msg: String, text: TextSource, docSource: FileSource): String = {
-    s"${msg} at ${text} in ${docSource}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 
   def formatMessageFromErrorList(errors: Seq[SyntaxError]): String = {
     // make one big report on all the syntax errors
     val messages = errors.map {
-      case SyntaxError(docSource, symbol, textSource, msg) =>
-        s"${msg} at ${symbol} in ${docSource.toString} ${textSource}"
+      case SyntaxError(symbol, locSource, msg) =>
+        s"${msg} at ${symbol} at ${locSource}"
     }
     messages.mkString("\n")
   }
@@ -110,10 +109,10 @@ object SyntaxException {
 /**
   * A WDL comment.
   * @param value the comment string, including prefix ('#')
-  * @param text the location of the comment in the source file
+  * @param loc the location of the comment in the source file
   */
-case class Comment(value: String, text: TextSource) extends Ordered[Comment] {
-  override def compare(that: Comment): Int = text.line - that.text.line
+case class Comment(value: String, loc: SourceLocation) extends Ordered[Comment] {
+  override def compare(that: Comment): Int = loc.line - that.loc.line
 }
 
 case class CommentMap(comments: Map[Int, Comment]) {

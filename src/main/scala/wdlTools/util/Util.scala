@@ -61,9 +61,13 @@ object Util {
     }) + addExt
   }
 
+  def replaceFileSuffix(path: Path, suffix: String): String = {
+    replaceFileSuffix(path.getFileName.toString, suffix)
+  }
+
   // Add a suffix to a filename, before the regular suffix. For example:
   //  xxx.wdl -> xxx.simplified.wdl
-  def replaceFileSuffix(fileName: String, suffix: String = ""): String = {
+  def replaceFileSuffix(fileName: String, suffix: String): String = {
     val index = fileName.lastIndexOf('.')
     val prefix = if (index >= 0) {
       fileName.substring(0, index)

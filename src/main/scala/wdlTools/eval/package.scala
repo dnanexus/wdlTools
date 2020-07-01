@@ -3,8 +3,8 @@ package wdlTools.eval
 import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
-import wdlTools.syntax.TextSource
-import wdlTools.util.{FileAccessProtocol, FileSource, FileSourceResolver, Logger}
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger}
 
 import scala.io.Codec
 
@@ -17,7 +17,7 @@ case class Context(bindings: Map[String, WdlValues.V]) {
 
 // There is a standard library implementation for each WDL version.
 trait StandardLibraryImpl {
-  def call(funcName: String, args: Vector[WdlValues.V], text: TextSource): WdlValues.V
+  def call(funcName: String, args: Vector[WdlValues.V], loc: SourceLocation): WdlValues.V
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
@@ -67,14 +67,14 @@ object EvalConfig {
 
 // A runtime error
 final class EvalException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSource: FileSource) = {
-    this(EvalException.formatMessage(msg, text, docSource))
+  def this(msg: String, loc: SourceLocation) = {
+    this(EvalException.formatMessage(msg, loc))
   }
 }
 
 object EvalException {
-  def formatMessage(msg: String, text: TextSource, docSource: FileSource): String = {
-    s"${msg} at ${text} in ${docSource}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 }
 
