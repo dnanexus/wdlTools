@@ -110,6 +110,27 @@ abstract class AbstractFileSource(val encoding: Charset) extends FileSource {
   protected def localizeTo(file: Path): Unit
 }
 
+trait RealFileSource extends FileSource {
+
+  /**
+    * The original value that was resolved to get this FileSource.
+    */
+  def value: String
+
+  override def toString: String = value
+}
+
+abstract class AbstractRealFileSource(override val value: String, override val encoding: Charset)
+    extends AbstractFileSource(encoding)
+    with RealFileSource {
+
+  override lazy val readString: String = new String(readBytes, encoding)
+
+  override lazy val readLines: Vector[String] = {
+    Source.fromBytes(readBytes, encoding.name).getLines().toVector
+  }
+}
+
 class NoSuchProtocolException(name: String) extends Exception(s"Protocol ${name} not supported")
 
 // A protocol defined by the user. Intended for allowing access to
@@ -133,82 +154,11 @@ trait FileAccessProtocol {
   def resolve(uri: String): FileSource
 }
 
-abstract class AbstractVirtualFileSource(name: Option[Path] = None,
-                                         encoding: Charset = Util.DefaultEncoding)
-    extends AbstractFileSource(encoding) {
-  override lazy val toString: String = name.map(_.toString).getOrElse("<string>")
-
-  override def localPath: Path = {
-    name.getOrElse(
-        throw new RuntimeException("virtual FileSource has no localPath")
-    )
-  }
-
-  override lazy val readBytes: Array[Byte] = readString.getBytes(encoding)
-
-  override protected def localizeTo(file: Path): Unit = {
-    Util.writeFileContent(file, readString)
-  }
-}
-
-case class StringFileSource(string: String,
-                            name: Option[Path] = None,
-                            override val encoding: Charset = Util.DefaultEncoding)
-    extends AbstractVirtualFileSource(name, encoding) {
-  override def readString: String = string
-
-  lazy val readLines: Vector[String] = {
-    Source.fromString(string).getLines().toVector
-  }
-}
-
-object StringFileSource {
-  def withName(name: String, content: String): StringFileSource = {
-    StringFileSource(content, Some(Util.getPath(name)))
-  }
-
-  lazy val empty: StringFileSource = StringFileSource("")
-}
-
-case class LinesFileSource(override val readLines: Vector[String],
-                           name: Option[Path] = None,
-                           override val encoding: Charset = Util.DefaultEncoding,
-                           lineSeparator: String = "\n",
-                           trailingNewline: Boolean = true)
-    extends AbstractVirtualFileSource(name, encoding) {
-  override def readString: String = {
-    val s = readLines.mkString(lineSeparator)
-    if (trailingNewline) {
-      s + lineSeparator
-    } else {
-      s
-    }
-  }
-}
-
-object LinesFileSource {
-  def withName(name: String, lines: Vector[String]): LinesFileSource = {
-    LinesFileSource(lines, Some(Util.getPath(name)))
-  }
-}
-
-abstract class AbstractPhysicalFileSource(override val encoding: Charset)
-    extends AbstractFileSource(encoding) {
-
-  override lazy val readString: String = new String(readBytes, encoding)
-
-  override lazy val readLines: Vector[String] = {
-    Source.fromBytes(readBytes, encoding.name).getLines().toVector
-  }
-}
-
-case class LocalFileSource(value: String,
+case class LocalFileSource(override val value: String,
                            override val localPath: Path,
                            logger: Logger,
                            override val encoding: Charset)
-    extends AbstractPhysicalFileSource(encoding) {
-  override lazy val toString: String = value
-
+    extends AbstractRealFileSource(value, encoding) {
   def checkExists(exists: Boolean): Unit = {
     val existing = Files.exists(localPath)
     if (exists && !existing) {
@@ -296,13 +246,14 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
   }
 }
 
-case class RemoteFileSource(uri: URI, override val encoding: Charset, logger: Logger)
-    extends AbstractPhysicalFileSource(encoding) {
+case class RemoteFileSource(override val value: String,
+                            uri: URI,
+                            override val encoding: Charset,
+                            logger: Logger)
+    extends AbstractRealFileSource(value, encoding) {
   private var hasBytes: Boolean = false
 
   override def localPath: Path = Paths.get(uri.getPath).getFileName
-
-  override lazy val toString: String = uri.toString
 
   // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
   override lazy val size: Long = {
@@ -376,11 +327,11 @@ case class HttpFileAccessProtocol(logger: Logger = Logger.Quiet,
   val prefixes = Vector(Util.HTTP_SCHEME, Util.HTTPS_SCHEME)
 
   override def resolve(uri: String): RemoteFileSource = {
-    resolve(URI.create(uri))
+    resolve(URI.create(uri), Some(uri))
   }
 
-  def resolve(uri: URI): RemoteFileSource = {
-    RemoteFileSource(uri, encoding, logger)
+  def resolve(uri: URI, value: Option[String] = None): RemoteFileSource = {
+    RemoteFileSource(value.getOrElse(uri.toString), uri, encoding, logger)
   }
 }
 
@@ -437,5 +388,66 @@ object FileSourceResolver {
         HttpFileAccessProtocol(logger, encoding)
     )
     FileSourceResolver(protocols ++ userProtocols)
+  }
+}
+
+// A VirtualFileSource only exists in memory - it doesn't have an associated URI and so cannot be resolved
+
+abstract class AbstractVirtualFileSource(name: Option[Path] = None,
+                                         encoding: Charset = Util.DefaultEncoding)
+    extends AbstractFileSource(encoding) {
+  override lazy val toString: String = name.map(_.toString).getOrElse("<string>")
+
+  override def localPath: Path = {
+    name.getOrElse(
+        throw new RuntimeException("virtual FileSource has no localPath")
+    )
+  }
+
+  override lazy val readBytes: Array[Byte] = readString.getBytes(encoding)
+
+  override protected def localizeTo(file: Path): Unit = {
+    Util.writeFileContent(file, readString)
+  }
+}
+
+case class StringFileSource(string: String,
+                            name: Option[Path] = None,
+                            override val encoding: Charset = Util.DefaultEncoding)
+    extends AbstractVirtualFileSource(name, encoding) {
+  override def readString: String = string
+
+  lazy val readLines: Vector[String] = {
+    Source.fromString(string).getLines().toVector
+  }
+}
+
+object StringFileSource {
+  def withName(name: String, content: String): StringFileSource = {
+    StringFileSource(content, Some(Util.getPath(name)))
+  }
+
+  lazy val empty: StringFileSource = StringFileSource("")
+}
+
+case class LinesFileSource(override val readLines: Vector[String],
+                           name: Option[Path] = None,
+                           override val encoding: Charset = Util.DefaultEncoding,
+                           lineSeparator: String = "\n",
+                           trailingNewline: Boolean = true)
+    extends AbstractVirtualFileSource(name, encoding) {
+  override def readString: String = {
+    val s = readLines.mkString(lineSeparator)
+    if (trailingNewline) {
+      s + lineSeparator
+    } else {
+      s
+    }
+  }
+}
+
+object LinesFileSource {
+  def withName(name: String, lines: Vector[String]): LinesFileSource = {
+    LinesFileSource(lines, Some(Util.getPath(name)))
   }
 }
