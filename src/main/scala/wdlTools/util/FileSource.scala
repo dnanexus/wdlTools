@@ -154,7 +154,16 @@ trait FileAccessProtocol {
   def resolve(uri: String): FileSource
 }
 
+/**
+  * A FileSource for a local file.
+  * @param value the original path/URI used to resolve this file.
+  * @param valuePath the original path - may be relative
+  * @param localPath the absolute, cannonical path to this file
+  * @param logger the logger
+  * @param encoding the file encoding
+  */
 case class LocalFileSource(override val value: String,
+                           valuePath: Path,
                            override val localPath: Path,
                            logger: Logger,
                            override val encoding: Charset)
@@ -242,7 +251,7 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
       // it's a non-existant relative path - localize it to current working dir
       Util.absolutePath(path)
     }
-    LocalFileSource(value.getOrElse(path.toString), resolved, logger, encoding)
+    LocalFileSource(value.getOrElse(path.toString), path, resolved, logger, encoding)
   }
 }
 
