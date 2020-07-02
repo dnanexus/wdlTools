@@ -157,7 +157,7 @@ trait FileAccessProtocol {
 /**
   * A FileSource for a local file.
   * @param value the original path/URI used to resolve this file.
-  * @param valuePath the original path - may be relative
+  * @param valuePath the original, non-cannonicalized Path determined from `value` - may be relative
   * @param localPath the absolute, cannonical path to this file
   * @param logger the logger
   * @param encoding the file encoding
