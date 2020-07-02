@@ -3,7 +3,7 @@ package wdlTools.util
 import java.io.{ByteArrayOutputStream, FileNotFoundException, FileOutputStream, OutputStream}
 import java.net.{HttpURLConnection, URI}
 import java.nio.charset.Charset
-import java.nio.file.{FileAlreadyExistsException, FileSystemNotFoundException, Files, Path, Paths}
+import java.nio.file.{FileAlreadyExistsException, Files, Path, Paths}
 
 import wdlTools.util.Util.{FILE_SCHEME, getUriScheme}
 
@@ -202,11 +202,12 @@ abstract class AbstractPhysicalFileSource(override val encoding: Charset)
   }
 }
 
-case class LocalFileSource(override val localPath: Path,
+case class LocalFileSource(value: String,
+                           override val localPath: Path,
                            logger: Logger,
                            override val encoding: Charset)
     extends AbstractPhysicalFileSource(encoding) {
-  override lazy val toString: String = localPath.toString
+  override lazy val toString: String = value
 
   def checkExists(exists: Boolean): Unit = {
     val existing = Files.exists(localPath)
@@ -219,9 +220,7 @@ case class LocalFileSource(override val localPath: Path,
   }
 
   override lazy val size: Long = {
-    if (!Files.exists(localPath)) {
-      throw new FileSystemNotFoundException(s"File ${localPath} not found")
-    }
+    checkExists(true)
     try {
       localPath.toFile.length()
     } catch {
@@ -247,6 +246,7 @@ case class LocalFileSource(override val localPath: Path,
       )
     } else {
       logger.trace(s"Copying file ${localPath} to ${file}")
+      checkExists(true)
       Files.copy(localPath, file)
     }
   }
@@ -272,16 +272,16 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
       )
   }
 
-  def resolve(uri: String): FileSource = {
+  def resolve(uri: String): LocalFileSource = {
     val path: Path = getUriScheme(uri) match {
       case Some(FILE_SCHEME) => Paths.get(URI.create(uri))
       case None              => Util.getPath(uri)
       case _                 => throw new Exception(s"${uri} is not a path or file:// URI")
     }
-    resolvePath(path)
+    resolvePath(path, Some(uri))
   }
 
-  def resolvePath(path: Path): FileSource = {
+  def resolvePath(path: Path, value: Option[String] = None): LocalFileSource = {
     val resolved: Path = if (Files.exists(path)) {
       path.toRealPath()
     } else if (path.isAbsolute) {
@@ -292,7 +292,7 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
       // it's a non-existant relative path - localize it to current working dir
       Util.absolutePath(path)
     }
-    LocalFileSource(resolved, logger, encoding)
+    LocalFileSource(value.getOrElse(path.toString), resolved, logger, encoding)
   }
 }
 
@@ -375,8 +375,12 @@ case class HttpFileAccessProtocol(logger: Logger = Logger.Quiet,
     extends FileAccessProtocol {
   val prefixes = Vector(Util.HTTP_SCHEME, Util.HTTPS_SCHEME)
 
-  override def resolve(uri: String): FileSource = {
-    RemoteFileSource(URI.create(uri), encoding, logger)
+  override def resolve(uri: String): RemoteFileSource = {
+    resolve(URI.create(uri))
+  }
+
+  def resolve(uri: URI): RemoteFileSource = {
+    RemoteFileSource(uri, encoding, logger)
   }
 }
 
@@ -384,19 +388,38 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
   private lazy val protocolMap: Map[String, FileAccessProtocol] =
     protocols.flatMap(prot => prot.prefixes.map(prefix => prefix -> prot)).toMap
 
-  def getProtocol(uriOrPath: String): FileAccessProtocol = {
-    val scheme = Util.getUriScheme(uriOrPath).getOrElse(Util.FILE_SCHEME)
+  def getProtocolForScheme(scheme: String): FileAccessProtocol = {
     protocolMap.get(scheme) match {
       case None        => throw new NoSuchProtocolException(scheme)
       case Some(proto) => proto
     }
   }
 
+  def getProtocol(uriOrPath: String): FileAccessProtocol = {
+    val scheme = Util.getUriScheme(uriOrPath).getOrElse(Util.FILE_SCHEME)
+    getProtocolForScheme(scheme)
+  }
+
+  def getProtocol(uri: URI): FileAccessProtocol = {
+    getProtocolForScheme(uri.getScheme)
+  }
+
   def resolve(uriOrPath: String): FileSource = {
     getProtocol(uriOrPath).resolve(uriOrPath)
   }
 
-  def fromPath(path: Path): FileSource = {
+  def resolve(uri: URI): FileSource = {
+    getProtocol(uri).resolve(uri.toString)
+  }
+
+  def fromPath(path: String): LocalFileSource = {
+    resolve(path) match {
+      case lfs: LocalFileSource => lfs
+      case _                    => throw new RuntimeException(s"${path} does not resolve to a LocalFileSource")
+    }
+  }
+
+  def fromPath(path: Path): LocalFileSource = {
     protocolMap.get(Util.FILE_SCHEME) match {
       case Some(proto: LocalFileAccessProtocol) => proto.resolvePath(path)
       case _                                    => throw new RuntimeException("No file protocol")

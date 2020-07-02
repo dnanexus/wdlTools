@@ -38,7 +38,7 @@ object Util {
 
   /**
     * Converts a String to a Path. Use this instead of `Paths.get()` if you want a relative
-    * path to remain relative (`Paths.get()` converts a relative path to an absolute path
+    * path to remain relative (`Paths.get()` may convert a relative path to an absolute path
     * relative to cwd).
     * @param path the path string
     * @return
