@@ -74,7 +74,7 @@ object Util {
     } else {
       ""
     }
-    changeFileExt(prefix, suffix)
+    changeFileExt(prefix, addExt = suffix)
   }
 
   /**
