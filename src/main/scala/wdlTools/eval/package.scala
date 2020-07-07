@@ -1,10 +1,10 @@
 package wdlTools.eval
 
-import java.net.{URI, URL}
 import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
-import wdlTools.syntax.TextSource
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger, Util}
 
 import scala.io.Codec
 
@@ -17,27 +17,7 @@ case class Context(bindings: Map[String, WdlValues.V]) {
 
 // There is a standard library implementation for each WDL version.
 trait StandardLibraryImpl {
-  def call(funcName: String, args: Vector[WdlValues.V], text: TextSource): WdlValues.V
-}
-
-// A protocol defined by the user. Intended for allowing access to
-// private/public clouds such as S3, Azure, or dnanexus. This has to be a web
-// protocol, meaning that the prefix has to include "://". Anything
-// else is considered a local file.
-//
-// PREFIX
-//   For S3              s3://
-//   For google cloud    gs://
-//   For dnanexus        dx://
-//
-trait FileAccessProtocol {
-  val prefixes: Vector[String]
-
-  // Get the size of the file in bytes
-  def size(uri: URI): Long
-
-  // Read the entire file into a string
-  def readFile(uri: URI): String
+  def call(funcName: String, args: Vector[WdlValues.V], loc: SourceLocation): WdlValues.V
 }
 
 /** Configuration for expression evaluation. Some operations perform file IO.
@@ -47,15 +27,15 @@ trait FileAccessProtocol {
   * @param stdout   the file that has a copy of standard output. This is used in the command section.
   *                 Must resolve to a file that either exists or is creatable.
   * @param stderr   as above for standard error.
-  * @param protocols  protocols for accessing files. By default local-file and http protocols are provided.
+  * @param fileResolver  FileSourceResolver for accessing files. By default local-file and http protocols are provided.
   * @param encoding the encoding to use when reading files.
   */
 case class EvalConfig(homeDir: Path,
                       tmpDir: Path,
                       stdout: Path,
                       stderr: Path,
-                      protocols: Map[String, FileAccessProtocol],
-                      encoding: Charset)
+                      fileResolver: FileSourceResolver,
+                      encoding: Charset = Util.DefaultEncoding)
 
 object EvalConfig {
   // Always add the default protocols (file and web) into the configuration.
@@ -63,17 +43,18 @@ object EvalConfig {
            tmpDir: Path,
            stdout: Path,
            stderr: Path,
+           userSearchPath: Vector[Path] = Vector.empty,
            userProtos: Vector[FileAccessProtocol] = Vector.empty,
-           encoding: Charset = Codec.default.charSet): EvalConfig = {
-    val defaultProtos = Vector(IoSupp.LocalFiles(encoding), IoSupp.HttpProtocol(encoding))
-    val allProtos = defaultProtos ++ userProtos
-    val dispatchTbl: Map[String, FileAccessProtocol] =
-      allProtos.flatMap { proto =>
-        proto.prefixes.map { prefix =>
-          (prefix, proto)
-        }
-      }.toMap
-    new EvalConfig(homeDir, tmpDir, stdout, stderr, dispatchTbl, encoding)
+           encoding: Charset = Codec.default.charSet,
+           logger: Logger = Logger.Quiet): EvalConfig = {
+    new EvalConfig(
+        homeDir,
+        tmpDir,
+        stdout,
+        stderr,
+        FileSourceResolver.create(Vector(homeDir) ++ userSearchPath, userProtos, logger, encoding),
+        encoding
+    )
   }
 
   // an EvalConfig where all the paths point to /dev/null - only useful for
@@ -86,15 +67,14 @@ object EvalConfig {
 
 // A runtime error
 final class EvalException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
-    this(EvalException.formatMessage(msg, text, docSourceUrl))
+  def this(msg: String, loc: SourceLocation) = {
+    this(EvalException.formatMessage(msg, loc))
   }
 }
 
 object EvalException {
-  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
-    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-    s"${msg} at ${text}${urlPart}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 }
 

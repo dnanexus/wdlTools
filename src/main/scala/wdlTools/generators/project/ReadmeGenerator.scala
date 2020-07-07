@@ -1,11 +1,10 @@
 package wdlTools.generators.project
 
-import java.net.URL
 import java.nio.file.Path
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
-import wdlTools.util.Util
+import wdlTools.util.{FileSource, LocalFileSource, StringFileSource, Util}
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
@@ -13,14 +12,14 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
   val WORKFLOW_README_DEVELOPER_TEMPLATE = "/templates/readme/WorkflowReadme.developer.md.ssp"
   val TASK_README_DEVELOPER_TEMPLATE = "/templates/readme/TaskReadme.developer.md.ssp"
 
-  case class Generator(wdlUrl: URL) {
-    private val wdlPath = Util.getLocalPath(wdlUrl)
+  case class Generator(wdlSource: LocalFileSource) {
+    private val wdlPath = wdlSource.localPath
     private val fname = wdlPath.getFileName.toString
     require(fname.endsWith(".wdl"))
     private val wdlName = fname.slice(0, fname.length - 4)
-    private var generatedFiles: Map[URL, String] = Map.empty
+    private var generatedFiles: Vector[FileSource] = Vector.empty
 
-    def getGeneratedFiles: Map[URL, String] = generatedFiles
+    def getGeneratedFiles: Vector[FileSource] = generatedFiles
 
     def getReadmeNameAndPath(elementName: String, developer: Boolean): (String, Path) = {
       val devStr = if (developer) {
@@ -43,7 +42,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles += (Util.pathToUrl(path) -> contents)
+      generatedFiles +:= StringFileSource(contents, Some(Util.absolutePath(path)))
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -54,13 +53,18 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles += (Util.pathToUrl(path) -> contents)
+      generatedFiles +:= StringFileSource(contents, Some(Util.absolutePath(path)))
       readmeName
     }
   }
 
-  def apply(document: Document): Map[URL, String] = {
-    val generator = Generator(document.sourceUrl.get)
+  def apply(document: Document): Vector[FileSource] = {
+    val localFileSource = document.source match {
+      case lfs: LocalFileSource => lfs
+      case _ =>
+        throw new RuntimeException(s"Cannot generate READMEs for non-local file ${document.source}")
+    }
+    val generator = Generator(localFileSource)
 
     val tasks: Seq[(String, String)] = document.elements.flatMap {
       case task: Task =>

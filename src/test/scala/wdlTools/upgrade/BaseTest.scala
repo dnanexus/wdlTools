@@ -1,34 +1,36 @@
 package wdlTools.upgrade
 
-import java.net.URL
-import java.nio.file.{Path, Paths}
+import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{BasicOptions, Logger, Util}
+import wdlTools.util.{BasicOptions, FileSource, Logger, Util}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val opts = BasicOptions(logger = Logger.Verbose)
 
-  def getBeforePath(fname: String): Path = {
-    Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath)
+  def getBeforePath(fname: String): FileSource = {
+    val path =
+      Util.absolutePath(Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath))
+    opts.fileResolver.fromPath(path)
   }
 
-  def getAfterPath(fname: String): Path = {
-    Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath)
+  def getAfterPath(fname: String): FileSource = {
+    val path =
+      Util.absolutePath(Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath))
+    opts.fileResolver.fromPath(path)
   }
 
-  def getBeforeAfterPair(fname: String): (URL, Path) = {
-    (Util.pathToUrl(getBeforePath(fname)), getAfterPath(fname))
+  def getBeforeAfterPair(fname: String): (FileSource, FileSource) = {
+    (getBeforePath(fname), getAfterPath(fname))
   }
 
   it should "Upgrade draft-2 to v1.0" in {
-    val (beforeURL, afterPath) = getBeforeAfterPair("simple.wdl")
-    val expected = Util.readFileContent(afterPath)
+    val (beforeUri, afterPath) = getBeforeAfterPair("simple.wdl")
     val upgrader = code.Upgrader(opts)
-    val documents = upgrader.upgrade(beforeURL, Some(WdlVersion.Draft_2), WdlVersion.V1)
-    documents(beforeURL).mkString("\n") shouldBe expected
+    val documents = upgrader.upgrade(beforeUri, Some(WdlVersion.Draft_2), WdlVersion.V1)
+    documents(beforeUri).mkString("\n") shouldBe afterPath.readString
   }
 }

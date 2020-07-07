@@ -1,7 +1,6 @@
 package wdlTools.util
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileNotFoundException, IOException}
-import java.net.{MalformedURLException, URI, URL}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File, IOException}
 import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{
@@ -21,145 +20,61 @@ import scala.io.{Codec, Source}
 import scala.sys.process.{Process, ProcessLogger}
 
 object Util {
+  val FILE_SCHEME: String = "file"
+  val HTTP_SCHEME: String = "http"
+  val HTTPS_SCHEME: String = "https"
+  private val uriRegexp = "^(.+?)://.+".r
   // the spec states that WDL files must use UTF8 encoding
   val DefaultEncoding: Charset = Codec.UTF8.charSet
   val DefaultLineSeparator: String = "\n"
 
-  /**
-    * Convert a path or URI string to a `java.net.URI`. Handles the following types of URIs:
-    *
-    * foo.txt                  : relative path, converts to file:///path/to/foo.txt
-    * /path/to/foo.txt         : absolute path, converts to file:///path/to/foo.txt
-    * https://foo.com/bar.txt  : URL with a 'standard' protocol
-    * dx://file-XXX            : URI with custom scheme - converted directly to URI, so keep in mind that
-    *                            'file-XXX' will actually be in the 'authority' field
-    *
-    * Note that a URI of the form 'file://foo.txt' (where 'foo.txt' is intended to be a relative path) is
-    * invalid and will cause a MalformedURIException
-    *
-    * @param pathOrUri the path or URI to convert
-    * @return a URI
-    */
-  def getUri(pathOrUri: String): URI = {
-    if (pathOrUri.contains("://")) {
-      val uri = URI.create(pathOrUri)
-      // ensure the URI has a scheme
-      val scheme =
-        try {
-          uri.getScheme
-        } catch {
-          case _: NullPointerException =>
-            throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
-        }
-      if (scheme == null || scheme.trim.isEmpty) {
-        throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
-      }
-      if (scheme == "file") {
-        // for file URIs, ensure there is a path
-        val path =
-          try {
-            uri.getPath
-          } catch {
-            case _: NullPointerException =>
-              throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
-          }
-        if (path == null || path.trim.isEmpty) {
-          throw new MalformedURLException(s"Invalid URI ${pathOrUri}")
-        }
-      }
-      uri
-    } else {
-      Paths.get(pathOrUri).toAbsolutePath.toUri
-    }
-  }
-
-  def getUrl(pathOrUrl: String,
-             searchPath: Vector[Path] = Vector.empty,
-             mustExist: Boolean = true): URL = {
-    if (pathOrUrl.contains("://")) {
-      new URL(pathOrUrl)
-    } else {
-      val path: Path = Paths.get(pathOrUrl)
-      val resolved: Option[Path] = if (Files.exists(path)) {
-        Some(path.toRealPath())
-      } else if (searchPath.nonEmpty) {
-        // search in all directories where imports may be found
-        searchPath.map(d => d.resolve(pathOrUrl)).collectFirst {
-          case fp if Files.exists(fp) => fp.toRealPath()
-        }
-      } else None
-      val result = resolved.getOrElse {
-        if (mustExist) {
-          throw new FileNotFoundException(
-              s"Could not resolve path or URL ${pathOrUrl} in search path [${searchPath.mkString(",")}]"
-          )
-        } else {
-          path
-        }
-      }
-      new URL(s"file://${result}")
-    }
-  }
-
-  def pathToUrl(path: Path): URL = {
-    val absPath = if (Files.exists(path)) {
+  def absolutePath(path: Path): Path = {
+    if (Files.exists(path)) {
       path.toRealPath()
     } else {
       path.toAbsolutePath
     }
-    absPath.toUri.toURL
   }
 
   /**
-    * Determines the local path to a URI's file. The path will be the URI's file name relative to the parent; the
-    * current working directory is used as the parent unless `parent` is specified. If the URI indicates a local path
-    * and `ovewrite` is `true`, then the absolute local path is returned unless `parent` is specified.
-    *
-    * @param url a URL, which might be a local path, a file:// uri, or an http(s):// uri)
-    * @param parent The directory to which the local file should be made relative
-    * @param existsOk Whether it is allowed to return the absolute path of a URI that is a local file that already
-    *                  exists, rather than making it relative to the current directory; ignored if `parent` is defined
-    * @return The Path to the local file
+    * Converts a String to a Path. Use this instead of `Paths.get()` if you want a relative
+    * path to remain relative (`Paths.get()` may convert a relative path to an absolute path
+    * relative to cwd).
+    * @param path the path string
+    * @return
     */
-  def getLocalPath(url: URL, parent: Option[Path] = None, existsOk: Boolean = true): Path = {
-    val resolved: Path = url.getProtocol match {
-      case null | "" | "file" =>
-        val path = Paths.get(url.getPath)
-        if (parent.isDefined) {
-          parent.get.resolve(path.getFileName)
-        } else if (path.isAbsolute) {
-          path
-        } else {
-          Paths.get("").resolve(path)
-        }
-      case _ =>
-        parent.getOrElse(Paths.get("")).resolve(Paths.get(url.getPath).getFileName)
-    }
-    if (Files.exists(resolved)) {
-      if (!existsOk) {
-        throw new Exception(s"File already exists: ${resolved}")
-      } else {
-        resolved.toRealPath()
-      }
-    } else {
-      resolved.toAbsolutePath
+  def getPath(path: String): Path = {
+    new File(path).toPath
+  }
+
+  def getUriScheme(pathOrUri: String): Option[String] = {
+    pathOrUri match {
+      case uriRegexp(scheme) => Some(scheme)
+      case _                 => None
     }
   }
 
-  def getFilename(addr: String, dropExt: String = "", addExt: String = ""): String = {
-    val fileFullPath =
-      try {
-        // treat it as a HTTP address
-        new URL(addr).getPath
-      } catch {
-        case _: java.net.MalformedURLException =>
-          // failed, it is just a local file
-          addr
-      }
-    ((Paths.get(fileFullPath).getFileName.toString, dropExt) match {
+  def changeFileExt(fileName: String, dropExt: String = "", addExt: String = ""): String = {
+    ((fileName, dropExt) match {
       case (fn, ext) if fn.length > 0 && fn.endsWith(ext) => fn.dropRight(dropExt.length)
       case (fn, _)                                        => fn
     }) + addExt
+  }
+
+  def replaceFileSuffix(path: Path, suffix: String): String = {
+    replaceFileSuffix(path.getFileName.toString, suffix)
+  }
+
+  // Add a suffix to a filename, before the regular suffix. For example:
+  //  xxx.wdl -> xxx.simplified.wdl
+  def replaceFileSuffix(fileName: String, suffix: String): String = {
+    val index = fileName.lastIndexOf('.')
+    val prefix = if (index >= 0) {
+      fileName.substring(0, index)
+    } else {
+      ""
+    }
+    changeFileExt(prefix, addExt = suffix)
   }
 
   /**
@@ -168,8 +83,8 @@ object Util {
     * @param path file path
     * @return file contents as a string
     */
-  def readFileContent(path: Path): String = {
-    new String(Files.readAllBytes(path), DefaultEncoding)
+  def readFileContent(path: Path, encoding: Charset = DefaultEncoding): String = {
+    new String(Files.readAllBytes(path), encoding)
   }
 
   /**
@@ -179,8 +94,8 @@ object Util {
     * @param path the path to the file
     * @return a Seq of the lines from the file
     */
-  def readFileLines(path: Path): Vector[String] = {
-    val source = Source.fromFile(path.toString, DefaultEncoding.name)
+  def readFileLines(path: Path, encoding: Charset = DefaultEncoding): Vector[String] = {
+    val source = Source.fromFile(path.toString, encoding.name)
     try {
       source.getLines.toVector
     } finally {
@@ -188,50 +103,14 @@ object Util {
     }
   }
 
-  /**
-    * Write a collection of documents, which is a map of URIs to sequences of lines, to
-    * disk by converting each URI to a local path.
-    * @param docs the documents to write
-    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
-    * @param overwrite whether it is okay to overwrite an existing file
-    */
-  def writeUrlLines(docs: Map[URL, Seq[String]],
-                    outputDir: Option[Path],
-                    overwrite: Boolean = false): Unit = {
-    docs.foreach {
-      case (url, lines) =>
-        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
-        writeFileContent(outputPath, lines.mkString("\n"), overwrite)
+  def checkOverwrite(path: Path, overwrite: Boolean): Unit = {
+    if (Files.exists(path)) {
+      if (!overwrite) {
+        throw new FileAlreadyExistsException(s"${path} exists and overwrite = false")
+      } else if (Files.isDirectory(path)) {
+        throw new FileAlreadyExistsException(s"${path} already exists as a directory")
+      }
     }
-  }
-
-  /**
-    * Write a collection of documents, which is a map of Paths to contents, to disk by converting
-    * each URI to a local path.
-    * @param docs the documents to write
-    * @param overwrite whether it is okay to overwrite an existing file
-    */
-  def writeFilesContents(docs: Map[Path, String], overwrite: Boolean): Unit = {
-    docs.foreach {
-      case (outputPath, content) => writeFileContent(outputPath, content, overwrite)
-    }
-  }
-
-  /**
-    * Write a collection of documents, which is a map of URIs to contents, to disk by converting
-    * each URI to a local path.
-    * @param docs the documents to write
-    * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
-    * @param overwrite whether it is okay to overwrite an existing file
-    */
-  def writeUrlContents(docs: Map[URL, String],
-                       outputDir: Option[Path],
-                       overwrite: Boolean): Unit = {
-    writeFilesContents(docs.map {
-      case (url, contents) =>
-        val outputPath = Util.getLocalPath(url, outputDir, overwrite)
-        outputPath -> contents
-    }, overwrite)
   }
 
   /**
@@ -326,19 +205,6 @@ object Util {
   def base64DecodeAndGunzip(buf64: String): String = {
     val ba: Array[Byte] = Base64.getDecoder.decode(buf64.getBytes)
     gzipDecompress(ba)
-  }
-
-  // Add a suffix to a filename, before the regular suffix. For example:
-  //  xxx.wdl -> xxx.simplified.wdl
-  def replaceFileSuffix(src: Path, suffix: String): String = {
-    val fName = src.toFile.getName
-    val index = fName.lastIndexOf('.')
-    if (index == -1) {
-      fName + suffix
-    } else {
-      val prefix = fName.substring(0, index)
-      prefix + suffix
-    }
   }
 
   /**

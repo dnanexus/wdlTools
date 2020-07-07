@@ -4,29 +4,29 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Comment, Edge, SyntaxException, TextSource}
+import wdlTools.syntax.{Comment, Edge, SyntaxException, SourceLocation}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
 
 class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val opts = BasicOptions(
-      logger = Logger.Quiet,
-      localDirectories = Vector(tasksDir, workflowsDir)
+      fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir)),
+      logger = Logger.Quiet
   )
 
-  private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
+  private def getTaskSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
+  private def getWorkflowSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
-  private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlDraft2Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
+    ParseTop(conf, WdlDraft2Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {
@@ -264,25 +264,26 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val doc = getDocument(getTaskSource("wc.wdl"))
 
     doc.comments(1) should matchPattern {
-      case Comment("# A task that counts how many lines a file has", TextSource(1, 0, 1, 46)) =>
+      case Comment("# A task that counts how many lines a file has",
+                   SourceLocation(_, 1, 0, 1, 46)) =>
     }
     doc.comments(4) should matchPattern {
-      case Comment("# Just a random declaration", TextSource(4, 2, 4, 29)) =>
+      case Comment("# Just a random declaration", SourceLocation(_, 4, 2, 4, 29)) =>
     }
     doc.comments(7) should matchPattern {
-      case Comment("# comment after bracket", TextSource(7, 12, 7, 35)) =>
+      case Comment("# comment after bracket", SourceLocation(_, 7, 12, 7, 35)) =>
     }
     doc.comments(8) should matchPattern {
-      case Comment("# Int num_lines = read_int(stdout())", TextSource(8, 4, 8, 40)) =>
+      case Comment("# Int num_lines = read_int(stdout())", SourceLocation(_, 8, 4, 8, 40)) =>
     }
     doc.comments(9) should matchPattern {
-      case Comment("# end of line comment", TextSource(9, 23, 9, 44)) =>
+      case Comment("# end of line comment", SourceLocation(_, 9, 23, 9, 44)) =>
     }
     doc.comments(18) should matchPattern {
-      case Comment("# The comment below is empty", TextSource(18, 4, 18, 32)) =>
+      case Comment("# The comment below is empty", SourceLocation(_, 18, 4, 18, 32)) =>
     }
     doc.comments(19) should matchPattern {
-      case Comment("#", TextSource(19, 4, 19, 5)) =>
+      case Comment("#", SourceLocation(_, 19, 4, 19, 5)) =>
     }
 
     doc.elements.size shouldBe 1

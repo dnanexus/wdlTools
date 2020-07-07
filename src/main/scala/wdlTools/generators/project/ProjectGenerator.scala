@@ -1,20 +1,23 @@
 package wdlTools.generators.project
 
-import java.net.URL
-import java.nio.file.Path
-
 import wdlTools.generators.{Renderer, code}
 import wdlTools.generators.code.WdlV1Formatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
-import wdlTools.util.{InteractiveConsole, Options, Util}
+import wdlTools.util.{
+  FileSource,
+  InteractiveConsole,
+  LinesFileSource,
+  Options,
+  StringFileSource,
+  Util
+}
 
 import scala.util.control.Breaks._
 
 case class ProjectGenerator(opts: Options,
                             name: String,
-                            outputDir: Path,
                             wdlVersion: WdlVersion = WdlVersion.V1,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
@@ -258,7 +261,7 @@ case class ProjectGenerator(opts: Options,
   }
 
   def apply(workflowModel: Option[WorkflowModel],
-            taskModels: Vector[TaskModel]): Map[URL, String] = {
+            taskModels: Vector[TaskModel]): Vector[FileSource] = {
     val tasksAndLinkedInputs = if (interactive) {
       val predefinedTaskInputs = if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
@@ -284,49 +287,44 @@ case class ProjectGenerator(opts: Options,
     }
 
     val doc = Document(null,
-                       null,
                        Version(wdlVersion, null),
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
                        null,
                        CommentMap.empty)
     val wdlName = s"${name}.wdl"
-    val docUrl = Util.pathToUrl(outputDir.resolve(wdlName))
-    Map(docUrl -> formatter.formatDocument(doc).mkString(System.lineSeparator())) ++ (
-        if (readmes) {
-          readmeGenerator.apply(doc)
-        } else {
-          Map.empty
-        }
-    ) ++ (
-        if (dockerfile) {
-          val dockerfileUrl = Util.pathToUrl(outputDir.resolve("Dockerfile"))
-          Map(dockerfileUrl -> renderer.render(DOCKERFILE_TEMPLATE))
-        } else {
-          Map.empty
-        }
-    ) ++ (
-        if (tests) {
-          val testUrl = Util.pathToUrl(
-              outputDir.resolve("tests").resolve(s"test_${name}.json")
-          )
-          Map(testUrl -> TestsGenerator.apply(testUrl, wdlName, doc))
-        } else {
-          Map.empty
-        }
-    ) ++ (
-        if (makefile) {
-          val makefileUrl = Util.pathToUrl(outputDir.resolve("Makefile"))
-          Map(
-              makefileUrl -> renderer.render(
-                  MAKEFILE_TEMPLATE,
-                  Map("name" -> name, "test" -> tests, "docker" -> dockerfile)
-              )
-          )
-        } else {
-          Map.empty
-        }
+    val wdlFile: Vector[FileSource] = Vector(
+        LinesFileSource.withName(wdlName, formatter.formatDocument(doc))
     )
+    val readMes: Vector[FileSource] = if (readmes) {
+      readmeGenerator.apply(doc)
+    } else {
+      Vector.empty
+    }
+    val dockerFile: Vector[FileSource] = if (dockerfile) {
+      Vector(StringFileSource.withName("Dockerfile", renderer.render(DOCKERFILE_TEMPLATE)))
+    } else {
+      Vector.empty
+    }
+    val testFile: Vector[FileSource] = if (tests) {
+      val testPath = Util.getPath("tests").resolve(s"test_${name}.json")
+      Vector(StringFileSource(TestsGenerator.apply(wdlName, doc), Some(testPath)))
+    } else {
+      Vector.empty
+    }
+    val makeFile: Vector[FileSource] = if (makefile) {
+      Vector(
+          StringFileSource
+            .withName("Makefile",
+                      renderer.render(
+                          MAKEFILE_TEMPLATE,
+                          Map("name" -> name, "test" -> tests, "docker" -> dockerfile)
+                      ))
+      )
+    } else {
+      Vector.empty
+    }
+    wdlFile ++ readMes ++ dockerFile ++ testFile ++ makeFile
   }
 }
 

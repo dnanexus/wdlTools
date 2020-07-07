@@ -12,14 +12,14 @@ Currently, WDL draft-2 and 1.0 are supported.
 import java.net.URL
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Parsers
-import wdlTools.util.Options
-val opts = Options(followImports=true)
+import wdlTools.util.BasicOptions
+val opts = BasicOptions(followImports=true)
 val parsers = Parsers(opts)
 val wdl = new URL("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
 // print the source locations of all tasks in the document
 doc.elements.foreach {
-  case task: Task => println(s"Task ${task.name} is at ${task.text} in ${doc.sourceUrl}")
+  case task: Task => println(s"Task ${task.name} is at ${task.loc} in ${doc.source}")
 }
 ```
 

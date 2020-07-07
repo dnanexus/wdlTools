@@ -519,7 +519,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private case class ImportStatement(importDoc: ImportDoc) extends BaseStatement {
     private val keywordToken = Literal(Symbols.Import)
-    private val urlLiteral = Literal(importDoc.addr)
+    private val uriLiteral = Literal(importDoc.addr)
     private val nameTokens = Vector(Literal(Symbols.As), Literal(importDoc.namespace))
     private val aliasTokens = importDoc.aliases.map { alias =>
       Vector(Literal(Symbols.Alias), Literal(alias.id1), Literal(Symbols.As), Literal(alias.id2))
@@ -528,7 +528,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator
         .derive(newWrapping = Wrapping.Never)
-        .appendAll(Vector(keywordToken, urlLiteral))
+        .appendAll(Vector(keywordToken, uriLiteral))
       lineGenerator.appendAll(nameTokens)
       aliasTokens.foreach { alias =>
         lineGenerator.derive(newWrapping = Wrapping.Always).appendAll(alias)

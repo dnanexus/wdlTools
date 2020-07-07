@@ -15,4 +15,8 @@ class UtilTest extends AnyFlatSpec with Matchers {
     val encodeDecode = Util.base64DecodeAndGunzip(Util.gzipAndBase64Encode(sentence))
     sentence should be(encodeDecode)
   }
+
+  it should "Correctly replace file suffix" in {
+    Util.replaceFileSuffix("foo.bar.baz", ".blorf") shouldBe "foo.bar.blorf"
+  }
 }

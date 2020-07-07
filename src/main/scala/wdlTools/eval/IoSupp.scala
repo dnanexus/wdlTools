@@ -1,62 +1,37 @@
 package wdlTools.eval
 
-import java.io.{ByteArrayOutputStream, IOException}
-import java.net.{HttpURLConnection, URI, URL}
-import java.nio.charset.Charset
+import java.io.IOException
 import java.nio.file._
 
-import wdlTools.syntax.TextSource
-import wdlTools.util.{Options, Util}
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{FileSource, NoSuchProtocolException, Options, Util}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL]) {
-
-  /** Figure out which scheme should be used
-    *
-    *  For S3              s3://
-    *  For google cloud    gs://
-    *  For dnanexus        dx://
-    *
-    */
-  def getProtocol(uri: URI, text: TextSource): FileAccessProtocol = {
-    val protocol =
-      try {
-        uri.getScheme
-      } catch {
-        case _: NullPointerException =>
-          "file"
-      }
-
-    if (opts.logger.isVerbose) {
-      System.out.println(s"uri ${uri} has protocol ${protocol}")
-    }
-
-    evalCfg.protocols.get(protocol) match {
-      case None =>
-        throw new EvalException(s"Protocol ${protocol} not supported", text, docSourceUrl)
-      case Some(proto) =>
-        proto
+case class IoSupp(opts: Options, evalCfg: EvalConfig) {
+  def getFileSource(uri: String, loc: SourceLocation): FileSource = {
+    try {
+      evalCfg.fileResolver.resolve(uri)
+    } catch {
+      case e: NoSuchProtocolException =>
+        throw new EvalException(e.getMessage, loc)
     }
   }
 
-  def size(pathOrUri: String, text: TextSource): Long = {
-    val uri = Util.getUri(pathOrUri)
-    val proto = getProtocol(uri, text)
+  def size(pathOrUri: String, loc: SourceLocation): Long = {
+    val file = getFileSource(pathOrUri, loc)
     try {
-      proto.size(uri)
+      file.size
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"error getting size of ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 
   // Create an empty file if the given path does not already exist - used by stdout() and stderr()
-  def ensureFileExists(path: Path, name: String, text: TextSource): Unit = {
+  def ensureFileExists(path: Path, name: String, loc: SourceLocation): Unit = {
     val file = path.toFile
     if (!file.exists()) {
       try {
@@ -65,38 +40,71 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
         case e: IOException =>
           throw new EvalException(
               s"${name} file ${file} does not exist and cannot be created: ${e.getMessage}",
-              text,
-              docSourceUrl
+              loc
           )
       }
     }
   }
 
-  // Read the contents of the file/URL and return a string
-  def readFile(pathOrUri: String, text: TextSource): String = {
-    val uri = Util.getUri(pathOrUri)
-    val proto = getProtocol(uri, text)
+  // Download `pathOrUri` to `dest`. If `pathOrUri` is already a local file, this
+  // is a copy operation (unless `pathOrUri and `dest` are the same, in which case
+  // this is a noop).
+  def downloadFile(pathOrUri: String,
+                   destFile: Option[Path] = None,
+                   destDir: Option[Path] = None,
+                   overwrite: Boolean = false,
+                   loc: SourceLocation): Path = {
+    val src = getFileSource(pathOrUri, loc)
+    val dest = destFile.getOrElse(
+        destDir.getOrElse(Paths.get(".")).resolve(src.fileName)
+    )
+    val realPath = if (!Files.exists(dest)) {
+      Util.createDirectories(dest.getParent)
+      dest.toAbsolutePath
+    } else if (Files.isDirectory(dest)) {
+      throw new EvalException(
+          s"${dest} already exists as a directory - can't overwrite",
+          loc
+      )
+    } else if (overwrite) {
+      val realPath = dest.toRealPath()
+      opts.logger.warning(s"Deleting existing file ${realPath}")
+      Files.delete(realPath)
+      realPath
+    } else {
+      throw new EvalException(
+          s"File ${dest} already exists and overwrite = false",
+          loc
+      )
+    }
     try {
-      proto.readFile(uri)
+      src.localize(realPath)
     } catch {
       case e: Throwable =>
-        throw new EvalException(s"error read file ${pathOrUri}, msg=${e.getMessage}",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}", loc)
+    }
+  }
+
+  // Read the contents of the file/URI and return a string
+  def readFile(pathOrUri: String, loc: SourceLocation): String = {
+    val file = getFileSource(pathOrUri, loc)
+    try {
+      file.readString
+    } catch {
+      case e: Throwable =>
+        throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 
   /**
     * Write "content" to the specified "path" location
     */
-  def writeFile(p: Path, content: String, text: TextSource): Unit = {
+  def writeFile(p: Path, content: String, loc: SourceLocation): Unit = {
     try {
       Files.write(p, content.getBytes(evalCfg.encoding))
     } catch {
       case t: Throwable =>
-        throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}",
-                                text,
-                                docSourceUrl)
+        throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}", loc)
     }
   }
 
@@ -134,92 +142,5 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig, docSourceUrl: Option[URL])
   def mkTempFile(): Path = {
     val rndName = Random.alphanumeric.take(8).mkString("")
     evalCfg.tmpDir.resolve(rndName)
-  }
-}
-
-object IoSupp {
-  val MiB = BigDecimal(1024 * 1024)
-  val MaxFileSizeMiB = BigDecimal(256)
-
-  case class LocalFiles(encoding: Charset) extends FileAccessProtocol {
-    val prefixes = Vector("", "file")
-
-    def size(uri: URI): Long = {
-      val p = Paths.get(uri.getPath)
-      if (!Files.exists(p)) {
-        throw new FileSystemNotFoundException(s"File ${p} not found")
-      }
-      try {
-        p.toFile.length()
-      } catch {
-        case t: Throwable =>
-          throw new Exception(s"Error getting size of file ${uri}: ${t.getMessage}")
-      }
-    }
-
-    def readFile(uri: URI): String = {
-      // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(uri)) / MiB
-      if (fileSizeMiB > MaxFileSizeMiB) {
-        throw new Exception(
-            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
-        )
-      }
-      new String(Files.readAllBytes(Paths.get(uri.getPath)), encoding)
-    }
-  }
-
-  case class HttpProtocol(encoding: Charset) extends FileAccessProtocol {
-    val prefixes = Vector("http", "https")
-
-    // A url
-    // https://stackoverflow.com/questions/12800588/how-to-calculate-a-file-size-from-url-in-java
-    //
-    def size(uri: URI): Long = {
-      val url = uri.toURL
-      var conn: HttpURLConnection = null
-      try {
-        conn = url.openConnection().asInstanceOf[HttpURLConnection]
-        conn.setRequestMethod("HEAD")
-        conn.getContentLengthLong
-      } catch {
-        case t: Throwable =>
-          throw new Exception(s"Error getting size of URL ${url}: ${t.getMessage}")
-      } finally {
-        if (conn != null) {
-          conn.disconnect()
-        }
-      }
-    }
-
-    def readFile(uri: URI): String = {
-      // check that file isn't too big
-      val fileSizeMiB = BigDecimal(size(uri)) / MiB
-      if (fileSizeMiB > MaxFileSizeMiB)
-        throw new Exception(
-            s"${uri} size is ${fileSizeMiB} MiB; reading files larger than ${MaxFileSizeMiB} MiB is unsupported"
-        )
-
-      val url = uri.toURL
-      val is = url.openStream()
-      val buffer: ByteArrayOutputStream = new ByteArrayOutputStream()
-
-      try {
-        // read all the bytes from the URL
-        var nRead = 0
-        val data = new Array[Byte](16384)
-
-        while (nRead > 0) {
-          nRead = is.read(data, 0, data.length)
-          if (nRead > 0)
-            buffer.write(data, 0, nRead)
-        }
-
-        new String(buffer.toByteArray, encoding)
-      } finally {
-        is.close()
-        buffer.close()
-      }
-    }
   }
 }

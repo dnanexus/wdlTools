@@ -7,13 +7,12 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Logger, Util => UUtil}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
-      localDirectories = Vector(
-          Paths.get(getClass.getResource("/types/v1").getPath)
-      ),
+      fileResolver =
+        FileSourceResolver.create(Vector(Paths.get(getClass.getResource("/types/v1").getPath))),
       logger = Logger.Normal
   )
   private val parser = Parsers(opts)
@@ -79,14 +78,14 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val includeList: Option[Set[String]] = None
   private val excludeList: Option[Set[String]] = None
 
-  private def checkCorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
+  private def checkCorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
     }
     val checker = TypeInfer(opts2)
     try {
-      val doc = parser.parseDocument(UUtil.pathToUrl(file))
+      val doc = parser.parseDocument(file)
       checker.apply(doc)
     } catch {
       case e: Throwable =>
@@ -95,7 +94,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  private def checkIncorrect(file: Path, flag: Option[TypeCheckingRegime.Value]): Unit = {
+  private def checkIncorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val opts2 = flag match {
       case None    => opts
       case Some(x) => opts.copy(typeChecking = x)
@@ -103,7 +102,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     val checker = TypeInfer(opts2)
     val checkVal =
       try {
-        val doc = parser.parseDocument(UUtil.pathToUrl(file))
+        val doc = parser.parseDocument(file)
         checker.apply(doc)
         true
       } catch {
@@ -151,7 +150,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
         None
       } else {
         val tResult = controlTable(name)
-        Some(testFile, tResult)
+        Some(opts.fileResolver.fromPath(testFile), tResult)
       }
     }
 
@@ -189,9 +188,9 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
         //
     )
 
-    for (src <- sources) {
-      val url = UUtil.getUrl(src)
-      val doc = parser.parseDocument(url)
+    sources.foreach { uri =>
+      val docSource = opts.fileResolver.resolve(uri)
+      val doc = parser.parseDocument(docSource)
       checker.apply(doc)
     }
   }
@@ -201,11 +200,11 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "handle several struct definitions" taggedAs Edge in {
     val opts2 = TypeOptions(
-        localDirectories = Vector(structsDir),
+        fileResolver = FileSourceResolver.create(Vector(structsDir)),
         logger = Logger.Normal
     )
     val checker = TypeInfer(opts2)
-    val sourceFile = UUtil.pathToUrl(structsDir.resolve("file3.wdl"))
+    val sourceFile = opts.fileResolver.fromPath(structsDir.resolve("file3.wdl"))
     val doc = Parsers(opts2).parseDocument(sourceFile)
     checker.apply(doc)
   }

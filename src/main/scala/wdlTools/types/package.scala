@@ -1,10 +1,7 @@
 package wdlTools.types
 
-import java.net.URL
-import java.nio.file.Path
-
-import wdlTools.syntax.TextSource
-import wdlTools.util.{Logger, Options}
+import wdlTools.syntax.SourceLocation
+import wdlTools.util.{FileSourceResolver, Logger, Options}
 
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
@@ -16,7 +13,7 @@ object TypeCheckingRegime extends Enumeration {
   * @param allowNonWorkflowInputs   allow missing inputs; these can be provided at
   *                                 runtime by the user
   */
-case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
+case class TypeOptions(fileResolver: FileSourceResolver = FileSourceResolver.create(),
                        followImports: Boolean = true,
                        logger: Logger = Logger.Normal,
                        antlr4Trace: Boolean = false,
@@ -25,12 +22,12 @@ case class TypeOptions(localDirectories: Vector[Path] = Vector.empty,
                        allowNonWorkflowInputs: Boolean = true)
     extends Options
 
-final case class TypeError(docSourceUrl: Option[URL], textSource: TextSource, reason: String)
+final case class TypeError(loc: SourceLocation, reason: String)
 
 // Type error exception
 final class TypeException(message: String) extends Exception(message) {
-  def this(msg: String, text: TextSource, docSourceUrl: Option[URL] = None) = {
-    this(TypeException.formatMessage(msg, text, docSourceUrl))
+  def this(msg: String, loc: SourceLocation) = {
+    this(TypeException.formatMessage(msg, loc))
   }
   def this(errors: Seq[TypeError]) = {
     this(TypeException.formatMessageFromErrorList(errors))
@@ -38,17 +35,14 @@ final class TypeException(message: String) extends Exception(message) {
 }
 
 object TypeException {
-  def formatMessage(msg: String, text: TextSource, docSourceUrl: Option[URL]): String = {
-    val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-    s"${msg} at ${text}${urlPart}"
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
   }
 
   def formatMessageFromErrorList(errors: Seq[TypeError]): String = {
     // make one big report on all the type errors
     val messages = errors.map {
-      case TypeError(docSourceUrl, textSource, msg) =>
-        val urlPart = docSourceUrl.map(url => s" in ${url.toString}").getOrElse("")
-        s"${msg}${urlPart} at ${textSource}"
+      case TypeError(locSource, msg) => s"${msg} at ${locSource}"
     }
     messages.mkString("\n")
   }

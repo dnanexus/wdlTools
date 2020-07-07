@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.syntax.{TextSource, WdlVersion, AbstractSyntax => AST, Util => SUtil}
+import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Util => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
@@ -9,15 +9,15 @@ import wdlTools.util.{Util => UUtil}
 
 /**
   * Type inference
-  * @param conf options
+  * @param opts options
   * @param errorHandler optional error handler function. If defined, it is called every time a type-checking
   *                     error is encountered. If it returns false, type inference will proceed even if it
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
-  private val unify = Unification(conf)
-  private val regime = conf.typeChecking
+case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
+  private val unify = Unification(opts)
+  private val regime = opts.typeChecking
   private var errors = Vector.empty[TypeError]
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -49,15 +49,15 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     }
   }
 
-  private def handleError(reason: String, textSource: TextSource, ctx: Context): Unit = {
-    errors = errors :+ TypeError(ctx.docSourceUrl, textSource, reason)
+  private def handleError(reason: String, locSource: SourceLocation): Unit = {
+    errors = errors :+ TypeError(locSource, reason)
   }
 
   // The add operation is overloaded.
   // 1) The result of adding two integers is an integer
   // 2)    -"-                   floats   -"-   float
   // 3)    -"-                   strings  -"-   string
-  private def typeEvalAdd(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalAdd(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
     def isPseudoString(x: WdlType): Boolean = {
       x match {
         case T_String             => true
@@ -94,26 +94,24 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case (T_Directory, T_String | T_Directory) => T_Directory
 
       case (t, _) =>
-        handleError(s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added",
-                    a.text,
-                    ctx)
+        handleError(s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added", a.loc)
         t
     }
     t
   }
 
   // math operation on a single argument
-  private def typeEvalMathOp(expr: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalMathOp(expr: TypedAbstractSyntax.Expr) = {
     expr.wdlType match {
       case T_Int   => T_Int
       case T_Float => T_Float
       case other =>
-        handleError(s"${exprToString(expr)} must be an integer or a float", expr.text, ctx)
+        handleError(s"${exprToString(expr)} must be an integer or a float", expr.loc)
         other
     }
   }
 
-  private def typeEvalMathOp(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalMathOp(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
     (a.wdlType, b.wdlType) match {
       case (T_Int, T_Int)     => T_Int
       case (T_Float, T_Int)   => T_Float
@@ -122,36 +120,33 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case (t, _) =>
         handleError(
             s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
-            a.text,
-            ctx
+            a.loc
         )
         t
     }
   }
 
-  private def typeEvalLogicalOp(expr: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalLogicalOp(expr: TypedAbstractSyntax.Expr) = {
     expr.wdlType match {
       case T_Boolean => T_Boolean
       case other =>
         handleError(s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}",
-                    expr.text,
-                    ctx)
+                    expr.loc)
         other
     }
   }
 
-  private def typeEvalLogicalOp(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalLogicalOp(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
     (a.wdlType, b.wdlType) match {
       case (T_Boolean, T_Boolean) => T_Boolean
       case (t, _) =>
-        handleError(s"${exprToString(a)} and ${exprToString(b)} must have boolean type",
-                    a.text,
-                    ctx)
+        handleError(s"${exprToString(a)} and ${exprToString(b)} must have boolean type", a.loc)
         t
     }
   }
 
-  private def typeEvalCompareOp(a: TAT.Expr, b: TAT.Expr, ctx: Context): WdlType = {
+  private def typeEvalCompareOp(a: TypedAbstractSyntax.Expr,
+                                b: TypedAbstractSyntax.Expr): WdlType = {
     if (a.wdlType == b.wdlType) {
       // These could be complex types, such as Array[Array[Int]].
       return T_Boolean
@@ -165,8 +160,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case (t, _) =>
         handleError(
             s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
-            a.text,
-            ctx
+            a.loc
         )
         t
     }
@@ -177,9 +171,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case struct: T_Struct =>
         struct.members.get(id) match {
           case None =>
-            handleError(s"Struct ${struct.name} does not have member ${id} in expression",
-                        expr.text,
-                        ctx)
+            handleError(s"Struct ${struct.name} does not have member ${id} in expression", expr.loc)
             expr.wdlType
           case Some(t) =>
             t
@@ -188,8 +180,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         call.output.get(id) match {
           case None =>
             handleError(s"Call object ${call.name} does not have output ${id} in expression",
-                        expr.text,
-                        ctx)
+                        expr.loc)
             expr.wdlType
           case Some(t) =>
             t
@@ -202,17 +193,17 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         // produce the struct definition
         ctx.aliases.get(structName) match {
           case None =>
-            handleError(s"unknown struct ${structName}", expr.text, ctx)
+            handleError(s"unknown struct ${structName}", expr.loc)
             expr.wdlType
           case Some(struct: T_Struct) =>
             struct.members.get(id) match {
               case None =>
-                handleError(s"Struct ${structName} does not have member ${id}", expr.text, ctx)
+                handleError(s"Struct ${structName} does not have member ${id}", expr.loc)
                 expr.wdlType
               case Some(t) => t
             }
           case other =>
-            handleError(s"not a struct ${other}", expr.text, ctx)
+            handleError(s"not a struct ${other}", expr.loc)
             expr.wdlType
         }
 
@@ -220,26 +211,23 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case T_Pair(l, _) if id.toLowerCase() == "left"  => l
       case T_Pair(_, r) if id.toLowerCase() == "right" => r
       case T_Pair(_, _) =>
-        handleError(s"accessing a pair with (${id}) is illegal", expr.text, ctx)
+        handleError(s"accessing a pair with (${id}) is illegal", expr.loc)
         expr.wdlType
 
       case _ =>
-        handleError(s"member access (${id}) in expression is illegal", expr.text, ctx)
+        handleError(s"member access (${id}) in expression is illegal", expr.loc)
         expr.wdlType
     }
   }
 
   // unify a vector of types
-  private def unifyTypes(vec: Iterable[WdlType],
-                         errMsg: String,
-                         textSource: TextSource,
-                         ctx: Context): WdlType = {
+  private def unifyTypes(vec: Iterable[WdlType], errMsg: String, locSource: SourceLocation) = {
     try {
       val (t, _) = unify.unifyCollection(vec, Map.empty)
       t
     } catch {
       case _: TypeUnificationException =>
-        handleError(errMsg + " must have the same type, or be coercible to one", textSource, ctx)
+        handleError(errMsg + " must have the same type, or be coercible to one", locSource)
         vec.head
     }
   }
@@ -249,26 +237,26 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyExpr(expr: AST.Expr, bindings: Bindings, ctx: Context): TAT.Expr = {
     expr match {
       // None can be any type optional
-      case AST.ValueNone(text)           => TAT.ValueNone(T_Optional(T_Any), text)
-      case AST.ValueBoolean(value, text) => TAT.ValueBoolean(value, T_Boolean, text)
-      case AST.ValueInt(value, text)     => TAT.ValueInt(value, T_Int, text)
-      case AST.ValueFloat(value, text)   => TAT.ValueFloat(value, T_Float, text)
-      case AST.ValueString(value, text)  => TAT.ValueString(value, T_String, text)
+      case AST.ValueNone(loc)           => TAT.ValueNone(T_Optional(T_Any), loc)
+      case AST.ValueBoolean(value, loc) => TAT.ValueBoolean(value, T_Boolean, loc)
+      case AST.ValueInt(value, loc)     => TAT.ValueInt(value, T_Int, loc)
+      case AST.ValueFloat(value, loc)   => TAT.ValueFloat(value, T_Float, loc)
+      case AST.ValueString(value, loc)  => TAT.ValueString(value, T_String, loc)
 
       // an identifier has to be bound to a known type. Lookup the the type,
       // and add it to the expression.
-      case AST.ExprIdentifier(id, text) =>
+      case AST.ExprIdentifier(id, loc) =>
         val t = ctx.lookup(id, bindings) match {
           case None =>
-            handleError(s"Identifier ${id} is not defined", expr.text, ctx)
+            handleError(s"Identifier ${id} is not defined", expr.loc)
             T_Any
           case Some(t) =>
             t
         }
-        TAT.ExprIdentifier(id, t, text)
+        TAT.ExprIdentifier(id, t, loc)
 
       // All the sub-exressions have to be strings, or coercible to strings
-      case AST.ExprCompoundString(vec, text) =>
+      case AST.ExprCompoundString(vec, loc) =>
         val initialType: T = T_String
         val (vec2, wdlType) = vec.foldLeft((Vector.empty[TAT.Expr], initialType)) {
           case ((v, t), subExpr) =>
@@ -278,8 +266,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             } else {
               handleError(
                   s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
-                  expr.text,
-                  ctx
+                  expr.loc
               )
               if (t == initialType) {
                 e2.wdlType
@@ -289,19 +276,19 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             }
             (v :+ e2, t2)
         }
-        TAT.ExprCompoundString(vec2, wdlType, text)
+        TAT.ExprCompoundString(vec2, wdlType, loc)
 
-      case AST.ExprPair(l, r, text) =>
+      case AST.ExprPair(l, r, loc) =>
         val l2 = applyExpr(l, bindings, ctx)
         val r2 = applyExpr(r, bindings, ctx)
         val t = T_Pair(l2.wdlType, r2.wdlType)
-        TAT.ExprPair(l2, r2, t, text)
+        TAT.ExprPair(l2, r2, t, loc)
 
-      case AST.ExprArray(vec, text) if vec.isEmpty =>
+      case AST.ExprArray(vec, loc) if vec.isEmpty =>
         // The array is empty, we can't tell what the array type is.
-        TAT.ExprArray(Vector.empty, T_Array(T_Any), text)
+        TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
 
-      case AST.ExprArray(vec, text) =>
+      case AST.ExprArray(vec, loc) =>
         val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
         val t =
           try {
@@ -309,60 +296,58 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           } catch {
             case _: TypeUnificationException =>
               handleError("array elements must have the same type, or be coercible to one",
-                          expr.text,
-                          ctx)
+                          expr.loc)
               tVecExprs.head.wdlType
           }
-        TAT.ExprArray(tVecExprs, t, text)
+        TAT.ExprArray(tVecExprs, t, loc)
 
-      case AST.ExprObject(members, text) =>
+      case AST.ExprObject(members, loc) =>
         val members2 = members.map {
           case AST.ExprMember(key, value, _) =>
             applyExpr(key, bindings, ctx) -> applyExpr(value, bindings, ctx)
         }.toMap
-        TAT.ExprObject(members2, T_Object, text)
+        TAT.ExprObject(members2, T_Object, loc)
 
-      case AST.ExprMap(m, text) if m.isEmpty =>
+      case AST.ExprMap(m, loc) if m.isEmpty =>
         // The key and value types are unknown.
-        TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), text)
+        TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), loc)
 
-      case AST.ExprMap(value, text) =>
+      case AST.ExprMap(value, loc) =>
         val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
           applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
         }.toMap
         // unify the key types
-        val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", text, ctx)
+        val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc)
         // unify the value types
-        val tv = unifyTypes(m.values.map(_.wdlType), "map values", text, ctx)
+        val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc)
         T_Map(tk, tv)
-        TAT.ExprMap(m, T_Map(tk, tv), text)
+        TAT.ExprMap(m, T_Map(tk, tv), loc)
 
       // These are expressions like:
       // ${true="--yes" false="--no" boolean_value}
-      case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, text) =>
+      case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
         val te = applyExpr(t, bindings, ctx)
         val fe = applyExpr(f, bindings, ctx)
         val ve = applyExpr(value, bindings, ctx)
         val wdlType = if (te.wdlType != fe.wdlType) {
           handleError(
               s"subexpressions ${exprToString(te)} and ${exprToString(fe)} must have the same type",
-              text,
-              ctx
+              loc
           )
           te.wdlType
         } else if (ve.wdlType != T_Boolean) {
           val msg =
             s"condition ${exprToString(ve)} should have boolean type, it has type ${typeToString(ve.wdlType)} instead"
-          handleError(msg, expr.text, ctx)
+          handleError(msg, expr.loc)
           ve.wdlType
         } else {
           te.wdlType
         }
-        TAT.ExprPlaceholderEqual(te, fe, ve, wdlType, text)
+        TAT.ExprPlaceholderEqual(te, fe, ve, wdlType, loc)
 
       // An expression like:
       // ${default="foo" optional_value}
-      case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, text) =>
+      case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
         val de = applyExpr(default, bindings, ctx)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
@@ -374,19 +359,17 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             val msg = s"""|Expression (${exprToString(ve)}) must have type coercible to
                           |(${typeToString(de.wdlType)}), it has type (${typeToString(ve.wdlType)}) instead
                           |""".stripMargin.replaceAll("\n", " ")
-            handleError(msg, expr.text, ctx)
+            handleError(msg, expr.loc)
             ve.wdlType
         }
-        TAT.ExprPlaceholderDefault(de, ve, t, text)
+        TAT.ExprPlaceholderDefault(de, ve, t, loc)
 
       // An expression like:
       // ${sep=", " array_value}
-      case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, text) =>
+      case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
         val se = applyExpr(sep, bindings, ctx)
         if (se.wdlType != T_String)
-          throw new TypeException(s"separator ${exprToString(se)} must have string type",
-                                  text,
-                                  ctx.docSourceUrl)
+          throw new TypeException(s"separator ${exprToString(se)} must have string type", loc)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
           case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
@@ -394,106 +377,106 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           case other =>
             val msg =
               s"expression ${exprToString(ve)} should be coercible to Array[String], but it is ${typeToString(other)}"
-            handleError(msg, ve.text, ctx)
+            handleError(msg, ve.loc)
             other
         }
-        TAT.ExprPlaceholderSep(se, ve, t, text)
+        TAT.ExprPlaceholderSep(se, ve, t, loc)
 
       // math operators on one argument
-      case AST.ExprUnaryPlus(value, text) =>
+      case AST.ExprUnaryPlus(value, loc) =>
         val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUnaryPlus(ve, typeEvalMathOp(ve, ctx), text)
-      case AST.ExprUnaryMinus(value, text) =>
+        TAT.ExprUnaryPlus(ve, typeEvalMathOp(ve), loc)
+      case AST.ExprUnaryMinus(value, loc) =>
         val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUnaryMinus(ve, typeEvalMathOp(ve, ctx), text)
+        TAT.ExprUnaryMinus(ve, typeEvalMathOp(ve), loc)
 
       // logical operators
-      case AST.ExprLor(a: AST.Expr, b: AST.Expr, text) =>
+      case AST.ExprLor(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLor(ae, be, typeEvalLogicalOp(ae, be, ctx), text)
-      case AST.ExprLand(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprLor(ae, be, typeEvalLogicalOp(ae, be), loc)
+      case AST.ExprLand(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLand(ae, be, typeEvalLogicalOp(ae, be, ctx), text)
-      case AST.ExprNegate(value: AST.Expr, text) =>
+        TAT.ExprLand(ae, be, typeEvalLogicalOp(ae, be), loc)
+      case AST.ExprNegate(value: AST.Expr, loc) =>
         val e = applyExpr(value, bindings, ctx)
-        TAT.ExprNegate(e, typeEvalLogicalOp(e, ctx), text)
+        TAT.ExprNegate(e, typeEvalLogicalOp(e), loc)
 
       // equality comparisons
-      case AST.ExprEqeq(a: AST.Expr, b: AST.Expr, text) =>
+      case AST.ExprEqeq(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprEqeq(ae, be, typeEvalCompareOp(ae, be, ctx), text)
-      case AST.ExprNeq(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprEqeq(ae, be, typeEvalCompareOp(ae, be), loc)
+      case AST.ExprNeq(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprNeq(ae, be, typeEvalCompareOp(ae, be, ctx), text)
-      case AST.ExprLt(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprNeq(ae, be, typeEvalCompareOp(ae, be), loc)
+      case AST.ExprLt(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLt(ae, be, typeEvalCompareOp(ae, be, ctx), text)
-      case AST.ExprGte(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprLt(ae, be, typeEvalCompareOp(ae, be), loc)
+      case AST.ExprGte(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprGte(ae, be, typeEvalCompareOp(ae, be, ctx), text)
-      case AST.ExprLte(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprGte(ae, be, typeEvalCompareOp(ae, be), loc)
+      case AST.ExprLte(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLte(ae, be, typeEvalCompareOp(ae, be, ctx), text)
-      case AST.ExprGt(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprLte(ae, be, typeEvalCompareOp(ae, be), loc)
+      case AST.ExprGt(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprGt(ae, be, typeEvalCompareOp(ae, be, ctx), text)
+        TAT.ExprGt(ae, be, typeEvalCompareOp(ae, be), loc)
 
       // add is overloaded, it is a special case
-      case AST.ExprAdd(a: AST.Expr, b: AST.Expr, text) =>
+      case AST.ExprAdd(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprAdd(ae, be, typeEvalAdd(ae, be, ctx), text)
+        TAT.ExprAdd(ae, be, typeEvalAdd(ae, be), loc)
 
       // math operators on two arguments
-      case AST.ExprSub(a: AST.Expr, b: AST.Expr, text) =>
+      case AST.ExprSub(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprSub(ae, be, typeEvalMathOp(ae, be, ctx), text)
-      case AST.ExprMod(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprSub(ae, be, typeEvalMathOp(ae, be), loc)
+      case AST.ExprMod(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprMod(ae, be, typeEvalMathOp(ae, be, ctx), text)
-      case AST.ExprMul(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprMod(ae, be, typeEvalMathOp(ae, be), loc)
+      case AST.ExprMul(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprMul(ae, be, typeEvalMathOp(ae, be, ctx), text)
-      case AST.ExprDivide(a: AST.Expr, b: AST.Expr, text) =>
+        TAT.ExprMul(ae, be, typeEvalMathOp(ae, be), loc)
+      case AST.ExprDivide(a: AST.Expr, b: AST.Expr, loc) =>
         val ae = applyExpr(a, bindings, ctx)
         val be = applyExpr(b, bindings, ctx)
-        TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be, ctx), text)
+        TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be), loc)
 
       // Access an array element at [index]
-      case AST.ExprAt(array: AST.Expr, index: AST.Expr, text) =>
+      case AST.ExprAt(array: AST.Expr, index: AST.Expr, loc) =>
         val eIndex = applyExpr(index, bindings, ctx)
         val eArray = applyExpr(array, bindings, ctx)
         val t = (eIndex.wdlType, eArray.wdlType) match {
           case (T_Int, T_Array(elementType, _)) => elementType
           case (T_Int, _) =>
-            handleError(s"${exprToString(eIndex)} must be an integer", text, ctx)
+            handleError(s"${exprToString(eIndex)} must be an integer", loc)
             eIndex.wdlType
           case (_, _) =>
-            handleError(s"expression ${exprToString(eArray)} must be an array", eArray.text, ctx)
+            handleError(s"expression ${exprToString(eArray)} must be an array", eArray.loc)
             eArray.wdlType
         }
-        TAT.ExprAt(eArray, eIndex, t, text)
+        TAT.ExprAt(eArray, eIndex, t, loc)
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
-      case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, text) =>
+      case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, loc) =>
         val eCond = applyExpr(cond, bindings, ctx)
         val eTrueBranch = applyExpr(trueBranch, bindings, ctx)
         val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
         val t = {
           if (eCond.wdlType != T_Boolean) {
-            handleError(s"condition ${exprToString(eCond)} must be a boolean", eCond.text, ctx)
+            handleError(s"condition ${exprToString(eCond)} must be a boolean", eCond.loc)
             eCond.wdlType
           } else {
             try {
@@ -506,36 +489,36 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
                       |  true branch: ${typeToString(eTrueBranch.wdlType)}
                       |  flase branch: ${typeToString(eFalseBranch.wdlType)}
                       |""".stripMargin
-                handleError(msg, expr.text, ctx)
+                handleError(msg, expr.loc)
                 eTrueBranch.wdlType
             }
           }
         }
-        TAT.ExprIfThenElse(eCond, eTrueBranch, eFalseBranch, t, text)
+        TAT.ExprIfThenElse(eCond, eTrueBranch, eFalseBranch, t, loc)
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
-      case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], text) =>
+      case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], loc) =>
         val eElements = elements.map(applyExpr(_, bindings, ctx))
         try {
           val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType))
-          TAT.ExprApply(funcName, funcSig, eElements, outputType, text)
+          TAT.ExprApply(funcName, funcSig, eElements, outputType, loc)
         } catch {
           case e: StdlibFunctionException =>
-            handleError(e.getMessage, expr.text, ctx)
-            TAT.ValueNone(T_Any, expr.text)
+            handleError(e.getMessage, expr.loc)
+            TAT.ValueNone(T_Any, expr.loc)
         }
 
       // Access a field in a struct or an object. For example "x.a" in:
       //   Int z = x.a
-      case AST.ExprGetName(expr: AST.Expr, id: String, text) =>
+      case AST.ExprGetName(expr: AST.Expr, id: String, loc) =>
         val e = applyExpr(expr, bindings, ctx)
         val t = typeEvalExprGetName(e, id, ctx)
-        TAT.ExprGetName(e, id, t, text)
+        TAT.ExprGetName(e, id, t, loc)
     }
   }
 
-  private def typeFromAst(t: AST.Type, text: TextSource, ctx: Context): WdlType = {
+  private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: Context): WdlType = {
     t match {
       case _: AST.TypeBoolean     => T_Boolean
       case _: AST.TypeInt         => T_Int
@@ -543,21 +526,21 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
       case _: AST.TypeString      => T_String
       case _: AST.TypeFile        => T_File
       case _: AST.TypeDirectory   => T_Directory
-      case AST.TypeOptional(t, _) => T_Optional(typeFromAst(t, text, ctx))
-      case AST.TypeArray(t, _, _) => T_Array(typeFromAst(t, text, ctx))
-      case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, text, ctx), typeFromAst(v, text, ctx))
-      case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, text, ctx), typeFromAst(r, text, ctx))
+      case AST.TypeOptional(t, _) => T_Optional(typeFromAst(t, loc, ctx))
+      case AST.TypeArray(t, _, _) => T_Array(typeFromAst(t, loc, ctx))
+      case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, loc, ctx), typeFromAst(v, loc, ctx))
+      case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, loc, ctx), typeFromAst(r, loc, ctx))
       case AST.TypeIdentifier(id, _) =>
         ctx.aliases.get(id) match {
           case None =>
-            handleError(s"struct ${id} has not been defined", text, ctx)
+            handleError(s"struct ${id} has not been defined", loc)
             T_Any
           case Some(struct) => struct
         }
       case _: AST.TypeObject => T_Object
       case AST.TypeStruct(name, members, _) =>
         T_Struct(name, members.map {
-          case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, text, ctx)
+          case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, loc, ctx)
         }.toMap)
     }
   }
@@ -576,11 +559,11 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
                         ctx: Context,
                         canShadow: Boolean = false): TAT.Declaration = {
 
-    val lhsType = typeFromAst(decl.wdlType, decl.text, ctx)
+    val lhsType = typeFromAst(decl.wdlType, decl.loc, ctx)
     val tDecl = decl.expr match {
       // Int x
       case None =>
-        TAT.Declaration(decl.name, lhsType, None, decl.text)
+        TAT.Declaration(decl.name, lhsType, None, decl.loc)
       case Some(expr) =>
         val e = applyExpr(expr, bindings, ctx)
         val rhsType = e.wdlType
@@ -592,16 +575,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
                 |but is assigned ${typeToString(rhsType)}
                 |${exprToString(e)}
                 |""".stripMargin.replaceAll("\n", " ")
-          handleError(msg, decl.text, ctx)
+          handleError(msg, decl.loc)
           lhsType
         }
-        TAT.Declaration(decl.name, wdlType, Some(e), decl.text)
+        TAT.Declaration(decl.name, wdlType, Some(e), decl.loc)
     }
 
     // There are cases where we want to allow shadowing. For example, it
     // is legal to have an output variable with the same name as an input variable.
     if (!canShadow && ctx.lookup(decl.name, bindings).isDefined) {
-      handleError(s"variable ${decl.name} shadows an existing variable", decl.text, ctx)
+      handleError(s"variable ${decl.name} shadows an existing variable", decl.loc)
     }
 
     tDecl
@@ -618,9 +601,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings.empty)) {
           case ((tDecls, names, bindings), decl) =>
             if (names.contains(decl.name)) {
-              handleError(s"Input section has duplicate definition ${decl.name}",
-                          inputSection.text,
-                          ctx)
+              handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
             }
             val tDecl = applyDecl(decl, bindings, ctx)
             (tDecls :+ tDecl, names + decl.name, bindings + (tDecl.name -> tDecl.wdlType))
@@ -634,13 +615,13 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         case None => {
           tDecl.wdlType match {
             case t: WdlTypes.T_Optional =>
-              TAT.OptionalInputDefinition(tDecl.name, t, tDecl.text)
+              TAT.OptionalInputDefinition(tDecl.name, t, tDecl.loc)
             case _ =>
-              TAT.RequiredInputDefinition(tDecl.name, tDecl.wdlType, tDecl.text)
+              TAT.RequiredInputDefinition(tDecl.name, tDecl.wdlType, tDecl.loc)
           }
         }
         case Some(expr) =>
-          TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+          TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
   }
@@ -660,10 +641,10 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           case ((tDecls, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
             if (names.contains(decl.name)) {
-              handleError(s"Output section has duplicate definition ${decl.name}", decl.text, ctx)
+              handleError(s"Output section has duplicate definition ${decl.name}", decl.loc)
             }
             if (both.contains(decl.name)) {
-              handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.text, ctx)
+              handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.loc)
             }
             val tDecl = applyDecl(decl, bindings, ctx, canShadow = true)
             val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
@@ -674,9 +655,9 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     tDecls.map { tDecl =>
       tDecl.expr match {
         case None =>
-          throw new TypeException("Outputs must have expressions", tDecl.text, ctx.docSourceUrl)
+          throw new TypeException("Outputs must have expressions", tDecl.loc)
         case Some(expr) =>
-          TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.text)
+          TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
   }
@@ -709,44 +690,43 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
     val m = rtSection.kvs.map {
-      case AST.RuntimeKV(id, expr, text) =>
+      case AST.RuntimeKV(id, expr, loc) =>
         val tExpr = applyExpr(expr, Map.empty, ctx)
         // if there are type restrictions, check that the type of the expression is coercible to
         // one of the allowed types
         if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
           throw new TypeException(
               s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
-              text,
-              ctx.docSourceUrl
+              loc
           )
         }
         id -> tExpr
     }.toMap
-    TAT.RuntimeSection(m, rtSection.text)
+    TAT.RuntimeSection(m, rtSection.loc)
   }
 
   // convert the generic expression syntax into a specialized JSON object
   // language for meta values only.
   private def applyMetaValue(expr: AST.MetaValue, ctx: Context): TAT.MetaValue = {
     expr match {
-      case AST.MetaValueNull(text)           => TAT.MetaValueNull(text)
-      case AST.MetaValueBoolean(value, text) => TAT.MetaValueBoolean(value, text)
-      case AST.MetaValueInt(value, text)     => TAT.MetaValueInt(value, text)
-      case AST.MetaValueFloat(value, text)   => TAT.MetaValueFloat(value, text)
-      case AST.MetaValueString(value, text)  => TAT.MetaValueString(value, text)
-      case AST.MetaValueArray(vec, text) =>
-        TAT.MetaValueArray(vec.map(applyMetaValue(_, ctx)), text)
-      case AST.MetaValueObject(members, text) =>
+      case AST.MetaValueNull(loc)           => TAT.MetaValueNull(loc)
+      case AST.MetaValueBoolean(value, loc) => TAT.MetaValueBoolean(value, loc)
+      case AST.MetaValueInt(value, loc)     => TAT.MetaValueInt(value, loc)
+      case AST.MetaValueFloat(value, loc)   => TAT.MetaValueFloat(value, loc)
+      case AST.MetaValueString(value, loc)  => TAT.MetaValueString(value, loc)
+      case AST.MetaValueArray(vec, loc) =>
+        TAT.MetaValueArray(vec.map(applyMetaValue(_, ctx)), loc)
+      case AST.MetaValueObject(members, loc) =>
         TAT.MetaValueObject(
             members.map {
               case AST.MetaKV(key, value, _) =>
                 key -> applyMetaValue(value, ctx)
             }.toMap,
-            text
+            loc
         )
       case other =>
-        handleError(s"${SUtil.metaValueToString(other)} is an invalid meta value", expr.text, ctx)
-        TAT.MetaValueNull(other.text)
+        handleError(s"${SUtil.metaValueToString(other)} is an invalid meta value", expr.loc)
+        TAT.MetaValueNull(other.loc)
     }
   }
 
@@ -754,7 +734,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     TAT.MetaSection(metaSection.kvs.map {
       case AST.MetaKV(k, v, _) =>
         k -> applyMetaValue(v, ctx)
-    }.toMap, metaSection.text)
+    }.toMap, metaSection.loc)
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
@@ -766,14 +746,13 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           } else {
             handleError(
                 s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
-                kv.text,
-                ctx
+                kv.loc
             )
-            TAT.MetaValueNull(kv.value.text)
+            TAT.MetaValueNull(kv.value.loc)
           }
           kv.id -> metaValue
         }.toMap,
-        paramMetaSection.text
+        paramMetaSection.loc
     )
   }
 
@@ -783,7 +762,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           case AST.MetaKV(k, v, _) =>
             k -> applyMetaValue(v, ctx)
         }.toMap,
-        hintsSection.text
+        hintsSection.loc
     )
   }
 
@@ -818,7 +797,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             curCtx.bindVar(tDecl.name, tDecl.wdlType)
           } catch {
             case e: DuplicateDeclarationException =>
-              handleError(e.getMessage, tDecl.text, ctx)
+              handleError(e.getMessage, tDecl.loc)
               curCtx
           }
         (tDecls :+ tDecl, newCtx)
@@ -837,13 +816,12 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         case _ =>
           handleError(
               s"Expression ${exprToString(e)} in the command section is not coercible to a string",
-              expr.text,
-              ctx
+              expr.loc
           )
-          TAT.ValueString(exprToString(e), T_String, e.text)
+          TAT.ValueString(exprToString(e), T_String, e.loc)
       }
     }
-    val tCommand = TAT.CommandSection(cmdParts, task.command.text)
+    val tCommand = TAT.CommandSection(cmdParts, task.command.loc)
 
     val (outputDefs, ctxOutput) = task.output match {
       case None =>
@@ -871,7 +849,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         parameterMeta = tParamMeta,
         runtime = tRuntime,
         hints = tHints,
-        text = task.text
+        loc = task.loc
     )
   }
 
@@ -897,7 +875,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     // check that the call refers to a valid callee
     val callee: T_Callable = ctx.callables.get(call.name) match {
       case None =>
-        handleError(s"called task/workflow ${call.name} is not defined", call.text, ctx)
+        handleError(s"called task/workflow ${call.name} is not defined", call.loc)
         WdlTypes.T_Task(call.name, Map.empty, Map.empty)
       case Some(x: T_Callable) => x
     }
@@ -905,7 +883,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     // check if the call shadows an existing call
     val callType = T_Call(actualName, callee.output)
     val wdlType = if (ctx.declarations contains actualName) {
-      handleError(s"call ${actualName} shadows an existing definition", call.text, ctx)
+      handleError(s"call ${actualName} shadows an existing definition", call.loc)
       T_Call(actualName, Map.empty)
     } else {
       callType
@@ -918,14 +896,12 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         case Some(_) =>
           handleError(
               s"call ${actualName} after clause refers to non-call declaration ${after.name}",
-              after.text,
-              ctx
+              after.loc
           )
           T_Call(after.name, Map.empty)
         case None =>
           handleError(s"call ${actualName} after clause refers to non-existant call ${after.name}",
-                      after.text,
-                      ctx)
+                      after.loc)
           T_Call(after.name, Map.empty)
       }
     }
@@ -947,7 +923,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             case _ => None
           }
           if (errorMsg.nonEmpty) {
-            handleError(errorMsg.get, call.text, ctx)
+            handleError(errorMsg.get, call.loc)
           }
           argName -> tExpr
         }.toMap
@@ -958,16 +934,15 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     val missingInputs = callee.input.flatMap {
       case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
-          case None if conf.allowNonWorkflowInputs =>
-            conf.logger.warning(
+          case None if opts.allowNonWorkflowInputs =>
+            opts.logger.warning(
                 s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
             )
-            Some(argName -> TAT.ValueNone(wdlType, call.text))
+            Some(argName -> TAT.ValueNone(wdlType, call.loc))
           case None =>
             handleError(s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
-                        call.text,
-                        ctx)
-            Some(argName -> TAT.ValueNone(wdlType, call.text))
+                        call.loc)
+            Some(argName -> TAT.ValueNone(wdlType, call.loc))
           case Some(_) =>
             // argument is provided
             None
@@ -992,7 +967,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         afters,
         actualName,
         callerInputs ++ missingInputs,
-        call.text
+        call.loc
     )
   }
 
@@ -1021,7 +996,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             ctx.bindVarList(bindings)
           } catch {
             case e: DuplicateDeclarationException =>
-              handleError(e.getMessage, wElt.text, ctx)
+              handleError(e.getMessage, wElt.loc)
               ctx
           }
         wElt match {
@@ -1058,9 +1033,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case other =>
-        handleError(s"Collection in scatter (${scatter}) is not an array type",
-                    scatter.text,
-                    ctxOuter)
+        handleError(s"Collection in scatter (${scatter}) is not an array type", scatter.loc)
         other
     }
     // add a binding for the iteration variable
@@ -1071,7 +1044,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         (ctxOuter.bindVar(scatter.identifier, elementType), elementType)
       } catch {
         case e: DuplicateDeclarationException =>
-          handleError(e.getMessage, scatter.text, ctxOuter)
+          handleError(e.getMessage, scatter.loc)
           (ctxOuter, elementType)
       }
 
@@ -1090,7 +1063,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
           varName -> T_Array(typ)
       }
 
-    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tElements, scatter.text)
+    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tElements, scatter.loc)
     (tScatter, bindingsWithArray)
   }
 
@@ -1116,8 +1089,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
     val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter) match {
       case e if e.wdlType == T_Boolean => e
       case e =>
-        handleError(s"Expression ${exprToString(e)} must have boolean type", cond.text, ctxOuter)
-        TAT.ValueBoolean(value = false, T_Boolean, e.text)
+        handleError(s"Expression ${exprToString(e)} must have boolean type", cond.loc)
+        TAT.ValueBoolean(value = false, T_Boolean, e.loc)
     }
 
     // keep track of the inner/outer bindings. Within the block we need [inner],
@@ -1135,7 +1108,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         case (varName, typ: WdlType) =>
           varName -> makeOptional(typ)
       }
-    (TAT.Conditional(condExpr, wfElements, cond.text), bindingsWithOpt)
+    (TAT.Conditional(condExpr, wfElements, cond.loc), bindingsWithOpt)
   }
 
   private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
@@ -1173,7 +1146,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
         meta = tMeta,
         parameterMeta = tParamMeta,
         body = wfElements,
-        text = wf.text
+        loc = wf.loc
     )
   }
 
@@ -1181,8 +1154,8 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
     val initCtx = Context(
         version = doc.version.value,
-        stdlib = Stdlib(conf, doc.version.value),
-        docSourceUrl = doc.sourceUrl
+        stdlib = Stdlib(opts, doc.version.value),
+        docSource = doc.source
     )
 
     // translate each of the elements in the document
@@ -1195,7 +1168,7 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
               ctx.bindCallable(task2.wdlType)
             } catch {
               case e: DuplicateDeclarationException =>
-                handleError(e.getMessage, task.text, ctx)
+                handleError(e.getMessage, task.loc)
                 ctx
             }
           (newCtx, elems :+ task2)
@@ -1216,16 +1189,16 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
               // will be named:
               //    stdlib
               //    C
-              UUtil.getFilename(addr, ".wdl")
+              UUtil.changeFileExt(opts.fileResolver.resolve(addr).fileName, dropExt = ".wdl")
             case Some(x) => x
           }
 
           val aliases = iStat.aliases.map {
-            case AST.ImportAlias(id1, id2, text) =>
-              TAT.ImportAlias(id1, id2, ctx.aliases(id1), text)
+            case AST.ImportAlias(id1, id2, loc) =>
+              TAT.ImportAlias(id1, id2, ctx.aliases(id1), loc)
           }
 
-          val importDoc = TAT.ImportDoc(namespace, aliases, addr, iDoc, iStat.text)
+          val importDoc = TAT.ImportDoc(namespace, aliases, addr, iDoc, iStat.loc)
 
           // add the externally visible definitions to the context
           val newCtx =
@@ -1233,21 +1206,21 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
               ctx.bindImportedDoc(namespace, iCtx, iStat.aliases)
             } catch {
               case e: DuplicateDeclarationException =>
-                handleError(e.getMessage, importDoc.text, ctx)
+                handleError(e.getMessage, importDoc.loc)
                 ctx
             }
           (newCtx, elems :+ importDoc)
 
         case ((ctx, elems), struct: AST.TypeStruct) =>
           // Add the struct to the context
-          val tStruct = typeFromAst(struct, struct.text, ctx).asInstanceOf[T_Struct]
-          val defStruct = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.text)
+          val tStruct = typeFromAst(struct, struct.loc, ctx).asInstanceOf[T_Struct]
+          val defStruct = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.loc)
           val newCtx =
             try {
               ctx.bindStruct(tStruct)
             } catch {
               case e: DuplicateDeclarationException =>
-                handleError(e.getMessage, struct.text, ctx)
+                handleError(e.getMessage, struct.loc)
                 ctx
             }
           (newCtx, elems :+ defStruct)
@@ -1263,18 +1236,17 @@ case class TypeInfer(conf: TypeOptions, errorHandler: Option[Vector[TypeError] =
             context.bindCallable(tWf.wdlType)
           } catch {
             case e: DuplicateDeclarationException =>
-              handleError(e.getMessage, wf.text, context)
+              handleError(e.getMessage, wf.loc)
               context
           }
         (Some(tWf), ctxFinal)
     }
 
-    val tDoc = TAT.Document(doc.sourceUrl,
-                            doc.sourceCode,
-                            TAT.Version(doc.version.value, doc.version.text),
+    val tDoc = TAT.Document(doc.source,
+                            TAT.Version(doc.version.value, doc.version.loc),
                             elements,
                             tWf,
-                            doc.text,
+                            doc.loc,
                             doc.comments)
     (tDoc, contextFinal)
   }

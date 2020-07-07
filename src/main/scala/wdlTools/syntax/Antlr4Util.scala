@@ -1,7 +1,5 @@
 package wdlTools.syntax
 
-import java.net.URL
-
 import org.antlr.v4.runtime.tree.{ParseTreeListener, TerminalNode}
 import org.antlr.v4.runtime.{
   BaseErrorListener,
@@ -16,13 +14,16 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.Options
+import wdlTools.util.{FileSource, Options}
 
 object Antlr4Util {
-  def getTextSource(startToken: Token, maybeStopToken: Option[Token] = None): TextSource = {
+  def getTextSource(source: FileSource,
+                    startToken: Token,
+                    maybeStopToken: Option[Token] = None): SourceLocation = {
     // TODO: for an ending token that containing newlines, the endLine and endCol will be wrong
     val stopToken = maybeStopToken.getOrElse(startToken)
-    syntax.TextSource(
+    syntax.SourceLocation(
+        source = source,
         line = startToken.getLine,
         col = startToken.getCharPositionInLine,
         endLine = stopToken.getLine,
@@ -30,18 +31,18 @@ object Antlr4Util {
     )
   }
 
-  def getTextSource(ctx: ParserRuleContext): TextSource = {
+  def getTextSource(source: FileSource, ctx: ParserRuleContext): SourceLocation = {
     val stop = ctx.getStop
-    getTextSource(ctx.getStart, Option(stop))
+    getTextSource(source, ctx.getStart, Option(stop))
   }
 
-  def getTextSource(symbol: TerminalNode): TextSource = {
-    getTextSource(symbol.getSymbol, None)
+  def getTextSource(source: FileSource, symbol: TerminalNode): SourceLocation = {
+    getTextSource(source, symbol.getSymbol, None)
   }
 
   // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
   //
-  case class WdlAggregatingErrorListener(docSourceUrl: Option[URL]) extends BaseErrorListener {
+  case class WdlAggregatingErrorListener(docSource: FileSource) extends BaseErrorListener {
 
     private var errors = Vector.empty[SyntaxError]
 
@@ -62,10 +63,11 @@ object Antlr4Util {
           case _ =>
             offendingSymbol.toString
         }
-      val err = SyntaxError(docSourceUrl,
-                            symbolText,
-                            TextSource(line, charPositionInLine, line, charPositionInLine),
-                            msg)
+      val err = SyntaxError(
+          symbolText,
+          SourceLocation(docSource, line, charPositionInLine, line, charPositionInLine),
+          msg
+      )
       errors = errors :+ err
     }
 
@@ -74,7 +76,9 @@ object Antlr4Util {
     def hasErrors: Boolean = errors.nonEmpty
   }
 
-  private case class CommentListener(tokenStream: BufferedTokenStream, channelIndex: Int)
+  private case class CommentListener(docSource: FileSource,
+                                     tokenStream: BufferedTokenStream,
+                                     channelIndex: Int)
       extends AllParseTreeListener {
     private var comments: Map[Int, Comment] = Map.empty
 
@@ -82,7 +86,7 @@ object Antlr4Util {
 
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
-        val source = Antlr4Util.getTextSource(tok, None)
+        val source = Antlr4Util.getTextSource(docSource, tok, None)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
@@ -120,11 +124,10 @@ object Antlr4Util {
       val lexer: Lexer,
       val parser: Parser,
       val listenerFactories: Vector[ParseTreeListenerFactory],
-      val docSourceUrl: Option[URL] = None,
-      val docSource: String,
+      val docSource: FileSource,
       val opts: Options
   ) {
-    val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSourceUrl)
+    val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSource)
     // setting up our own error handling
     lexer.removeErrorListeners()
     lexer.addErrorListener(errListener)
@@ -144,6 +147,7 @@ object Antlr4Util {
     val hiddenChannel: Int = getChannel("HIDDEN")
     val commentChannel: Int = getChannel("COMMENTS")
     private val commentListener = CommentListener(
+        docSource,
         parser.getTokenStream.asInstanceOf[BufferedTokenStream],
         commentChannel
     )

@@ -7,14 +7,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Logger, Util => UUtil}
+import wdlTools.util.{FileSourceResolver, Logger, Util => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val opts =
-    TypeOptions(typeChecking = TypeCheckingRegime.Lenient,
-                localDirectories = Vector(srcDir),
+    TypeOptions(fileResolver = FileSourceResolver.create(Vector(srcDir)),
+                typeChecking = TypeCheckingRegime.Lenient,
                 logger = Logger.Normal)
   private val parsers = Parsers(opts)
   private val typeInfer = TypeInfer(opts)
@@ -42,15 +42,14 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
-    val doc = parsers.parseDocument(UUtil.pathToUrl(file))
+    val doc = parsers.parseDocument(opts.fileResolver.fromPath(UUtil.absolutePath(file)))
     val (tDoc, _) = typeInfer.apply(doc)
     tDoc
   }
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, Some(opts.getUrl(file.toString)))
+    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
 
     tDoc.workflow should not be empty
     val wf = tDoc.workflow.get
@@ -247,8 +246,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1, Some(opts.getUrl(file.toString)))
+    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
 
     tDoc.elements should not be empty
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]

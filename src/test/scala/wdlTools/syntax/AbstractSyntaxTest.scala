@@ -6,22 +6,23 @@ import java.nio.file.Paths
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{BasicOptions, Logger, SourceCode, Util}
+import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, StringFileSource}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)
   private val workflowsDir =
     Paths.get(getClass.getResource("/syntax/v1/workflows").getPath)
   private val opts =
-    BasicOptions(localDirectories = Vector(tasksDir, workflowsDir), logger = Logger.Quiet)
+    BasicOptions(fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir)),
+                 logger = Logger.Quiet)
   private val parser = ParseAll(opts)
 
-  private def getTaskSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(tasksDir.resolve(fname)))
+  private def getTaskSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(workflowsDir.resolve(fname)))
+  private def getWorkflowSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
   it should "handle import statements" in {
@@ -59,8 +60,8 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   it should "parse GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
-    val doc = parser.parseDocument(sourceCode)
+    val FileSource = opts.fileResolver.resolve(url)
+    val doc = parser.parseDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1
   }
@@ -68,8 +69,8 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   it should "parse GATK joint genotyping workflow" taggedAs Edge in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
-    val sourceCode = SourceCode.loadFrom(Util.getUrl(url))
-    val doc = parser.parseDocument(sourceCode)
+    val FileSource = opts.fileResolver.resolve(url)
+    val doc = parser.parseDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1
   }
@@ -120,7 +121,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
         |}
         |""".stripMargin
     val parsers = Parsers(opts)
-    val src = SourceCode(None, wdl.split("\n").toVector)
+    val src = StringFileSource(wdl)
     val parser = parsers.getParser(src)
     val doc = parser.parseDocument(src)
     doc.version should matchPattern {

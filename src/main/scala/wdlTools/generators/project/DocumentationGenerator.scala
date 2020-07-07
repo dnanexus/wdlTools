@@ -1,13 +1,11 @@
 package wdlTools.generators.project
 
-import java.net.URL
-
 import wdlTools.generators.Renderer
 import wdlTools.generators.project.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.{FileSource, Options, StringFileSource, Util}
 
 object DocumentationGenerator {
   case class DocumentationComment(comments: Vector[Comment]) {
@@ -73,7 +71,7 @@ object DocumentationGenerator {
                                meta: Vector[KeyValueDocumentation],
                                comment: Option[DocumentationComment])
 
-  case class WdlDocumentation(sourceUrl: Option[URL],
+  case class WdlDocumentation(source: FileSource,
                               imports: Vector[ImportDocumentation],
                               structs: Vector[StructDocumentation],
                               workflow: Option[WorkflowDocumentation],
@@ -89,11 +87,11 @@ case class DocumentationGenerator(opts: Options) {
 
   def generateDocumentation(doc: Document): Option[WdlDocumentation] = {
     val sortedElements = (doc.elements ++ doc.workflow.map(Vector(_)).getOrElse(Vector.empty))
-      .sortWith(_.text < _.text)
+      .sortWith(_.loc < _.loc)
     if (sortedElements.nonEmpty) {
       def getDocumentationComment(element: Element): Option[DocumentationComment] = {
         val preceedingComments =
-          (1 until element.text.line).reverse
+          (1 until element.loc.line).reverse
             .map(doc.comments.get)
             .takeWhile(comment => comment.isDefined && comment.get.value.startsWith("###"))
             .reverse
@@ -107,7 +105,7 @@ case class DocumentationGenerator(opts: Options) {
       }
 
       def getMetaValueDocumentation(value: MetaValue, parentLine: Int): ValueDocumentation = {
-        val comment = if (value.text.line > parentLine) {
+        val comment = if (value.loc.line > parentLine) {
           getDocumentationComment(value)
         } else {
           None
@@ -128,7 +126,7 @@ case class DocumentationGenerator(opts: Options) {
           value: Expr,
           parentLine: Int
       ): ValueDocumentation = {
-        val comment = if (value.text.line > parentLine) {
+        val comment = if (value.loc.line > parentLine) {
           getDocumentationComment(value)
         } else {
           None
@@ -165,7 +163,7 @@ case class DocumentationGenerator(opts: Options) {
       def getMetaDocumentation(meta: MetaSection): Vector[KeyValueDocumentation] = {
         meta.kvs.map { kv =>
           KeyValueDocumentation(kv.id,
-                                getMetaValueDocumentation(kv.value, kv.text.line),
+                                getMetaValueDocumentation(kv.value, kv.loc.line),
                                 getDocumentationComment(kv))
         }
       }
@@ -188,7 +186,7 @@ case class DocumentationGenerator(opts: Options) {
               d.name,
               d.wdlType,
               default,
-              paramMeta.map(v => getMetaValueDocumentation(v, meta.get.text.line)),
+              paramMeta.map(v => getMetaValueDocumentation(v, meta.get.loc.line)),
               getDocumentationComment(d)
           )
         }
@@ -208,7 +206,10 @@ case class DocumentationGenerator(opts: Options) {
               imp.addr.value,
               imp.name
                 .map(_.value)
-                .getOrElse(Util.getFilename(imp.addr.value, ".wdl")),
+                .getOrElse(
+                    Util.changeFileExt(opts.fileResolver.resolve(imp.addr.value).fileName,
+                                       dropExt = ".wdl")
+                ),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
               getDocumentationComment(imp)
           )
@@ -257,7 +258,7 @@ case class DocumentationGenerator(opts: Options) {
                     _.kvs.map(kv =>
                       KeyValueDocumentation(
                           kv.id,
-                          getValueDocumentation(kv.expr, kv.text.line),
+                          getValueDocumentation(kv.expr, kv.loc.line),
                           getDocumentationComment(kv)
                       )
                     )
@@ -268,7 +269,7 @@ case class DocumentationGenerator(opts: Options) {
                     _.kvs.map(kv =>
                       KeyValueDocumentation(
                           kv.id,
-                          getMetaValueDocumentation(kv.value, kv.text.line),
+                          getMetaValueDocumentation(kv.value, kv.loc.line),
                           getDocumentationComment(kv)
                       )
                     )
@@ -280,46 +281,58 @@ case class DocumentationGenerator(opts: Options) {
       }
 
       // find the first element in the document and see if there's a top-level comment above it
-      val firstElementLine = sortedElements.head.text.line
+      val firstElementLine = sortedElements.head.loc.line
       val topComments =
-        doc.comments.filterWithin((doc.version.text.endLine + 1) until firstElementLine)
+        doc.comments.filterWithin((doc.version.loc.endLine + 1) until firstElementLine)
       val overview = if (topComments.nonEmpty) {
         Some(DocumentationComment(topComments.toSortedVector))
       } else {
         None
       }
 
-      Some(WdlDocumentation(doc.sourceUrl, imports, structs, workflow.headOption, tasks, overview))
+      Some(WdlDocumentation(doc.source, imports, structs, workflow.headOption, tasks, overview))
     } else {
       None
     }
   }
 
-  def apply(url: URL, title: String): Map[String, String] = {
-    val docs = Parsers(opts).getDocumentWalker[Map[URL, WdlDocumentation]](url, Map.empty).walk {
-      (doc, results) =>
-        val docs = generateDocumentation(doc)
-        if (docs.isDefined) {
-          results + (doc.sourceUrl.get -> docs.get)
-        } else {
-          results
+  def apply(docSource: FileSource, title: String): Vector[FileSource] = {
+    val docs =
+      Parsers(opts)
+        .getDocumentWalker[Map[FileSource, WdlDocumentation]](docSource, Map.empty)
+        .walk { (doc, results) =>
+          val docs = generateDocumentation(doc)
+          if (docs.isDefined) {
+            results + (doc.source -> docs.get)
+          } else {
+            results
+          }
         }
-    }
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
     val renderer: Renderer = Renderer()
-    val pages = docs.map {
-      case (url, doc) =>
-        Util.getFilename(url.getPath, ".wdl", ".md") ->
-          renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc))
-    } ++ (if (structs.nonEmpty) {
-            Map("structs.md" -> renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)))
-          } else {
-            Map.empty
-          })
-    pages ++ Map(
-        "index.md" ->
-          renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.keys.toVector))
+    val pages: Vector[FileSource] = docs.map {
+      case (source, doc) =>
+        val destFile = Util.changeFileExt(source.fileName, ".wdl", ".md")
+        StringFileSource(
+            renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc)),
+            Some(Util.getPath(destFile))
+        )
+    }.toVector ++ (
+        if (structs.nonEmpty) {
+          Vector(
+              StringFileSource(
+                  renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)),
+                  Some(Util.getPath("structs.md"))
+              )
+          )
+        } else {
+          Vector.empty
+        }
+    )
+    pages :+ StringFileSource(
+        renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.map(_.fileName))),
+        Some(Util.getPath("index.md"))
     )
   }
 }

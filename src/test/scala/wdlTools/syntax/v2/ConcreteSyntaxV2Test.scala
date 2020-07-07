@@ -6,21 +6,21 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.WdlVersion
 import wdlTools.syntax.v2.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, Logger, Options, SourceCode, Util}
+import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)
   private val opts = BasicOptions(
-      logger = Logger.Quiet,
-      localDirectories = Vector(sourcePath)
+      fileResolver = FileSourceResolver.create(Vector(sourcePath)),
+      logger = Logger.Quiet
   )
 
-  private def getSource(fname: String): SourceCode = {
-    SourceCode.loadFrom(Util.pathToUrl(sourcePath.resolve(fname)))
+  private def getSource(fname: String): FileSource = {
+    opts.fileResolver.fromPath(sourcePath.resolve(fname))
   }
 
-  private def getDocument(sourceCode: SourceCode, conf: Options = opts): Document = {
-    ParseTop(conf, WdlV2Grammar.newInstance(sourceCode, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
+    ParseTop(conf, WdlV2Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
   }
 
   it should "handle various types" in {
