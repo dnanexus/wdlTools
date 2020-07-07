@@ -2,6 +2,9 @@ package wdlTools.util
 
 import java.nio.file.Path
 
+/**
+  * Supports reading some metadata from "adjunct" files - i.e. files in the same directory as the WDL file.
+  */
 object Adjuncts {
   sealed abstract class AdjunctFile
   final case class Readme(text: String) extends AdjunctFile
