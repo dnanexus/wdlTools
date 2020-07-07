@@ -1,3 +1,7 @@
+# v0.3.0 (2020-07-07)
+
+* 
+
 # v0.2.0 (2020-06-26)
 
 * Cleaned up utility functions

@@ -217,20 +217,6 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     extends FileAccessProtocol {
   val prefixes = Vector("", Util.FILE_SCHEME)
 
-  // search for a relative path in the directories of `searchPath`
-  private def findInPath(relPath: String): Path = {
-    searchPath
-      .map(d => d.resolve(relPath))
-      .collectFirst {
-        case fp if Files.exists(fp) => fp.toRealPath()
-      }
-      .getOrElse(
-          throw new FileNotFoundException(
-              s"Could not resolve relative path ${relPath} in search path [${searchPath.mkString(",")}]"
-          )
-      )
-  }
-
   def resolve(uri: String): LocalFileSource = {
     val path: Path = getUriScheme(uri) match {
       case Some(FILE_SCHEME) => Paths.get(URI.create(uri))
@@ -240,16 +226,25 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     resolvePath(path, Some(uri))
   }
 
+  // search for a relative path in the directories of `searchPath`
+  private def findInPath(relPath: String): Option[Path] = {
+    searchPath
+      .map(d => d.resolve(relPath))
+      .collectFirst {
+        case fp if Files.exists(fp) => fp.toRealPath()
+      }
+  }
+
   def resolvePath(path: Path, value: Option[String] = None): LocalFileSource = {
     val resolved: Path = if (Files.exists(path)) {
       path.toRealPath()
     } else if (path.isAbsolute) {
       path
-    } else if (searchPath.nonEmpty) {
-      findInPath(path.toString)
     } else {
-      // it's a non-existant relative path - localize it to current working dir
-      Util.absolutePath(path)
+      findInPath(path.toString).getOrElse(
+          // it's a non-existant relative path - localize it to current working dir
+          Util.absolutePath(path)
+      )
     }
     LocalFileSource(value.getOrElse(path.toString), path, resolved, logger, encoding)
   }

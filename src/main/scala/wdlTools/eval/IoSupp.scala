@@ -50,27 +50,35 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
   // is a copy operation (unless `pathOrUri and `dest` are the same, in which case
   // this is a noop).
   def downloadFile(pathOrUri: String,
-                   dest: Path,
+                   destFile: Option[Path] = None,
+                   destDir: Option[Path] = None,
                    overwrite: Boolean = false,
                    loc: SourceLocation): Path = {
+    val src = getFileSource(pathOrUri, loc)
+    val dest = destFile.getOrElse(
+        destDir.getOrElse(Paths.get(".")).resolve(src.fileName)
+    )
     val realPath = if (!Files.exists(dest)) {
       Util.createDirectories(dest.getParent)
-      dest
+      dest.toAbsolutePath
     } else if (Files.isDirectory(dest)) {
-      dest.toRealPath()
+      throw new EvalException(
+          s"${dest} already exists as a directory - can't overwrite",
+          loc
+      )
     } else if (overwrite) {
-      opts.logger.warning(s"Deleting existing file ${dest}")
-      Files.delete(dest)
-      dest
+      val realPath = dest.toRealPath()
+      opts.logger.warning(s"Deleting existing file ${realPath}")
+      Files.delete(realPath)
+      realPath
     } else {
       throw new EvalException(
           s"File ${dest} already exists and overwrite = false",
           loc
       )
     }
-    val file = getFileSource(pathOrUri, loc)
     try {
-      file.localize(realPath)
+      src.localize(realPath)
     } catch {
       case e: Throwable =>
         throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}", loc)

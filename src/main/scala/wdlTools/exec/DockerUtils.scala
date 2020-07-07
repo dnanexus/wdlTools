@@ -94,7 +94,10 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       // 2. load into the local docker cache
       // 3. figure out the image name
       logger.traceLimited(s"downloading docker tarball to ${DOCKER_TARBALLS_DIR}")
-      val localTar = ioSupp.downloadFile(nameOrUrl, DOCKER_TARBALLS_DIR, overwrite = true, loc)
+      val localTar = ioSupp.downloadFile(nameOrUrl,
+                                         destDir = Some(DOCKER_TARBALLS_DIR),
+                                         overwrite = true,
+                                         loc = loc)
       logger.traceLimited("figuring out the image name")
       val (mContent, _) = Util.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
       logger.traceLimited(

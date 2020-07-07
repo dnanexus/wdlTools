@@ -4,7 +4,7 @@ import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger}
+import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger, Util}
 
 import scala.io.Codec
 
@@ -35,7 +35,7 @@ case class EvalConfig(homeDir: Path,
                       stdout: Path,
                       stderr: Path,
                       fileResolver: FileSourceResolver,
-                      encoding: Charset)
+                      encoding: Charset = Util.DefaultEncoding)
 
 object EvalConfig {
   // Always add the default protocols (file and web) into the configuration.
