@@ -9,17 +9,16 @@ The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. 
 Currently, WDL draft-2 and 1.0 are supported.
 
 ```scala
-import java.net.URL
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Parsers
 import wdlTools.util.BasicOptions
 val opts = BasicOptions(followImports=true)
 val parsers = Parsers(opts)
-val wdl = new URL("file:///path/to/my/wdl")
+val wdl = opts.fileResolver.resolve("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
 // print the source locations of all tasks in the document
 doc.elements.foreach {
-  case task: Task => println(s"Task ${task.name} is at ${task.loc} in ${doc.source}")
+  case task: Task => println(s"Task ${task.name} is at ${task.loc}")
 }
 ```
 
