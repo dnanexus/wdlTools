@@ -1,6 +1,6 @@
 package wdlTools.util
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File, IOException}
+import java.io.{File, IOException}
 import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{
@@ -11,8 +11,6 @@ import java.nio.file.{
   Paths,
   SimpleFileVisitor
 }
-import java.util.Base64
-import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 
 import scala.concurrent.{Await, Future, TimeoutException, blocking, duration}
 import scala.concurrent.ExecutionContext.Implicits._
@@ -177,34 +175,6 @@ object Util {
         Files.delete(path)
       }
     }
-  }
-
-  // From: https://gist.github.com/owainlewis/1e7d1e68a6818ee4d50e
-  // By: owainlewis
-  def gzipCompress(input: Array[Byte]): Array[Byte] = {
-    val bos = new ByteArrayOutputStream(input.length)
-    val gzip = new GZIPOutputStream(bos)
-    gzip.write(input)
-    gzip.close()
-    val compressed = bos.toByteArray
-    bos.close()
-    compressed
-  }
-
-  def gzipDecompress(compressed: Array[Byte]): String = {
-    val inputStream = new GZIPInputStream(new ByteArrayInputStream(compressed))
-    scala.io.Source.fromInputStream(inputStream).mkString
-  }
-
-  def gzipAndBase64Encode(buf: String): String = {
-    val bytes = buf.getBytes
-    val gzBytes = gzipCompress(bytes)
-    Base64.getEncoder.encodeToString(gzBytes)
-  }
-
-  def base64DecodeAndGunzip(buf64: String): String = {
-    val ba: Array[Byte] = Base64.getDecoder.decode(buf64.getBytes)
-    gzipDecompress(ba)
   }
 
   /**
