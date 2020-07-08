@@ -11,6 +11,7 @@ val conf = ConfigFactory.parseFile(new File(confPath)).resolve()
 version := conf.getString("wdlTools.version")
 organization := "com.dnanexus"
 developers := List(
+    Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus-rnd")),
     Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd"))
 )
 homepage := Some(url("https://github.com/dnanexus-rnd/wdlTools"))
@@ -83,7 +84,6 @@ val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.6"
 val sprayVersion = "1.3.5"
 val katanVersion = "0.6.1"
-val scalacticVersion = "3.1.1"
 val scalatestVersion = "3.1.1"
 
 libraryDependencies ++= Seq(
@@ -97,7 +97,6 @@ libraryDependencies ++= Seq(
     "io.spray" %% "spray-json" % sprayVersion,
     "com.nrinaudo" %% "kantan.csv" % katanVersion,
     //---------- Test libraries -------------------//
-    "org.scalactic" % "scalactic_2.13" % scalacticVersion,
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )
 
