@@ -3,7 +3,6 @@ import sbtassembly.AssemblyPlugin.autoImport._
 
 scalaVersion := "2.13.2"
 name := "wdlTools"
-//version := "0.1.0"
 import com.typesafe.config._
 val confPath =
   Option(System.getProperty("config.file")).getOrElse("src/main/resources/application.conf")
