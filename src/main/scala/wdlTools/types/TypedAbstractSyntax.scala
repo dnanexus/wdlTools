@@ -191,7 +191,7 @@ object TypedAbstractSyntax {
   sealed trait MetaValue extends Element
   case class MetaValueNull(loc: SourceLocation) extends MetaValue
   case class MetaValueBoolean(value: Boolean, loc: SourceLocation) extends MetaValue
-  case class MetaValueInt(value: Int, loc: SourceLocation) extends MetaValue
+  case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
   case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
   case class MetaValueObject(value: Map[String, MetaValue], loc: SourceLocation) extends MetaValue

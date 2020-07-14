@@ -1,0 +1,32 @@
+<%@ val paths: wdlTools.exec.ExecPaths %>
+<%@ val imageName: String %>
+<%@ val maxMemory: Int %>
+<% val bashDollar: String = "$" %>
+#!/bin/bash -x
+
+# make sure there is no preexisting Docker CID file
+rm -f ${paths.dockerCid}
+
+# Run the container under a priviliged user, so it will have
+# permissions to read/write files in the home directory. This
+# is required in cases where the container uses a different
+# user.
+extraFlags="--user ${bashDollar}(id -u):${bashDollar}(id -g) --hostname ${bashDollar}(hostname)"
+
+# run as in the original configuration
+docker run \\
+--memory=${maxMemory} \\
+--cidfile ${paths.dockerCid} \\
+${bashDollar}{extraFlags} \\
+--entrypoint /bin/bash \\
+-v ${paths.homeDir}:${paths.homeDir} \\
+${imageName} ${paths.commandScript}
+
+# get the return code (working even if the container was detached)
+rc=${bashDollar}(docker wait `cat ${paths.dockerCid}`)
+
+# remove the container after waiting
+docker rm `cat ${paths.dockerCid}`
+
+# return exit code
+exit ${bashDollar}rc

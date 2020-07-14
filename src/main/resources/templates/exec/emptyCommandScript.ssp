@@ -1,0 +1,3 @@
+<%@ val paths: wdlTools.exec.ExecPaths %>
+#!/bin/bash
+echo 0 > ${paths.returnCode}

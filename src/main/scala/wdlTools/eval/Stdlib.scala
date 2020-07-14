@@ -13,8 +13,7 @@ import wdlTools.util.Options
 
 import scala.io.Source
 
-case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion)
-    extends StandardLibraryImpl {
+case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   type FunctionImpl = (Vector[WdlValues.V], SourceLocation) => V
 
   protected val iosp: IoSupp = IoSupp(opts, evalCfg)
@@ -177,7 +176,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion)
     Coercion.coerceTo(T_File, args.head, loc).asInstanceOf[V_File]
   }
 
-  protected def getWdlInt(arg: V, loc: SourceLocation): Int = {
+  protected def getWdlInt(arg: V, loc: SourceLocation): Long = {
     val n = Coercion.coerceTo(T_Int, arg, loc).asInstanceOf[V_Int]
     n.value
   }
@@ -595,22 +594,6 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion)
     }
   }
 
-  // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
-  private def sizeUnit(sUnit: String, loc: SourceLocation): Double = {
-    sUnit.toLowerCase match {
-      case "b"   => 1
-      case "kb"  => 1000d
-      case "mb"  => 1000d * 1000d
-      case "gb"  => 1000d * 1000d * 1000d
-      case "tb"  => 1000d * 1000d * 1000d * 1000d
-      case "kib" => 1024d
-      case "mib" => 1024d * 1024d
-      case "gib" => 1024d * 1024d * 1024d
-      case "tib" => 1024d * 1024d * 1024d * 1024d
-      case _     => throw new EvalException(s"Unknown unit ${sUnit}", loc)
-    }
-  }
-
   // Size can take several kinds of arguments.
   //
   // since: draft-2
@@ -623,7 +606,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion)
         V_Float(sizeCore(args.head, loc))
       case 2 =>
         val sUnit = getWdlString(args(1), loc)
-        val nBytesInUnit = sizeUnit(sUnit, loc)
+        val nBytesInUnit = Util.sizeUnit(sUnit, loc)
         val nBytes = sizeCore(args.head, loc)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
@@ -651,7 +634,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion)
   // since: draft-2
   protected def range(args: Vector[V], loc: SourceLocation): V_Array = {
     assert(args.size == 1)
-    val n = getWdlInt(args.head, loc)
+    val n = getWdlInt(args.head, loc).toInt
     val vec: Vector[V] = Vector.tabulate(n)(i => V_Int(i))
     V_Array(vec)
   }

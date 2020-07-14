@@ -5,7 +5,9 @@ import java.nio.file.Files
 import spray.json._
 import wdlTools.eval.{EvalConfig, IoSupp}
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{Options, TraceLevel, Util}
+import wdlTools.util.{FileUtils, Options, SysUtils, TraceLevel}
+
+import scala.util.{Success, Try}
 
 case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
   private val ioSupp = IoSupp(opts, evalCfg)
@@ -13,17 +15,16 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
     sys.addShutdownHook({
-      Util.deleteRecursive(p)
+      FileUtils.deleteRecursive(p)
     })
     p
   }
 
   // pull a Docker image from a repository - requires Docker client to be installed
-  def pullImage(name: String, loc: SourceLocation): String = {
-    var retry_count = 5
-    while (retry_count > 0) {
+  def pullImage(name: String, loc: SourceLocation, maxRetries: Int = 3): String = {
+    (0 to maxRetries).foreach { retry =>
       try {
-        val (outstr, errstr) = Util.execCommand(s"docker pull ${name}")
+        val (_, outstr, errstr) = SysUtils.execCommand(s"docker pull ${name}")
         logger.trace(
             s"""|output:
                 |${outstr}
@@ -34,16 +35,15 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       } catch {
         // ideally should catch specific exception.
         case _: Throwable =>
-          retry_count = retry_count - 1
           logger.trace(
               s"""Failed to pull docker image:
-                 |${name}. Retrying... ${5 - retry_count}
+                 |${name}. Retrying... ${maxRetries - retry}
                     """.stripMargin
           )
           Thread.sleep(1000)
       }
     }
-    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries", loc)
+    throw new ExecException(s"Unable to pull docker image: ${name} after ${maxRetries} tries", loc)
   }
 
   // Read the manifest file from a docker tarball, and get the repository name.
@@ -94,12 +94,10 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       // 2. load into the local docker cache
       // 3. figure out the image name
       logger.traceLimited(s"downloading docker tarball to ${DOCKER_TARBALLS_DIR}")
-      val localTar = ioSupp.downloadFile(nameOrUrl,
-                                         destDir = Some(DOCKER_TARBALLS_DIR),
-                                         overwrite = true,
-                                         loc = loc)
+      val localTarSrc = ioSupp.getFileSource(nameOrUrl, loc)
+      val localTar = localTarSrc.localizeToDir(DOCKER_TARBALLS_DIR, overwrite = true)
       logger.traceLimited("figuring out the image name")
-      val (mContent, _) = Util.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
+      val (_, mContent, _) = SysUtils.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
       logger.traceLimited(
           s"""|manifest content:
               |${mContent}
@@ -108,7 +106,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       val repo = readManifestGetDockerImageName(mContent)
       logger.traceLimited(s"repository is ${repo}")
       logger.traceLimited(s"load tarball ${localTar} to docker", minLevel = TraceLevel.None)
-      val (outstr, errstr) = Util.execCommand(s"docker load --input ${localTar}")
+      val (_, outstr, errstr) = SysUtils.execCommand(s"docker load --input ${localTar}")
       logger.traceLimited(
           s"""|output:
               |${outstr}
@@ -120,5 +118,20 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       pullImage(nameOrUrl, loc)
       nameOrUrl
     }
+  }
+
+  def getImage(nameOrUrlVec: Vector[String], loc: SourceLocation): String = {
+    nameOrUrlVec
+      .collectFirst { nameOrUrl =>
+        Try(getImage(nameOrUrl, loc)) match {
+          case Success(value) => value
+        }
+      }
+      .getOrElse(
+          throw new ExecException(
+              s"Could not get image from any of ${nameOrUrlVec}",
+              loc
+          )
+      )
   }
 }

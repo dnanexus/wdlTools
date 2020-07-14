@@ -4,21 +4,9 @@ import java.nio.file.{Path, Paths}
 import java.nio.charset.Charset
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger, Util}
+import wdlTools.util.{FileAccessProtocol, FileSourceResolver, FileUtils, Logger}
 
 import scala.io.Codec
-
-case class Context(bindings: Map[String, WdlValues.V]) {
-  def addBinding(name: String, value: WdlValues.V): Context = {
-    assert(!(bindings contains name))
-    this.copy(bindings = bindings + (name -> value))
-  }
-}
-
-// There is a standard library implementation for each WDL version.
-trait StandardLibraryImpl {
-  def call(funcName: String, args: Vector[WdlValues.V], loc: SourceLocation): WdlValues.V
-}
 
 /** Configuration for expression evaluation. Some operations perform file IO.
   *
@@ -30,24 +18,33 @@ trait StandardLibraryImpl {
   * @param fileResolver  FileSourceResolver for accessing files. By default local-file and http protocols are provided.
   * @param encoding the encoding to use when reading files.
   */
-case class EvalConfig(homeDir: Path,
-                      tmpDir: Path,
-                      stdout: Path,
-                      stderr: Path,
-                      fileResolver: FileSourceResolver,
-                      encoding: Charset = Util.DefaultEncoding)
+class EvalConfig(val homeDir: Path,
+                 val tmpDir: Path,
+                 val stdout: Path,
+                 val stderr: Path,
+                 val fileResolver: FileSourceResolver,
+                 val encoding: Charset = FileUtils.DefaultEncoding)
 
 object EvalConfig {
+  def apply(homeDir: Path,
+            tmpDir: Path,
+            stdout: Path,
+            stderr: Path,
+            fileResolver: FileSourceResolver,
+            encoding: Charset = FileUtils.DefaultEncoding): EvalConfig = {
+    new EvalConfig(homeDir, tmpDir, stdout, stderr, fileResolver, encoding)
+  }
+
   // Always add the default protocols (file and web) into the configuration.
-  def make(homeDir: Path,
-           tmpDir: Path,
-           stdout: Path,
-           stderr: Path,
-           userSearchPath: Vector[Path] = Vector.empty,
-           userProtos: Vector[FileAccessProtocol] = Vector.empty,
-           encoding: Charset = Codec.default.charSet,
-           logger: Logger = Logger.Quiet): EvalConfig = {
-    new EvalConfig(
+  def create(homeDir: Path,
+             tmpDir: Path,
+             stdout: Path,
+             stderr: Path,
+             userSearchPath: Vector[Path] = Vector.empty,
+             userProtos: Vector[FileAccessProtocol] = Vector.empty,
+             encoding: Charset = Codec.default.charSet,
+             logger: Logger = Logger.Quiet): EvalConfig = {
+    EvalConfig(
         homeDir,
         tmpDir,
         stdout,
@@ -61,7 +58,7 @@ object EvalConfig {
   // testing where there are no I/O functions used
   lazy val empty: EvalConfig = {
     val devNull = Paths.get("/dev/null")
-    make(devNull, devNull, devNull, devNull)
+    create(devNull, devNull, devNull, devNull)
   }
 }
 

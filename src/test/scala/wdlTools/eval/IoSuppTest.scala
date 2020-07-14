@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
-import wdlTools.util.{FileAccessProtocol, FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{FileAccessProtocol, FileSource, Logger, FileSourceResolver, StringFileSource}
 
 class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval").getPath)
@@ -40,7 +40,7 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     }
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig.make(dirs(0), dirs(1), stdout, stderr, userProtos = Vector(DxProtocol))
+    EvalConfig.create(dirs(0), dirs(1), stdout, stderr, userProtos = Vector(DxProtocol))
   }
 
   private val dummyTextSource = SourceLocation.empty

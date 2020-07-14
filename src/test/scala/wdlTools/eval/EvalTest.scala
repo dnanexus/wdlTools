@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger, Util => UUtil}
+import wdlTools.util.{Logger, FileSourceResolver, FileUtils => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
@@ -38,7 +38,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       safeMkdir(d)
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig.make(homeDir, tmpDir, stdout, stderr)
+    EvalConfig.create(homeDir, tmpDir, stdout, stderr)
   }
 
   def parseAndTypeCheck(file: Path): TAT.Document = {

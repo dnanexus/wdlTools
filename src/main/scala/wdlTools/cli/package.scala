@@ -14,7 +14,7 @@ import org.rogach.scallop.{
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{TypeCheckingRegime, TypeOptions}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.Util.{FILE_SCHEME, getUriScheme}
+import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
 import wdlTools.util.{BasicOptions, FileSourceResolver, Logger, Options, TraceLevel}
 
 import scala.util.Try
@@ -127,7 +127,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
     val uri: ScallopOption[String] =
       trailArg[String](descr = "path or String (file:// or http(s)://) to the main WDL file")
+  }
 
+  abstract class BasicParserSubcommand(name: String, description: String)
+      extends ParserSubcommand(name, description) {
     def getOptions: Options = {
       val localDirs = this.localDirectories(uri())
       BasicOptions(
@@ -135,6 +138,20 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
           followImports = followImports(),
           logger = logger,
           antlr4Trace = antlr4Trace()
+      )
+    }
+  }
+
+  abstract class TypedParserSubcommand(name: String, description: String)
+      extends ParserSubcommand(name, description) {
+    override def getOptions: TypeOptions = {
+      val localDirs = this.localDirectories(uri())
+      TypeOptions(
+          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
+          followImports = followImports(),
+          logger = logger,
+          antlr4Trace = antlr4Trace(),
+          typeChecking = TypeCheckingRegime.Strict
       )
     }
   }
@@ -189,7 +206,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(check)
 
-  val docgen = new ParserSubcommand(
+  val docgen = new BasicParserSubcommand(
       name = "docgen",
       description = "Generate documentation from a WDL file and all its dependencies"
   ) {
@@ -209,7 +226,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(docgen)
 
-  val format = new ParserSubcommand(
+  val format = new BasicParserSubcommand(
       name = "format",
       description = "Reformat WDL file and all its dependencies according to style rules."
   ) {
@@ -234,7 +251,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(format)
 
-  val lint = new ParserSubcommand(
+  val lint = new TypedParserSubcommand(
       name = "lint",
       description = "Check WDL file for common mistakes and bad code smells"
   ) {
@@ -263,21 +280,10 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "(Default) Do not overwrite existing files",
         default = Some(false)
     )
-
-    override def getOptions: TypeOptions = {
-      val localDirs = this.localDirectories(uri())
-      TypeOptions(
-          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
-          followImports = followImports(),
-          logger = logger,
-          antlr4Trace = antlr4Trace(),
-          typeChecking = TypeCheckingRegime.Strict
-      )
-    }
   }
   addSubcommand(lint)
 
-  val upgrade = new ParserSubcommand(
+  val upgrade = new BasicParserSubcommand(
       name = "upgrade",
       description = "Upgrade a WDL file to a more recent version"
   ) {
@@ -311,6 +317,36 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
   }
   addSubcommand(upgrade)
+
+  val exec = new TypedParserSubcommand(
+      name = "exec",
+      description = "Execute a WDL task"
+  ) {
+    val task: ScallopOption[String] = opt(
+        descr = "The task name - requred unless the WDL has a single task"
+    )
+    val inputsFile: ScallopOption[Path] = opt(
+        name = "inputs",
+        descr = "Task inputs JSON file - if not specified, inputs are read from stdin"
+    )
+    val runtimeDefaults: ScallopOption[Path] = opt(
+        descr = "JSON file with default runtime values"
+    )
+    val outputsFile: ScallopOption[Path] = opt(
+        name = "outputs",
+        descr = "Task outputs JSON file - if not specified, outputs are written to stdout"
+    )
+    val summaryFile: ScallopOption[Path] = opt(
+        name = "summary",
+        descr = "Also write a job summary in JSON format"
+    )
+    val container: ScallopOption[Boolean] = toggle(
+        descrYes = "Execute the task using Docker (if applicable)",
+        descrNo = "Do not use Docker - all dependencies must be installed on the local system",
+        default = Some(true)
+    )
+  }
+  addSubcommand(exec)
 
   val printTree = new WdlToolsSubcommand(
       name = "printTree",
@@ -404,7 +440,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(generate)
 
-  val readmes = new ParserSubcommand(
+  val readmes = new BasicParserSubcommand(
       name = "readmes",
       description = "Generate README file stubs for tasks and workflows."
   ) {

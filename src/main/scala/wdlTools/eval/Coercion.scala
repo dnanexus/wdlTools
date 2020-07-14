@@ -4,6 +4,8 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 
+import scala.util.{Success, Try}
+
 object Coercion {
   private def coerceToStruct(structName: String,
                              memberDefs: Map[String, WdlTypes.T],
@@ -35,7 +37,7 @@ object Coercion {
             s.toInt
           } catch {
             case _: NumberFormatException =>
-              throw new EvalException(s"string ${s} cannot be converted into an integer", loc)
+              throw new EvalException(s"string ${s} cannot be converted into an Int", loc)
           }
         V_Int(n)
       case (WdlTypes.T_Float, V_Int(n))   => V_Float(n.toFloat)
@@ -46,7 +48,7 @@ object Coercion {
             s.toDouble
           } catch {
             case _: NumberFormatException =>
-              throw new EvalException(s"string ${s} cannot be converted into an integer", loc)
+              throw new EvalException(s"string ${s} cannot be converted into a Float", loc)
           }
         V_Float(x)
       case (WdlTypes.T_String, V_Boolean(b)) => V_String(b.toString)
@@ -105,5 +107,18 @@ object Coercion {
       case (t, other) =>
         throw new EvalException(s"value ${other} cannot be coerced to type ${t}", loc)
     }
+  }
+
+  def coerceToFirst(wdlTypes: Vector[WdlTypes.T], value: V, loc: SourceLocation): WdlValues.V = {
+    val coerced: WdlValues.V = wdlTypes
+      .collectFirst { t =>
+        Try(Coercion.coerceTo(t, value, loc)) match {
+          case Success(v) => v
+        }
+      }
+      .getOrElse(
+          throw new EvalException(s"Value ${value} could not be coerced to one of ${wdlTypes}")
+      )
+    coerced
   }
 }

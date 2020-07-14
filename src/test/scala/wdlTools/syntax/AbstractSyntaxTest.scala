@@ -6,7 +6,7 @@ import java.nio.file.Paths
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{BasicOptions, FileSource, Logger, FileSourceResolver, StringFileSource}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)

@@ -3,7 +3,20 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{Options, Util}
+import wdlTools.util.Options
+
+case class Context(bindings: Map[String, WdlValues.V]) {
+  def addBinding(name: String, value: WdlValues.V): Context = {
+    assert(!(bindings contains name))
+    this.copy(bindings = bindings + (name -> value))
+  }
+}
+
+object Context {
+  def createFromEnv(env: Map[String, (WdlTypes.T, WdlValues.V)]): Context = {
+    Context(env.map { case (name, (_, v)) => name -> v })
+  }
+}
 
 case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion) {
   // choose the standard library implementation based on version
@@ -429,7 +442,7 @@ case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion) {
         val index_v = apply(index, ctx)
         (array_v, index_v) match {
           case (V_Array(av), V_Int(n)) if n < av.size =>
-            av(n)
+            av(n.toInt)
           case (V_Array(av), V_Int(n)) =>
             val arraySize = av.size
             throw new EvalException(
@@ -490,15 +503,79 @@ case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion) {
     Coercion.coerceTo(wdlType, value, expr.loc)
   }
 
+  def applyExprAndCoerce(expr: TAT.Expr,
+                         wdlTypes: Vector[WdlTypes.T],
+                         ctx: Context): WdlValues.V = {
+    val value = apply(expr, ctx)
+    Coercion.coerceToFirst(wdlTypes, value, expr.loc)
+  }
+
   // Evaluate all the declarations and return a Context
   def applyDeclarations(decls: Vector[TAT.Declaration], ctx: Context): Context = {
     decls.foldLeft(ctx) {
       case (accu, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
         val value = apply(expr, accu)
-        val value2 = Coercion.coerceTo(wdlType, value, loc)
-        accu.addBinding(name, value2)
+        val coerced = Coercion.coerceTo(wdlType, value, loc)
+        accu.addBinding(name, coerced)
       case (_, ast) =>
-        throw new Exception(s"Can not evaluate element ${ast.getClass}")
+        throw new Exception(s"Cannot evaluate element ${ast.getClass}")
+    }
+  }
+
+  /**
+    * Given a multi-line string, determine the largest w such that each line
+    * begins with at least w whitespace characters.
+    * @param s the string to trim
+    * @param ignoreEmptyLines ignore empty lines
+    * @param lineSep character to use to separate lines in the returned String
+    * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
+    *  is the number of lines trimmed from the beginning of the string,
+    *  colOffset is the number of whitespace characters trimmed from the
+    *  beginning of the line containing the first non-whitespace character,
+    *  and trimmedString is `s` with all all prefix and suffix whitespace
+    *  trimmed, as well as `w` whitespace characters trimmed from the
+    *  beginning of each line.
+    *  @example
+    *    val s = "   \n  hello\n   goodbye\n "
+    *    stripLeadingWhitespace(s, false) => (1, 1, "hello\n  goodbye\n")
+    *     stripLeadingWhitespace(s, true) => (1, 2, "hello\n goodbye")
+    */
+  private def stripLeadingWhitespace(
+      s: String,
+      ignoreEmptyLines: Boolean = true,
+      lineSep: String = System.lineSeparator()
+  ): String = {
+    val lines = s.split("\r\n?|\n")
+    val wsRegex = "^([ \t]*)$".r
+    val nonWsRegex = "^([ \t]*)(.+)$".r
+    val (_, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
+      case ((lineOffset, content), wsRegex(txt)) =>
+        if (content.isEmpty) {
+          (lineOffset + 1, content)
+        } else if (ignoreEmptyLines) {
+          (lineOffset, content)
+        } else {
+          (lineOffset, content :+ (txt, ""))
+        }
+      case ((lineOffset, content), nonWsRegex(ws, txt)) => (lineOffset, content :+ (ws, txt))
+    }
+    if (content.isEmpty) {
+      ""
+    } else {
+      val (whitespace, strippedLines) = content.unzip
+      val colOffset = whitespace.map(_.length).min
+      val strippedContent = (
+          if (colOffset == 0) {
+            strippedLines
+          } else {
+            // add back to each line any whitespace longer than colOffset
+            strippedLines.zip(whitespace).map {
+              case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+              case (line, _)                           => line
+            }
+          }
+      ).mkString(lineSep)
+      strippedContent
     }
   }
 
@@ -513,7 +590,6 @@ case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion) {
       }
       .mkString("")
     // strip off common leading whitespace
-    val (_, _, strippedCommandStr) = Util.stripLeadingWhitespace(commandStr)
-    strippedCommandStr
+    stripLeadingWhitespace(commandStr)
   }
 }

@@ -24,7 +24,9 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
                       logger = opts.logger,
                       antlr4Trace = opts.antlr4Trace)
       )
-      println(Util.prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports)))
+      println(
+          Util.prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports))
+      )
     } else {
       def ignoreImports(p: Product): Option[String] = {
         p match {

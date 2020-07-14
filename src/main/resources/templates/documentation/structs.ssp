@@ -1,4 +1,4 @@
-<%@ import val structs: Vector[wdlTools.generators.DocumentationGenerator.StructDocumentation] %>
+<%@ import val structs: Vector[wdlTools.generators.project.DocumentationGenerator.StructDocumentation] %>
 <%
 import wdlTools.syntax.AbstractSyntax._
 def typeToString(wdlType: Type): String = {

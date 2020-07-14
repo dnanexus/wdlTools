@@ -4,7 +4,7 @@ import java.io.IOException
 import java.nio.file._
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileSource, NoSuchProtocolException, Options, Util}
+import wdlTools.util.{FileSource, NoSuchProtocolException, Options}
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
@@ -43,45 +43,6 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
               loc
           )
       }
-    }
-  }
-
-  // Download `pathOrUri` to `dest`. If `pathOrUri` is already a local file, this
-  // is a copy operation (unless `pathOrUri and `dest` are the same, in which case
-  // this is a noop).
-  def downloadFile(pathOrUri: String,
-                   destFile: Option[Path] = None,
-                   destDir: Option[Path] = None,
-                   overwrite: Boolean = false,
-                   loc: SourceLocation): Path = {
-    val src = getFileSource(pathOrUri, loc)
-    val dest = destFile.getOrElse(
-        destDir.getOrElse(Paths.get(".")).resolve(src.fileName)
-    )
-    val realPath = if (!Files.exists(dest)) {
-      Util.createDirectories(dest.getParent)
-      dest.toAbsolutePath
-    } else if (Files.isDirectory(dest)) {
-      throw new EvalException(
-          s"${dest} already exists as a directory - can't overwrite",
-          loc
-      )
-    } else if (overwrite) {
-      val realPath = dest.toRealPath()
-      opts.logger.warning(s"Deleting existing file ${realPath}")
-      Files.delete(realPath)
-      realPath
-    } else {
-      throw new EvalException(
-          s"File ${dest} already exists and overwrite = false",
-          loc
-      )
-    }
-    try {
-      src.localize(realPath)
-    } catch {
-      case e: Throwable =>
-        throw new EvalException(s"error downloading file ${pathOrUri}, msg=${e.getMessage}", loc)
     }
   }
 

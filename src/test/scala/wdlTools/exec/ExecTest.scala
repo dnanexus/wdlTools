@@ -28,7 +28,7 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
     }
     val stdout = baseDir.resolve("stdout")
     val stderr = baseDir.resolve("stderr")
-    EvalConfig.make(dirs(0), dirs(1), stdout, stderr)
+    EvalConfig.create(dirs(0), dirs(1), stdout, stderr)
   }
 
   private val opts = BasicOptions(logger = Logger.Quiet)
