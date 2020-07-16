@@ -1,0 +1,35 @@
+<% escapeMarkup = false %>
+<%@ val hostRootDir: String %>
+<%@ val containerRootDir: String %>
+<%@ val containerIdFile: String %>
+<%@ val commandFile: String %>
+<%@ val imageName: String %>
+<%@ val maxMemory: Long %>
+<% val bashDollar: String = "$" %>
+#!/bin/bash -x
+
+# make sure there is no preexisting container ID file
+rm -f ${containerIdFile}
+
+# Run the container under a priviliged user, so it will have
+# permissions to read/write files in the home directory. This
+# is required in cases where the container uses a different user.
+extraFlags="--user ${bashDollar}(id -u):${bashDollar}(id -g) --hostname ${bashDollar}(hostname)"
+
+# run as in the original configuration
+docker run \\
+--memory=${maxMemory.toString} \\
+--cidfile ${containerIdFile} \\
+${bashDollar}{extraFlags} \\
+--entrypoint /bin/bash \\
+-v ${hostRootDir}:${containerRootDir} \\
+${imageName} ${commandFile}
+
+# get the return code (working even if the container was detached)
+rc=${bashDollar}(docker wait `cat ${containerIdFile}`)
+
+# remove the container after waiting
+docker rm `cat ${containerIdFile}`
+
+# return exit code
+exit ${bashDollar}rc

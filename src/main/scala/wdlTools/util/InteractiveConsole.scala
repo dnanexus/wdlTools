@@ -3,7 +3,6 @@ package wdlTools.util
 import java.io.EOFException
 
 import wdlTools.util.InteractiveConsole.{Reader, _}
-import wdlTools.util.Util.BiMap
 
 case class InteractiveConsole(promptColor: String = "",
                               separator: String = ": ",

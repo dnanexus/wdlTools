@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.{Parsers, WdlVersion}
-import wdlTools.util.{BasicOptions, FileSource, LinesFileSource, Util}
+import wdlTools.util.{BasicOptions, FileSource, LinesFileSource, FileUtils}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   private val opts = BasicOptions()
@@ -14,7 +14,7 @@ class BaseTest extends AnyFlatSpec with Matchers {
   private val v1Parser = parsers.getParser(WdlVersion.V1)
 
   def getWdlPath(fname: String, subdir: String): Path = {
-    Util.absolutePath(Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath))
+    FileUtils.absolutePath(Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath))
   }
 
   def getWdlSource(fname: String, subdir: String): FileSource = {

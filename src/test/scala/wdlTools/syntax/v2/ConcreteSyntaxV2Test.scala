@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.WdlVersion
 import wdlTools.syntax.v2.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
+import wdlTools.util.{BasicOptions, FileSource, Logger, Options, FileSourceResolver}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)

@@ -3,47 +3,65 @@ package wdlTools.exec
 import java.nio.file.Files
 
 import spray.json._
-import wdlTools.eval.{EvalConfig, IoSupp}
+import wdlTools.eval.EvalException
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{Options, TraceLevel, Util}
+import wdlTools.util.{
+  FileSourceResolver,
+  FileUtils,
+  Logger,
+  NoSuchProtocolException,
+  SysUtils,
+  TraceLevel
+}
 
-case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
-  private val ioSupp = IoSupp(opts, evalCfg)
-  private val logger = opts.logger
+import scala.util.{Success, Try}
+
+case class DockerUtils(fileResolver: FileSourceResolver, logger: Logger) {
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
     sys.addShutdownHook({
-      Util.deleteRecursive(p)
+      FileUtils.deleteRecursive(p)
     })
     p
   }
 
   // pull a Docker image from a repository - requires Docker client to be installed
-  def pullImage(name: String, loc: SourceLocation): String = {
-    var retry_count = 5
-    while (retry_count > 0) {
+  def pullImage(name: String, loc: SourceLocation, maxRetries: Int = 3): String = {
+    def pull(retry: Int): Option[String] = {
       try {
-        val (outstr, errstr) = Util.execCommand(s"docker pull ${name}")
+        // stdout will be the full image name
+        val (_, stdout, stderr) = SysUtils.execCommand(s"docker pull --quiet ${name}")
         logger.trace(
             s"""|output:
-                |${outstr}
+                |${stdout}
                 |stderr:
-                |${errstr}""".stripMargin
+                |${stderr}""".stripMargin
         )
-        return name
+        return Some(stdout.trim)
       } catch {
         // ideally should catch specific exception.
-        case _: Throwable =>
-          retry_count = retry_count - 1
+        case t: Throwable =>
           logger.trace(
               s"""Failed to pull docker image:
-                 |${name}. Retrying... ${5 - retry_count}
-                    """.stripMargin
+                 |${name}. Retrying... ${maxRetries - retry}
+                    """.stripMargin,
+              exception = Some(t)
           )
           Thread.sleep(1000)
       }
+      None
     }
-    throw new ExecException(s"Unable to pull docker image: ${name} after 5 tries", loc)
+
+    (0 to maxRetries)
+      .collectFirst { retry =>
+        pull(retry) match {
+          case Some(name) => name
+        }
+      }
+      .getOrElse(
+          throw new ExecException(s"Unable to pull docker image: ${name} after ${maxRetries} tries",
+                                  loc)
+      )
   }
 
   // Read the manifest file from a docker tarball, and get the repository name.
@@ -94,12 +112,16 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       // 2. load into the local docker cache
       // 3. figure out the image name
       logger.traceLimited(s"downloading docker tarball to ${DOCKER_TARBALLS_DIR}")
-      val localTar = ioSupp.downloadFile(nameOrUrl,
-                                         destDir = Some(DOCKER_TARBALLS_DIR),
-                                         overwrite = true,
-                                         loc = loc)
+      val localTarSrc =
+        try {
+          fileResolver.resolve(nameOrUrl)
+        } catch {
+          case e: NoSuchProtocolException =>
+            throw new EvalException(e.getMessage, loc)
+        }
+      val localTar = localTarSrc.localizeToDir(DOCKER_TARBALLS_DIR, overwrite = true)
       logger.traceLimited("figuring out the image name")
-      val (mContent, _) = Util.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
+      val (_, mContent, _) = SysUtils.execCommand(s"tar --to-stdout -xf ${localTar} manifest.json")
       logger.traceLimited(
           s"""|manifest content:
               |${mContent}
@@ -108,7 +130,7 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       val repo = readManifestGetDockerImageName(mContent)
       logger.traceLimited(s"repository is ${repo}")
       logger.traceLimited(s"load tarball ${localTar} to docker", minLevel = TraceLevel.None)
-      val (outstr, errstr) = Util.execCommand(s"docker load --input ${localTar}")
+      val (_, outstr, errstr) = SysUtils.execCommand(s"docker load --input ${localTar}")
       logger.traceLimited(
           s"""|output:
               |${outstr}
@@ -118,7 +140,21 @@ case class DockerUtils(opts: Options, evalCfg: EvalConfig) {
       repo
     } else {
       pullImage(nameOrUrl, loc)
-      nameOrUrl
     }
+  }
+
+  def getImage(nameOrUrlVec: Vector[String], loc: SourceLocation): String = {
+    nameOrUrlVec
+      .collectFirst { nameOrUrl =>
+        Try(getImage(nameOrUrl, loc)) match {
+          case Success(value) => value
+        }
+      }
+      .getOrElse(
+          throw new ExecException(
+              s"Could not get image from any of ${nameOrUrlVec}",
+              loc
+          )
+      )
   }
 }

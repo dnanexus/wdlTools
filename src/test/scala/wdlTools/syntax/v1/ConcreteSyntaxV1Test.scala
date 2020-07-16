@@ -4,9 +4,9 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Comment, Edge, SyntaxException, SourceLocation, WdlVersion}
+import wdlTools.syntax.{Comment, Edge, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, FileSource, FileSourceResolver, Logger, Options}
+import wdlTools.util.{BasicOptions, FileSource, Logger, Options, FileSourceResolver}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)

@@ -8,7 +8,7 @@ object WdlValues {
   // primitive values
   case object V_Null extends V
   case class V_Boolean(value: Boolean) extends V
-  case class V_Int(value: Int) extends V
+  case class V_Int(value: Long) extends V
   case class V_Float(value: Double) extends V
   case class V_String(value: String) extends V
   case class V_File(value: String) extends V

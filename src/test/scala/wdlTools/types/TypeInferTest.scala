@@ -7,12 +7,13 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileSource, Logger, FileSourceResolver}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val opts = TypeOptions(
-      fileResolver =
-        FileSourceResolver.create(Vector(Paths.get(getClass.getResource("/types/v1").getPath))),
+      fileResolver = FileSourceResolver.create(
+          Vector(Paths.get(getClass.getResource("/types/v1").getPath))
+      ),
       logger = Logger.Normal
   )
   private val parser = Parsers(opts)

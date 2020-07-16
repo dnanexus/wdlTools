@@ -1,0 +1,4 @@
+<% escapeMarkup = false %>
+<%@ val returnCodeFile: String %>
+#!/bin/bash
+echo 0 > ${returnCodeFile}

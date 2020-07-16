@@ -5,7 +5,7 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
 import TypeCheckingRegime._
-import wdlTools.util.{Util => UUtil}
+import wdlTools.util.{FileUtils => UUtil}
 
 /**
   * Type inference

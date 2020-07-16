@@ -16,16 +16,27 @@ import wdlTools.syntax.SourceLocation
 object Serialize {
   def toJson(wv: V): JsValue = {
     wv match {
-      case V_Null           => JsNull
-      case V_Boolean(value) => JsBoolean(value)
-      case V_Int(value)     => JsNumber(value)
-      case V_Float(value)   => JsNumber(value)
-      case V_String(value)  => JsString(value)
-      case V_File(value)    => JsString(value)
+      case V_Null             => JsNull
+      case V_Boolean(value)   => JsBoolean(value)
+      case V_Int(value)       => JsNumber(value)
+      case V_Float(value)     => JsNumber(value)
+      case V_String(value)    => JsString(value)
+      case V_File(value)      => JsString(value)
+      case V_Directory(value) => JsString(value)
 
       // compound values
       case V_Array(vec) =>
         JsArray(vec.map(toJson))
+      case V_Map(members) =>
+        JsObject(members.map {
+          case (k, v) =>
+            val key = toJson(k) match {
+              case JsString(value) => value
+              case other =>
+                throw new RuntimeException(s"Cannot serialize non-string map key ${other}")
+            }
+            key -> toJson(v)
+        })
       case V_Object(members) =>
         JsObject(members.map { case (k, v) => k -> toJson(v) })
       case V_Struct(_, members) =>
@@ -35,18 +46,17 @@ object Serialize {
     }
   }
 
+  def toJson(wv: Map[String, WdlValues.V]): Map[String, JsValue] = {
+    wv.view.mapValues(toJson).toMap
+  }
+
   def fromJson(jsv: JsValue): V = {
     jsv match {
-      case JsNull           => V_Null
-      case JsBoolean(value) => V_Boolean(value)
-      case JsNumber(value)  =>
-        // Convert the big-decimal to int, if possible. Otherwise
-        // return a float.
-        val n = value.toInt
-        val x = value.toDouble
-        if (n == x.toInt) V_Int(n)
-        else V_Float(x)
-      case JsString(value) => V_String(value)
+      case JsNull                               => V_Null
+      case JsBoolean(value)                     => V_Boolean(value)
+      case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
+      case JsNumber(value)                      => V_Float(value.toDouble)
+      case JsString(value)                      => V_String(value)
 
       // compound values
       case JsArray(vec) =>

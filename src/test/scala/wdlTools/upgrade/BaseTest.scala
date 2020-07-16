@@ -6,20 +6,20 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{BasicOptions, FileSource, Logger, Util}
+import wdlTools.util.{BasicOptions, FileSource, Logger, FileUtils}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   private lazy val opts = BasicOptions(logger = Logger.Verbose)
 
   def getBeforePath(fname: String): FileSource = {
     val path =
-      Util.absolutePath(Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath))
+      FileUtils.absolutePath(Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath))
     opts.fileResolver.fromPath(path)
   }
 
   def getAfterPath(fname: String): FileSource = {
     val path =
-      Util.absolutePath(Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath))
+      FileUtils.absolutePath(Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath))
     opts.fileResolver.fromPath(path)
   }
 

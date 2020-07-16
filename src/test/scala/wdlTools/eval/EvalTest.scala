@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger, Util => UUtil}
+import wdlTools.util.{Logger, FileSourceResolver, FileUtils => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
@@ -30,16 +30,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
   }
 
-  private lazy val evalCfg: EvalConfig = {
-    val baseDir = Files.createTempDirectory("evalTest")
-    val homeDir = baseDir.resolve("home")
-    val tmpDir = baseDir.resolve("tmp")
-    for (d <- Vector(baseDir, homeDir, tmpDir))
-      safeMkdir(d)
-    val stdout = baseDir.resolve("stdout")
-    val stderr = baseDir.resolve("stderr")
-    EvalConfig.make(homeDir, tmpDir, stdout, stderr)
-  }
+  private lazy val evalPaths: EvalPaths = EvalPaths.createFromTemp()
+
+  private lazy val fileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parsers.parseDocument(opts.fileResolver.fromPath(UUtil.absolutePath(file)))
@@ -49,7 +42,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
+    val evaluator = Eval(evalPaths, fileResolver, wdlTools.syntax.WdlVersion.V1, Logger.Quiet)
 
     tDoc.workflow should not be empty
     val wf = tDoc.workflow.get
@@ -246,7 +239,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(opts, evalCfg, wdlTools.syntax.WdlVersion.V1)
+    val evaluator = Eval(evalPaths, fileResolver, wdlTools.syntax.WdlVersion.V1, Logger.Quiet)
 
     tDoc.elements should not be empty
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]

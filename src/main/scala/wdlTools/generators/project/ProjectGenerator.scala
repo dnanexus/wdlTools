@@ -11,7 +11,7 @@ import wdlTools.util.{
   LinesFileSource,
   Options,
   StringFileSource,
-  Util
+  FileUtils
 }
 
 import scala.util.control.Breaks._
@@ -307,7 +307,7 @@ case class ProjectGenerator(opts: Options,
       Vector.empty
     }
     val testFile: Vector[FileSource] = if (tests) {
-      val testPath = Util.getPath("tests").resolve(s"test_${name}.json")
+      val testPath = FileUtils.getPath("tests").resolve(s"test_${name}.json")
       Vector(StringFileSource(TestsGenerator.apply(wdlName, doc), Some(testPath)))
     } else {
       Vector.empty

@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
-import wdlTools.util.{FileSource, LocalFileSource, StringFileSource, Util}
+import wdlTools.util.{FileSource, LocalFileSource, StringFileSource, FileUtils}
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
@@ -42,7 +42,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles +:= StringFileSource(contents, Some(Util.absolutePath(path)))
+      generatedFiles +:= StringFileSource(contents, Some(FileUtils.absolutePath(path)))
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -53,7 +53,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles +:= StringFileSource(contents, Some(Util.absolutePath(path)))
+      generatedFiles +:= StringFileSource(contents, Some(FileUtils.absolutePath(path)))
       readmeName
     }
   }

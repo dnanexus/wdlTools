@@ -1,18 +1,26 @@
 package wdlTools.util
 
+import java.nio.file.Path
+
 import spray.json._
 
 import scala.collection.immutable.TreeMap
-import scala.io.Source
 
 object JsUtils {
-  def readJsSource(src: Source, name: String): Map[String, JsValue] = {
-    try {
-      getFields(src.getLines.mkString(System.lineSeparator).parseJson)
-    } catch {
-      case _: NullPointerException =>
-        throw new Exception(s"Could not open resource ${name}")
-    }
+  def jsFromFile(path: Path): JsValue = {
+    FileUtils.readFileContent(path).parseJson
+  }
+
+  def jsFromString(json: String): JsValue = {
+    json.parseJson
+  }
+
+  def jsToString(js: JsValue): String = {
+    js.prettyPrint
+  }
+
+  def jsToFile(js: JsValue, path: Path): Unit = {
+    FileUtils.writeFileContent(path, js.prettyPrint)
   }
 
   def getFields(js: JsValue, fieldName: Option[String] = None): Map[String, JsValue] = {

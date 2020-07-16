@@ -1,68 +1,76 @@
 package wdlTools.eval
 
-import java.nio.file.{Path, Paths}
-import java.nio.charset.Charset
+import java.nio.file.{Files, Path}
 
+import wdlTools.exec.ExecPaths
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileAccessProtocol, FileSourceResolver, Logger, Util}
+import wdlTools.util.FileUtils
 
-import scala.io.Codec
-
-case class Context(bindings: Map[String, WdlValues.V]) {
-  def addBinding(name: String, value: WdlValues.V): Context = {
-    assert(!(bindings contains name))
-    this.copy(bindings = bindings + (name -> value))
-  }
-}
-
-// There is a standard library implementation for each WDL version.
-trait StandardLibraryImpl {
-  def call(funcName: String, args: Vector[WdlValues.V], loc: SourceLocation): WdlValues.V
-}
-
-/** Configuration for expression evaluation. Some operations perform file IO.
+/**
+  * Configuration for expression evaluation. Some operations perform file IO.
   *
-  * @param homeDir  the root directory for relative paths, and the root directory for search (glob).
-  * @param tmpDir   directory for placing temporary files.
-  * @param stdout   the file that has a copy of standard output. This is used in the command section.
-  *                 Must resolve to a file that either exists or is creatable.
-  * @param stderr   as above for standard error.
-  * @param fileResolver  FileSourceResolver for accessing files. By default local-file and http protocols are provided.
-  * @param encoding the encoding to use when reading files.
+  * @param rootDir  the root directory - all other paths (except possibly tmpDir) are under this dir
+  * @param tempDir  directory for placing temporary files.
   */
-case class EvalConfig(homeDir: Path,
-                      tmpDir: Path,
-                      stdout: Path,
-                      stderr: Path,
-                      fileResolver: FileSourceResolver,
-                      encoding: Charset = Util.DefaultEncoding)
+class EvalPaths(rootDir: Path, tempDir: Path) {
+  private var cache: Map[String, Path] = Map.empty
 
-object EvalConfig {
-  // Always add the default protocols (file and web) into the configuration.
-  def make(homeDir: Path,
-           tmpDir: Path,
-           stdout: Path,
-           stderr: Path,
-           userSearchPath: Vector[Path] = Vector.empty,
-           userProtos: Vector[FileAccessProtocol] = Vector.empty,
-           encoding: Charset = Codec.default.charSet,
-           logger: Logger = Logger.Quiet): EvalConfig = {
-    new EvalConfig(
-        homeDir,
-        tmpDir,
-        stdout,
-        stderr,
-        FileSourceResolver.create(Vector(homeDir) ++ userSearchPath, userProtos, logger, encoding),
-        encoding
-    )
+  protected def getOrCreateDir(key: String, path: Path, ensureExists: Boolean): Path = {
+    cache.getOrElse(key, if (ensureExists) {
+      val resolved = FileUtils.createDirectories(path)
+      cache += (key -> resolved)
+      resolved
+    } else {
+      path
+    })
+  }
+
+  def getRootDir(ensureExists: Boolean = false): Path =
+    getOrCreateDir("root", rootDir, ensureExists)
+
+  def getTempDir(ensureExists: Boolean = false): Path =
+    getOrCreateDir("temp", tempDir, ensureExists)
+
+  /**
+    * The execution directory - used as the base dir for relative paths (e.g. for glob search).
+    */
+  def getHomeDir(ensureExists: Boolean = false): Path = {
+    getOrCreateDir(ExecPaths.DefaultHomeDir,
+                   getRootDir(ensureExists).resolve(ExecPaths.DefaultHomeDir),
+                   ensureExists)
+  }
+
+  /**
+    * The file that has a copy of standard output.
+    */
+  def getStdoutFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultStdout)
+
+  /**
+    * The file that has a copy of standard error.
+    */
+  def getStderrFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultStderr)
+}
+
+object EvalPaths {
+  def apply(rootDir: Path, tempDir: Path): EvalPaths = {
+    new EvalPaths(rootDir, tempDir)
+  }
+
+  def create(): EvalPaths = {
+    EvalPaths(FileUtils.cwd, FileUtils.systemTempDir)
+  }
+
+  def createFromTemp(): EvalPaths = {
+    val rootDir = Files.createTempDirectory("eval")
+    val tempDir = rootDir.resolve("tmp")
+    EvalPaths(rootDir, tempDir)
   }
 
   // an EvalConfig where all the paths point to /dev/null - only useful for
   // testing where there are no I/O functions used
-  lazy val empty: EvalConfig = {
-    val devNull = Paths.get("/dev/null")
-    make(devNull, devNull, devNull, devNull)
-  }
+  lazy val empty: EvalPaths = EvalPaths(FileUtils.NullPath, FileUtils.NullPath)
 }
 
 // A runtime error

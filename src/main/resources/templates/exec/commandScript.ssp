@@ -1,0 +1,36 @@
+<%
+// This is based on Cromwell code from
+// [BackgroundAsyncJobExecutionActor.scala].  Generate a bash
+// script that captures standard output, and standard
+// error. We need to be careful to pipe stdout/stderr to the
+// parent stdout/stderr, and not lose the result code of the
+// shell command. Notes on bash magic symbols used here:
+//
+//  Symbol  Explanation
+//    >     redirect stdout
+//    2>    redirect stderr
+//    <     redirect stdin
+%>
+<% escapeMarkup = false %>
+<%@ val command: String %>
+<%@ val homeDir: String %>
+<%@ val tempDir: String %>
+<%@ val stdoutFile: String %>
+<%@ val stderrFile: String %>
+<%@ val returnCodeFile: String %>
+<% val bashDollar: String = "$" %>
+#!/bin/bash
+(
+  mkdir -p ${homeDir} ${tempDir} && \
+  cd ${homeDir}
+  ${command}
+) \
+> >( tee ${stdoutFile} ) \
+2> >( tee ${stderrFile} >&2 )
+
+echo ${bashDollar}? > ${returnCodeFile}
+
+# make sure the files are on stable storage
+# before leaving. This helps with stdin and stdout
+# characters that may be in the fifo queues.
+sync

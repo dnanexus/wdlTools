@@ -5,7 +5,7 @@ import wdlTools.generators.project.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.{FileSource, Options, StringFileSource, Util}
+import wdlTools.util.{FileSource, Options, StringFileSource, FileUtils}
 
 object DocumentationGenerator {
   case class DocumentationComment(comments: Vector[Comment]) {
@@ -207,8 +207,8 @@ case class DocumentationGenerator(opts: Options) {
               imp.name
                 .map(_.value)
                 .getOrElse(
-                    Util.changeFileExt(opts.fileResolver.resolve(imp.addr.value).fileName,
-                                       dropExt = ".wdl")
+                    FileUtils.changeFileExt(opts.fileResolver.resolve(imp.addr.value).fileName,
+                                            dropExt = ".wdl")
                 ),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
               getDocumentationComment(imp)
@@ -313,17 +313,17 @@ case class DocumentationGenerator(opts: Options) {
     val renderer: Renderer = Renderer()
     val pages: Vector[FileSource] = docs.map {
       case (source, doc) =>
-        val destFile = Util.changeFileExt(source.fileName, ".wdl", ".md")
+        val destFile = FileUtils.changeFileExt(source.fileName, ".wdl", ".md")
         StringFileSource(
             renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc)),
-            Some(Util.getPath(destFile))
+            Some(FileUtils.getPath(destFile))
         )
     }.toVector ++ (
         if (structs.nonEmpty) {
           Vector(
               StringFileSource(
                   renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)),
-                  Some(Util.getPath("structs.md"))
+                  Some(FileUtils.getPath("structs.md"))
               )
           )
         } else {
@@ -332,7 +332,7 @@ case class DocumentationGenerator(opts: Options) {
     )
     pages :+ StringFileSource(
         renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.map(_.fileName))),
-        Some(Util.getPath("index.md"))
+        Some(FileUtils.getPath("index.md"))
     )
   }
 }

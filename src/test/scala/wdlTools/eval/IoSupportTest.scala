@@ -6,15 +6,11 @@ import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{SourceLocation, WdlVersion}
-import wdlTools.types.{TypeCheckingRegime, TypeOptions}
-import wdlTools.util.{FileAccessProtocol, FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{FileAccessProtocol, FileSource, Logger, FileSourceResolver, StringFileSource}
 
-class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
+class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval").getPath)
-  private val opts =
-    TypeOptions(fileResolver = FileSourceResolver.create(Vector(srcDir)),
-                typeChecking = TypeCheckingRegime.Lenient,
-                logger = Logger.Normal)
+  private val logger = Logger.Normal
 
   private def safeMkdir(path: Path): Unit = {
     if (!Files.exists(path)) {
@@ -31,19 +27,20 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     override def resolve(uri: String): FileSource = ???
   }
 
-  private lazy val evalCfg: EvalConfig = {
+  private lazy val evalPaths: EvalPaths = {
     val baseDir = Files.createTempDirectory("eval")
     val dirs = Vector("home", "tmp").map { subdir =>
       val d = baseDir.resolve(subdir)
       safeMkdir(d)
       d
     }
-    val stdout = baseDir.resolve("stdout")
-    val stderr = baseDir.resolve("stderr")
-    EvalConfig.make(dirs(0), dirs(1), stdout, stderr, userProtos = Vector(DxProtocol))
+    EvalPaths(dirs(0), dirs(1))
   }
 
-  private val dummyTextSource = SourceLocation.empty
+  private lazy val fileResolver =
+    FileSourceResolver.create(Vector(srcDir, evalPaths.getHomeDir()), Vector(DxProtocol))
+
+  private val placeholderSourceLocation = SourceLocation.empty
 
   it should "be able to get size of a local file" in {
     val p = Files.createTempFile("Y", ".txt")
@@ -51,10 +48,10 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
       val buf = "hello bunny"
       val docSrc = StringFileSource(buf, Some(p))
       docSrc.localize(overwrite = true)
-      val ioSupp = IoSupp(opts, evalCfg)
-      val len = ioSupp.size(p.toString, dummyTextSource)
+      val ioSupp = IoSupport(evalPaths, fileResolver, logger)
+      val len = ioSupp.size(p.toString, placeholderSourceLocation)
       len shouldBe buf.length
-      val data = ioSupp.readFile(p.toString, dummyTextSource)
+      val data = ioSupp.readFile(p.toString, placeholderSourceLocation)
       data shouldBe buf
     } finally {
       Files.delete(p)
@@ -67,8 +64,9 @@ class IoSuppTest extends AnyFlatSpec with Matchers with Inside {
     try {
       val docSrc = StringFileSource(buf, Some(p))
       docSrc.localize(overwrite = true)
-      val stdlib = Stdlib(opts, evalCfg, WdlVersion.V1)
-      val retval = stdlib.call("size", Vector(WdlValues.V_String(p.toString)), dummyTextSource)
+      val stdlib = Stdlib(evalPaths, fileResolver, WdlVersion.V1, logger)
+      val retval =
+        stdlib.call("size", Vector(WdlValues.V_String(p.toString)), placeholderSourceLocation)
       inside(retval) {
         case WdlValues.V_Float(x) =>
           x.toInt shouldBe buf.length

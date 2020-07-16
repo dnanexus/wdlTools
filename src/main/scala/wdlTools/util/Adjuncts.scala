@@ -39,9 +39,9 @@ object Adjuncts {
         {
           file.getName match {
             case readmeRegexp(target) =>
-              Some(target -> Readme(Util.readFileContent(file.toPath)))
+              Some(target -> Readme(FileUtils.readFileContent(file.toPath)))
             case developerNotesRegexp(target) =>
-              Some(target -> DeveloperNotes(Util.readFileContent(file.toPath)))
+              Some(target -> DeveloperNotes(FileUtils.readFileContent(file.toPath)))
             case _ => None
           }
         }

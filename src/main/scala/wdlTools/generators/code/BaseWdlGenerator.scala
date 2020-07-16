@@ -3,7 +3,6 @@ package wdlTools.generators.code
 import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
-import wdlTools.util.Util.MutableHolder
 
 import scala.collection.mutable
 

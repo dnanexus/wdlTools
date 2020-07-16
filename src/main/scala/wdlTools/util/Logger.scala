@@ -60,16 +60,16 @@ case class Logger(quiet: Boolean,
   }
 
   // print an error message in red
-  def error(msg: String): Unit = {
-    Logger.error(msg)
+  def error(msg: String, exception: Option[Throwable] = None): Unit = {
+    Logger.error(msg, exception)
   }
 
   private def traceEnabledFor(minLevel: Int, requiredKey: Option[String]): Boolean = {
     traceLevel >= minLevel && requiredKey.forall(containsKey)
   }
 
-  private def printTrace(msg: String): Unit = {
-    System.err.println(s"${" " * traceIndenting * 2}${msg}")
+  private def printTrace(msg: String, exception: Option[Throwable] = None): Unit = {
+    System.err.println(Util.errorMessage(s"${" " * traceIndenting * 2}${msg}", exception))
   }
 
   private def truncateMessage(msg: String, maxLength: Int) = {
@@ -85,12 +85,13 @@ case class Logger(quiet: Boolean,
   def trace(msg: String,
             maxLength: Option[Int] = None,
             minLevel: Int = TraceLevel.Verbose,
-            requiredKey: Option[String] = None): Unit = {
+            requiredKey: Option[String] = None,
+            exception: Option[Throwable] = None): Unit = {
     if (traceEnabledFor(minLevel, requiredKey)) {
       if (maxLength.isDefined) {
-        printTrace(truncateMessage(msg, maxLength.get))
+        printTrace(truncateMessage(msg, maxLength.get), exception)
       } else {
-        printTrace(msg)
+        printTrace(msg, exception)
       }
     }
   }
@@ -100,8 +101,9 @@ case class Logger(quiet: Boolean,
   def traceLimited(msg: String,
                    limit: Int = DEFAULT_MESSAGE_LIMIT,
                    minLevel: Int = TraceLevel.Verbose,
-                   requiredKey: Option[String] = None): Unit = {
-    trace(msg, Some(limit), minLevel, requiredKey)
+                   requiredKey: Option[String] = None,
+                   exception: Option[Throwable] = None): Unit = {
+    trace(msg, Some(limit), minLevel, requiredKey, exception)
   }
 
   // Ignore a value and print a trace message. This is useful for avoiding warnings/errors
@@ -121,7 +123,7 @@ object Logger {
   lazy val Verbose: Logger = Logger(quiet = false, traceLevel = TraceLevel.Verbose)
 
   // print an error message in red
-  def error(msg: String): Unit = {
-    System.err.println(Console.RED + msg + Console.RESET)
+  def error(msg: String, exception: Option[Throwable] = None): Unit = {
+    System.err.println(Util.errorMessage(Console.RED + msg + Console.RESET, exception))
   }
 }
