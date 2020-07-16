@@ -441,7 +441,7 @@ case class Stdlib(paths: EvalPaths,
       }
       // note: '\n' line endings explicitly specified in the spec
       .mkString("\n")
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     ioSupport.writeFile(tmpFile, strRepr, loc)
     V_File(tmpFile.toString)
   }
@@ -453,7 +453,7 @@ case class Stdlib(paths: EvalPaths,
     assert(args.size == 1)
     val arAr: V_Array =
       Coercion.coerceTo(T_Array(T_Array(T_String)), args.head, loc).asInstanceOf[V_Array]
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       arAr.value
@@ -481,7 +481,7 @@ case class Stdlib(paths: EvalPaths,
     assert(args.size == 1)
     val m: V_Map =
       Coercion.coerceTo(T_Map(T_String, T_String), args.head, loc).asInstanceOf[V_Map]
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[(String, String)](tsvConf)
     try {
       m.value
@@ -509,7 +509,7 @@ case class Stdlib(paths: EvalPaths,
   protected def write_object(args: Vector[V], loc: SourceLocation): V_File = {
     assert(args.size == 1)
     val obj = Coercion.coerceTo(T_Object, args.head, loc).asInstanceOf[V_Object]
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(obj.members.keys.toVector)
@@ -543,7 +543,7 @@ case class Stdlib(paths: EvalPaths,
         )
     }
 
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(fstObj.members.keys.toVector)
@@ -566,7 +566,7 @@ case class Stdlib(paths: EvalPaths,
         case e: JsonSerializationException =>
           throw new EvalException(e.getMessage, loc)
       }
-    val tmpFile: Path = ioSupport.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile(suffix = ".json")
     ioSupport.writeFile(tmpFile, jsv.prettyPrint, loc)
     V_File(tmpFile.toString)
   }

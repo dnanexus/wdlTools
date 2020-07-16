@@ -103,7 +103,7 @@ case class IoSupport(paths: EvalPaths,
     retval
   }
 
-  def mkTempFile(): Path = {
-    Files.createTempDirectory(paths.getTempDir(true), "wdlTools")
+  def mkTempFile(prefix: String = "wdlTools", suffix: String = ""): Path = {
+    Files.createTempFile(paths.getTempDir(true), prefix, suffix)
   }
 }

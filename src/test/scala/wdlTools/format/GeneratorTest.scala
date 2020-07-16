@@ -24,7 +24,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   private def evalCommand(tDoc: TAT.Document): Vector[String] = {
-    val evaluator = Eval(opts, EvalPaths.empty, wdlTools.syntax.WdlVersion.V1)
+    val evaluator =
+      Eval(EvalPaths.empty, opts.fileResolver, wdlTools.syntax.WdlVersion.V1, opts.logger)
     tDoc.elements should not be empty
     tDoc.elements.collect {
       case task: TAT.Task =>

@@ -1,6 +1,6 @@
 package wdlTools.eval
 
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
 import wdlTools.exec.ExecPaths
 import wdlTools.syntax.SourceLocation
@@ -56,6 +56,16 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
 object EvalPaths {
   def apply(rootDir: Path, tempDir: Path): EvalPaths = {
     new EvalPaths(rootDir, tempDir)
+  }
+
+  def create(): EvalPaths = {
+    EvalPaths(FileUtils.cwd, FileUtils.systemTempDir)
+  }
+
+  def createFromTemp(): EvalPaths = {
+    val rootDir = Files.createTempDirectory("eval")
+    val tempDir = rootDir.resolve("tmp")
+    EvalPaths(rootDir, tempDir)
   }
 
   // an EvalConfig where all the paths point to /dev/null - only useful for

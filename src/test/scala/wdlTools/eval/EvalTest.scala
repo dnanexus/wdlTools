@@ -30,15 +30,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
   }
 
-  private lazy val evalPaths: EvalPaths = {
-    val baseDir = Files.createTempDirectory("evalTest")
-    val homeDir = baseDir.resolve("home")
-    val tmpDir = baseDir.resolve("tmp")
-    Vector(baseDir, homeDir, tmpDir).foreach(d => safeMkdir(d))
-    val stdout = baseDir.resolve("stdout")
-    val stderr = baseDir.resolve("stderr")
-    EvalPaths(homeDir, tmpDir, stdout, stderr)
-  }
+  private lazy val evalPaths: EvalPaths = EvalPaths.createFromTemp()
 
   private lazy val fileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
 
