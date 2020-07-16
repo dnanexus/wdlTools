@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.Options
+import wdlTools.util.{FileSourceResolver, Logger}
 
 case class Context(bindings: Map[String, WdlValues.V]) {
   def addBinding(name: String, value: WdlValues.V): Context = {
@@ -18,9 +18,12 @@ object Context {
   }
 }
 
-case class Eval(opts: Options, evalCfg: EvalConfig, wdlVersion: WdlVersion) {
+case class Eval(paths: EvalPaths,
+                fileResovler: FileSourceResolver,
+                wdlVersion: WdlVersion,
+                logger: Logger) {
   // choose the standard library implementation based on version
-  private val standardLibrary = Stdlib(opts, evalCfg, wdlVersion)
+  private val standardLibrary = Stdlib(paths, fileResovler, wdlVersion, logger)
 
   private def getStringVal(value: V, loc: SourceLocation): String = {
     value match {

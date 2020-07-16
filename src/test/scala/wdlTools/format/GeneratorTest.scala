@@ -4,7 +4,7 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval.{Context, Eval, EvalConfig}
+import wdlTools.eval.{Context, Eval, EvalPaths}
 import wdlTools.generators.code
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
@@ -24,7 +24,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   private def evalCommand(tDoc: TAT.Document): Vector[String] = {
-    val evaluator = Eval(opts, EvalConfig.empty, wdlTools.syntax.WdlVersion.V1)
+    val evaluator = Eval(opts, EvalPaths.empty, wdlTools.syntax.WdlVersion.V1)
     tDoc.elements should not be empty
     tDoc.elements.collect {
       case task: TAT.Task =>

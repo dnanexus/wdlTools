@@ -58,8 +58,12 @@ case class SourceLocation(source: FileSource, line: Int, col: Int, endLine: Int,
     }
   }
 
+  def locationString: String = {
+    s"${line}:${col}-${endLine}:${endCol}"
+  }
+
   override def toString: String = {
-    s"${line}:${col}-${endLine}:${endCol} in ${source}"
+    s"${locationString} in ${source}"
   }
 }
 

@@ -5,36 +5,37 @@ import wdlTools.util.Logger
 object Main extends App {
   val conf = new WdlToolsConf(args.toVector)
 
-  def runCommand: Int = {
+  def runCommand: Boolean = {
     conf.subcommand match {
       case None =>
         conf.printHelp()
-        1
+        true
       case Some(subcommand) =>
-        val command: Command = subcommand match {
-          case conf.check     => TypeCheck(conf)
-          case conf.docgen    => Docgen(conf)
-          case conf.exec      => Exec(conf)
-          case conf.format    => Format(conf)
-          case conf.lint      => Lint(conf)
-          case conf.upgrade   => Upgrade(conf)
-          case conf.generate  => Generate(conf)
-          case conf.readmes   => Readmes(conf)
-          case conf.printTree => PrintTree(conf)
-          case other =>
-            Logger.error(s"Unrecognized command $other")
-            return 1
-        }
         try {
+          val command: Command = subcommand match {
+            case conf.check     => TypeCheck(conf)
+            case conf.docgen    => Docgen(conf)
+            case conf.exec      => Exec(conf)
+            case conf.format    => Format(conf)
+            case conf.lint      => Lint(conf)
+            case conf.upgrade   => Upgrade(conf)
+            case conf.generate  => Generate(conf)
+            case conf.readmes   => Readmes(conf)
+            case conf.printTree => PrintTree(conf)
+            case other          => throw new Exception(s"Unrecognized command $other")
+          }
           command.apply()
-          0
+          false
         } catch {
           case t: Throwable =>
             Logger.error(s"Command ${subcommand.printedName} failed", Some(t))
-            1
+            true
         }
     }
   }
 
-  System.exit(runCommand)
+  val error = runCommand
+  if (error) {
+    System.exit(1)
+  }
 }

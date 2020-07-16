@@ -9,14 +9,17 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.WdlTypes._
-import wdlTools.util.Options
+import wdlTools.util.{FileSourceResolver, Logger}
 
 import scala.io.Source
 
-case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
+case class Stdlib(paths: EvalPaths,
+                  fileResolver: FileSourceResolver,
+                  version: WdlVersion,
+                  logger: Logger) {
   type FunctionImpl = (Vector[WdlValues.V], SourceLocation) => V
 
-  protected val iosp: IoSupp = IoSupp(opts, evalCfg)
+  private val ioSupport: IoSupport = IoSupport(paths, fileResolver, logger)
 
   private val draft2FuncTable: Map[String, FunctionImpl] = Map(
       "stdout" -> stdout,
@@ -215,15 +218,17 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // since: draft-1
   protected def stdout(args: Vector[V], loc: SourceLocation): V_File = {
     assert(args.isEmpty)
-    iosp.ensureFileExists(evalCfg.stdout, "stdout", loc)
-    V_File(evalCfg.stdout.toString)
+    val stdoutFile = paths.getStdoutFile(true)
+    ioSupport.ensureFileExists(stdoutFile, "stdout", loc)
+    V_File(stdoutFile.toString)
   }
 
   // since: draft-1
   protected def stderr(args: Vector[V], loc: SourceLocation): V_File = {
     assert(args.isEmpty)
-    iosp.ensureFileExists(evalCfg.stderr, "stderr", loc)
-    V_File(evalCfg.stdout.toString)
+    val stderrFile = paths.getStdoutFile(true)
+    ioSupport.ensureFileExists(stderrFile, "stderr", loc)
+    V_File(stderrFile.toString)
   }
 
   // Array[String] read_lines(String|File)
@@ -232,7 +237,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_lines(args: Vector[V], loc: SourceLocation): V_Array = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     V_Array(Source.fromString(content).getLines.map(x => V_String(x)).toVector)
   }
 
@@ -244,7 +249,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_tsv(args: Vector[V], loc: SourceLocation): V_Array = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     val reader = content.asCsvReader[Vector[String]](tsvConf)
     V_Array(reader.map {
       case Left(err) =>
@@ -259,7 +264,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_map(args: Vector[V], loc: SourceLocation): V_Map = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     val reader = content.asCsvReader[(String, String)](tsvConf)
     V_Map(
         reader
@@ -281,7 +286,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // * removed in Version 2
   protected def read_object(args: Vector[V], loc: SourceLocation): V_Object = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     val lines: Vector[Vector[String]] = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
@@ -307,7 +312,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // * removed in Version 2
   protected def read_objects(args: Vector[V], loc: SourceLocation): V_Array = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     val lines = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
@@ -347,7 +352,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_json(args: Vector[V], loc: SourceLocation): V = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     try {
       Serialize.fromJson(content.parseJson)
     } catch {
@@ -362,7 +367,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_int(args: Vector[V], loc: SourceLocation): V_Int = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     try {
       V_Int(content.trim.toInt)
     } catch {
@@ -381,7 +386,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_string(args: Vector[V], loc: SourceLocation): V_String = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     val lines = content.split("\n")
     if (lines.isEmpty) {
       // There are no lines in the file, should we throw an exception instead?
@@ -397,7 +402,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_float(args: Vector[V], loc: SourceLocation): V_Float = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     try {
       V_Float(content.trim.toDouble)
     } catch {
@@ -412,7 +417,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // deprecation: beginning in draft-2, URI parameter is not supported
   protected def read_boolean(args: Vector[V], loc: SourceLocation): V_Boolean = {
     val file = getWdlFile(args, loc)
-    val content = iosp.readFile(file.value, loc)
+    val content = ioSupport.readFile(file.value, loc)
     content.trim.toLowerCase() match {
       case "false" => V_Boolean(false)
       case "true"  => V_Boolean(true)
@@ -436,8 +441,8 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
       }
       // note: '\n' line endings explicitly specified in the spec
       .mkString("\n")
-    val tmpFile: Path = iosp.mkTempFile()
-    iosp.writeFile(tmpFile, strRepr, loc)
+    val tmpFile: Path = ioSupport.mkTempFile()
+    ioSupport.writeFile(tmpFile, strRepr, loc)
     V_File(tmpFile.toString)
   }
 
@@ -448,7 +453,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
     assert(args.size == 1)
     val arAr: V_Array =
       Coercion.coerceTo(T_Array(T_Array(T_String)), args.head, loc).asInstanceOf[V_Array]
-    val tmpFile: Path = iosp.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile()
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       arAr.value
@@ -476,7 +481,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
     assert(args.size == 1)
     val m: V_Map =
       Coercion.coerceTo(T_Map(T_String, T_String), args.head, loc).asInstanceOf[V_Map]
-    val tmpFile: Path = iosp.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile()
     val writer = tmpFile.asCsvWriter[(String, String)](tsvConf)
     try {
       m.value
@@ -504,7 +509,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   protected def write_object(args: Vector[V], loc: SourceLocation): V_File = {
     assert(args.size == 1)
     val obj = Coercion.coerceTo(T_Object, args.head, loc).asInstanceOf[V_Object]
-    val tmpFile: Path = iosp.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile()
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(obj.members.keys.toVector)
@@ -538,7 +543,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
         )
     }
 
-    val tmpFile: Path = iosp.mkTempFile()
+    val tmpFile: Path = ioSupport.mkTempFile()
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(fstObj.members.keys.toVector)
@@ -561,8 +566,8 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
         case e: JsonSerializationException =>
           throw new EvalException(e.getMessage, loc)
       }
-    val tmpFile: Path = iosp.mkTempFile()
-    iosp.writeFile(tmpFile, jsv.prettyPrint, loc)
+    val tmpFile: Path = ioSupport.mkTempFile()
+    ioSupport.writeFile(tmpFile, jsv.prettyPrint, loc)
     V_File(tmpFile.toString)
   }
 
@@ -572,8 +577,8 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   // are coerced into file paths.
   private def sizeCoreInner(arg: V, loc: SourceLocation): Double = {
     arg match {
-      case V_String(path) => iosp.size(path, loc).toDouble
-      case V_File(path)   => iosp.size(path, loc).toDouble
+      case V_String(path) => ioSupport.size(path, loc).toDouble
+      case V_File(path)   => ioSupport.size(path, loc).toDouble
       case V_Array(ar) =>
         ar.foldLeft(0.0) {
           case (accu, wv) => accu + sizeCoreInner(wv, loc)
@@ -888,7 +893,7 @@ case class Stdlib(opts: Options, evalCfg: EvalConfig, version: WdlVersion) {
   protected def glob(args: Vector[V], loc: SourceLocation): V_Array = {
     assert(args.size == 1)
     val pattern = getWdlString(args.head, loc)
-    val filenames = iosp.glob(pattern)
+    val filenames = ioSupport.glob(pattern)
     V_Array(filenames.map { filepath =>
       V_File(filepath)
     })

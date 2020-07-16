@@ -439,6 +439,16 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
         throw new RuntimeException(s"Expected LocalFileAccessProtocol not ${other}")
     }
   }
+
+  def addToLocalSearchPath(paths: Vector[Path], append: Boolean = true): FileSourceResolver = {
+    val newProtos = protocols.map {
+      case LocalFileAccessProtocol(searchPath, logger, encoding) =>
+        val newSearchPath = if (append) searchPath ++ paths else paths ++ searchPath
+        LocalFileAccessProtocol(newSearchPath, logger, encoding)
+      case other => other
+    }
+    FileSourceResolver(newProtos)
+  }
 }
 
 object FileSourceResolver {

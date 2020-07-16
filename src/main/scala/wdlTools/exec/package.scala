@@ -1,13 +1,11 @@
 package wdlTools.exec
 
-import java.nio.charset.Charset
 import java.nio.file.{Files, Path, Paths}
 
-import wdlTools.eval.EvalConfig
+import spray.json.{JsString, JsValue}
+import wdlTools.eval.EvalPaths
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileAccessProtocol, FileSourceResolver, FileUtils, Logger}
-
-import scala.io.Codec
+import wdlTools.util.FileUtils
 
 // A runtime error
 final class ExecException(message: String) extends Exception(message) {
@@ -27,96 +25,82 @@ object ExecException {
   }
 }
 
-class ExecPaths(
-    // home directory in which the command executes
-    homeDir: Path,
-    // temporary file dir
-    tmpDir: Path,
-    // command stdout
-    stdout: Path,
-    // command stderr
-    stderr: Path,
-    // bash script
-    val commandScript: Path,
-    // Status code returned from the shell command
-    val returnCode: Path,
-    // bash script for running the docker image
-    val dockerRunScript: Path,
-    // the docker container name
-    val dockerCid: Path,
-    fileResolver: FileSourceResolver,
-    encoding: Charset = FileUtils.DefaultEncoding
-) extends EvalConfig(homeDir, tmpDir, stdout, stderr, fileResolver, encoding)
+class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir) {
+  def getCommandFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultCommandScript)
+  def getReturnCodeFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultReturnCode)
+  def getContainerCommandFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultContainerRunScript)
+  def getContainerIdFile(ensureParentExists: Boolean = false): Path =
+    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultContainerId)
+
+  def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
+    Map(
+        "root" -> getRootDir(),
+        "home" -> getHomeDir(),
+        "tmp" -> getTempDir(),
+        "stdout" -> getStdoutFile(),
+        "stderr" -> getStderrFile(),
+        "commands" -> getCommandFile(),
+        "returnCode" -> getReturnCodeFile(),
+        "containerCommands" -> getContainerCommandFile(),
+        "containerId" -> getContainerIdFile()
+    ).flatMap {
+      case (key, path) =>
+        if (!onlyExisting || Files.exists(path)) {
+          Some(key -> JsString(path.toString))
+        } else {
+          None
+        }
+    }
+  }
+}
 
 object ExecPaths {
-  def create(
-      homeDir: Path,
-      tmpDir: Path,
-      stdout: Path,
-      stderr: Path,
-      commandScript: Path,
-      returnCode: Path,
-      dockerRunScript: Path,
-      dockerCid: Path,
-      userSearchPath: Vector[Path] = Vector.empty,
-      userProtos: Vector[FileAccessProtocol] = Vector.empty,
-      encoding: Charset = Codec.default.charSet,
-      logger: Logger = Logger.Quiet
-  ): ExecPaths = {
-    new ExecPaths(
-        homeDir,
-        tmpDir,
-        stdout,
-        stderr,
-        commandScript,
-        returnCode,
-        dockerRunScript,
-        dockerCid,
-        FileSourceResolver.create(Vector(homeDir) ++ userSearchPath, userProtos, logger, encoding),
-        encoding
-    )
+  val DefaultHomeDir = "exec"
+  val DefaultTempDir = "tmp"
+  val DefaultStdout = "stdout"
+  val DefaultStderr = "stderr"
+  val DefaultCommandScript = "commandScript"
+  val DefaultReturnCode = "returnCode"
+  val DefaultContainerRunScript = "containerRunScript"
+  val DefaultContainerId = "containerId"
+
+  def apply(executionDir: Path, tempDir: Path): ExecPaths = {
+    new ExecPaths(executionDir, tempDir)
   }
 
-  def createFromDir(path: Path = Paths.get("."),
-                    userSearchPath: Vector[Path] = Vector.empty,
-                    userProtos: Vector[FileAccessProtocol] = Vector.empty,
-                    encoding: Charset = Codec.default.charSet,
-                    logger: Logger = Logger.Quiet): ExecPaths = {
-    create(
-        path.resolve("home"),
-        FileUtils.tempDir,
-        path.resolve("stdout"),
-        path.resolve("stderr"),
-        path.resolve("commandScript"),
-        path.resolve("returnCode"),
-        path.resolve("dockerRunScript"),
-        path.resolve("dockerCid"),
-        userSearchPath,
-        userProtos,
-        encoding,
-        logger
-    )
+  def createLocalPathsFromDir(executionDir: Path = FileUtils.cwd,
+                              tempDir: Path = FileUtils.systemTempDir): ExecPaths = {
+    if (!Files.isDirectory(executionDir)) {
+      throw new ExecException(s"${executionDir} does not exist or is not a directory")
+    }
+    ExecPaths(executionDir, tempDir)
   }
 
-  def createFromTemp(userSearchPath: Vector[Path] = Vector.empty,
-                     userProtos: Vector[FileAccessProtocol] = Vector.empty,
-                     encoding: Charset = Codec.default.charSet,
-                     logger: Logger = Logger.Quiet): (ExecPaths, Path) = {
-    val tempDir = Files.createTempDirectory("wdlTools")
-    val config = create(
-        tempDir.resolve("home"),
-        tempDir.resolve("tmp"),
-        tempDir.resolve("stdout"),
-        tempDir.resolve("stderr"),
-        tempDir.resolve("commandScript"),
-        tempDir.resolve("returnCode"),
-        tempDir.resolve("dockerRunScript"),
-        tempDir.resolve("dockerCid"),
-        userSearchPath,
-        userProtos,
-        encoding,
-        logger
-    )
-    (config, tempDir)
+  def createLocalPathsFromTemp(): ExecPaths = {
+    val rootDir = Files.createTempDirectory("wdlTools")
+    val tempDir = rootDir.resolve(DefaultTempDir)
+    ExecPaths(rootDir, tempDir)
+  }
+
+  def createContainerPaths(containerExecutionDir: Path,
+                           containerTempDir: Path = Paths.get("/tmp")): ExecPaths = {
+    ExecPaths(containerExecutionDir, containerTempDir)
+  }
+
+  def createLocalContainerPair(
+      useWorkingDir: Boolean = false,
+      containerMountDir: Path,
+      containerTempDir: Path = Paths.get("/tmp")
+  ): (ExecPaths, ExecPaths) = {
+    val localPaths = if (useWorkingDir) {
+      createLocalPathsFromDir()
+    } else {
+      createLocalPathsFromTemp()
+    }
+    val containerPaths = createContainerPaths(containerMountDir, containerTempDir)
+    (localPaths, containerPaths)
   }
 }

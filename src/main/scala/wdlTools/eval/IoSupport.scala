@@ -1,19 +1,22 @@
 package wdlTools.eval
 
 import java.io.IOException
+import java.nio.charset.Charset
 import java.nio.file._
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileSource, NoSuchProtocolException, Options}
+import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, Logger, NoSuchProtocolException}
 
 import scala.jdk.CollectionConverters._
-import scala.util.Random
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
-case class IoSupp(opts: Options, evalCfg: EvalConfig) {
+case class IoSupport(paths: EvalPaths,
+                     fileResolver: FileSourceResolver,
+                     logger: Logger,
+                     encoding: Charset = FileUtils.DefaultEncoding) {
   def getFileSource(uri: String, loc: SourceLocation): FileSource = {
     try {
-      evalCfg.fileResolver.resolve(uri)
+      fileResolver.resolve(uri)
     } catch {
       case e: NoSuchProtocolException =>
         throw new EvalException(e.getMessage, loc)
@@ -62,7 +65,7 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     */
   def writeFile(p: Path, content: String, loc: SourceLocation): Unit = {
     try {
-      Files.write(p, content.getBytes(evalCfg.encoding))
+      Files.write(p, content.getBytes(encoding))
     } catch {
       case t: Throwable =>
         throw new EvalException(s"Error wrting content to file ${p}: ${t.getMessage}", loc)
@@ -74,10 +77,10 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
     * @return the list of globbed paths
     */
   def glob(pattern: String): Vector[String] = {
-    if (opts.logger.isVerbose) {
+    if (logger.isVerbose) {
       System.out.println(s"glob(${pattern})")
     }
-    val baseDir = evalCfg.homeDir
+    val baseDir = paths.getHomeDir(true)
     val matcher: PathMatcher = FileSystems.getDefault
       .getPathMatcher(s"glob:${baseDir.toString}/${pattern}")
     val retval =
@@ -94,14 +97,13 @@ case class IoSupp(opts: Options, evalCfg: EvalConfig) {
           .toVector
         files.sorted
       }
-    if (opts.logger.isVerbose) {
+    if (logger.isVerbose) {
       System.out.println(s"""glob results=${retval.mkString("\n")}""")
     }
     retval
   }
 
   def mkTempFile(): Path = {
-    val rndName = Random.alphanumeric.take(8).mkString("")
-    evalCfg.tmpDir.resolve(rndName)
+    Files.createTempDirectory(paths.getTempDir(true), "wdlTools")
   }
 }

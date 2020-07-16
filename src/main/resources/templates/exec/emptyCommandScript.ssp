@@ -1,3 +1,4 @@
-<%@ val paths: wdlTools.exec.ExecPaths %>
+<% escapeMarkup = false %>
+<%@ val returnCodeFile: String %>
 #!/bin/bash
-echo 0 > ${paths.returnCode}
+echo 0 > ${returnCodeFile}

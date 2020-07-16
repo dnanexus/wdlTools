@@ -27,6 +27,16 @@ object Serialize {
       // compound values
       case V_Array(vec) =>
         JsArray(vec.map(toJson))
+      case V_Map(members) =>
+        JsObject(members.map {
+          case (k, v) =>
+            val key = toJson(k) match {
+              case JsString(value) => value
+              case other =>
+                throw new RuntimeException(s"Cannot serialize non-string map key ${other}")
+            }
+            key -> toJson(v)
+        })
       case V_Object(members) =>
         JsObject(members.map { case (k, v) => k -> toJson(v) })
       case V_Struct(_, members) =>

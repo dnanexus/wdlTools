@@ -1,6 +1,6 @@
 package wdlTools.util
 
-import java.io.{File, IOException}
+import java.io.{BufferedReader, File, FileNotFoundException, IOException, InputStreamReader}
 import java.nio.charset.Charset
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{
@@ -24,13 +24,18 @@ object FileUtils {
   // the spec states that WDL files must use UTF8 encoding
   val DefaultEncoding: Charset = Codec.UTF8.charSet
   val DefaultLineSeparator: String = "\n"
+  val NullPath: Path = Paths.get("/dev/null")
 
-  def tempDir: Path = {
+  def systemTempDir: Path = {
     try {
       Paths.get(GetPropertyAction.privilegedGetProperty("java.io.tmpdir"))
     } catch {
       case _: Throwable => Paths.get("/tmp")
     }
+  }
+
+  def cwd: Path = {
+    Paths.get(".")
   }
 
   def absolutePath(path: Path): Path = {
@@ -83,7 +88,11 @@ object FileUtils {
   }
 
   def readStdinContent(encoding: Charset = DefaultEncoding): String = {
-    Source.fromInputStream(System.in, encoding.name).getLines().mkString("\n")
+    if (System.in.available() == 0) {
+      return ""
+    }
+    val in = new BufferedReader(new InputStreamReader(System.in, encoding))
+    Iterator.continually(in.readLine()).takeWhile(_ != null).mkString("\n")
   }
 
   /**
@@ -92,8 +101,16 @@ object FileUtils {
     * @param path file path
     * @return file contents as a string
     */
-  def readFileContent(path: Path, encoding: Charset = DefaultEncoding): String = {
-    new String(Files.readAllBytes(path), encoding)
+  def readFileContent(path: Path,
+                      encoding: Charset = DefaultEncoding,
+                      mustExist: Boolean = true): String = {
+    if (Files.exists(path)) {
+      new String(Files.readAllBytes(path), encoding)
+    } else if (mustExist) {
+      throw new FileNotFoundException(path.toString)
+    } else {
+      ""
+    }
   }
 
   /**
@@ -136,9 +153,10 @@ object FileUtils {
                        content: String,
                        overwrite: Boolean = true,
                        makeExecutable: Boolean = false): Path = {
-    checkOverwrite(path, overwrite)
-    val parent = createDirectories(path.getParent)
-    val resolved = parent.resolve(path.getFileName)
+    val absPath = absolutePath(path)
+    checkOverwrite(absPath, overwrite)
+    val parent = createDirectories(absPath.getParent)
+    val resolved = parent.resolve(absPath.getFileName)
     Files.write(resolved, content.getBytes(DefaultEncoding))
     if (makeExecutable) {
       resolved.toFile.setExecutable(true)

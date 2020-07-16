@@ -1,39 +1,14 @@
 package wdlTools.exec
 
-import java.nio.file.{Files, Path}
-
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval.EvalConfig
-import wdlTools.util.{BasicOptions, Logger}
+import wdlTools.util.{FileSourceResolver, Logger}
 
 class ExecTest extends AnyFlatSpec with Matchers with Inside {
-  private def safeMkdir(path: Path): Unit = {
-    if (!Files.exists(path)) {
-      Files.createDirectories(path)
-    } else {
-      // Path exists, make sure it is a directory, and not a file
-      if (!Files.isDirectory(path))
-        throw new Exception(s"Path ${path} exists, but is not a directory")
-    }
-  }
-
-  private lazy val evalCfg: EvalConfig = {
-    val baseDir = Files.createTempDirectory("eval")
-    val dirs = Vector("home", "tmp").map { subdir =>
-      val d = baseDir.resolve(subdir)
-      safeMkdir(d)
-      d
-    }
-    val stdout = baseDir.resolve("stdout")
-    val stderr = baseDir.resolve("stderr")
-    EvalConfig.create(dirs(0), dirs(1), stdout, stderr)
-  }
-
-  private val opts = BasicOptions(logger = Logger.Quiet)
-  private val dockerUtils = DockerUtils(opts, evalCfg)
-  //private val dummyTextSource = TextSource(0, 0, 0, 0)
+  private lazy val paths: ExecPaths = ExecPaths.createLocalPathsFromTemp()
+  private lazy val fileResolver = FileSourceResolver.create(Vector(paths.getHomeDir()))
+  private val dockerUtils = DockerUtils(fileResolver, Logger.Quiet)
 
   it should "read a docker manifest file" in {
     val buf = """|[

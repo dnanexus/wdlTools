@@ -11,17 +11,24 @@
 //    2>    redirect stderr
 //    <     redirect stdin
 %>
+<% escapeMarkup = false %>
 <%@ val command: String %>
-<%@ val paths: wdlTools.exec.ExecPaths %>
+<%@ val homeDir: String %>
+<%@ val tempDir: String %>
+<%@ val stdoutFile: String %>
+<%@ val stderrFile: String %>
+<%@ val returnCodeFile: String %>
+<% val bashDollar: String = "$" %>
 #!/bin/bash
 (
-  cd ${paths.homeDir.toString}
+  mkdir -p ${homeDir} ${tempDir} && \
+  cd ${homeDir}
   ${command}
-) \\
-> >( tee ${paths.stdout} ) \\
-2> >( tee ${paths.stderr} >&2 )
+) \
+> >( tee ${stdoutFile} ) \
+2> >( tee ${stderrFile} >&2 )
 
-echo $$? > ${paths.returnCode}
+echo ${bashDollar}? > ${returnCodeFile}
 
 # make sure the files are on stable storage
 # before leaving. This helps with stdin and stdout

@@ -1,10 +1,13 @@
 package wdlTools.cli
 
+import java.nio.file.Paths
+
+import spray.json.JsValue
 import wdlTools.eval.{Eval, Serialize, WdlValues}
 import wdlTools.exec.{
-  DefaultTaskExecutor,
   ExecPaths,
   TaskContext,
+  TaskExecutor,
   TaskExecutorCommandFailure,
   TaskExecutorInternalError,
   TaskExecutorSuccess
@@ -28,7 +31,13 @@ case class Exec(conf: WdlToolsConf) extends Command {
       case task: TAT.Task if taskName.isEmpty          => task
       case task: TAT.Task if taskName.get == task.name => task
     }
-    if (tasks.isEmpty) {}
+    if (tasks.isEmpty) {
+      if (taskName.isEmpty) {
+        throw new Exception(s"""WDL file ${docSource} has no tasks""")
+      } else {
+        throw new Exception(s"""WDL file ${docSource} has no task named ${taskName.get}""")
+      }
+    }
     if (tasks.size > 1) {
       throw new Exception(
           s"""WDL file ${docSource} has ${tasks.size} tasks - use '--task' 
@@ -40,23 +49,35 @@ case class Exec(conf: WdlToolsConf) extends Command {
       case None       => FileUtils.readStdinContent()
       case Some(path) => FileUtils.readFileContent(path)
     }
+    val jsInputs: Map[String, JsValue] = if (inputsString.trim.isEmpty) {
+      Map.empty
+    } else {
+      JsUtils.getFields(JsUtils.jsFromString(inputsString))
+    }
     val runtimeDefaults: Map[String, WdlValues.V] = conf.exec.runtimeDefaults.toOption match {
       case None => Map.empty
       case Some(path) =>
         JsUtils.getFields(JsUtils.jsFromFile(path)).view.mapValues(Serialize.fromJson).toMap
     }
-    val (execPaths, tempDir) = ExecPaths.createFromTemp(logger = logger)
-    val evaluator = Eval(opts, execPaths, doc.version.value)
+    val wdlVersion = doc.version.value
+    val (hostPaths: ExecPaths, guestPaths: Option[ExecPaths]) = if (conf.exec.container()) {
+      val (host, guest) =
+        ExecPaths.createLocalContainerPair(containerMountDir = Paths.get("/home/wdlTools"))
+      (host, Some(guest))
+    } else {
+      (ExecPaths.createLocalPathsFromTemp(), None)
+    }
     val taskContext = TaskContext.fromJson(
-        JsUtils.getFields(JsUtils.jsFromString(inputsString)),
+        jsInputs,
         task,
+        opts.fileResolver,
+        Eval(hostPaths, opts.fileResolver, wdlVersion, opts.logger),
+        guestPaths.map(p => Eval(p, opts.fileResolver, wdlVersion, opts.logger)),
         runtimeDefaults,
-        evaluator,
         logger = logger
     )
-    val useDocker = conf.exec.container()
-    val taskExecutor = DefaultTaskExecutor(taskContext, execPaths, logger, useDocker)
-    logger.traceLimited(s"""Executing task ${task.name} in ${tempDir}""")
+    val taskExecutor = TaskExecutor(taskContext, hostPaths, guestPaths, logger)
+    logger.info(s"""Executing task ${task.name} in ${hostPaths.getRootDir()}""")
     val result = taskExecutor.run
     if (conf.exec.summaryFile.isDefined) {
       JsUtils.jsToFile(taskExecutor.summary, conf.exec.summaryFile())

@@ -90,28 +90,21 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }).getParent
   }
 
-  trait ParserOptions {
-    def antlr4Trace: ScallopOption[Boolean]
-    def localDir: ScallopOption[List[Path]]
-
-    /**
-      * The local directories to search for WDL imports.
-      * @param pathOrUri a file path or URI, from which to get the parent directory to add to the paths
-      * @return
-      */
-    def localDirectories(pathOrUri: String): Vector[Path] = {
-      val path = Set(getParent(pathOrUri))
-      if (this.localDir.isDefined) {
-        (this.localDir().toSet ++ path).toVector
-      } else {
-        path
-      }.toVector
+  /**
+    * The local directories to search for WDL imports.
+    * @param pathOrUri a file path or URI, from which to get the parent directory to add to the paths
+    * @return
+    */
+  private def localDirectories(pathOrUri: String,
+                               localDirs: ScallopOption[List[Path]]): Vector[Path] = {
+    localDirs.toOption match {
+      case None        => Vector(getParent(pathOrUri))
+      case Some(paths) => (paths.toSet ++ Set(getParent(pathOrUri))).toVector
     }
   }
 
   abstract class ParserSubcommand(name: String, description: String)
-      extends WdlToolsSubcommand(name: String, description: String)
-      with ParserOptions {
+      extends WdlToolsSubcommand(name: String, description: String) {
     val antlr4Trace: ScallopOption[Boolean] = opt(
         descr = "enable trace logging of the ANTLR4 parser"
     )
@@ -132,7 +125,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   abstract class BasicParserSubcommand(name: String, description: String)
       extends ParserSubcommand(name, description) {
     def getOptions: Options = {
-      val localDirs = this.localDirectories(uri())
+      val localDirs = localDirectories(uri(), localDir)
       BasicOptions(
           fileResolver = FileSourceResolver.create(localDirs, logger = logger),
           followImports = followImports(),
@@ -145,7 +138,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   abstract class TypedParserSubcommand(name: String, description: String)
       extends ParserSubcommand(name, description) {
     override def getOptions: TypeOptions = {
-      val localDirs = this.localDirectories(uri())
+      val localDirs = localDirectories(uri(), localDir)
       TypeOptions(
           fileResolver = FileSourceResolver.create(localDirs, logger = logger),
           followImports = followImports(),
@@ -164,7 +157,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   val check = new WdlToolsSubcommand(
       name = "check",
       description = "Type check WDL file."
-  ) with ParserOptions {
+  ) {
     val antlr4Trace: ScallopOption[Boolean] =
       opt(descr = "enable trace logging of the ANTLR4 parser")
     val localDir: ScallopOption[List[Path]] =
@@ -195,7 +188,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
 
     def getOptions: TypeOptions = {
-      val localDirs = this.localDirectories(uri())
+      val localDirs = localDirectories(uri(), localDir)
       TypeOptions(
           FileSourceResolver.create(localDirs, logger = logger),
           logger = logger,
@@ -318,7 +311,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   }
   addSubcommand(upgrade)
 
-  val exec = new TypedParserSubcommand(
+  val exec = new WdlToolsSubcommand(
       name = "exec",
       description = "Execute a WDL task"
   ) {
@@ -345,6 +338,22 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descrNo = "Do not use Docker - all dependencies must be installed on the local system",
         default = Some(true)
     )
+    val localDir: ScallopOption[List[Path]] =
+      opt[List[Path]](
+          descr =
+            "directory in which to search for imports; ignored if --nofollow-imports is specified"
+      )
+    val uri: ScallopOption[String] =
+      trailArg[String](descr = "path or String (file:// or http(s)://) to the main WDL file")
+
+    override def getOptions: TypeOptions = {
+      val localDirs = localDirectories(uri(), localDir)
+      TypeOptions(
+          fileResolver = FileSourceResolver.create(localDirs, logger = logger),
+          logger = logger,
+          typeChecking = TypeCheckingRegime.Strict
+      )
+    }
   }
   addSubcommand(exec)
 

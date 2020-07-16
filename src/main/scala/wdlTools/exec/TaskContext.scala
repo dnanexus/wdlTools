@@ -4,9 +4,8 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, EvalConfig, Runtime, Serialize, WdlValues, Context => EvalContext}
+import wdlTools.eval.{Eval, Runtime, Serialize, WdlValues, Context => EvalContext}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.WdlTypes
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 trait FileSourceLocalizer {
@@ -62,31 +61,28 @@ case class SafeFileSourceLocalizer(root: Path,
   }
 }
 
-object SafeFileSourceLocalizer {
-  def create(evalCfg: EvalConfig): SafeFileSourceLocalizer = {
-    SafeFileSourceLocalizer(evalCfg.homeDir, evalCfg.fileResolver)
-  }
-}
-
 case class TaskContext(task: Task,
                        inputContext: EvalContext,
+                       fileResolver: FileSourceResolver,
+                       hostEvaluator: Eval,
+                       guestEvaluator: Option[Eval] = None,
                        defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
-                       evaluator: Eval,
-                       fileLocalizer: Option[FileSourceLocalizer] = None) {
-  private lazy val dockerUtils = DockerUtils(evaluator.opts, evaluator.evalCfg)
+                       logger: Logger = Logger.Quiet) {
+  private lazy val dockerUtils = DockerUtils(fileResolver, logger)
   private lazy val hasCommand: Boolean = task.command.parts.exists {
     case ValueString(s, _, _) => s.trim.nonEmpty
     case _                    => true
   }
+  // The inputs and runtime section are evaluated using the host paths
+  // (which will be the same as the guest paths, unless we're running in a container)
   private lazy val evalContext: EvalContext = {
-    val fullContext = evaluator.applyDeclarations(task.declarations, inputContext)
+    val fullContext = hostEvaluator.applyDeclarations(task.declarations, inputContext)
     // If there is a command to evaluate, pre-localize all the files/dirs, otherwise
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
     if (hasCommand) {
-      val localizer = fileLocalizer.getOrElse(
-          SafeFileSourceLocalizer.create(evaluator.evalCfg)
-      )
+      val localizer =
+        SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true), fileResolver)
       EvalContext(fullContext.bindings.map {
         case (name, V_File(uri)) =>
           val localizedPath = localizer.localizeFile(uri)
@@ -101,10 +97,13 @@ case class TaskContext(task: Task,
     }
   }
   lazy val runtime: Runtime =
-    Runtime.fromTask(task, evalContext, evaluator, defaultRuntimeValues)
+    Runtime.fromTask(task, evalContext, hostEvaluator, defaultRuntimeValues)
 
+  // The command is evaluated using the guest paths, since it will be executed within
+  // the guest system (i.e. container) if applicable, otherwise host and guest are the same
   lazy val command: Option[String] = if (hasCommand) {
-    evaluator.applyCommand(task.command, evalContext) match {
+    val guestEval = guestEvaluator.getOrElse(hostEvaluator)
+    guestEval.applyCommand(task.command, evalContext) match {
       case s if s.trim.isEmpty => None
       case s                   => Some(s)
     }
@@ -117,7 +116,8 @@ case class TaskContext(task: Task,
         "task" -> JsObject(
             Map(
                 "name" -> JsString(task.name),
-                "source" -> JsString(task.loc.toString)
+                "source" -> JsString(task.loc.source.toString),
+                "sourceLocation" -> JsString(task.loc.locationString)
             )
         ),
         "inputs" -> JsObject(Serialize.toJson(evalContext.bindings)),
@@ -138,19 +138,28 @@ case class TaskContext(task: Task,
   lazy val outputContext: EvalContext = {
     task.outputs.foldLeft(evalContext) {
       case (accu, output) =>
-        val outputValue = evaluator.applyExpr(output.expr, accu)
+        val outputValue = hostEvaluator.applyExpr(output.expr, accu)
         accu.addBinding(output.name, outputValue)
     }
   }
 
-  def outputs: Map[String, (WdlTypes.T, WdlValues.V)] = {
+  def outputs: Map[String, WdlValues.V] = {
+    val outputFileResolver =
+      fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getHomeDir()))
     task.outputs.map { output =>
-      output.name -> (output.wdlType, outputContext.bindings(output.name))
+      val value = outputContext.bindings.get(output.name)
+      val resolved: WdlValues.V =
+        InputOutput.resolveWdlValue(output.name,
+                                    output.wdlType,
+                                    value,
+                                    outputFileResolver,
+                                    output.loc)
+      output.name -> resolved
     }.toMap
   }
 
   def jsonOutputs: JsObject = {
-    InputOutput.taskOutputToJson(outputContext, task.name, task.outputs)
+    InputOutput.taskOutputToJson(outputs, task.name, task.outputs)
   }
 }
 
@@ -162,7 +171,9 @@ object TaskContext {
     * (if any).
     * @param jsInputs map of fully-qualified input names (i.e. '{task_name}.{input_name}') to JsValues
     * @param task the task
-    * @param evaluator expression evaluator
+    * @param fileResolver FileSourceResolver
+    * @param hostEvaluator expression evaluator for the guest (i.e. container) system
+    * @param guestEvaluator expression evaluator for the guest (i.e. container) system - defaults to `hostEvaluator`
     * @param logger Logger
     * @param strict whether to throw an exception if a default cannot be evaluated; if false, then any
     *               optional parameters with unspecified values and un-evaluable defaults is set to V_Null.
@@ -173,13 +184,20 @@ object TaskContext {
     */
   def fromJson(jsInputs: Map[String, JsValue],
                task: Task,
+               fileResolver: FileSourceResolver,
+               hostEvaluator: Eval,
+               guestEvaluator: Option[Eval] = None,
                defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
-               evaluator: Eval,
                logger: Logger = Logger.Quiet,
-               localizer: Option[FileSourceLocalizer] = None,
                strict: Boolean = false): TaskContext = {
     val inputs =
-      InputOutput.taskInputFromJson(jsInputs, task.name, task.inputs, evaluator, logger, strict)
-    TaskContext(task, inputs, defaultRuntimeValues, evaluator, localizer)
+      InputOutput.taskInputFromJson(jsInputs, task.name, task.inputs, hostEvaluator, logger, strict)
+    TaskContext(task,
+                inputs,
+                fileResolver,
+                hostEvaluator,
+                guestEvaluator,
+                defaultRuntimeValues,
+                logger)
   }
 }
