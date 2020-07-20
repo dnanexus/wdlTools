@@ -14,7 +14,6 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val name = args.name()
     val outputDir: Path = args.outputDir.getOrElse(Paths.get(name))
     val generator = ProjectGenerator(
-        conf.generate.getOptions,
         name,
         wdlVersion = args.wdlVersion(),
         interactive = args.interactive(),

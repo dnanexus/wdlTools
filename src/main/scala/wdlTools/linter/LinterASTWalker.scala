@@ -3,9 +3,9 @@ package wdlTools.linter
 import wdlTools.syntax.ASTVisitor.Context
 import wdlTools.syntax.{ASTVisitor, ASTWalker}
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.Options
 
-case class LinterASTWalker(opts: Options, visitors: Vector[ASTVisitor]) extends ASTWalker(opts) {
+case class LinterASTWalker(visitors: Vector[ASTVisitor], followImports: Boolean = true)
+    extends ASTWalker(followImports) {
   def visitEveryRule(ctx: Context[Element]): Unit = {}
 
   override def visitDocument(ctx: Context[Document]): Unit = {

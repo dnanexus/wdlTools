@@ -21,9 +21,7 @@ trait FileSourceLocalizer {
 //   the same directory for task execution
 // We use the general strategy of creating randomly named directories under root. We use a single
 // directory if possible, but create additional directories to avoid name collision.
-case class SafeFileSourceLocalizer(root: Path,
-                                   fileResolver: FileSourceResolver,
-                                   subdirPrefix: String = "input")
+case class SafeFileSourceLocalizer(root: Path, subdirPrefix: String = "input")
     extends FileSourceLocalizer {
   private var sourceTargetMap: Map[Path, Path] = Map.empty
   private lazy val primaryDir = Files.createTempDirectory(root, subdirPrefix)
@@ -51,23 +49,23 @@ case class SafeFileSourceLocalizer(root: Path,
   }
 
   override def localizeFile(uri: String): Path = {
-    val fileSource = fileResolver.resolve(uri)
+    val fileSource = FileSourceResolver.get.resolve(uri)
     localize(fileSource)
   }
 
   override def localizeDirectory(uri: String): Path = {
-    val fileSource = fileResolver.resolveDirectory(uri)
+    val fileSource = FileSourceResolver.get.resolveDirectory(uri)
     localize(fileSource)
   }
 }
 
 case class TaskContext(task: Task,
                        inputContext: EvalContext,
-                       fileResolver: FileSourceResolver,
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
                        defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
-                       logger: Logger = Logger.Quiet) {
+                       fileResolver: FileSourceResolver = FileSourceResolver.get,
+                       logger: Logger = Logger.get) {
   private lazy val dockerUtils = DockerUtils(fileResolver, logger)
   private lazy val hasCommand: Boolean = task.command.parts.exists {
     case ValueString(s, _, _) => s.trim.nonEmpty
@@ -82,7 +80,7 @@ case class TaskContext(task: Task,
     // evaluate an output value expression).
     if (hasCommand) {
       val localizer =
-        SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true), fileResolver)
+        SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true))
       EvalContext(fullContext.bindings.map {
         case (name, V_File(uri)) =>
           val localizedPath = localizer.localizeFile(uri)
@@ -171,10 +169,8 @@ object TaskContext {
     * (if any).
     * @param jsInputs map of fully-qualified input names (i.e. '{task_name}.{input_name}') to JsValues
     * @param task the task
-    * @param fileResolver FileSourceResolver
     * @param hostEvaluator expression evaluator for the guest (i.e. container) system
     * @param guestEvaluator expression evaluator for the guest (i.e. container) system - defaults to `hostEvaluator`
-    * @param logger Logger
     * @param strict whether to throw an exception if a default cannot be evaluated; if false, then any
     *               optional parameters with unspecified values and un-evaluable defaults is set to V_Null.
     * @return TaskInputs
@@ -184,7 +180,6 @@ object TaskContext {
     */
   def fromJson(jsInputs: Map[String, JsValue],
                task: Task,
-               fileResolver: FileSourceResolver,
                hostEvaluator: Eval,
                guestEvaluator: Option[Eval] = None,
                defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
@@ -192,12 +187,6 @@ object TaskContext {
                strict: Boolean = false): TaskContext = {
     val inputs =
       InputOutput.taskInputFromJson(jsInputs, task.name, task.inputs, hostEvaluator, logger, strict)
-    TaskContext(task,
-                inputs,
-                fileResolver,
-                hostEvaluator,
-                guestEvaluator,
-                defaultRuntimeValues,
-                logger)
+    TaskContext(task, inputs, hostEvaluator, guestEvaluator, defaultRuntimeValues)
   }
 }

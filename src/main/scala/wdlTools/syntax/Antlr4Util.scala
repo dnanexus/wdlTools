@@ -14,9 +14,17 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.{FileSource, Options}
+import wdlTools.util.{FileSource, Logger}
 
 object Antlr4Util {
+  private var parserTrace: Boolean = false
+
+  def setParserTrace(trace: Boolean): Boolean = {
+    val currentTrace = parserTrace
+    parserTrace = trace
+    currentTrace
+  }
+
   def getTextSource(source: FileSource,
                     startToken: Token,
                     maybeStopToken: Option[Token] = None): SourceLocation = {
@@ -125,7 +133,7 @@ object Antlr4Util {
       val parser: Parser,
       val listenerFactories: Vector[ParseTreeListenerFactory],
       val docSource: FileSource,
-      val opts: Options
+      val logger: Logger = Logger.get
   ) {
     val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSource)
     // setting up our own error handling
@@ -134,7 +142,7 @@ object Antlr4Util {
     parser.removeErrorListeners()
     parser.addErrorListener(errListener)
 
-    if (opts.antlr4Trace) {
+    if (parserTrace) {
       parser.setTrace(true)
     }
 
@@ -230,8 +238,8 @@ object Antlr4Util {
       // check if any errors were found
       val errors: Vector[SyntaxError] = errListener.getErrors
       if (errors.nonEmpty) {
-        if (!opts.logger.quiet) {
-          errors.foreach(err => opts.logger.warning(err.toString))
+        if (!logger.quiet) {
+          errors.foreach(err => logger.warning(err.toString))
         }
         throw new SyntaxException(errors)
       }

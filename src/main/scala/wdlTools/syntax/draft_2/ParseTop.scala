@@ -16,10 +16,8 @@ import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import wdlTools.syntax.{CommentMap, SyntaxException, SourceLocation}
-import wdlTools.util.Options
 
-case class ParseTop(opts: Options, grammar: WdlDraft2Grammar)
-    extends WdlDraft2ParserBaseVisitor[Element] {
+case class ParseTop(grammar: WdlDraft2Grammar) extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
       throw new SyntaxException("missing identifier", getTextSource(grammar.docSource, ctx))

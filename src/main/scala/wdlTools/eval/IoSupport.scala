@@ -11,8 +11,8 @@ import scala.jdk.CollectionConverters._
 
 // Functions that (possibly) necessitate I/O operation (on local, network, or cloud filesystems)
 case class IoSupport(paths: EvalPaths,
-                     fileResolver: FileSourceResolver,
-                     logger: Logger,
+                     fileResolver: FileSourceResolver = FileSourceResolver.get,
+                     logger: Logger = Logger.get,
                      encoding: Charset = FileUtils.DefaultEncoding) {
   def getFileSource(uri: String, loc: SourceLocation): FileSource = {
     try {

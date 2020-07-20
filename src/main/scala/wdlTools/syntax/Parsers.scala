@@ -2,17 +2,31 @@ package wdlTools.syntax
 
 import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.util.{FileSource, Options}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 case class Parsers(
-    opts: Options,
+    followImports: Boolean = false,
+    fileResolver: FileSourceResolver = FileSourceResolver.get,
     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-    errorHandler: Option[Vector[SyntaxError] => Boolean] = None
+    errorHandler: Option[Vector[SyntaxError] => Boolean] = None,
+    logger: Logger = Logger.get
 ) {
   private val parsers: Map[WdlVersion, WdlParser] = Map(
-      WdlVersion.Draft_2 -> draft_2.ParseAll(opts, listenerFactories, errorHandler),
-      WdlVersion.V1 -> v1.ParseAll(opts, listenerFactories, errorHandler),
-      WdlVersion.V2 -> v2.ParseAll(opts, listenerFactories, errorHandler)
+      WdlVersion.Draft_2 -> draft_2.ParseAll(followImports,
+                                             fileResolver,
+                                             listenerFactories,
+                                             errorHandler,
+                                             logger),
+      WdlVersion.V1 -> v1.ParseAll(followImports,
+                                   fileResolver,
+                                   listenerFactories,
+                                   errorHandler,
+                                   logger),
+      WdlVersion.V2 -> v2.ParseAll(followImports,
+                                   fileResolver,
+                                   listenerFactories,
+                                   errorHandler,
+                                   logger)
   )
 
   def getParser(fileSource: FileSource): WdlParser = {
@@ -40,4 +54,8 @@ case class Parsers(
     val parser = getParser(fileSource)
     parser.Walker(fileSource, results)
   }
+}
+
+object Parsers {
+  lazy val instance: Parsers = Parsers()
 }

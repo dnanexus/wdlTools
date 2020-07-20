@@ -452,6 +452,29 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
 }
 
 object FileSourceResolver {
+  private var instance: Option[FileSourceResolver] = None
+
+  def get: FileSourceResolver = {
+    instance.getOrElse({
+      val instance = create()
+      set(instance)
+      instance
+    })
+  }
+
+  def set(fileResolver: FileSourceResolver): Option[FileSourceResolver] = {
+    val currentInstance = instance
+    instance = Some(fileResolver)
+    currentInstance
+  }
+
+  def set(localDirectories: Vector[Path] = Vector.empty,
+          userProtocols: Vector[FileAccessProtocol] = Vector.empty,
+          logger: Logger = Logger.get,
+          encoding: Charset = FileUtils.DefaultEncoding): Option[FileSourceResolver] = {
+    set(create(localDirectories, userProtocols, logger, encoding))
+  }
+
   def create(localDirectories: Vector[Path] = Vector.empty,
              userProtocols: Vector[FileAccessProtocol] = Vector.empty,
              logger: Logger = Logger.Quiet,

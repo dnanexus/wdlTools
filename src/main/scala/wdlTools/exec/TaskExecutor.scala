@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path}
 
 import spray.json.{JsNumber, JsObject, JsString, JsValue}
 import wdlTools.generators.Renderer
-import wdlTools.util.{FileUtils, Logger, SysUtils, Util => UUtil}
+import wdlTools.util.{FileUtils, Logger, SysUtils, errorMessage}
 
 sealed trait TaskExecutorResult {
   def toJson: Map[String, JsValue]
@@ -33,7 +33,7 @@ case class TaskExecutorInternalError(message: String, error: Option[Throwable] =
   override def toJson: Map[String, JsValue] = {
     Map(
         "status" -> JsString("error"),
-        "errorMessage" -> JsString(UUtil.errorMessage(message, error))
+        "errorMessage" -> JsString(errorMessage(message, error))
     )
   }
 }
@@ -102,7 +102,7 @@ object TaskCommandFileGenerator {
 case class TaskExecutor(taskContext: TaskContext,
                         hostPaths: ExecPaths,
                         guestPaths: Option[ExecPaths] = None,
-                        logger: Logger) {
+                        logger: Logger = Logger.get) {
   private val scriptGenerator = TaskCommandFileGenerator(logger)
 
   protected lazy val useContainer: Boolean = {

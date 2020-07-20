@@ -16,7 +16,8 @@ import wdlTools.util.{
 
 import scala.util.{Success, Try}
 
-case class DockerUtils(fileResolver: FileSourceResolver, logger: Logger) {
+case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get,
+                       logger: Logger = Logger.get) {
   private lazy val DOCKER_TARBALLS_DIR = {
     val p = Files.createTempDirectory("docker-tarballs")
     sys.addShutdownHook({

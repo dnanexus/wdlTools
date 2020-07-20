@@ -1,16 +1,15 @@
 package wdlTools.cli
 
 import wdlTools.syntax.{AbstractSyntax, Parsers}
-import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax}
-import wdlTools.util.Util
+import wdlTools.types.{TypeInfer, TypedAbstractSyntax}
+import wdlTools.util.{FileSourceResolver, prettyFormat}
 
 import scala.language.reflectiveCalls
 
 case class PrintTree(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val opts = conf.printTree.getOptions
-    val docSource = opts.fileResolver.resolve(conf.printTree.uri())
-    val parsers = Parsers(opts)
+    val docSource = FileSourceResolver.get.resolve(conf.printTree.uri())
+    val parsers = Parsers(followImports = false)
     val document = parsers.parseDocument(docSource)
     if (conf.printTree.typed()) {
       def ignoreImports(p: Product): Option[String] = {
@@ -19,13 +18,9 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
           case _                                                              => None
         }
       }
-      val typeChecker = TypeInfer(
-          TypeOptions(fileResolver = opts.fileResolver,
-                      logger = opts.logger,
-                      antlr4Trace = opts.antlr4Trace)
-      )
+      val typeChecker = TypeInfer(conf.printTree.regime())
       println(
-          Util.prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports))
+          prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports))
       )
     } else {
       def ignoreImports(p: Product): Option[String] = {
@@ -34,7 +29,7 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
           case _                                                         => None
         }
       }
-      println(Util.prettyFormat(document, callback = Some(ignoreImports)))
+      println(prettyFormat(document, callback = Some(ignoreImports)))
     }
   }
 }

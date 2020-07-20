@@ -4,28 +4,24 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval.{Context, Eval, EvalPaths}
+import wdlTools.eval
+import wdlTools.eval.{Context, EvalPaths}
 import wdlTools.generators.code
 import wdlTools.syntax.Parsers
-import wdlTools.types.{TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSource, LinesFileSource}
+import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
+import wdlTools.util.{FileSource, FileSourceResolver, LinesFileSource}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
-  private val opts = TypeOptions()
-  private val parsers = Parsers(opts)
-  private val typeInfer = TypeInfer(opts)
-
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
   private def getWdlSource(fname: String, subdir: String): FileSource = {
-    opts.fileResolver.fromPath(getWdlPath(fname, subdir))
+    FileSourceResolver.get.fromPath(getWdlPath(fname, subdir))
   }
 
   private def evalCommand(tDoc: TAT.Document): Vector[String] = {
-    val evaluator =
-      Eval(EvalPaths.empty, opts.fileResolver, wdlTools.syntax.WdlVersion.V1, opts.logger)
+    val evaluator = eval.Eval(EvalPaths.empty, wdlTools.syntax.WdlVersion.V1)
     tDoc.elements should not be empty
     tDoc.elements.collect {
       case task: TAT.Task =>
@@ -41,8 +37,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       validateContentFile: Boolean = false
   ): (FileSource, TAT.Document, FileSource, Option[TAT.Document]) = {
     val beforeSrc = getWdlSource(fname = fname, subdir = "before")
-    val doc = parsers.parseDocument(beforeSrc)
-    val (tDoc, _) = typeInfer.apply(doc)
+    val doc = Parsers.instance.parseDocument(beforeSrc)
+    val (tDoc, _) = TypeInfer.instance.apply(doc)
     val generator = code.WdlV1Generator()
     val gLines = LinesFileSource(generator.generateDocument(tDoc))
     if (validateContentSelf) {
@@ -52,8 +48,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       gLines.readLines.mkString("\n") shouldBe afterSrc.readLines.mkString("\n")
     }
     val gtDoc = if (validateParse) {
-      val gDoc = parsers.parseDocument(gLines)
-      Some(typeInfer.apply(gDoc)._1)
+      val gDoc = Parsers.instance.parseDocument(gLines)
+      Some(TypeInfer.instance.apply(gDoc)._1)
     } else {
       None
     }

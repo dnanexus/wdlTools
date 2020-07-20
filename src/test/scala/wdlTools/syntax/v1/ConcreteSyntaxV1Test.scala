@@ -4,34 +4,33 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Comment, Edge, SourceLocation, SyntaxException, WdlVersion}
+import wdlTools.Edge
+import wdlTools.syntax.{Comment, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, FileSource, Logger, Options, FileSourceResolver}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
-  private val opts = BasicOptions(
-      fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir)),
-      logger = Logger.Quiet
-  )
+  private val fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir))
+  private val logger = Logger.Quiet
 
   private def getTaskSource(fname: String): FileSource = {
-    opts.fileResolver.fromPath(tasksDir.resolve(fname))
+    fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
   private def getWorkflowSource(fname: String): FileSource = {
-    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
+    fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
   private def getStructSource(fname: String): FileSource = {
-    opts.fileResolver.fromPath(structsDir.resolve(fname))
+    fileResolver.fromPath(structsDir.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
-    ParseTop(conf, WdlV1Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource): Document = {
+    ParseTop(WdlV1Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 
   it should "handle various types" in {
@@ -516,7 +515,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   it should "have real world GATK tasks" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
-    val FileSource = opts.fileResolver.resolve(url)
+    val FileSource = fileResolver.resolve(url)
     val doc = getDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1
@@ -526,7 +525,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   it should "be able to handle GATK workflow" in {
     val url =
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
-    val FileSource = opts.fileResolver.resolve(url)
+    val FileSource = fileResolver.resolve(url)
     val doc = getDocument(FileSource)
 
     doc.version.value shouldBe WdlVersion.V1

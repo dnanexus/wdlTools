@@ -7,12 +7,12 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1.{WdlV1Parser, WdlV1ParserBaseVisitor}
 import wdlTools.syntax.Antlr4Util.getTextSource
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.syntax.{CommentMap, SyntaxException, SourceLocation, WdlVersion}
-import wdlTools.util.Options
+import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException, WdlVersion}
+import wdlTools.util.Logger
 
 import scala.jdk.CollectionConverters._
 
-case class ParseTop(opts: Options, grammar: WdlV1Grammar) extends WdlV1ParserBaseVisitor[Element] {
+case class ParseTop(grammar: WdlV1Grammar) extends WdlV1ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
       throw new SyntaxException("missing identifier", getTextSource(grammar.docSource, ctx))
@@ -981,7 +981,7 @@ task_input
         // issue a warning with the exact text where this occurs
         val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
         val text = decl.loc
-        opts.logger.warning(
+        Logger.get.warning(
             s"Warning: '${varName}' appears in both input and output sections at ${text} in ${grammar.docSource}"
         )
       }

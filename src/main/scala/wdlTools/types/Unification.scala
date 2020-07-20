@@ -1,13 +1,14 @@
 package wdlTools.types
 
-import wdlTools.types.Util.{typeToString, isPrimitive}
+import wdlTools.types.Utils.{typeToString, isPrimitive}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
 
-case class Unification(conf: TypeOptions) {
-  // Type checking rules. Are we lenient or strict in checking coercions?
-  private val regime = conf.typeChecking
-
+/**
+  *
+  * @param regime Type checking rules. Are we lenient or strict in checking coercions?
+  */
+case class Unification(regime: TypeCheckingRegime) {
   // A value for each type variable.
   //
   // This is used when we have polymorphic types,

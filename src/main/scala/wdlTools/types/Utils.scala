@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
-object Util {
+object Utils {
   // check if the right hand side of an assignment matches the left hand side
   //
   // Negative examples:

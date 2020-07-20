@@ -7,7 +7,7 @@ import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
 import wdlTools.linter.{LintEvent, Linter, Rules, Severity}
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, FileSourceResolver}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
@@ -16,8 +16,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
   private val RULES_RESOURCE = "rules/lint_rules.json"
 
   override def apply(): Unit = {
-    val opts = conf.lint.getOptions
-    val docSource = opts.fileResolver.resolve(conf.lint.uri())
+    val docSource = FileSourceResolver.get.resolve(conf.lint.uri())
     val rules =
       if (conf.lint.config.isDefined) {
         val (incl, excl) = rulesFromFile(conf.lint.config())
@@ -29,7 +28,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
       } else {
         Rules.defaultRules
       }
-    val linter = Linter(opts, rules)
+    val linter = Linter(rules, conf.lint.regime())
     val lint = linter.apply(docSource)
 
     if (lint.nonEmpty) {

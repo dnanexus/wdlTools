@@ -3,18 +3,17 @@ package wdlTools.cli
 import java.nio.file.Files
 
 import wdlTools.generators.code.WdlV1Formatter
-import wdlTools.util.LocalFileSource
+import wdlTools.util.{FileSourceResolver, LocalFileSource}
 
 import scala.jdk.CollectionConverters._
 import scala.language.reflectiveCalls
 
 case class Format(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val opts = conf.format.getOptions
-    val docSource = opts.fileResolver.resolve(conf.format.uri())
+    val docSource = FileSourceResolver.get.resolve(conf.format.uri())
     val outputDir = conf.format.outputDir.toOption
     val overwrite = conf.format.overwrite()
-    val formatter = WdlV1Formatter(opts)
+    val formatter = WdlV1Formatter(conf.format.followImports())
     val documents = formatter.formatDocuments(docSource)
     documents.foreach {
       case (source, lines) if outputDir.isDefined =>

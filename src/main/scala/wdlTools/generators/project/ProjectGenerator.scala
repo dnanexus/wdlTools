@@ -5,19 +5,11 @@ import wdlTools.generators.code.WdlV1Formatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
-import wdlTools.util.{
-  FileSource,
-  InteractiveConsole,
-  LinesFileSource,
-  Options,
-  StringFileSource,
-  FileUtils
-}
+import wdlTools.util.{FileSource, InteractiveConsole, LinesFileSource, StringFileSource, FileUtils}
 
 import scala.util.control.Breaks._
 
-case class ProjectGenerator(opts: Options,
-                            name: String,
+case class ProjectGenerator(name: String,
                             wdlVersion: WdlVersion = WdlVersion.V1,
                             interactive: Boolean = false,
                             readmes: Boolean = false,
@@ -25,18 +17,19 @@ case class ProjectGenerator(opts: Options,
                             dockerfile: Boolean = false,
                             tests: Boolean = false,
                             makefile: Boolean = true,
-                            dockerImage: Option[String] = None) {
+                            dockerImage: Option[String] = None,
+                            followImports: Boolean = true) {
 
   val DOCKERFILE_TEMPLATE = "/templates/project/Dockerfile.ssp"
   val MAKEFILE_TEMPLATE = "/templates/project/Makefile.ssp"
 
   val defaultDockerImage = "debian:stretch-slim"
-  lazy val formatter: WdlV1Formatter = code.WdlV1Formatter(opts)
+  lazy val formatter: WdlV1Formatter = code.WdlV1Formatter(followImports)
   lazy val renderer: Renderer = Renderer()
   lazy val readmeGenerator: ReadmeGenerator =
     ReadmeGenerator(developerReadmes = developerReadmes, renderer = renderer)
   lazy val console: InteractiveConsole = InteractiveConsole(promptColor = Console.BLUE)
-  lazy val parsers: Parsers = Parsers(opts)
+  lazy val parsers: Parsers = Parsers(followImports)
   lazy val fragParser: WdlParser = parsers.getParser(wdlVersion)
 
   val basicTypeChoices = Vector(

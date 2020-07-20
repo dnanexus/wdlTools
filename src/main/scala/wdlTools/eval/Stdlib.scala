@@ -14,9 +14,9 @@ import wdlTools.util.{FileSourceResolver, Logger}
 import scala.io.Source
 
 case class Stdlib(paths: EvalPaths,
-                  fileResolver: FileSourceResolver,
                   version: WdlVersion,
-                  logger: Logger) {
+                  fileResolver: FileSourceResolver = FileSourceResolver.get,
+                  logger: Logger = Logger.get) {
   type FunctionImpl = (Vector[WdlValues.V], SourceLocation) => V
 
   private val ioSupport: IoSupport = IoSupport(paths, fileResolver, logger)

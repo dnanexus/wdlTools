@@ -19,11 +19,11 @@ object Context {
 }
 
 case class Eval(paths: EvalPaths,
-                fileResovler: FileSourceResolver,
                 wdlVersion: WdlVersion,
-                logger: Logger) {
+                fileResovler: FileSourceResolver = FileSourceResolver.get,
+                logger: Logger = Logger.get) {
   // choose the standard library implementation based on version
-  private val standardLibrary = Stdlib(paths, fileResovler, wdlVersion, logger)
+  private val standardLibrary = Stdlib(paths, wdlVersion, fileResovler, logger)
 
   private def getStringVal(value: V, loc: SourceLocation): String = {
     value match {

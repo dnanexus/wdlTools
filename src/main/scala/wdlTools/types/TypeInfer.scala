@@ -3,21 +3,25 @@ package wdlTools.types
 import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Util => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
-import wdlTools.types.Util.{exprToString, isPrimitive, typeToString}
+import wdlTools.types.Utils.{exprToString, isPrimitive, typeToString}
 import TypeCheckingRegime._
-import wdlTools.util.{FileUtils => UUtil}
+import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
 
 /**
   * Type inference
-  * @param opts options
+  * @param regime Type checking rules. Are we lenient or strict in checking coercions?
+  * @param allowNonWorkflowInputs whether task inputs can be specified externally
   * @param errorHandler optional error handler function. If defined, it is called every time a type-checking
   *                     error is encountered. If it returns false, type inference will proceed even if it
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
   *                     a TypeException is thrown.
   */
-case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] => Boolean] = None) {
-  private val unify = Unification(opts)
-  private val regime = opts.typeChecking
+case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
+                     allowNonWorkflowInputs: Boolean = true,
+                     fileResolver: FileSourceResolver = FileSourceResolver.get,
+                     errorHandler: Option[Vector[TypeError] => Boolean] = None,
+                     logger: Logger = Logger.get) {
+  private val unify = Unification(regime)
   private var errors = Vector.empty[TypeError]
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -934,8 +938,8 @@ case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] =
     val missingInputs = callee.input.flatMap {
       case (argName, (wdlType, false)) =>
         callerInputs.get(argName) match {
-          case None if opts.allowNonWorkflowInputs =>
-            opts.logger.warning(
+          case None if allowNonWorkflowInputs =>
+            logger.warning(
                 s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
             )
             Some(argName -> TAT.ValueNone(wdlType, call.loc))
@@ -1154,7 +1158,7 @@ case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] =
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
     val initCtx = Context(
         version = doc.version.value,
-        stdlib = Stdlib(opts, doc.version.value),
+        stdlib = Stdlib(regime, doc.version.value),
         docSource = doc.source
     )
 
@@ -1189,7 +1193,7 @@ case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] =
               // will be named:
               //    stdlib
               //    C
-              UUtil.changeFileExt(opts.fileResolver.resolve(addr).fileName, dropExt = ".wdl")
+              UUtil.changeFileExt(fileResolver.resolve(addr).fileName, dropExt = ".wdl")
             case Some(x) => x
           }
 
@@ -1266,4 +1270,8 @@ case class TypeInfer(opts: TypeOptions, errorHandler: Option[Vector[TypeError] =
     }
     (tDoc, ctx)
   }
+}
+
+object TypeInfer {
+  lazy val instance: TypeInfer = TypeInfer()
 }

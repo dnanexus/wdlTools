@@ -6,7 +6,7 @@ import java.nio.file.Files
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException}
 import wdlTools.types.{TypeError, TypeException, TypeInfer}
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, FileSourceResolver}
 
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls
@@ -61,9 +61,8 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
   }
 
   override def apply(): Unit = {
-    val opts = conf.check.getOptions
-    val docSource = opts.fileResolver.resolve(conf.check.uri())
-    val parsers = Parsers(opts)
+    val docSource = FileSourceResolver.get.resolve(conf.check.uri())
+    val parsers = Parsers()
     var errors: Map[FileSource, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
@@ -75,7 +74,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       false
     }
 
-    val checker = TypeInfer(opts, errorHandler = Some(errorHandler))
+    val checker = TypeInfer(conf.check.regime(), errorHandler = Some(errorHandler))
 
     try {
       checker.apply(parsers.parseDocument(docSource))

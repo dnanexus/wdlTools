@@ -14,18 +14,14 @@ import wdlTools.exec.{
 }
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileUtils, JsUtils, Util}
+import wdlTools.util.{FileSourceResolver, FileUtils, JsUtils, Logger, errorMessage}
 
 import scala.language.reflectiveCalls
 
 case class Exec(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
-    val opts = conf.exec.getOptions
-    val logger = opts.logger
-    val docSource = opts.fileResolver.resolve(conf.exec.uri())
-    val parsers = Parsers(opts)
-    val checker = TypeInfer(opts)
-    val (doc: TAT.Document, _) = checker.apply(parsers.parseDocument(docSource))
+    val docSource = FileSourceResolver.get.resolve(conf.exec.uri())
+    val (doc: TAT.Document, _) = TypeInfer().apply(Parsers().parseDocument(docSource))
     val taskName = conf.exec.task.toOption
     val tasks = doc.elements.collect {
       case task: TAT.Task if taskName.isEmpty          => task
@@ -70,14 +66,12 @@ case class Exec(conf: WdlToolsConf) extends Command {
     val taskContext = TaskContext.fromJson(
         jsInputs,
         task,
-        opts.fileResolver,
-        Eval(hostPaths, opts.fileResolver, wdlVersion, opts.logger),
-        guestPaths.map(p => Eval(p, opts.fileResolver, wdlVersion, opts.logger)),
-        runtimeDefaults,
-        logger = logger
+        Eval(hostPaths, wdlVersion),
+        guestPaths.map(p => Eval(p, wdlVersion)),
+        runtimeDefaults
     )
-    val taskExecutor = TaskExecutor(taskContext, hostPaths, guestPaths, logger)
-    logger.info(s"""Executing task ${task.name} in ${hostPaths.getRootDir()}""")
+    val taskExecutor = TaskExecutor(taskContext, hostPaths, guestPaths)
+    Logger.get.info(s"""Executing task ${task.name} in ${hostPaths.getRootDir()}""")
     val result = taskExecutor.run
     if (conf.exec.summaryFile.isDefined) {
       JsUtils.jsToFile(taskExecutor.summary, conf.exec.summaryFile())
@@ -96,7 +90,7 @@ case class Exec(conf: WdlToolsConf) extends Command {
                |${stderr}""".stripMargin
         )
       case TaskExecutorInternalError(message, error) =>
-        throw new Exception(Util.errorMessage(message, error))
+        throw new Exception(errorMessage(message, error))
     }
   }
 }

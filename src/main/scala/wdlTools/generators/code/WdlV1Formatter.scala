@@ -5,11 +5,13 @@ import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, SourceLocation, WdlVersion}
-import wdlTools.util.{FileSource, Options}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 import scala.collection.BufferedIterator
 
-case class WdlV1Formatter(opts: Options) {
+case class WdlV1Formatter(followImports: Boolean = false,
+                          fileResolver: FileSourceResolver = FileSourceResolver.get,
+                          logger: Logger = Logger.get) {
 
   private case class Literal(value: Any,
                              quoting: Boolean = false,
@@ -1457,9 +1459,10 @@ case class WdlV1Formatter(opts: Options) {
   }
 
   def formatDocuments(docSource: FileSource): Map[FileSource, Vector[String]] = {
-    Parsers(opts).getDocumentWalker[Map[FileSource, Vector[String]]](docSource, Map.empty).walk {
-      (doc, results) =>
+    Parsers(followImports, fileResolver, logger = logger)
+      .getDocumentWalker[Map[FileSource, Vector[String]]](docSource, Map.empty)
+      .walk { (doc, results) =>
         results + (doc.source -> formatDocument(doc))
-    }
+      }
   }
 }

@@ -1,26 +1,11 @@
 package wdlTools.types
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileSourceResolver, Logger, Options}
 
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
   val Strict, Moderate, Lenient = Value
 }
-
-/**
-  * @param typeChecking             strictness of type-checking
-  * @param allowNonWorkflowInputs   allow missing inputs; these can be provided at
-  *                                 runtime by the user
-  */
-case class TypeOptions(fileResolver: FileSourceResolver = FileSourceResolver.create(),
-                       followImports: Boolean = true,
-                       logger: Logger = Logger.Normal,
-                       antlr4Trace: Boolean = false,
-                       typeChecking: TypeCheckingRegime.TypeCheckingRegime =
-                         TypeCheckingRegime.Moderate,
-                       allowNonWorkflowInputs: Boolean = true)
-    extends Options
 
 final case class TypeError(loc: SourceLocation, reason: String)
 

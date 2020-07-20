@@ -4,8 +4,9 @@ import org.antlr.v4.runtime.tree.ParseTreeListener
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers, SyntaxError}
-import wdlTools.types.{TypeError, TypeInfer, TypeOptions}
-import wdlTools.util.FileSource
+import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
+import wdlTools.types.{TypeCheckingRegime, TypeError, TypeInfer}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 case class LinterParserRuleFactory(rules: Map[String, Severity]) extends ParseTreeListenerFactory {
   private var listeners: Map[FileSource, Vector[Rules.LinterParserRule]] = Map.empty
@@ -25,7 +26,11 @@ case class LinterParserRuleFactory(rules: Map[String, Severity]) extends ParseTr
   }
 }
 
-case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaultRules) {
+case class Linter(rules: Map[String, Severity] = Rules.defaultRules,
+                  regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
+                  followImports: Boolean = true,
+                  fileResolver: FileSourceResolver = FileSourceResolver.get,
+                  logger: Logger = Logger.get) {
   def apply(docSource: FileSource): Map[FileSource, Vector[LintEvent]] = {
     var parserErrorEvents: Map[FileSource, Vector[LintEvent]] = Map.empty
     var typeErrorEvents: Map[FileSource, Vector[LintEvent]] = Map.empty
@@ -54,9 +59,11 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
 
     val parserRulesFactory = LinterParserRuleFactory(rules)
     val parsers = Parsers(
-        opts,
+        followImports,
+        fileResolver,
         listenerFactories = Vector(parserRulesFactory),
-        errorHandler = Some(handleParserErrors)
+        errorHandler = Some(handleParserErrors),
+        logger
     )
     val astRules = rules.view.filterKeys(Rules.astRules.contains)
     val result =
@@ -65,7 +72,7 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
           result + (doc.source -> (result.getOrElse(doc.source, Vector.empty) ++ (
               if (!parserErrorEvents.contains(doc.source) && astRules.nonEmpty) {
                 // First run the TypeChecker to infer the types of all expressions
-                val typeChecker = TypeInfer(opts, errorHandler = Some(handleTypeErrors))
+                val typeChecker = TypeInfer(regime, errorHandler = Some(handleTypeErrors))
                 val (_, typesContext) = typeChecker.apply(doc)
                 // Now execute the linter rules
                 val astVisitors = astRules.map {
@@ -77,7 +84,7 @@ case class Linter(opts: TypeOptions, rules: Map[String, Severity] = Rules.defaul
                         typesContext
                     )
                 }.toVector
-                val astWalker = LinterASTWalker(opts, astVisitors)
+                val astWalker = LinterASTWalker(astVisitors, followImports)
                 astWalker.apply(doc)
                 astVisitors.flatMap(_.getEvents)
               } else {

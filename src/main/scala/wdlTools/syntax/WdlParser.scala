@@ -1,20 +1,21 @@
 package wdlTools.syntax
 
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{FileSource, Options}
+import wdlTools.util.{FileSource, FileSourceResolver}
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
 }
 
-abstract class WdlParser(opts: Options) {
+abstract class WdlParser(followImports: Boolean = false,
+                         fileResolver: FileSourceResolver = FileSourceResolver.get) {
   // cache of documents that have already been fetched and parsed.
   private var docCache: Map[String, Option[AbstractSyntax.Document]] = Map.empty
 
   protected def followImport(uri: String): Option[AbstractSyntax.Document] = {
     docCache.get(uri) match {
       case None =>
-        val aDoc = Some(parseDocument(opts.fileResolver.resolve(uri)))
+        val aDoc = Some(parseDocument(fileResolver.resolve(uri)))
         docCache += (uri -> aDoc)
         aDoc
       case Some(aDoc) => aDoc
@@ -33,7 +34,7 @@ abstract class WdlParser(opts: Options) {
     def extractDependencies(document: Document): Map[FileSource, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
-          Some(opts.fileResolver.resolve(addr.value) -> doc.get)
+          Some(FileSourceResolver.get.resolve(addr.value) -> doc.get)
         case _ => None
       }.toMap
     }
@@ -46,7 +47,7 @@ abstract class WdlParser(opts: Options) {
         if (!visited.contains(fileSource.toString)) {
           visited += fileSource.toString
           results = visitor(doc, results)
-          if (opts.followImports) {
+          if (followImports) {
             extractDependencies(doc).foreach {
               case (fileSource, doc) => addDocument(fileSource, doc)
             }

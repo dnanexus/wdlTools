@@ -2,21 +2,23 @@ package wdlTools.syntax.draft_2
 
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{
+  SourceLocation,
   SyntaxError,
   SyntaxException,
-  SourceLocation,
   WdlParser,
   WdlVersion,
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import wdlTools.util.{FileSource, Options, StringFileSource}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger, StringFileSource}
 
 // parse and follow imports
-case class ParseAll(opts: Options,
+case class ParseAll(followImports: Boolean = false,
+                    fileResolver: FileSourceResolver = FileSourceResolver.get,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None)
-    extends WdlParser(opts) {
+                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None,
+                    logger: Logger = Logger.get)
+    extends WdlParser(followImports, fileResolver) {
 
   private case class Translator(docSource: FileSource) {
     def translateType(t: CST.Type): AST.Type = {
@@ -265,7 +267,7 @@ case class ParseAll(opts: Options,
       // translate all the elements of the document to the abstract syntax
       val elems: Vector[AST.DocumentElement] = doc.elements.map {
         case importDoc: ConcreteSyntax.ImportDoc =>
-          val importedDoc = if (opts.followImports) {
+          val importedDoc = if (followImports) {
             followImport(importDoc.addr.value)
           } else {
             None
@@ -293,8 +295,8 @@ case class ParseAll(opts: Options,
   }
 
   override def parseDocument(fileSource: FileSource): AST.Document = {
-    val grammar = WdlDraft2Grammar.newInstance(fileSource, listenerFactories, opts)
-    val visitor = ParseTop(opts, grammar)
+    val grammar = WdlDraft2Grammar.newInstance(fileSource, listenerFactories, logger)
+    val visitor = ParseTop(grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
     val errorListener = grammar.errListener
     if (errorListener.hasErrors && errorHandler
@@ -308,8 +310,7 @@ case class ParseAll(opts: Options,
   override def parseExpr(text: String): AST.Expr = {
     val docSource = StringFileSource(text)
     val parser = ParseTop(
-        opts,
-        WdlDraft2Grammar.newInstance(docSource, listenerFactories, opts = opts)
+        WdlDraft2Grammar.newInstance(docSource, listenerFactories, logger)
     )
     val translator = Translator(docSource)
     translator.translateExpr(parser.parseExpr)
@@ -318,8 +319,7 @@ case class ParseAll(opts: Options,
   override def parseType(text: String): AST.Type = {
     val docSource = StringFileSource(text)
     val parser = ParseTop(
-        opts,
-        WdlDraft2Grammar.newInstance(docSource, listenerFactories, opts = opts)
+        WdlDraft2Grammar.newInstance(docSource, listenerFactories, logger)
     )
     val translator = Translator(docSource)
     translator.translateType(parser.parseWdlType)

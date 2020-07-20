@@ -4,19 +4,18 @@ import java.nio.file.{Files, Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import wdlTools.Edge
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSource, Logger, FileSourceResolver}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
-  private val opts = TypeOptions(
-      fileResolver = FileSourceResolver.create(
-          Vector(Paths.get(getClass.getResource("/types/v1").getPath))
-      ),
-      logger = Logger.Normal
+  private val fileResolver = FileSourceResolver.create(
+      Vector(Paths.get(getClass.getResource("/types/v1").getPath))
   )
-  private val parser = Parsers(opts)
+  private val logger = Logger.Normal
+  private val parser = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
 
   // Get a list of WDL files from a resource directory.
   private def getWdlSourceFiles(folder: Path): Vector[Path] = {
@@ -80,27 +79,25 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val excludeList: Option[Set[String]] = None
 
   private def checkCorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
-    val opts2 = flag match {
-      case None    => opts
-      case Some(x) => opts.copy(typeChecking = x)
-    }
-    val checker = TypeInfer(opts2)
+    val checker =
+      TypeInfer(regime = flag.getOrElse(TypeCheckingRegime.Moderate),
+                fileResolver = fileResolver,
+                logger = logger)
     try {
       val doc = parser.parseDocument(file)
       checker.apply(doc)
     } catch {
       case e: Throwable =>
-        opts.logger.error(s"Type error in file ${file.toString}")
+        logger.error(s"Type error in file ${file.toString}")
         throw e
     }
   }
 
   private def checkIncorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
-    val opts2 = flag match {
-      case None    => opts
-      case Some(x) => opts.copy(typeChecking = x)
-    }
-    val checker = TypeInfer(opts2)
+    val checker =
+      TypeInfer(regime = flag.getOrElse(TypeCheckingRegime.Moderate),
+                fileResolver = fileResolver,
+                logger = logger)
     val checkVal =
       try {
         val doc = parser.parseDocument(file)
@@ -151,7 +148,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
         None
       } else {
         val tResult = controlTable(name)
-        Some(opts.fileResolver.fromPath(testFile), tResult)
+        Some(fileResolver.fromPath(testFile), tResult)
       }
     }
 
@@ -164,8 +161,8 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   }
 
   it should "be able to handle GATK" in {
-    val opts2 = opts.copy(typeChecking = TypeCheckingRegime.Lenient)
-    val checker = TypeInfer(opts2)
+    val checker =
+      TypeInfer(regime = TypeCheckingRegime.Lenient, fileResolver = fileResolver, logger = logger)
 
     val sources = Vector(
         // broad removed the terra version - the main version doesn't work because it's import statement uses
@@ -190,7 +187,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     )
 
     sources.foreach { uri =>
-      val docSource = opts.fileResolver.resolve(uri)
+      val docSource = fileResolver.resolve(uri)
       val doc = parser.parseDocument(docSource)
       checker.apply(doc)
     }
@@ -200,13 +197,11 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     Paths.get(getClass.getResource("/types/v1/structs").getPath)
 
   it should "handle several struct definitions" taggedAs Edge in {
-    val opts2 = TypeOptions(
-        fileResolver = FileSourceResolver.create(Vector(structsDir)),
-        logger = Logger.Normal
-    )
-    val checker = TypeInfer(opts2)
-    val sourceFile = opts.fileResolver.fromPath(structsDir.resolve("file3.wdl"))
-    val doc = Parsers(opts2).parseDocument(sourceFile)
+    val structsFileResolver = FileSourceResolver.create(Vector(structsDir))
+    val checker = TypeInfer(fileResolver = structsFileResolver, logger = logger)
+    val sourceFile = structsFileResolver.fromPath(structsDir.resolve("file3.wdl"))
+    val doc = Parsers(followImports = true, fileResolver = structsFileResolver, logger = logger)
+      .parseDocument(sourceFile)
     checker.apply(doc)
   }
 }

@@ -2,9 +2,10 @@ package wdlTools.types
 
 import WdlTypes._
 import wdlTools.syntax.WdlVersion
+import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 
-case class Stdlib(conf: TypeOptions, version: WdlVersion) {
-  private val unify = Unification(conf)
+case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
+  private val unify = Unification(regime)
 
   // Some functions are overloaded and can take several kinds of arguments.
   // A particulary problematic one is size.
@@ -262,8 +263,8 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
     val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
     results.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(Util.typeToString).mkString("\n")
-        val candidatesStr = candidates.map(Util.typeToString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(Utils.typeToString).mkString("\n")
+        val candidatesStr = candidates.map(Utils.typeToString(_)).mkString("\n")
         val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
                       |${candidatesStr}
                       |inputs: ${inputsStr}
@@ -277,7 +278,7 @@ case class Stdlib(conf: TypeOptions, version: WdlVersion) {
         val prototypeDescriptions = results
           .map {
             case (_, funcSig) =>
-              Util.typeToString(funcSig)
+              Utils.typeToString(funcSig)
           }
           .mkString("\n")
         val msg = s"""|Call to ${funcName} matches ${n} prototypes

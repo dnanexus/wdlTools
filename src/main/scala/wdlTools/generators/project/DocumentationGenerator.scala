@@ -1,13 +1,16 @@
 package wdlTools.generators.project
 
 import wdlTools.generators.Renderer
-import wdlTools.generators.project.DocumentationGenerator._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Util.exprToString
 import wdlTools.syntax.{Comment, Parsers}
-import wdlTools.util.{FileSource, Options, StringFileSource, FileUtils}
+import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
 
 object DocumentationGenerator {
+  private val DOCUMENT_TEMPLATE = "/templates/documentation/document.ssp"
+  private val STRUCTS_TEMPLATE = "/templates/documentation/structs.ssp"
+  private val INDEX_TEMPLATE = "/templates/documentation/index.ssp"
+
   case class DocumentationComment(comments: Vector[Comment]) {
     private val commentRegex = "#+\\s*(.*)".r
     override def toString: String = {
@@ -77,13 +80,6 @@ object DocumentationGenerator {
                               workflow: Option[WorkflowDocumentation],
                               tasks: Vector[TaskDocumentation],
                               comment: Option[DocumentationComment])
-
-}
-
-case class DocumentationGenerator(opts: Options) {
-  private val DOCUMENT_TEMPLATE = "/templates/documentation/document.ssp"
-  private val STRUCTS_TEMPLATE = "/templates/documentation/structs.ssp"
-  private val INDEX_TEMPLATE = "/templates/documentation/index.ssp"
 
   def generateDocumentation(doc: Document): Option[WdlDocumentation] = {
     val sortedElements = (doc.elements ++ doc.workflow.map(Vector(_)).getOrElse(Vector.empty))
@@ -207,7 +203,7 @@ case class DocumentationGenerator(opts: Options) {
               imp.name
                 .map(_.value)
                 .getOrElse(
-                    FileUtils.changeFileExt(opts.fileResolver.resolve(imp.addr.value).fileName,
+                    FileUtils.changeFileExt(FileSourceResolver.get.resolve(imp.addr.value).fileName,
                                             dropExt = ".wdl")
                 ),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
@@ -296,9 +292,11 @@ case class DocumentationGenerator(opts: Options) {
     }
   }
 
-  def apply(docSource: FileSource, title: String): Vector[FileSource] = {
+  def apply(docSource: FileSource,
+            title: String,
+            followImports: Boolean = true): Vector[FileSource] = {
     val docs =
-      Parsers(opts)
+      Parsers(followImports)
         .getDocumentWalker[Map[FileSource, WdlDocumentation]](docSource, Map.empty)
         .walk { (doc, results) =>
           val docs = generateDocumentation(doc)

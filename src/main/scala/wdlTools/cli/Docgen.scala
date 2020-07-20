@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.nio.file.Files
 
 import wdlTools.generators.project.DocumentationGenerator
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, FileSourceResolver}
 
 import scala.language.reflectiveCalls
 
@@ -14,11 +14,9 @@ case class Docgen(conf: WdlToolsConf) extends Command {
     if (!overwrite && Files.exists(outputDir)) {
       throw new Exception(s"File already exists: ${outputDir}")
     }
-    val opts = conf.docgen.getOptions
-    val docSource = opts.fileResolver.resolve(conf.docgen.uri())
+    val docSource = FileSourceResolver.get.resolve(conf.docgen.uri())
     val title = conf.docgen.title.getOrElse(outputDir.getFileName.toString)
-    val docgen = DocumentationGenerator(opts)
-    val pages = docgen.apply(docSource, title)
+    val pages = DocumentationGenerator.apply(docSource, title, conf.docgen.followImports())
     FileSource.localizeAll(pages, Some(outputDir), overwrite)
   }
 }

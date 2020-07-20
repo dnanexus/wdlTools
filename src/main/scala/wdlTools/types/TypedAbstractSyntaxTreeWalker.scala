@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-import wdlTools.util.{FileSource, Options}
+import wdlTools.util.FileSource
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -197,7 +197,8 @@ object TypedAbstractSyntaxTreeVisitor {
   }
 }
 
-class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTreeVisitor {
+class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
+    extends TypedAbstractSyntaxTreeVisitor {
   override def visitDocument(ctx: VisitorContext[Document]): Unit = {
     visitVersion(ctx.createChildContext[Version](ctx.element.version))
 
@@ -231,7 +232,7 @@ class TypedAbstractSyntaxTreeWalker(opts: Options) extends TypedAbstractSyntaxTr
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(ctx.createChildContext[ImportAlias](alias))
     }
-    if (opts.followImports) {
+    if (followImports) {
       visitDocument(ctx.createChildContext[Document](ctx.element.doc))
     }
   }

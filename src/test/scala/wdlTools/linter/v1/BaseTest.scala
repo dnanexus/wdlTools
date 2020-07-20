@@ -6,22 +6,19 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, Severity}
 import wdlTools.syntax.SourceLocation
-import wdlTools.types.TypeOptions
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, FileSourceResolver}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  private val opts = TypeOptions()
-
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/linter/${subdir}/${fname}").getPath)
   }
 
   private def getWdlSource(fname: String, subdir: String): FileSource = {
-    opts.fileResolver.fromPath(getWdlPath(fname, subdir))
+    FileSourceResolver.get.fromPath(getWdlPath(fname, subdir))
   }
 
   it should "detect lints" in {
-    val linter = Linter(opts)
+    val linter = Linter()
     val docSource = getWdlSource("simple.wdl", "v1")
     val allLints = linter.apply(docSource)
     val lints = allLints(docSource)

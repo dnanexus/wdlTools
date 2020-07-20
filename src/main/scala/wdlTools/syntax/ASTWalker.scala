@@ -2,7 +2,6 @@ package wdlTools.syntax
 
 import wdlTools.syntax.ASTVisitor.Context
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.util.Options
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -106,7 +105,7 @@ object ASTVisitor {
   }
 }
 
-class ASTWalker(opts: Options) extends ASTVisitor {
+class ASTWalker(followImports: Boolean = false) extends ASTVisitor {
   override def visitDocument(ctx: Context[Document]): Unit = {
     visitVersion(createContext[Version, Document](ctx.element.version, ctx))
 
@@ -143,7 +142,7 @@ class ASTWalker(opts: Options) extends ASTVisitor {
     ctx.element.aliases.foreach { alias =>
       visitImportAlias(createContext[ImportAlias, ImportDoc](alias, ctx))
     }
-    if (opts.followImports) {
+    if (followImports) {
       visitDocument(createContext[Document, ImportDoc](ctx.element.doc.get, ctx))
     }
   }

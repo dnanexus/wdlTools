@@ -1,48 +1,35 @@
 package wdlTools.eval
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Path, Paths}
 
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import wdlTools.Edge
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{Logger, FileSourceResolver, FileUtils => UUtil}
-import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypeOptions, TypedAbstractSyntax => TAT}
+import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
+import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
-  private val opts =
-    TypeOptions(fileResolver = FileSourceResolver.create(Vector(srcDir)),
-                typeChecking = TypeCheckingRegime.Lenient,
-                logger = Logger.Normal)
-  private val parsers = Parsers(opts)
-  private val typeInfer = TypeInfer(opts)
+  private val fileResolver = FileSourceResolver.create(Vector(srcDir))
+  private val logger = Logger.Normal
+  private val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
+  private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
   private val linesep = System.lineSeparator()
-
-  def safeMkdir(path: Path): Unit = {
-    if (!Files.exists(path)) {
-      Files.createDirectories(path)
-    } else {
-      // Path exists, make sure it is a directory, and not a file
-      if (!Files.isDirectory(path))
-        throw new Exception(s"Path ${path} exists, but is not a directory")
-    }
-  }
-
-  private lazy val evalPaths: EvalPaths = EvalPaths.createFromTemp()
-
-  private lazy val fileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
+  private val evalPaths: EvalPaths = EvalPaths.createFromTemp()
+  private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
-    val doc = parsers.parseDocument(opts.fileResolver.fromPath(UUtil.absolutePath(file)))
+    val doc = parsers.parseDocument(fileResolver.fromPath(UUtil.absolutePath(file)))
     val (tDoc, _) = typeInfer.apply(doc)
     tDoc
   }
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(evalPaths, fileResolver, wdlTools.syntax.WdlVersion.V1, Logger.Quiet)
+    val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
 
     tDoc.workflow should not be empty
     val wf = tDoc.workflow.get
@@ -239,7 +226,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(evalPaths, fileResolver, wdlTools.syntax.WdlVersion.V1, Logger.Quiet)
+    val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
 
     tDoc.elements should not be empty
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]

@@ -53,9 +53,9 @@ case class Logger(quiet: Boolean,
   }
 
   // print a warning message in yellow - ignored if `quiet` is true and `force` is false
-  def warning(msg: String, force: Boolean = false): Unit = {
+  def warning(msg: String, force: Boolean = false, exception: Option[Throwable] = None): Unit = {
     if (force || !quiet) {
-      System.err.println(Console.YELLOW + msg + Console.RESET)
+      System.err.println(errorMessage(Console.YELLOW + msg + Console.RESET, exception))
     }
   }
 
@@ -69,7 +69,7 @@ case class Logger(quiet: Boolean,
   }
 
   private def printTrace(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(Util.errorMessage(s"${" " * traceIndenting * 2}${msg}", exception))
+    System.err.println(errorMessage(s"${" " * traceIndenting * 2}${msg}", exception))
   }
 
   private def truncateMessage(msg: String, maxLength: Int) = {
@@ -121,9 +121,30 @@ object Logger {
   lazy val Quiet: Logger = Logger(quiet = true, traceLevel = TraceLevel.None)
   lazy val Normal: Logger = Logger(quiet = false, traceLevel = TraceLevel.None)
   lazy val Verbose: Logger = Logger(quiet = false, traceLevel = TraceLevel.Verbose)
+  private var instance: Logger = Normal
+
+  def get: Logger = instance
+
+  /**
+    * Update the system default Logger.
+    * @param logger the new default Logger
+    * @return the current default Logger
+    */
+  def set(logger: Logger): Logger = {
+    val curDefaultLogger = instance
+    instance = logger
+    curDefaultLogger
+  }
+
+  def set(quiet: Boolean = false,
+          traceLevel: Int = TraceLevel.None,
+          keywords: Set[String] = Set.empty,
+          traceIndenting: Int = 0): Logger = {
+    set(Logger(quiet, traceLevel, keywords, traceIndenting))
+  }
 
   // print an error message in red
   def error(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(Util.errorMessage(Console.RED + msg + Console.RESET, exception))
+    System.err.println(errorMessage(Console.RED + msg + Console.RESET, exception))
   }
 }

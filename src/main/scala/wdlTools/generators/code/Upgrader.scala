@@ -1,11 +1,12 @@
 package wdlTools.generators.code
 
-import wdlTools.syntax
-import wdlTools.syntax.WdlVersion
-import wdlTools.util.{FileSource, Options}
+import wdlTools.syntax.{Parsers, WdlVersion}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
-case class Upgrader(opts: Options) {
-  private val parsers = syntax.Parsers(opts)
+case class Upgrader(followImports: Boolean = false,
+                    fileResolver: FileSourceResolver = FileSourceResolver.get,
+                    logger: Logger = Logger.get) {
+  private val parsers = Parsers(followImports, fileResolver, logger = logger)
 
   def upgrade(docSource: FileSource,
               srcVersion: Option[WdlVersion] = None,
@@ -17,7 +18,7 @@ case class Upgrader(opts: Options) {
     }
 
     // the parser will follow imports, so the formatter should not
-    val formatter = WdlV1Formatter(opts)
+    val formatter = WdlV1Formatter(followImports)
 
     // parse and format the document (and any imports)
     parser.Walker[Map[FileSource, Seq[String]]](docSource, Map.empty).walk { (doc, results) =>

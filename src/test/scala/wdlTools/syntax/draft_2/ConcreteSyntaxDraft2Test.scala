@@ -4,29 +4,28 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Comment, Edge, SourceLocation, SyntaxException}
+import wdlTools.Edge
+import wdlTools.syntax.{Comment, SourceLocation, SyntaxException}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.util.{BasicOptions, FileSource, Logger, Options, FileSourceResolver}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/draft_2").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
-  private val opts = BasicOptions(
-      fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir)),
-      logger = Logger.Quiet
-  )
+  private val fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir))
+  private val logger = Logger.Quiet
 
   private def getTaskSource(fname: String): FileSource = {
-    opts.fileResolver.fromPath(tasksDir.resolve(fname))
+    fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
   private def getWorkflowSource(fname: String): FileSource = {
-    opts.fileResolver.fromPath(workflowsDir.resolve(fname))
+    fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileSource, conf: Options = opts): Document = {
-    ParseTop(conf, WdlDraft2Grammar.newInstance(FileSource, Vector.empty, opts)).parseDocument
+  private def getDocument(FileSource: FileSource): Document = {
+    ParseTop(WdlDraft2Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 
   it should "handle various types" in {
@@ -240,9 +239,8 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
   }
 
   it should "detect a wrong comment style" in {
-    val confQuiet = opts.copy(logger = Logger.Quiet)
     assertThrows[Exception] {
-      getDocument(getTaskSource("wrong_comment_style.wdl"), confQuiet)
+      getDocument(getTaskSource("wrong_comment_style.wdl"))
     }
   }
 
