@@ -6,15 +6,14 @@
 
 The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee. The class definitions reside in `src/main/scala/wdlTools/syntax/AbstractSyntax.scala`.
 
-Currently, WDL draft-2 and 1.0 are supported.
+Currently, WDL draft-2 and 1.0 are fully supported, and development/2.0 is partially supported.
 
 ```scala
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Parsers
-import wdlTools.util.BasicOptions
-val opts = BasicOptions(followImports=true)
-val parsers = Parsers(opts)
-val wdl = opts.fileResolver.resolve("file:///path/to/my/wdl")
+import wdlTools.util.{FileSource, FileSourceResolver}
+val parsers = Parsers(followImports = true)
+val wdl: FileSource = FileSourceResolver.get.resolve("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
 // print the source locations of all tasks in the document
 doc.elements.foreach {
