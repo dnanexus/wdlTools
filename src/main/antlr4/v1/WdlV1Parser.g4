@@ -44,9 +44,9 @@ number
   ;
 
 expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
+  : BoolLiteral EQUAL string
   | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
+  | SEP EQUAL string
   ;
 
 string_part
@@ -120,7 +120,6 @@ expr_infix5
 
 object_literal_key
   : Identifier
-  | string
   ;
 
 expr_core

@@ -102,7 +102,7 @@ object ConcreteSyntax {
 
   /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
     * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
-    * `InputSection` `TextSource` may overlap with other elements.
+    * `InputSection` `SourceLocation` may overlap with other elements.
     */
   case class InputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element
   case class OutputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element

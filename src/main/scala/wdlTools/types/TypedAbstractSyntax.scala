@@ -118,8 +118,14 @@ object TypedAbstractSyntax {
   //   Int z = x.a
   case class ExprGetName(e: Expr, id: String, wdlType: WdlType, loc: SourceLocation) extends Expr
 
+  sealed trait Variable extends Element {
+    val name: String
+    val wdlType: WdlType
+  }
+
   case class Declaration(name: String, wdlType: WdlType, expr: Option[Expr], loc: SourceLocation)
       extends WorkflowElement
+      with Variable
 
   // sections
 
@@ -129,11 +135,7 @@ object TypedAbstractSyntax {
     * This definition based on Cromwell wom.callable.Callable.InputDefinition. It
     * is easier to use a variant of this interface for backward compatibility with dxWDL.
     */
-  sealed trait InputDefinition extends Element {
-    val name: String
-    val wdlType: WdlTypes.T
-    val loc: SourceLocation
-  }
+  sealed trait InputDefinition extends Variable
 
   // A compulsory input that has no default, and must be provided by the caller
   case class RequiredInputDefinition(name: String, wdlType: WdlTypes.T, loc: SourceLocation)
@@ -151,7 +153,7 @@ object TypedAbstractSyntax {
   /*  case class FixedInputDefinitionWithDefault(name : String,
                                              wdlType : WdlTypes.T,
                                              defaultExpr : Expr,
-                                             text : TextSource) */
+                                             text : SourceLocation) */
 
   // an input that may be omitted by the caller. In that case the value will
   // be null (or None).
@@ -161,7 +163,7 @@ object TypedAbstractSyntax {
       extends InputDefinition
 
   case class OutputDefinition(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
-      extends Element
+      extends Variable
 
   // A workflow or a task.
   sealed trait Callable {

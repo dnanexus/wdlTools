@@ -38,7 +38,7 @@ object Rules {
     protected def addEventFromTokens(tok: Token,
                                      stopToken: Option[Token] = None,
                                      message: Option[String] = None): Unit = {
-      addEvent(Antlr4Util.getTextSource(docSource, tok, stopToken), message)
+      addEvent(Antlr4Util.getSourceLocation(docSource, tok, stopToken), message)
     }
 
     protected def addEvent(textSource: SourceLocation, message: Option[String] = None): Unit = {
@@ -53,7 +53,7 @@ object Rules {
     protected def addEvent(tok: Token): Unit = {
       val idx = tok.getTokenIndex
       if (!tokenIndexes.contains(idx)) {
-        // properly construct TextSource to deal with newlines
+        // properly construct SourceLocation to deal with newlines
         val text = tok.getText
         val lines = text.linesWithSeparators.toVector
         val textSource = syntax.SourceLocation(

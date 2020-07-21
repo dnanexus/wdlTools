@@ -25,9 +25,9 @@ object Antlr4Util {
     currentTrace
   }
 
-  def getTextSource(source: FileSource,
-                    startToken: Token,
-                    maybeStopToken: Option[Token] = None): SourceLocation = {
+  def getSourceLocation(source: FileSource,
+                        startToken: Token,
+                        maybeStopToken: Option[Token] = None): SourceLocation = {
     // TODO: for an ending token that containing newlines, the endLine and endCol will be wrong
     val stopToken = maybeStopToken.getOrElse(startToken)
     syntax.SourceLocation(
@@ -39,13 +39,13 @@ object Antlr4Util {
     )
   }
 
-  def getTextSource(source: FileSource, ctx: ParserRuleContext): SourceLocation = {
+  def getSourceLocation(source: FileSource, ctx: ParserRuleContext): SourceLocation = {
     val stop = ctx.getStop
-    getTextSource(source, ctx.getStart, Option(stop))
+    getSourceLocation(source, ctx.getStart, Option(stop))
   }
 
-  def getTextSource(source: FileSource, symbol: TerminalNode): SourceLocation = {
-    getTextSource(source, symbol.getSymbol, None)
+  def getSourceLocation(source: FileSource, symbol: TerminalNode): SourceLocation = {
+    getSourceLocation(source, symbol.getSymbol, None)
   }
 
   // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
@@ -94,7 +94,7 @@ object Antlr4Util {
 
     def addComments(tokens: Vector[Token]): Unit = {
       tokens.foreach { tok =>
-        val source = Antlr4Util.getTextSource(docSource, tok, None)
+        val source = Antlr4Util.getSourceLocation(docSource, tok, None)
         if (comments.contains(source.line)) {
           // TODO: should this be an error?
         } else {
