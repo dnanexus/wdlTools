@@ -70,6 +70,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       // simple functions again
       // basename has two variants
       T_Function1("basename", T_String, T_String),
+      T_Function2("basename", T_String, T_String, T_String),
       T_Function1("floor", T_Float, T_Int),
       T_Function1("ceil", T_Float, T_Int),
       T_Function1("round", T_Float, T_Int),

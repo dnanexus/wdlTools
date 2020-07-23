@@ -83,6 +83,7 @@ val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.6"
 val sprayVersion = "1.3.5"
 val katanVersion = "0.6.1"
+val graphVersion = "1.13.2"
 val scalatestVersion = "3.1.1"
 
 libraryDependencies ++= Seq(
@@ -95,6 +96,7 @@ libraryDependencies ++= Seq(
     "com.typesafe" % "config" % typesafeVersion,
     "io.spray" %% "spray-json" % sprayVersion,
     "com.nrinaudo" %% "kantan.csv" % katanVersion,
+    "org.scala-graph" %% "graph-core" % graphVersion,
     //---------- Test libraries -------------------//
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )

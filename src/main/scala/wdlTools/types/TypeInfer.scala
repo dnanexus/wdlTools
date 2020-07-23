@@ -567,6 +567,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tDecl = decl.expr match {
       // Int x
       case None =>
+        // TODO: this shouldn't be possible - there are separate types
+        //  for input and output declarations, and non-input declarations
+        //  must have a value
         TAT.Declaration(decl.name, lhsType, None, decl.loc)
       case Some(expr) =>
         val e = applyExpr(expr, bindings, ctx)
