@@ -5,7 +5,7 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Utils.{exprToString, isPrimitive, typeToString}
 import TypeCheckingRegime._
-import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
+import wdlTools.util.{FileSourceResolver, Logger, TraceLevel, FileUtils => UUtil}
 
 /**
   * Type inference
@@ -22,6 +22,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      errorHandler: Option[Vector[TypeError] => Boolean] = None,
                      logger: Logger = Logger.get) {
   private val unify = Unification(regime)
+  // TODO: handle warnings similarly to errors - either have TypeError take an ErrorKind parameter
+  //  or have a separate warningHandler parameter
   private var errors = Vector.empty[TypeError]
 
   // A group of bindings. This is typically a part of the context. For example,
@@ -1179,6 +1181,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
         case ((ctx, elems), iStat: AST.ImportDoc) =>
           // recurse into the imported document, add types
+          logger.trace(s"inferring types in ${iStat.doc.get.source}",
+                       minLevel = TraceLevel.VVerbose)
           val (iDoc, iCtx) = applyDoc(iStat.doc.get)
           val name = iStat.name.map(_.value)
           val addr = iStat.addr.value

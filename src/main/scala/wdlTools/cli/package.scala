@@ -26,6 +26,10 @@ trait Command {
   def apply(): Unit
 }
 
+abstract class InitializableSubcommand(name: String) extends Subcommand(name) {
+  def init(): Unit
+}
+
 class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   def exceptionHandler[T]: PartialFunction[Throwable, Either[String, Option[T]]] = {
     case t: Throwable => Left(s"${t.getMessage}")
@@ -58,7 +62,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName,
                                            exceptionHandler[TypeCheckingRegime])
 
-  abstract class WdlToolsSubcommand(name: String, description: String) extends Subcommand(name) {
+  abstract class WdlToolsSubcommand(name: String, description: String)
+      extends InitializableSubcommand(name) {
     // there is a compiler bug that prevents accessing name directly
     banner(s"""Usage: wdlTools ${commandNameAndAliases.head} [OPTIONS] <path|uri>
               |${description}

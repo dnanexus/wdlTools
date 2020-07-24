@@ -1,20 +1,22 @@
 package wdlTools.syntax
 
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger, TraceLevel}
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
 }
 
 abstract class WdlParser(followImports: Boolean = false,
-                         fileResolver: FileSourceResolver = FileSourceResolver.get) {
+                         fileResolver: FileSourceResolver = FileSourceResolver.get,
+                         logger: Logger) {
   // cache of documents that have already been fetched and parsed.
   private var docCache: Map[String, Option[AbstractSyntax.Document]] = Map.empty
 
   protected def followImport(uri: String): Option[AbstractSyntax.Document] = {
     docCache.get(uri) match {
       case None =>
+        logger.trace(s"parsing import ${uri}", minLevel = TraceLevel.VVerbose)
         val aDoc = Some(parseDocument(fileResolver.resolve(uri)))
         docCache += (uri -> aDoc)
         aDoc

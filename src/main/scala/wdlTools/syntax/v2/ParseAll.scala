@@ -11,7 +11,7 @@ case class ParseAll(followImports: Boolean = false,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
                     errorHandler: Option[Vector[SyntaxError] => Boolean] = None,
                     logger: Logger = Logger.get)
-    extends WdlParser(followImports, fileResolver) {
+    extends WdlParser(followImports, fileResolver, logger) {
   private case class Translator(docSource: FileSource) {
     def translateType(t: CST.Type): AST.Type = {
       t match {

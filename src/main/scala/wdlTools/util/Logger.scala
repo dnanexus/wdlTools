@@ -55,7 +55,7 @@ case class Logger(quiet: Boolean,
   // print a warning message in yellow - ignored if `quiet` is true and `force` is false
   def warning(msg: String, force: Boolean = false, exception: Option[Throwable] = None): Unit = {
     if (force || !quiet) {
-      System.err.println(errorMessage(Console.YELLOW + msg + Console.RESET, exception))
+      Logger.warning(msg, exception)
     }
   }
 
@@ -143,8 +143,15 @@ object Logger {
     set(Logger(quiet, traceLevel, keywords, traceIndenting))
   }
 
+  // print a warning message in yellow
+  def warning(msg: String, exception: Option[Throwable] = None): Unit = {
+    System.err.println(
+        errorMessage(s"${Console.YELLOW}[warning] ${msg}${Console.RESET}", exception)
+    )
+  }
+
   // print an error message in red
   def error(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(errorMessage(Console.RED + msg + Console.RESET, exception))
+    System.err.println(errorMessage(s"${Console.RED}[error] ${msg}${Console.RESET}", exception))
   }
 }

@@ -26,7 +26,8 @@ object WdlVersion {
   }
 }
 
-/** Source location in a WDL program. We add it to each syntax element
+/**
+  * Source location in a WDL program. We add it to each syntax element
   * so we could do accurate error reporting. All positions are 1-indexed.
   *
   * Note: 'line' and 'col' may be 0 for "implicit" elements. Currently,
