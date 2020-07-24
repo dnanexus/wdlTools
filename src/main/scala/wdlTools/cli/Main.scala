@@ -10,8 +10,9 @@ object Main extends App {
       case None =>
         conf.printHelp()
         true
-      case Some(subcommand) =>
+      case Some(subcommand: InitializableSubcommand) =>
         try {
+          subcommand.init()
           val command: Command = subcommand match {
             case conf.check     => TypeCheck(conf)
             case conf.docgen    => Docgen(conf)
@@ -31,6 +32,8 @@ object Main extends App {
             Logger.error(s"Command ${subcommand.printedName} failed", Some(t))
             true
         }
+      case other =>
+        throw new RuntimeException(s"Invalid subcommand ${other}")
     }
   }
 

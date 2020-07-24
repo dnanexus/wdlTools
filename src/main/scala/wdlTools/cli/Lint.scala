@@ -143,10 +143,10 @@ case class Lint(conf: WdlToolsConf) extends Command {
               "ruleName" -> JsString(getString(rule("name"))),
               "ruleDescription" -> JsString(getString(rule("description"))),
               "severity" -> JsString(err.severity.toString),
-              "startLine" -> JsNumber(err.textSource.line),
-              "startCol" -> JsNumber(err.textSource.col),
-              "endLine" -> JsNumber(err.textSource.endLine),
-              "endCol" -> JsNumber(err.textSource.endCol)
+              "startLine" -> JsNumber(err.loc.line),
+              "startCol" -> JsNumber(err.loc.col),
+              "endLine" -> JsNumber(err.loc.endLine),
+              "endCol" -> JsNumber(err.loc.endCol)
           )
       )
     }
@@ -178,35 +178,52 @@ case class Lint(conf: WdlToolsConf) extends Command {
         msg
       }
     }
-    events.foreach { item =>
-      val (msg, events) = item match {
-        case (uri, events) => (s"Lint in ${uri}", events)
-      }
-      val border1 = "=" * msg.length
-      val border2 = "-" * msg.length
-      printer.println(border1)
-      printer.println(colorMsg(msg, AnsiColor.BLUE))
-      printer.println(border1)
-      printer.println(colorMsg("Line:Col | Rule | Description", AnsiColor.BOLD))
-      printer.println(border2)
-      events.sortWith(_.textSource < _.textSource).foreach { event =>
-        val ruleDesc = rules(event.ruleId) match {
-          case JsObject(fields) =>
-            val desc = getString(fields("description"))
-            val eventMsg = if (event.message.isDefined) {
-              s"${desc}: ${event.message.get}"
-            } else {
-              desc
-            }
-            if (effects) {
-              colorMsg(eventMsg, severityToColor(event.severity))
-            } else {
-              s"${event.severity.toString}: ${eventMsg}"
-            }
-          case _ => throw new Exception("Invalid linter_rules.json format")
+    events.foreach {
+      case (uri, events) =>
+        val sortedEvents = events.sortWith(_.loc < _.loc)
+        // determine first column with from max line and column
+        val firstColWidth = Math.max(
+            ((
+                sortedEvents.last.loc.endLine.toString.length +
+                  sortedEvents.last.loc.endCol.toString.length
+            ) * 2) + 3,
+            9
+        )
+        val msg = s"Lint in ${uri}"
+        val border1 = "=" * msg.length
+        val border2 = "-" * msg.length
+        printer.println(border1)
+        printer.println(colorMsg(msg, AnsiColor.BLUE))
+        printer.println(border1)
+        val title =
+          String.format("%-" + firstColWidth.toString + "s| Rule | Description", "Line:Col")
+        printer.println(colorMsg(title, AnsiColor.BOLD))
+        printer.println(border2)
+        sortedEvents.foreach { event =>
+          val ruleDesc = rules(event.ruleId) match {
+            case JsObject(fields) =>
+              val desc = getString(fields("description"))
+              val eventMsg = if (event.message.isDefined) {
+                s"${desc}: ${event.message.get}"
+              } else {
+                desc
+              }
+              if (effects) {
+                colorMsg(eventMsg, severityToColor(event.severity))
+              } else {
+                s"${event.severity.toString}: ${eventMsg}"
+              }
+            case _ => throw new Exception("Invalid linter_rules.json format")
+          }
+          printer.println(
+              String.format(
+                  "%-" + firstColWidth.toString + "s| %s | %s",
+                  event.loc.locationString,
+                  event.ruleId,
+                  ruleDesc
+              )
+          )
         }
-        printer.println(f"${event.textSource}%-9s| ${event.ruleId} | ${ruleDesc}")
-      }
     }
   }
 }

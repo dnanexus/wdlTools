@@ -43,26 +43,41 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
         msg
       }
     }
-    errors.foreach { item =>
-      val (msg, docErrors) = item match {
-        case (uri, docErrors) => (s"Type-check errors in ${uri}", docErrors)
-      }
-      val border1 = "=" * msg.length
-      val border2 = "-" * msg.length
-      printer.println(border1)
-      printer.println(colorMsg(msg, AnsiColor.BLUE))
-      printer.println(border1)
-      printer.println(colorMsg("Line:Col | Description", AnsiColor.BOLD))
-      printer.println(border2)
-      docErrors.sortWith(_.loc < _.loc).foreach { err =>
-        printer.println(f"${err.loc}%-9s| ${err.reason}")
-      }
+    errors.foreach {
+      case (uri, docErrors) =>
+        val sortedErrors = docErrors.sortWith(_.loc < _.loc)
+        // determine first column with from max line and column
+        val firstColWidth = Math.max(
+            ((
+                sortedErrors.last.loc.endLine.toString.length +
+                  sortedErrors.last.loc.endCol.toString.length
+            ) * 2) + 3,
+            9
+        )
+        val msg = s"Type-check errors in ${uri}"
+        val border1 = "=" * msg.length
+        val border2 = "-" * msg.length
+        printer.println(border1)
+        printer.println(colorMsg(msg, AnsiColor.BLUE))
+        printer.println(border1)
+        val title = String.format("%-" + firstColWidth.toString + "s| Description", "Line:Col")
+        printer.println(colorMsg(title, AnsiColor.BOLD))
+        printer.println(border2)
+        sortedErrors.foreach { err =>
+          printer.println(
+              String.format(
+                  "%-" + firstColWidth.toString + "s| %s",
+                  err.loc.locationString,
+                  err.reason
+              )
+          )
+        }
     }
   }
 
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.check.uri())
-    val parsers = Parsers()
+    val parsers = Parsers(followImports = true)
     var errors: Map[FileSource, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
