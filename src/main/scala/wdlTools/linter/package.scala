@@ -11,11 +11,11 @@ object Severity extends Enumeration {
 
 case class LintEvent(ruleId: String,
                      severity: Severity,
-                     textSource: SourceLocation,
+                     loc: SourceLocation,
                      message: Option[String] = None)
     extends Ordered[LintEvent] {
   override def compare(that: LintEvent): Int = {
-    val cmp = textSource.compare(that.textSource)
+    val cmp = loc.compare(that.loc)
     if (cmp != 0) {
       cmp
     } else {
