@@ -4,21 +4,70 @@ import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
 object Utils {
-  // check if the right hand side of an assignment matches the left hand side
-  //
-  // Negative examples:
-  //    Int i = "hello"
-  //    Array[File] files = "8"
-  //
-  // Positive examples:
-  //    Int k =  3 + 9
-  //    Int j = k * 3
-  //    String s = "Ford model T"
-  //    String s2 = 5
+
+  /**
+    * Checks if the right hand side of an assignment matches the left hand side.
+    *
+    * @param t the type to check
+    * @return
+    * @todo is null/None primitive?
+    * @example
+    * Negative examples:
+    *   Int i = "hello"
+    *   Array[File] files = "8"
+    *
+    * Positive examples:
+    *   Int k =  3 + 9
+    *   Int j = k * 3
+    *   String s = "Ford model T"
+    *   String s2 = 5
+    */
   def isPrimitive(t: T): Boolean = {
     t match {
-      case T_String | T_File | T_Boolean | T_Int | T_Float => true
-      case _                                               => false
+      case T_String | T_File | T_Directory | T_Boolean | T_Int | T_Float => true
+      case _                                                             => false
+    }
+  }
+
+  def isPrimitiveValue(expr: TAT.Expr): Boolean = {
+    expr match {
+      case _: TAT.ValueBoolean   => true
+      case _: TAT.ValueInt       => true
+      case _: TAT.ValueFloat     => true
+      case _: TAT.ValueString    => true
+      case _: TAT.ValueFile      => true
+      case _: TAT.ValueDirectory => true
+      case _                     => false
+    }
+  }
+
+  def isOptional(t: T): Boolean = {
+    t match {
+      case _: T_Optional => true
+      case _             => false
+    }
+  }
+
+  /**
+    * Makes a type optional.
+    * @param t the type
+    * @param force if true, then `t` will be made optional even if it is already optional.
+    * @return
+    */
+  def makeOptional(t: T, force: Boolean = false): T_Optional = {
+    t match {
+      case t if force    => T_Optional(t)
+      case t: T_Optional => t
+      case _             => T_Optional(t)
+    }
+  }
+
+  def unwrapOptional(t: T, mustBeOptional: Boolean = false): T = {
+    t match {
+      case T_Optional(wrapped) => wrapped
+      case _ if mustBeOptional =>
+        throw new Exception(s"Type ${t} is not T_Optional")
+      case _ => t
     }
   }
 
@@ -221,6 +270,74 @@ object Utils {
 
       case TAT.ExprGetName(e, id: String, _, _) =>
         s"${exprToString(e, callback)}.${id}"
+    }
+  }
+
+  /**
+    * Extract all identifiers in an expression.
+    * @param expr an expression
+    * @return a Map of identifier -> type for all identifiers referenced in `expr`
+    * @todo: factor out an ExpressionWalker class.
+    *
+    * @example
+    *    expression   inputs
+    *    x + y        Vector(x, y)
+    *    x + y + z    Vector(x, y, z)
+    *    foo.y + 3    Vector(foo.y)
+    *    1 + 9        Vector.empty
+    *    "a" + "b"    Vector.empty
+    */
+  def exprDependencies(expr: TAT.Expr): Map[String, T] = {
+    expr match {
+      case _ if isPrimitiveValue(expr) =>
+        Map.empty
+      case _: TAT.ValueNull =>
+        Map.empty
+      case _: TAT.ValueNone =>
+        Map.empty
+      case TAT.ExprIdentifier(id, wdlType, _) =>
+        Map(id -> wdlType)
+      case TAT.ExprCompoundString(valArr, _, _) =>
+        valArr.flatMap(elem => exprDependencies(elem)).toMap
+      case TAT.ExprPair(l, r, _, _) =>
+        exprDependencies(l) ++ exprDependencies(r)
+      case TAT.ExprArray(arrVal, _, _) =>
+        arrVal.flatMap(elem => exprDependencies(elem)).toMap
+      case TAT.ExprMap(valMap, _, _) =>
+        valMap.flatMap { case (k, v) => exprDependencies(k) ++ exprDependencies(v) }
+      case TAT.ExprObject(fields, _, _) =>
+        fields.flatMap { case (_, v) => exprDependencies(v) }
+      case TAT.ExprPlaceholderEqual(t: TAT.Expr, f: TAT.Expr, value: TAT.Expr, _, _) =>
+        exprDependencies(t) ++ exprDependencies(f) ++ exprDependencies(value)
+      case TAT.ExprPlaceholderDefault(default: TAT.Expr, value: TAT.Expr, _, _) =>
+        exprDependencies(default) ++ exprDependencies(value)
+      case TAT.ExprPlaceholderSep(sep: TAT.Expr, value: TAT.Expr, _, _) =>
+        exprDependencies(sep) ++ exprDependencies(value)
+      // operators on one argument
+      case oper1: TAT.ExprOperator1 =>
+        exprDependencies(oper1.value)
+      // operators on two arguments
+      case oper2: TAT.ExprOperator2 =>
+        exprDependencies(oper2.a) ++ exprDependencies(oper2.b)
+      // Access an array element at [index]
+      case TAT.ExprAt(value, index, _, _) =>
+        exprDependencies(value) ++ exprDependencies(index)
+      // conditional:
+      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
+        exprDependencies(cond) ++ exprDependencies(tBranch) ++ exprDependencies(fBranch)
+      // Apply a standard library function to arguments.
+      //
+      // TODO: some arguments may be _optional_ we need to take that
+      // into account. We need to look into the function type
+      // and figure out which arguments are optional.
+      case TAT.ExprApply(_, _, elements, _, _) =>
+        elements.flatMap(exprDependencies).toMap
+      // Access a field in a call
+      //   Int z = eliminateDuplicate.fields
+      case TAT.ExprGetName(TAT.ExprIdentifier(id, wdlType, _), _, _, _) =>
+        Map(id -> wdlType)
+      case TAT.ExprGetName(expr, _, _, _) =>
+        exprDependencies(expr)
     }
   }
 }
