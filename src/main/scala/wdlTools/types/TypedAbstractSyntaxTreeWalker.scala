@@ -1,12 +1,91 @@
 package wdlTools.types
 
-import wdlTools.types.TypedAbstractSyntaxTreeVisitor.VisitorContext
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
 import wdlTools.util.FileSource
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
+
+class VisitorContext[E <: Element](val element: E, val parent: Option[VisitorContext[_]] = None) {
+  lazy val docSource: FileSource = element match {
+    case d: Document => d.source
+    case _           => findAncestor[Document].get.element.source
+  }
+
+  def createChildContext[C <: Element](element: C): VisitorContext[C] = {
+    new VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
+  }
+
+  /**
+    * Get the immediate parent of this context, or throw an exception if this context
+    * doesn't have a parent
+    * @tparam P parent element type
+    * @return
+    */
+  def getParent[P <: Element]: VisitorContext[P] = {
+    if (parent.isDefined) {
+      parent.get.asInstanceOf[VisitorContext[P]]
+    } else {
+      throw new Exception("VisitorContext does not have a parent")
+    }
+  }
+
+  /**
+    * Finds the first ancestor of this context that is an executable type
+    * (task or workflow).
+    */
+  def findAncestorExecutable: Option[Callable] = {
+    @tailrec
+    def getExecutable(ctx: VisitorContext[_]): Option[Callable] = {
+      ctx.element match {
+        case t: Task                   => Some(t)
+        case w: Workflow               => Some(w)
+        case _ if ctx.parent.isDefined => getExecutable(ctx.parent.get)
+        case _                         => None
+      }
+    }
+    getExecutable(this)
+  }
+
+  /**
+    * Finds the first ancestor of this context that is a Document.
+    * @return
+    */
+  def findAncestorDocument: Option[Document] = {
+    @tailrec
+    def getDocument(ctx: VisitorContext[_]): Option[Document] = {
+      ctx.element match {
+        case d: Document               => Some(d)
+        case _ if ctx.parent.isDefined => getDocument(ctx.parent.get)
+        case _                         => None
+      }
+    }
+    getDocument(this)
+  }
+
+  /**
+    * Finds the first ancestor of this context of the specified type.
+    * @param tag class tag for P
+    * @tparam P ancestor element type to find
+    * @return
+    */
+  def findAncestor[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
+    if (parent.isDefined) {
+      @tailrec
+      def find(ctx: VisitorContext[_]): Option[VisitorContext[P]] = {
+        ctx.element match {
+          case _: P                      => Some(ctx.asInstanceOf[VisitorContext[P]])
+          case _ if ctx.parent.isDefined => find(ctx.parent.get)
+          case _                         => None
+        }
+      }
+      find(this.parent.get)
+    } else {
+      None
+    }
+  }
+}
 
 class TypedAbstractSyntaxTreeVisitor {
   type WdlType = WdlTypes.T
@@ -129,72 +208,6 @@ class TypedAbstractSyntaxTreeVisitor {
   def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {}
 
   def visitTask(ctx: VisitorContext[Task]): Unit = {}
-}
-
-object TypedAbstractSyntaxTreeVisitor {
-  case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
-    lazy val docSource: FileSource = element match {
-      case d: Document => d.source
-      case _           => findAncestor[Document].get.element.source
-    }
-
-    def createChildContext[C <: Element](element: C): VisitorContext[C] = {
-      VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
-    }
-
-    /**
-      * Get the immediate parent of this context, or throw an exception if this context
-      * doesn't have a parent
-      * @tparam P parent element type
-      * @return
-      */
-    def getParent[P <: Element]: VisitorContext[P] = {
-      if (parent.isDefined) {
-        parent.get.asInstanceOf[VisitorContext[P]]
-      } else {
-        throw new Exception("VisitorContext does not have a parent")
-      }
-    }
-
-    /**
-      * Finds the first ancestor of this context that is an executable type
-      * (task or workflow).
-      */
-    def findAncestorExecutable: Option[Callable] = {
-      @tailrec
-      def getExecutable(ctx: VisitorContext[_]): Option[Callable] = {
-        ctx.element match {
-          case t: Task                   => Some(t)
-          case w: Workflow               => Some(w)
-          case _ if ctx.parent.isDefined => getExecutable(ctx.parent.get)
-          case _                         => None
-        }
-      }
-      getExecutable(this)
-    }
-
-    /**
-      * Finds the first ancestor of this context of the specified type.
-      * @param tag class tag for P
-      * @tparam P ancestor element type to find
-      * @return
-      */
-    def findAncestor[P <: Element](implicit tag: ClassTag[P]): Option[VisitorContext[P]] = {
-      if (parent.isDefined) {
-        @tailrec
-        def find(ctx: VisitorContext[_]): Option[VisitorContext[P]] = {
-          ctx.element match {
-            case _: P                      => Some(ctx.asInstanceOf[VisitorContext[P]])
-            case _ if ctx.parent.isDefined => find(ctx.parent.get)
-            case _                         => None
-          }
-        }
-        find(this.parent.get)
-      } else {
-        None
-      }
-    }
-  }
 }
 
 class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
@@ -414,6 +427,10 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   }
 
   def apply(doc: Document): Unit = {
-    visitDocument(VisitorContext[Document](doc))
+    visitDocument(createRootContext(doc))
+  }
+
+  protected def createRootContext(doc: Document): VisitorContext[Document] = {
+    new VisitorContext[Document](doc)
   }
 }

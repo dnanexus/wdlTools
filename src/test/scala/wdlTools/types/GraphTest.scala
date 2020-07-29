@@ -8,7 +8,7 @@ import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import scalax.collection.GraphEdge.DiEdge
 import wdlTools.syntax.Parsers
-import wdlTools.types.ExprGraph.VarKind
+import wdlTools.types.ExprGraph.TaskVarKind
 import wdlTools.types.TypedAbstractSyntax.Task
 import wdlTools.util.{FileSourceResolver, Logger}
 
@@ -56,22 +56,22 @@ class GraphTest extends AnyFlatSpec with Matchers {
     variables.foreach {
       case ("b", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe Some(VarKind.Input)
+        info.kind shouldBe Some(TaskVarKind.Input)
       case ("y", info) =>
         info.referenced shouldBe false
         info.kind shouldBe None
       case ("f" | "s" | "i" | "d" | "name", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Input)
+        info.kind shouldBe Some(TaskVarKind.Input)
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.PreCommand)
+        info.kind shouldBe Some(TaskVarKind.PreCommand)
       case ("dout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.PostCommand)
+        info.kind shouldBe Some(TaskVarKind.PostCommand)
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Output)
+        info.kind shouldBe Some(TaskVarKind.Output)
       case other =>
         throw new Exception(s"invalid var ${other}")
     }

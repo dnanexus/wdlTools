@@ -3,24 +3,97 @@ package wdlTools.types
 import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.Graph
 import scalax.collection.GraphPredef._
+import wdlTools.syntax.WdlVersion
 import wdlTools.types.TypedAbstractSyntax._
 
-//case class ElementGraph() {
-//  private var graph = Graph.empty[Element, DiEdge]
-//}
+case class ElementNode(element: Element)
+
+case class ElementGraph(graph: Graph[ElementNode, DiEdge],
+                        wdlVersion: WdlVersion,
+                        namespaces: Map[String, Document],
+                        structDefs: Map[String, StructDefinition]) {}
+
+case class ElementGraphBuilder(root: Document, followImports: Boolean) {
+  private var graph = Graph.empty[ElementNode, DiEdge]
+  private val wdlVersion: WdlVersion = root.version.value
+  private var namespaces: Map[String, Document] = Map.empty
+  private var structDefs: Map[String, StructDefinition] = Map.empty
+  private var tasks: Map[String, Task] = Map.empty
+
+  private def addDocument(doc: Document, namespace: Option[String] = None): Unit = {
+    // coherence check - all documents must have same version
+    if (doc.version.value != wdlVersion) {
+      throw new TypeException(
+          s"""Imported document ${doc.source} has different version than root document: 
+             |${wdlVersion} != ${doc.version.value}""".stripMargin,
+          doc.loc
+      )
+    }
+
+    val docElements = DocumentElements(doc)
+    // add all documents except root to the namespace table
+    if (namespace.isDefined) {
+      namespaces += (namespace.get -> doc)
+    }
+    // add all struct defs to the same table since structs use a flat namespace
+    docElements.structDefs.foreach { structDef =>
+      if (structDefs.contains(structDef.name)) {
+        throw new TypeException(
+            s"""All struct definitions in the document graph rooted at ${root} must have unique names; found 
+               |duplicate name ${structDef.name}""".stripMargin,
+            structDef.loc
+        )
+      }
+      structDefs += (structDef.name -> structDef)
+    }
+    // add tasks
+    docElements.tasks.foreach { task =>
+      val fqn = namespace.map(n => s"${n}.${task.name}").getOrElse(task.name)
+      if (tasks.contains(fqn)) {
+        throw new TypeException(s"""Found task with duplicate name ${fqn}""", task.loc)
+      }
+      tasks += (fqn -> task)
+    }
+    // descend workflow and add new elements to the graph
+    if (doc.workflow.isDefined) {
+      val wf = doc.workflow.get
+      val fqn = namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
+
+    }
+  }
+
+  def apply(): ElementGraph = {
+    addDocument(root)
+    ElementGraph(graph, wdlVersion, namespaces, structDefs)
+  }
+}
+
+object ElementGraph {
+
+  /**
+    * Builds an ElementGraph, which wraps a directed graph of the elements in a WDL Document, starting at
+    * the top-level WDL and including any imported WDLs.
+    * @param root the document to graph
+    * @param followImports: whether to include imports in the graph
+    * @return
+    */
+  def build(root: Document, followImports: Boolean): ElementGraph = {
+    ElementGraphBuilder(root, followImports).apply()
+  }
+}
 
 object ExprGraph {
-  object VarKind extends Enumeration {
+  object TaskVarKind extends Enumeration {
     val Input, PreCommand, PostCommand, Output = Value
   }
 
-  case class VarInfo(v: Variable,
-                     referenced: Boolean,
-                     expr: Option[Expr] = None,
-                     kind: Option[VarKind.Value] = None)
+  case class TaskVarInfo(v: Variable,
+                         referenced: Boolean,
+                         expr: Option[Expr] = None,
+                         kind: Option[TaskVarKind.Value] = None)
 
   /**
-    * Build a directed dependency graph of variables used within the scope of a task.
+    * Builds a directed dependency graph of variables used within the scope of a task.
     *
     * The graph is rooted by a special root node (`GraphUtils.RootNode`), which is a
     * "dependency" of all required input variables. The graph is constructed iteratively,
@@ -59,29 +132,29 @@ object ExprGraph {
     */
   def buildFromTask(
       task: Task
-  ): (Graph[String, DiEdge], Map[String, VarInfo]) = {
+  ): (Graph[String, DiEdge], Map[String, TaskVarInfo]) = {
     // collect all variables from task
-    val inputs: Map[String, VarInfo] = task.inputs.map {
+    val inputs: Map[String, TaskVarInfo] = task.inputs.map {
       case req: RequiredInputDefinition =>
-        req.name -> VarInfo(req, referenced = true, kind = Some(VarKind.Input))
+        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
       case opt: OptionalInputDefinition =>
-        opt.name -> VarInfo(opt, referenced = false, kind = Some(VarKind.Input))
+        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
       case optWithDefault: OverridableInputDefinitionWithDefault =>
-        optWithDefault.name -> VarInfo(optWithDefault,
-                                       referenced = false,
-                                       expr = Some(optWithDefault.defaultExpr),
-                                       kind = Some(VarKind.Input))
+        optWithDefault.name -> TaskVarInfo(optWithDefault,
+                                           referenced = false,
+                                           expr = Some(optWithDefault.defaultExpr),
+                                           kind = Some(TaskVarKind.Input))
     }.toMap
-    val outputs: Map[String, VarInfo] = task.outputs.map { out =>
-      out.name -> VarInfo(out,
-                          referenced = true,
-                          expr = Some(out.expr),
-                          kind = Some(VarKind.Output))
+    val outputs: Map[String, TaskVarInfo] = task.outputs.map { out =>
+      out.name -> TaskVarInfo(out,
+                              referenced = true,
+                              expr = Some(out.expr),
+                              kind = Some(TaskVarKind.Output))
     }.toMap
-    val decls: Map[String, VarInfo] = task.declarations.map { decl =>
-      decl.name -> VarInfo(decl, referenced = false, expr = decl.expr)
+    val decls: Map[String, TaskVarInfo] = task.declarations.map { decl =>
+      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
     }.toMap
-    val allVars: Map[String, VarInfo] = inputs ++ outputs ++ decls
+    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
 
     // Since a task is self-contained, it is an error to reference an identifier
     // that is not in the set of task variables.
@@ -101,7 +174,7 @@ object ExprGraph {
       names.foldLeft(graph) {
         case (g, name) =>
           allVars(name) match {
-            case VarInfo(_, _, Some(expr), _) =>
+            case TaskVarInfo(_, _, Some(expr), _) =>
               val deps = Utils.exprDependencies(expr).keySet.map { dep =>
                 checkDependency(name, dep, Some(expr))
                 (dep, name)
@@ -152,16 +225,16 @@ object ExprGraph {
     // Also update VarKind for decls based on whether they are depended on by any non-output
     // expressions.
     val updatedVars = allVars.map {
-      case (name, VarInfo(v, _, expr, None)) if graph.contains(name) =>
+      case (name, TaskVarInfo(v, _, expr, None)) if graph.contains(name) =>
         val dependentNodes = graph.get(name).outgoing.map(_.to.value)
         val newKind = {
           if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
-            Some(VarKind.PreCommand)
+            Some(TaskVarKind.PreCommand)
           } else {
-            Some(VarKind.PostCommand)
+            Some(TaskVarKind.PostCommand)
           }
         }
-        name -> VarInfo(v, referenced = true, expr = expr, kind = newKind)
+        name -> TaskVarInfo(v, referenced = true, expr = expr, kind = newKind)
       case (name, info) if graph.contains(name) =>
         name -> info.copy(referenced = true)
       case (name, varInfo) if varInfo.referenced =>
@@ -170,6 +243,40 @@ object ExprGraph {
     }
 
     (graph, updatedVars)
+  }
+
+  object WorkflowVarKind extends Enumeration {
+    val Input, Output = Value
+  }
+
+  case class WorkflowVarInfo(v: Variable,
+                             referenced: Boolean,
+                             expr: Option[Expr] = None,
+                             kind: Option[WorkflowVarKind.Value] = None)
+
+  def buildFromWorkflow(wf: Workflow): (Graph[String, DiEdge], Map[String, WorkflowVarInfo]) = {
+    val wfBody = WorkflowBodyElements(wf.body)
+    val inputs: Map[String, TaskVarInfo] = wf.inputs.map {
+      case req: RequiredInputDefinition =>
+        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
+      case opt: OptionalInputDefinition =>
+        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
+      case optWithDefault: OverridableInputDefinitionWithDefault =>
+        optWithDefault.name -> TaskVarInfo(optWithDefault,
+                                           referenced = false,
+                                           expr = Some(optWithDefault.defaultExpr),
+                                           kind = Some(TaskVarKind.Input))
+    }.toMap
+    val outputs: Map[String, TaskVarInfo] = wf.outputs.map { out =>
+      out.name -> TaskVarInfo(out,
+                              referenced = true,
+                              expr = Some(out.expr),
+                              kind = Some(TaskVarKind.Output))
+    }.toMap
+    val decls: Map[String, TaskVarInfo] = wfBody.declarations.map { decl =>
+      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
+    }.toMap
+    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
   }
 }
 

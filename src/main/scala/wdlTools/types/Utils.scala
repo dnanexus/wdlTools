@@ -3,6 +3,46 @@ package wdlTools.types
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
+case class DocumentElements(doc: TAT.Document) {
+  val (imports, structDefs, tasks) = doc.elements.foldLeft(
+      (Vector.empty[TAT.ImportDoc], Vector.empty[TAT.StructDefinition], Vector.empty[TAT.Task])
+  ) {
+    case ((imports, structs, tasks), element: TAT.ImportDoc) =>
+      (imports :+ element, structs, tasks)
+    case ((imports, structs, tasks), element: TAT.StructDefinition) =>
+      (imports, structs :+ element, tasks)
+    case ((imports, structs, tasks), element: TAT.Task) =>
+      (imports, structs, tasks :+ element)
+    case other => throw new RuntimeException(s"Invalid document element ${other}")
+  }
+}
+
+case class WorkflowScatter(scatter: TAT.Scatter) {
+  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(scatter.body)
+}
+
+case class WorkflowConditional(conditional: TAT.Conditional) {
+  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body)
+}
+
+case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
+  val (declarations, calls, scatters, conditionals) = body.foldLeft(
+      (Vector.empty[TAT.Declaration],
+       Vector.empty[TAT.Call],
+       Vector.empty[WorkflowScatter],
+       Vector.empty[WorkflowConditional])
+  ) {
+    case ((declarations, calls, scatters, conditionals), decl: TAT.Declaration) =>
+      (declarations :+ decl, calls, scatters, conditionals)
+    case ((declarations, calls, scatters, conditionals), call: TAT.Call) =>
+      (declarations, calls :+ call, scatters, conditionals)
+    case ((declarations, calls, scatters, conditionals), scatter: TAT.Scatter) =>
+      (declarations, calls, scatters :+ WorkflowScatter(scatter), conditionals)
+    case ((declarations, calls, scatters, conditionals), cond: TAT.Conditional) =>
+      (declarations, calls, scatters, conditionals :+ WorkflowConditional(cond))
+  }
+}
+
 object Utils {
 
   /**
