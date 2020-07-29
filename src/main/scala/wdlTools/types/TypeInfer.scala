@@ -924,7 +924,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           // type-check input argument
           val errorMsg = callee.input.get(argName) match {
             case None =>
-              Some(s"call ${call} has argument ${argName} that does not exist in the callee")
+              Some(s"call ${call.name} has argument ${argName} that does not exist in the callee")
             case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
@@ -1042,7 +1042,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case other =>
-        handleError(s"Collection in scatter (${scatter}) is not an array type", scatter.loc)
+        handleError(s"Scatter collection ${scatter.identifier} is not an array type", scatter.loc)
         other
     }
     // add a binding for the iteration variable
