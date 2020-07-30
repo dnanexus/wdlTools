@@ -34,7 +34,7 @@ object ConcreteSyntax {
   sealed trait Expr extends Element
   case class ExprString(value: String, loc: SourceLocation) extends Expr
   case class ExprBoolean(value: Boolean, loc: SourceLocation) extends Expr
-  case class ExprInt(value: Int, loc: SourceLocation) extends Expr
+  case class ExprInt(value: Long, loc: SourceLocation) extends Expr
   case class ExprFloat(value: Double, loc: SourceLocation) extends Expr
 
   // represents strings with interpolation.

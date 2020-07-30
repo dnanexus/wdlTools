@@ -34,7 +34,7 @@ object ConcreteSyntax {
   sealed trait Expr extends Element
   case class ExprString(value: String, loc: SourceLocation) extends Expr
   case class ExprBoolean(value: Boolean, loc: SourceLocation) extends Expr
-  case class ExprInt(value: Int, loc: SourceLocation) extends Expr
+  case class ExprInt(value: Long, loc: SourceLocation) extends Expr
   case class ExprFloat(value: Double, loc: SourceLocation) extends Expr
 
   // represents strings with interpolation.
@@ -124,7 +124,7 @@ object ConcreteSyntax {
   sealed trait MetaValue extends Element
   case class MetaValueNull(loc: SourceLocation) extends MetaValue
   case class MetaValueBoolean(value: Boolean, loc: SourceLocation) extends MetaValue
-  case class MetaValueInt(value: Int, loc: SourceLocation) extends MetaValue
+  case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
   case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
   case class MetaValueObject(value: Vector[MetaKV], loc: SourceLocation) extends MetaValue
