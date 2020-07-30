@@ -37,7 +37,7 @@ object AbstractSyntax {
   case class ValueNone(loc: SourceLocation) extends Value
   case class ValueString(value: String, loc: SourceLocation) extends Value
   case class ValueBoolean(value: Boolean, loc: SourceLocation) extends Value
-  case class ValueInt(value: Int, loc: SourceLocation) extends Value
+  case class ValueInt(value: Long, loc: SourceLocation) extends Value
   case class ValueFloat(value: Double, loc: SourceLocation) extends Value
 
   case class ExprIdentifier(id: String, loc: SourceLocation) extends Expr
@@ -130,7 +130,7 @@ object AbstractSyntax {
   sealed trait MetaValue extends Element
   case class MetaValueNull(loc: SourceLocation) extends MetaValue
   case class MetaValueBoolean(value: Boolean, loc: SourceLocation) extends MetaValue
-  case class MetaValueInt(value: Int, loc: SourceLocation) extends MetaValue
+  case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
   case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
   case class MetaValueObject(value: Vector[MetaKV], loc: SourceLocation) extends MetaValue

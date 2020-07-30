@@ -107,7 +107,7 @@ wdl_type
 
   override def visitNumber(ctx: WdlDraft2Parser.NumberContext): Expr = {
     if (ctx.IntLiteral() != null) {
-      return ExprInt(ctx.getText.toInt, getSourceLocation(grammar.docSource, ctx))
+      return ExprInt(ctx.getText.toLong, getSourceLocation(grammar.docSource, ctx))
     }
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getSourceLocation(grammar.docSource, ctx))
