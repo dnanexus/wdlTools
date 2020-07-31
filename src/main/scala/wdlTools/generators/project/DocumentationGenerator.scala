@@ -2,7 +2,7 @@ package wdlTools.generators.project
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.Util.exprToString
+import wdlTools.syntax.Utils.exprToString
 import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
 

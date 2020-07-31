@@ -111,7 +111,7 @@ object Utils {
     }
   }
 
-  def typeToString(t: T): String = {
+  def prettyFormatType(t: T): String = {
     t match {
       case T_Boolean        => "Boolean"
       case T_Int            => "Int"
@@ -122,11 +122,15 @@ object Utils {
       case T_Any            => "Any"
       case T_Var(i)         => s"Var($i)"
       case T_Identifier(id) => s"Id(${id})"
-      case T_Pair(l, r)     => s"Pair[${typeToString(l)}, ${typeToString(r)}]"
-      case T_Array(t, _)    => s"Array[${typeToString(t)}]"
-      case T_Map(k, v)      => s"Map[${typeToString(k)}, ${typeToString(v)}]"
       case T_Object         => "Object"
-      case T_Optional(t)    => s"Optional[${typeToString(t)}]"
+      case T_Pair(l, r) =>
+        s"Pair[${prettyFormatType(l)}, ${prettyFormatType(r)}]"
+      case T_Array(t, _) =>
+        s"Array[${prettyFormatType(t)}]"
+      case T_Map(k, v) =>
+        s"Map[${prettyFormatType(k)}, ${prettyFormatType(v)}]"
+      case T_Optional(t) =>
+        s"Optional[${prettyFormatType(t)}]"
 
       // a user defined structure
       case T_Struct(name, _) => s"Struct($name)"
@@ -135,13 +139,13 @@ object Utils {
         val inputs = input
           .map {
             case (name, (t, _)) =>
-              s"$name -> ${typeToString(t)}"
+              s"$name -> ${prettyFormatType(t)}"
           }
           .mkString(", ")
         val outputs = output
           .map {
             case (name, t) =>
-              s"$name -> ${typeToString(t)}"
+              s"$name -> ${prettyFormatType(t)}"
           }
           .mkString(", ")
         s"TaskSig($name, input=$inputs, outputs=${outputs})"
@@ -150,13 +154,13 @@ object Utils {
         val inputs = input
           .map {
             case (name, (t, _)) =>
-              s"$name -> ${typeToString(t)}"
+              s"$name -> ${prettyFormatType(t)}"
           }
           .mkString(", ")
         val outputs = output
           .map {
             case (name, t) =>
-              s"$name -> ${typeToString(t)}"
+              s"$name -> ${prettyFormatType(t)}"
           }
           .mkString(", ")
         s"WorkflowSig($name, input={$inputs}, outputs={$outputs})"
@@ -166,7 +170,7 @@ object Utils {
         val outputs = output
           .map {
             case (name, t) =>
-              s"$name -> ${typeToString(t)}"
+              s"$name -> ${prettyFormatType(t)}"
           }
           .mkString(", ")
         s"Call $name { $outputs }"
@@ -174,21 +178,66 @@ object Utils {
       // T representation for an stdlib function.
       // For example, stdout()
       case T_Function0(name, output) =>
-        s"${name}() -> ${typeToString(output)}"
+        s"${name}() -> ${prettyFormatType(output)}"
 
       // A function with one argument
       case T_Function1(name, input, output) =>
-        s"${name}(${typeToString(input)}) -> ${typeToString(output)}"
+        s"${name}(${prettyFormatType(input)}) -> ${prettyFormatType(output)}"
 
       // A function with two arguments. For example:
       // Float size(File, [String])
       case T_Function2(name, arg1, arg2, output) =>
-        s"${name}(${typeToString(arg1)}, ${typeToString(arg2)}) -> ${typeToString(output)}"
+        s"${name}(${prettyFormatType(arg1)}, ${prettyFormatType(arg2)}) -> ${prettyFormatType(output)}"
 
       // A function with three arguments. For example:
       // String sub(String, String, String)
       case T_Function3(name, arg1, arg2, arg3, output) =>
-        s"${name}(${typeToString(arg1)}, ${typeToString(arg2)}, ${typeToString(arg3)}) -> ${typeToString(output)}"
+        s"${name}(${prettyFormatType(arg1)}, ${prettyFormatType(arg2)}, ${prettyFormatType(arg3)}) -> ${prettyFormatType(output)}"
+    }
+  }
+
+  /**
+    * Renders a WdlTypes.T as a WDL String.
+    * @example
+    * T_Int ->   "Int"
+    * T_Optional[ T_Array[T_Int] ] -> "Array[Int]?"
+    * @param t the type
+    * @return
+    */
+  def serializeType(t: T): String = {
+    t match {
+      // Base case: primitive types.
+      case T_Any       => "Any"
+      case T_Boolean   => "Boolean"
+      case T_Int       => "Int"
+      case T_Float     => "Float"
+      case T_String    => "String"
+      case T_File      => "File"
+      case T_Directory => "Directory"
+
+      // compound types
+      case T_Array(memberType, _) =>
+        val inner = serializeType(memberType)
+        s"Array[${inner}]"
+      case T_Map(keyType, valueType) =>
+        val k = serializeType(keyType)
+        val v = serializeType(valueType)
+        s"Map[$k, $v]"
+      case T_Optional(memberType) =>
+        val inner = serializeType(memberType)
+        s"$inner?"
+      case T_Pair(lType, rType) =>
+        val ls = serializeType(lType)
+        val rs = serializeType(rType)
+        s"Pair[$ls, $rs]"
+
+      // structs
+      case T_Struct(structName, _) =>
+        structName
+
+      // catch-all for other types not currently supported
+      case _ =>
+        throw new Exception(s"Unsupported WDL type ${prettyFormatType(t)}")
     }
   }
 
@@ -201,9 +250,9 @@ object Utils {
     *                 expression.
     * @param disableQuoting whether to disable quoting of strings
     */
-  def exprToString(expr: TAT.Expr,
-                   callback: Option[TAT.Expr => Option[String]] = None,
-                   disableQuoting: Boolean = false): String = {
+  def prettyFormatExpr(expr: TAT.Expr,
+                       callback: Option[TAT.Expr => Option[String]] = None,
+                       disableQuoting: Boolean = false): String = {
     if (callback.isDefined) {
       val s = callback.get(expr)
       if (s.isDefined) {
@@ -229,16 +278,16 @@ object Utils {
       case TAT.ExprIdentifier(id: String, _, _) => id
 
       case TAT.ExprCompoundString(value, _, _) =>
-        val vec = value.map(x => exprToString(x, callback)).mkString(", ")
+        val vec = value.map(x => prettyFormatExpr(x, callback)).mkString(", ")
         s"ExprCompoundString(${vec})"
       case TAT.ExprPair(l, r, _, _) =>
-        s"(${exprToString(l, callback)}, ${exprToString(r, callback)})"
+        s"(${prettyFormatExpr(l, callback)}, ${prettyFormatExpr(r, callback)})"
       case TAT.ExprArray(value, _, _) =>
-        "[" + value.map(x => exprToString(x, callback)).mkString(", ") + "]"
+        "[" + value.map(x => prettyFormatExpr(x, callback)).mkString(", ") + "]"
       case TAT.ExprMap(value, _, _) =>
         val m2 = value
           .map {
-            case (k, v) => s"${exprToString(k, callback)} : ${exprToString(v, callback)}"
+            case (k, v) => s"${prettyFormatExpr(k, callback)} : ${prettyFormatExpr(v, callback)}"
           }
           .mkString(", ")
         s"{$m2}"
@@ -246,70 +295,76 @@ object Utils {
         val m2 = value
           .map {
             case (k, v) =>
-              s"${exprToString(k, callback, disableQuoting = true)} : ${exprToString(v, callback)}"
+              s"${prettyFormatExpr(k, callback, disableQuoting = true)} : ${prettyFormatExpr(v, callback)}"
           }
           .mkString(", ")
         s"object {$m2}"
 
       // ~{true="--yes" false="--no" boolean_value}
       case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
-        s"{true=${exprToString(t, callback)} false=${exprToString(f, callback)} ${exprToString(value, callback)}"
+        s"{true=${prettyFormatExpr(t, callback)} false=${prettyFormatExpr(f, callback)} ${prettyFormatExpr(value, callback)}"
 
       // ~{default="foo" optional_value}
       case TAT.ExprPlaceholderDefault(default, value, _, _) =>
-        s"{default=${exprToString(default, callback)} ${exprToString(value, callback)}}"
+        s"{default=${prettyFormatExpr(default, callback)} ${prettyFormatExpr(value, callback)}}"
 
       // ~{sep=", " array_value}
       case TAT.ExprPlaceholderSep(sep, value, _, _) =>
-        s"{sep=${exprToString(sep, callback)} ${exprToString(value, callback)}"
+        s"{sep=${prettyFormatExpr(sep, callback)} ${prettyFormatExpr(value, callback)}"
 
       // operators on one argument
       case TAT.ExprUnaryPlus(value, _, _) =>
-        s"+ ${exprToString(value, callback)}"
+        s"+ ${prettyFormatExpr(value, callback)}"
       case TAT.ExprUnaryMinus(value, _, _) =>
-        s"- ${exprToString(value, callback)}"
+        s"- ${prettyFormatExpr(value, callback)}"
       case TAT.ExprNegate(value, _, _) =>
-        s"not(${exprToString(value, callback)})"
+        s"not(${prettyFormatExpr(value, callback)})"
 
       // operators on two arguments
       case TAT.ExprLor(a, b, _, _) =>
-        s"${exprToString(a, callback)} || ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} || ${prettyFormatExpr(b, callback)}"
       case TAT.ExprLand(a, b, _, _) =>
-        s"${exprToString(a, callback)} && ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} && ${prettyFormatExpr(b, callback)}"
       case TAT.ExprEqeq(a, b, _, _) =>
-        s"${exprToString(a, callback)} == ${exprToString(b, callback)}"
-      case TAT.ExprLt(a, b, _, _) => s"${exprToString(a, callback)} < ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} == ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprLt(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} < ${prettyFormatExpr(b, callback)}"
       case TAT.ExprGte(a, b, _, _) =>
-        s"${exprToString(a, callback)} >= ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} >= ${prettyFormatExpr(b, callback)}"
       case TAT.ExprNeq(a, b, _, _) =>
-        s"${exprToString(a, callback)} != ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} != ${prettyFormatExpr(b, callback)}"
       case TAT.ExprLte(a, b, _, _) =>
-        s"${exprToString(a, callback)} <= ${exprToString(b, callback)}"
-      case TAT.ExprGt(a, b, _, _)  => s"${exprToString(a, callback)} > ${exprToString(b, callback)}"
-      case TAT.ExprAdd(a, b, _, _) => s"${exprToString(a, callback)} + ${exprToString(b, callback)}"
-      case TAT.ExprSub(a, b, _, _) => s"${exprToString(a, callback)} - ${exprToString(b, callback)}"
-      case TAT.ExprMod(a, b, _, _) => s"${exprToString(a, callback)} % ${exprToString(b, callback)}"
-      case TAT.ExprMul(a, b, _, _) => s"${exprToString(a, callback)} * ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} <= ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprGt(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} > ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprAdd(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} + ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprSub(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} - ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprMod(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} % ${prettyFormatExpr(b, callback)}"
+      case TAT.ExprMul(a, b, _, _) =>
+        s"${prettyFormatExpr(a, callback)} * ${prettyFormatExpr(b, callback)}"
       case TAT.ExprDivide(a, b, _, _) =>
-        s"${exprToString(a, callback)} / ${exprToString(b, callback)}"
+        s"${prettyFormatExpr(a, callback)} / ${prettyFormatExpr(b, callback)}"
 
       // Access an array element at [index]
       case TAT.ExprAt(array, index, _, _) =>
-        s"${exprToString(array, callback)}[${index}]"
+        s"${prettyFormatExpr(array, callback)}[${index}]"
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
       case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
-        s"if (${exprToString(cond, callback)}) then ${exprToString(tBranch, callback)} else ${exprToString(fBranch, callback)}"
+        s"if (${prettyFormatExpr(cond, callback)}) then ${prettyFormatExpr(tBranch, callback)} else ${prettyFormatExpr(fBranch, callback)}"
 
       // Apply a standard library function to arguments. For example:
       //   read_int("4")
       case TAT.ExprApply(funcName, _, elements, _, _) =>
-        val args = elements.map(x => exprToString(x, callback)).mkString(", ")
+        val args = elements.map(x => prettyFormatExpr(x, callback)).mkString(", ")
         s"${funcName}(${args})"
 
       case TAT.ExprGetName(e, id: String, _, _) =>
-        s"${exprToString(e, callback)}.${id}"
+        s"${prettyFormatExpr(e, callback)}.${id}"
     }
   }
 

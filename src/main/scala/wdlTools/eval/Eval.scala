@@ -660,7 +660,7 @@ case class Eval(paths: EvalPaths,
     val commandStr = command.parts
       .map { expr =>
         val value = apply(expr, ctx)
-        val str = Serialize.primitiveValueToString(value, expr.loc)
+        val str = Utils.primitiveValueToString(value, expr.loc)
         str
       }
       .mkString("")

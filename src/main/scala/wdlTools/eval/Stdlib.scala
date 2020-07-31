@@ -354,7 +354,7 @@ case class Stdlib(paths: EvalPaths,
     val file = getWdlFile(args, loc)
     val content = ioSupport.readFile(file.value, loc)
     try {
-      Serialize.fromJson(content.parseJson)
+      JsonSerde.deserialize(content.parseJson)
     } catch {
       case e: JsonSerializationException =>
         throw new EvalException(e.getMessage, loc)
@@ -561,7 +561,7 @@ case class Stdlib(paths: EvalPaths,
     assert(args.size == 1)
     val jsv =
       try {
-        Serialize.toJson(args.head)
+        JsonSerde.serialize(args.head)
       } catch {
         case e: JsonSerializationException =>
           throw new EvalException(e.getMessage, loc)
@@ -611,7 +611,7 @@ case class Stdlib(paths: EvalPaths,
         V_Float(sizeCore(args.head, loc))
       case 2 =>
         val sUnit = getWdlString(args(1), loc)
-        val nBytesInUnit = Util.sizeUnit(sUnit, loc)
+        val nBytesInUnit = Utils.sizeUnit(sUnit, loc)
         val nBytes = sizeCore(args.head, loc)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
@@ -797,7 +797,7 @@ case class Stdlib(paths: EvalPaths,
   }
 
   private def getStringVector(arg: V, loc: SourceLocation): Vector[String] = {
-    getWdlVector(arg, loc).map(vw => Serialize.primitiveValueToString(vw, loc))
+    getWdlVector(arg, loc).map(vw => Utils.primitiveValueToString(vw, loc))
   }
 
   // X select_first(Array[X?])

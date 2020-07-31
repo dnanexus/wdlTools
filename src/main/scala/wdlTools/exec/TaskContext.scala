@@ -4,7 +4,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, Runtime, Serialize, WdlValues, Context => EvalContext}
+import wdlTools.eval.{Eval, Runtime, JsonSerde, WdlValues, Context => EvalContext}
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
@@ -118,9 +118,9 @@ case class TaskContext(task: Task,
                 "sourceLocation" -> JsString(task.loc.locationString)
             )
         ),
-        "inputs" -> JsObject(Serialize.toJson(evalContext.bindings)),
+        "inputs" -> JsObject(JsonSerde.serialize(evalContext.bindings)),
         "command" -> JsString(command.getOrElse("")),
-        "runtime" -> JsObject(Serialize.toJson(runtime.getAll))
+        "runtime" -> JsObject(JsonSerde.serialize(runtime.getAll))
     )
   }
 
