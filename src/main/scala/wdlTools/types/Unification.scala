@@ -46,6 +46,8 @@ case class Unification(regime: TypeCheckingRegime) {
 
       // coercions to objects and structs can fail at runtime. We
       // are not thoroughly checking them here.
+      // TODO: in lenient mode, support Array[String] to Struct coercion as described in
+      //  https://github.com/openwdl/wdl/issues/389
       case (T_Object, T_Object)    => true
       case (_: T_Struct, T_Object) => true
       case (_: T_Struct, _: T_Map) => true

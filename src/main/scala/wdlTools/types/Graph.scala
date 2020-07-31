@@ -14,7 +14,7 @@ case class ElementGraph(graph: Graph[ElementNode, DiEdge],
                         structDefs: Map[String, StructDefinition]) {}
 
 case class ElementGraphBuilder(root: Document, followImports: Boolean) {
-  private var graph = Graph.empty[ElementNode, DiEdge]
+  private val graph = Graph.empty[ElementNode, DiEdge]
   private val wdlVersion: WdlVersion = root.version.value
   private var namespaces: Map[String, Document] = Map.empty
   private var structDefs: Map[String, StructDefinition] = Map.empty
@@ -57,8 +57,8 @@ case class ElementGraphBuilder(root: Document, followImports: Boolean) {
     // descend workflow and add new elements to the graph
     if (doc.workflow.isDefined) {
       val wf = doc.workflow.get
-      val fqn = namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
-
+      //val fqn =
+      namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
     }
   }
 
@@ -244,40 +244,40 @@ object ExprGraph {
 
     (graph, updatedVars)
   }
-
-  object WorkflowVarKind extends Enumeration {
-    val Input, Output = Value
-  }
-
-  case class WorkflowVarInfo(v: Variable,
-                             referenced: Boolean,
-                             expr: Option[Expr] = None,
-                             kind: Option[WorkflowVarKind.Value] = None)
-
-  def buildFromWorkflow(wf: Workflow): (Graph[String, DiEdge], Map[String, WorkflowVarInfo]) = {
-    val wfBody = WorkflowBodyElements(wf.body)
-    val inputs: Map[String, TaskVarInfo] = wf.inputs.map {
-      case req: RequiredInputDefinition =>
-        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
-      case opt: OptionalInputDefinition =>
-        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
-      case optWithDefault: OverridableInputDefinitionWithDefault =>
-        optWithDefault.name -> TaskVarInfo(optWithDefault,
-                                           referenced = false,
-                                           expr = Some(optWithDefault.defaultExpr),
-                                           kind = Some(TaskVarKind.Input))
-    }.toMap
-    val outputs: Map[String, TaskVarInfo] = wf.outputs.map { out =>
-      out.name -> TaskVarInfo(out,
-                              referenced = true,
-                              expr = Some(out.expr),
-                              kind = Some(TaskVarKind.Output))
-    }.toMap
-    val decls: Map[String, TaskVarInfo] = wfBody.declarations.map { decl =>
-      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
-    }.toMap
-    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
-  }
+//
+//  object WorkflowVarKind extends Enumeration {
+//    val Input, Output = Value
+//  }
+//
+//  case class WorkflowVarInfo(v: Variable,
+//                             referenced: Boolean,
+//                             expr: Option[Expr] = None,
+//                             kind: Option[WorkflowVarKind.Value] = None)
+//
+//  def buildFromWorkflow(wf: Workflow): (Graph[String, DiEdge], Map[String, WorkflowVarInfo]) = {
+//    val wfBody = WorkflowBodyElements(wf.body)
+//    val inputs: Map[String, TaskVarInfo] = wf.inputs.map {
+//      case req: RequiredInputDefinition =>
+//        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
+//      case opt: OptionalInputDefinition =>
+//        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
+//      case optWithDefault: OverridableInputDefinitionWithDefault =>
+//        optWithDefault.name -> TaskVarInfo(optWithDefault,
+//                                           referenced = false,
+//                                           expr = Some(optWithDefault.defaultExpr),
+//                                           kind = Some(TaskVarKind.Input))
+//    }.toMap
+//    val outputs: Map[String, TaskVarInfo] = wf.outputs.map { out =>
+//      out.name -> TaskVarInfo(out,
+//                              referenced = true,
+//                              expr = Some(out.expr),
+//                              kind = Some(TaskVarKind.Output))
+//    }.toMap
+//    val decls: Map[String, TaskVarInfo] = wfBody.declarations.map { decl =>
+//      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
+//    }.toMap
+//    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
+//  }
 }
 
 object GraphUtils {

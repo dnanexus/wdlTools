@@ -68,15 +68,18 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 }
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
-                          ctx: Context,
                           evaluator: Eval,
+                          ctx: Option[Context] = None,
                           userDefaultValues: Map[String, V] = Map.empty,
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map.empty
 
   override protected def applyKv(id: String, expr: TAT.Expr): V = {
-    evaluator.applyExpr(expr, ctx)
+    ctx match {
+      case Some(c) => evaluator.applyExpr(expr, c)
+      case None    => evaluator.applyConst(expr)
+    }
   }
 
   lazy val container: Vector[String] = {
@@ -120,8 +123,8 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 }
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
-                     ctx: Context,
                      evaluator: Eval,
+                     ctx: Option[Context] = None,
                      userDefaultValues: Map[String, V] = Map.empty,
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -139,7 +142,10 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 
   protected def applyKv(id: String, expr: TAT.Expr): V = {
     def getValue(allowed: Vector[WdlTypes.T]): V = {
-      evaluator.applyExprAndCoerce(expr, allowed, ctx)
+      ctx match {
+        case Some(c) => evaluator.applyExprAndCoerce(expr, allowed, c)
+        case None    => evaluator.applyConstAndCoerce(expr, allowed)
+      }
     }
 
     id match {
@@ -232,21 +238,21 @@ object Runtime {
 
   def fromTask(
       task: TAT.Task,
-      ctx: Context,
       evaluator: Eval,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, V] = Map.empty
   ): Runtime = {
     create(task.runtime,
-           ctx,
            evaluator,
+           ctx,
            defaultValues,
            Some(task.runtime.map(_.loc).getOrElse(task.loc)))
   }
 
   def create(
       runtime: Option[TAT.RuntimeSection],
-      ctx: Context,
       evaluator: Eval,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, V] = Map.empty,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {
@@ -257,8 +263,8 @@ object Runtime {
           throw new RuntimeException("either 'runtime' or 'runtimeLocation' must be nonEmpty")
       )
     evaluator.wdlVersion match {
-      case WdlVersion.V2 => V2Runtime(runtime, ctx, evaluator, defaultValues, loc)
-      case _             => DefaultRuntime(runtime, ctx, evaluator, defaultValues, loc)
+      case WdlVersion.V2 => V2Runtime(runtime, evaluator, ctx, defaultValues, loc)
+      case _             => DefaultRuntime(runtime, evaluator, ctx, defaultValues, loc)
     }
   }
 

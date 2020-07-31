@@ -95,7 +95,7 @@ case class TaskContext(task: Task,
     }
   }
   lazy val runtime: Runtime =
-    Runtime.fromTask(task, evalContext, hostEvaluator, defaultRuntimeValues)
+    Runtime.fromTask(task, hostEvaluator, Some(evalContext), defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
   // the guest system (i.e. container) if applicable, otherwise host and guest are the same

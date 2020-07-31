@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSourceResolver, Logger}
+import wdlTools.util.{FileSourceResolver, LocalFileSource, Logger}
 
 case class Context(bindings: Map[String, WdlValues.V]) {
   def addBinding(name: String, value: WdlValues.V): Context = {
@@ -16,6 +16,8 @@ object Context {
   def createFromEnv(env: Map[String, (WdlTypes.T, WdlValues.V)]): Context = {
     Context(env.map { case (name, (_, v)) => name -> v })
   }
+
+  lazy val empty: Context = Context(Map.empty)
 }
 
 case class Eval(paths: EvalPaths,
@@ -267,6 +269,7 @@ case class Eval(paths: EvalPaths,
   private def apply(expr: TAT.Expr, ctx: Context): WdlValues.V = {
     expr match {
       case _: TAT.ValueNull    => V_Null
+      case _: TAT.ValueNone    => V_Null
       case x: TAT.ValueBoolean => V_Boolean(x.value)
       case x: TAT.ValueInt     => V_Int(x.value)
       case x: TAT.ValueFloat   => V_Float(x.value)
@@ -497,10 +500,16 @@ case class Eval(paths: EvalPaths,
     apply(expr, ctx)
   }
 
-  // cast the result value to the correct type
-  // For example, an expression like:
-  //   Float x = "3.2"
-  // requires casting from string to float
+  /**
+    * Coerces the result value to the correct type.
+    * For example, an expression like:
+    *   Float x = "3.2"
+    * requires casting from string to float
+    * @param expr expression
+    * @param wdlType allowed type
+    * @param ctx context
+    * @return
+    */
   def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, ctx: Context): WdlValues.V = {
     val value = apply(expr, ctx)
     Coercion.coerceTo(wdlType, value, expr.loc)
@@ -523,6 +532,69 @@ case class Eval(paths: EvalPaths,
       case (_, ast) =>
         throw new Exception(s"Cannot evaluate element ${ast.getClass}")
     }
+  }
+
+  /**
+    * Evaluates a constant expression. Throws an exception if it isn't a constant.
+    * @param expr the expression to evaluate
+    * @return the value
+    * @example
+    * task foo {
+    *   command {
+    *       # create file mut.vcf
+    *   }
+    *   output {
+    *     File mutations = "mut.vcf"
+    *   }
+    * }
+    *
+    * File 'mutations' is not a constant output. It is generated,
+    * read from disk, and uploaded to the platform.  A file can't
+    * have a constant string as an input, this has to be a dnanexus
+    * link.
+    */
+  def applyConst(expr: TAT.Expr): WdlValues.V = {
+    try {
+      expr match {
+        case fl: TAT.ValueFile =>
+          fileResovler.resolve(fl.value) match {
+            case f: LocalFileSource => throw new Exception(s"File ${f} is not constant")
+            case _                  => WdlValues.V_File(fl.value)
+          }
+        case fl: TAT.ValueDirectory =>
+          fileResovler.resolveDirectory(fl.value) match {
+            case f: LocalFileSource => throw new Exception(s"Directory ${f} is not constant")
+            case _                  => WdlValues.V_Directory(fl.value)
+          }
+        case _ =>
+          apply(expr, Context.empty)
+      }
+    } catch {
+      case t: Throwable =>
+        throw new EvalException(
+            s"Expression cannot be evaluated without the runtime context: ${t.getMessage}",
+            expr.loc
+        )
+    }
+  }
+
+  /**
+    * Coerces the result value to the correct type.
+    * For example, an expression like:
+    *   Float x = "3.2"
+    * requires casting from string to float
+    * @param expr expression
+    * @param wdlType allowed type
+    * @return
+    */
+  def applyConstAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T): WdlValues.V = {
+    val value = applyConst(expr)
+    Coercion.coerceTo(wdlType, value, expr.loc)
+  }
+
+  def applyConstAndCoerce(expr: TAT.Expr, wdlTypes: Vector[WdlTypes.T]): WdlValues.V = {
+    val value = applyConst(expr)
+    Coercion.coerceToFirst(wdlTypes, value, expr.loc)
   }
 
   /**
