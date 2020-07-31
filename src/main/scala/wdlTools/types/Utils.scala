@@ -315,10 +315,9 @@ object Utils {
 
   /**
     * Extract all identifiers in an expression.
+    * TODO: factor out an ExpressionWalker class.
     * @param expr an expression
     * @return a Map of identifier -> type for all identifiers referenced in `expr`
-    * @todo: factor out an ExpressionWalker class.
-    *
     * @example
     *    expression   inputs
     *    x + y        Vector(x, y)
