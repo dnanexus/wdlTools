@@ -107,9 +107,11 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
     }
   }
 
-  // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using `IoSupp.downloadFile`
-  // and loaded using `docker load`. Otherwise, it is assumed to be an image name and is pulled
-  // with `pullImage`. Requires Docker client to be installed.
+  // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using the fileReSovler,
+  // and loaded using `docker load`. The image name is preferentially taken from the tar
+  // manifest, but the output of `docker load` is used as a fallback. Otherwise, it is assumed
+  // to be an image name and is pulled with `pullImage`. Requires Docker client to be installed.
+  // TODO: I'm not sure that the manifest should take priority over the output of 'docker load'
   def getImage(nameOrUrl: String, loc: SourceLocation): String = {
     if (nameOrUrl.contains("://")) {
       // a tarball created with "docker save".
@@ -133,7 +135,6 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
               |${mContent}
               |""".stripMargin
       )
-      // TODO: I'm not sure that the manifest should take priority over the output of 'docker load'
       val repo = readManifestGetDockerImageName(mContent)
       logger.traceLimited(s"repository is ${repo}")
       logger.traceLimited(s"load tarball ${localTar} to docker", minLevel = TraceLevel.None)
