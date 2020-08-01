@@ -467,21 +467,22 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         val be = applyExpr(b, bindings, ctx)
         TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be), loc)
 
-      // Access an array element at [index: Int] or a map key at [index: String]
-      case AST.ExprAt(array: AST.Expr, index: AST.Expr, loc) =>
+      // Access an array element at [index: Int] or a map value at [key: K]
+      case AST.ExprAt(collection: AST.Expr, index: AST.Expr, loc) =>
         val eIndex = applyExpr(index, bindings, ctx)
-        val eArray = applyExpr(array, bindings, ctx)
-        val t = (eIndex.wdlType, eArray.wdlType) match {
+        val eCollection = applyExpr(collection, bindings, ctx)
+        val t = (eIndex.wdlType, eCollection.wdlType) match {
           case (T_Int, T_Array(elementType, _))                                  => elementType
           case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
           case (T_Int, _) =>
             handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
             eIndex.wdlType
           case (_, _) =>
-            handleError(s"expression ${prettyFormatExpr(eArray)} must be an array", eArray.loc)
-            eArray.wdlType
+            handleError(s"expression ${prettyFormatExpr(eCollection)} must be an array",
+                        eCollection.loc)
+            eCollection.wdlType
         }
-        TAT.ExprAt(eArray, eIndex, t, loc)
+        TAT.ExprAt(eCollection, eIndex, t, loc)
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"

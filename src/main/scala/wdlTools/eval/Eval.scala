@@ -442,11 +442,11 @@ case class Eval(paths: EvalPaths,
         val bv = apply(b, ctx)
         divide(av, bv, loc)
 
-      // Access an array element at [index]
-      case TAT.ExprAt(array, index, _, loc) =>
-        val array_v = apply(array, ctx)
+      // Access an array element at [index: Int] or map value at [key: K]
+      case TAT.ExprAt(collection, index, _, loc) =>
+        val collection_v = apply(collection, ctx)
         val index_v = apply(index, ctx)
-        (array_v, index_v) match {
+        (collection_v, index_v) match {
           case (V_Array(av), V_Int(n)) if n < av.size =>
             av(n.toInt)
           case (V_Array(av), V_Int(n)) =>
@@ -455,8 +455,19 @@ case class Eval(paths: EvalPaths,
                 s"array access out of bounds (size=${arraySize}, element accessed=${n})",
                 loc
             )
-          case (_, _) =>
+          case (_: V_Array, _) =>
             throw new EvalException(s"array access requires an array and an integer", loc)
+          case (V_Map(value), key) if value.contains(key) =>
+            value(key)
+          case (V_Map(value), key) =>
+            throw new EvalException(
+                s"map ${value} does not contain key ${key}",
+                loc
+            )
+          case _ =>
+            throw new EvalException(
+                s"Invalid array/map ${collection_v} and/or index ${index_v}"
+            )
         }
 
       // conditional:
