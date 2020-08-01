@@ -467,12 +467,13 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         val be = applyExpr(b, bindings, ctx)
         TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be), loc)
 
-      // Access an array element at [index]
+      // Access an array element at [index: Int] or a map key at [index: String]
       case AST.ExprAt(array: AST.Expr, index: AST.Expr, loc) =>
         val eIndex = applyExpr(index, bindings, ctx)
         val eArray = applyExpr(array, bindings, ctx)
         val t = (eIndex.wdlType, eArray.wdlType) match {
-          case (T_Int, T_Array(elementType, _)) => elementType
+          case (T_Int, T_Array(elementType, _))                                  => elementType
+          case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
           case (T_Int, _) =>
             handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
             eIndex.wdlType

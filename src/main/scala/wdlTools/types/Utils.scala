@@ -71,6 +71,8 @@ object Utils {
 
   def isPrimitiveValue(expr: TAT.Expr): Boolean = {
     expr match {
+      case _: TAT.ValueNone      => true
+      case _: TAT.ValueNull      => true
       case _: TAT.ValueBoolean   => true
       case _: TAT.ValueInt       => true
       case _: TAT.ValueFloat     => true
