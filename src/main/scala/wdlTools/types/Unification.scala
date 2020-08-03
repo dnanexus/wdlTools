@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.types.Utils.{typeToString, isPrimitive}
+import wdlTools.types.Utils.{prettyFormatType, isPrimitive}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
 
@@ -46,6 +46,8 @@ case class Unification(regime: TypeCheckingRegime) {
 
       // coercions to objects and structs can fail at runtime. We
       // are not thoroughly checking them here.
+      // TODO: in lenient mode, support Array[String] to Struct coercion as described in
+      //  https://github.com/openwdl/wdl/issues/389
       case (T_Object, T_Object)    => true
       case (_: T_Struct, T_Object) => true
       case (_: T_Struct, _: T_Map) => true
@@ -212,7 +214,7 @@ case class Unification(regime: TypeCheckingRegime) {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
         case a: T_Var if !(typeBindings contains a) =>
           throw new SubstitutionException(
-              s"type variable ${typeToString(a)} does not have a binding"
+              s"type variable ${prettyFormatType(a)} does not have a binding"
           )
         case a: T_Var       => typeBindings(a)
         case x: T_Struct    => x
@@ -224,7 +226,7 @@ case class Unification(regime: TypeCheckingRegime) {
         case T_Any          => T_Any
         case other =>
           throw new SubstitutionException(
-              s"Type ${typeToString(other)} should not appear in this context"
+              s"Type ${prettyFormatType(other)} should not appear in this context"
           )
       }
     }

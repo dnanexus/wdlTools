@@ -25,7 +25,7 @@ object RuntimeAttributes {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Context,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, WdlValues.V] = Map.empty
   ): RuntimeAttributes = {
     create(task.runtime, task.hints, evaluator, ctx, defaultValues, Some(task.loc))
@@ -35,12 +35,12 @@ object RuntimeAttributes {
       runtimeSection: Option[RuntimeSection],
       hintsSection: Option[HintsSection],
       evaluator: Eval,
-      ctx: Context,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, WdlValues.V] = Map.empty,
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
     val runtime = runtimeSection.map(r =>
-      Runtime.create(Some(r), ctx, evaluator, runtimeLocation = sourceLocation)
+      Runtime.create(Some(r), evaluator, ctx, runtimeLocation = sourceLocation)
     )
     val hints = hintsSection.map(h => Hints.create(Some(h)))
     RuntimeAttributes(runtime, hints, defaultValues)

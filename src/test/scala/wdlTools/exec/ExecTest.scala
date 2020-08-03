@@ -28,6 +28,6 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
                  |]""".stripMargin.trim
 
     val repo = dockerUtils.readManifestGetDockerImageName(buf)
-    repo should equal("ubuntu_18_04_minimal:latest")
+    repo should equal(Some("ubuntu_18_04_minimal:latest"))
   }
 }

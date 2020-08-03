@@ -102,6 +102,9 @@ object Coercion {
         }
         coerceToStruct(name, memberDefs, members2, loc)
 
+      // TODO: Support Array[String] to Struct coercion as described in
+      //  https://github.com/openwdl/wdl/issues/389
+
       case (WdlTypes.T_Object, V_Object(_)) => value
 
       case (t, other) =>

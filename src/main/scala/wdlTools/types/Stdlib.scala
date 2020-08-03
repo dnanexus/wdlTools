@@ -264,8 +264,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
     val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
     results.size match {
       case 0 =>
-        val inputsStr = inputTypes.map(Utils.typeToString).mkString("\n")
-        val candidatesStr = candidates.map(Utils.typeToString(_)).mkString("\n")
+        val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
+        val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
         val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
                       |${candidatesStr}
                       |inputs: ${inputsStr}
@@ -279,7 +279,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
         val prototypeDescriptions = results
           .map {
             case (_, funcSig) =>
-              Utils.typeToString(funcSig)
+              Utils.prettyFormatType(funcSig)
           }
           .mkString("\n")
         val msg = s"""|Call to ${funcName} matches ${n} prototypes

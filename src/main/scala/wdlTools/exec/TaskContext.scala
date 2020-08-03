@@ -4,7 +4,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, Runtime, Serialize, WdlValues, Context => EvalContext}
+import wdlTools.eval.{Eval, Runtime, JsonSerde, WdlValues, Context => EvalContext}
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
@@ -95,7 +95,7 @@ case class TaskContext(task: Task,
     }
   }
   lazy val runtime: Runtime =
-    Runtime.fromTask(task, evalContext, hostEvaluator, defaultRuntimeValues)
+    Runtime.fromTask(task, hostEvaluator, Some(evalContext), defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
   // the guest system (i.e. container) if applicable, otherwise host and guest are the same
@@ -118,9 +118,9 @@ case class TaskContext(task: Task,
                 "sourceLocation" -> JsString(task.loc.locationString)
             )
         ),
-        "inputs" -> JsObject(Serialize.toJson(evalContext.bindings)),
+        "inputs" -> JsObject(JsonSerde.serialize(evalContext.bindings)),
         "command" -> JsString(command.getOrElse("")),
-        "runtime" -> JsObject(Serialize.toJson(runtime.getAll))
+        "runtime" -> JsObject(JsonSerde.serialize(runtime.getAll))
     )
   }
 

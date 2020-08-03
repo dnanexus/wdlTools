@@ -1,9 +1,10 @@
 package wdlTools.eval
 
+import wdlTools.eval.WdlValues.{V, V_Boolean, V_File, V_Float, V_Int, V_Null, V_Optional, V_String}
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 
-object Util {
+object Utils {
   // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
   def sizeUnit(sUnit: String, loc: SourceLocation): Double = {
     sUnit.toLowerCase match {
@@ -55,6 +56,21 @@ object Util {
         }
       }
       userTypes
+    }
+  }
+
+  @scala.annotation.tailrec
+  def primitiveValueToString(wv: V, loc: SourceLocation): String = {
+    wv match {
+      case V_Null           => "null"
+      case V_Boolean(value) => value.toString
+      case V_Int(value)     => value.toString
+      case V_Float(value)   => value.toString
+      case V_String(value)  => value
+      case V_File(value)    => value
+      case V_Optional(x)    => primitiveValueToString(x, loc)
+      case other =>
+        throw new EvalException(s"prefix: ${other} is not a primitive value", loc)
     }
   }
 }

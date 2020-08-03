@@ -23,7 +23,7 @@ object TypedAbstractSyntax {
   case class ValueNull(wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ValueNone(wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ValueBoolean(value: Boolean, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueInt(value: Int, wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ValueInt(value: Long, wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ValueFloat(value: Double, wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ValueString(value: String, wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ValueFile(value: String, wdlType: WdlType, loc: SourceLocation) extends Expr

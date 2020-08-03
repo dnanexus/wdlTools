@@ -1,9 +1,9 @@
 package wdlTools.types
 
-import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Util => SUtil}
+import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Utils => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
-import wdlTools.types.Utils.{exprToString, isPrimitive, typeToString}
+import wdlTools.types.Utils.{prettyFormatExpr, isPrimitive, prettyFormatType}
 import TypeCheckingRegime._
 import wdlTools.util.{FileSourceResolver, Logger, TraceLevel, FileUtils => UUtil}
 
@@ -100,7 +100,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case (T_Directory, T_String | T_Directory) => T_Directory
 
       case (t, _) =>
-        handleError(s"Expressions ${exprToString(a)} and ${exprToString(b)} cannot be added", a.loc)
+        handleError(
+            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} cannot be added",
+            a.loc
+        )
         t
     }
     t
@@ -112,7 +115,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case T_Int   => T_Int
       case T_Float => T_Float
       case other =>
-        handleError(s"${exprToString(expr)} must be an integer or a float", expr.loc)
+        handleError(s"${prettyFormatExpr(expr)} must be an integer or a float", expr.loc)
         other
     }
   }
@@ -125,7 +128,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case (T_Float, T_Float) => T_Float
       case (t, _) =>
         handleError(
-            s"Expressions ${exprToString(a)} and ${exprToString(b)} must be integers or floats",
+            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must be integers or floats",
             a.loc
         )
         t
@@ -136,8 +139,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     expr.wdlType match {
       case T_Boolean => T_Boolean
       case other =>
-        handleError(s"${exprToString(expr)} must be a boolean, it is ${typeToString(other)}",
-                    expr.loc)
+        handleError(
+            s"${prettyFormatExpr(expr)} must be a boolean, it is ${prettyFormatType(other)}",
+            expr.loc
+        )
         other
     }
   }
@@ -146,7 +151,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     (a.wdlType, b.wdlType) match {
       case (T_Boolean, T_Boolean) => T_Boolean
       case (t, _) =>
-        handleError(s"${exprToString(a)} and ${exprToString(b)} must have boolean type", a.loc)
+        handleError(s"${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must have boolean type",
+                    a.loc)
         t
     }
   }
@@ -165,7 +171,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case (T_Float, T_Int) => T_Boolean
       case (t, _) =>
         handleError(
-            s"Expressions ${exprToString(a)} and ${exprToString(b)} must have the same type",
+            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must have the same type",
             a.loc
         )
         t
@@ -271,7 +277,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               t
             } else {
               handleError(
-                  s"expression ${exprToString(e2)} of type ${e2.wdlType} is not coercible to string",
+                  s"expression ${prettyFormatExpr(e2)} of type ${e2.wdlType} is not coercible to string",
                   expr.loc
               )
               if (t == initialType) {
@@ -337,13 +343,13 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         val ve = applyExpr(value, bindings, ctx)
         val wdlType = if (te.wdlType != fe.wdlType) {
           handleError(
-              s"subexpressions ${exprToString(te)} and ${exprToString(fe)} must have the same type",
+              s"subexpressions ${prettyFormatExpr(te)} and ${prettyFormatExpr(fe)} must have the same type",
               loc
           )
           te.wdlType
         } else if (ve.wdlType != T_Boolean) {
           val msg =
-            s"condition ${exprToString(ve)} should have boolean type, it has type ${typeToString(ve.wdlType)} instead"
+            s"condition ${prettyFormatExpr(ve)} should have boolean type, it has type ${prettyFormatType(ve.wdlType)} instead"
           handleError(msg, expr.loc)
           ve.wdlType
         } else {
@@ -362,8 +368,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             // another unsavory case. The optional_value is NOT optional.
             de.wdlType
           case _ =>
-            val msg = s"""|Expression (${exprToString(ve)}) must have type coercible to
-                          |(${typeToString(de.wdlType)}), it has type (${typeToString(ve.wdlType)}) instead
+            val msg = s"""|Expression (${prettyFormatExpr(ve)}) must have type coercible to
+                          |(${prettyFormatType(de.wdlType)}), it has type (${prettyFormatType(
+                             ve.wdlType
+                         )}) instead
                           |""".stripMargin.replaceAll("\n", " ")
             handleError(msg, expr.loc)
             ve.wdlType
@@ -375,14 +383,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
         val se = applyExpr(sep, bindings, ctx)
         if (se.wdlType != T_String)
-          throw new TypeException(s"separator ${exprToString(se)} must have string type", loc)
+          throw new TypeException(s"separator ${prettyFormatExpr(se)} must have string type", loc)
         val ve = applyExpr(value, bindings, ctx)
         val t = ve.wdlType match {
           case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
             T_String
           case other =>
             val msg =
-              s"expression ${exprToString(ve)} should be coercible to Array[String], but it is ${typeToString(other)}"
+              s"expression ${prettyFormatExpr(ve)} should be coercible to Array[String], but it is ${prettyFormatType(other)}"
             handleError(msg, ve.loc)
             other
         }
@@ -459,20 +467,22 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         val be = applyExpr(b, bindings, ctx)
         TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be), loc)
 
-      // Access an array element at [index]
-      case AST.ExprAt(array: AST.Expr, index: AST.Expr, loc) =>
+      // Access an array element at [index: Int] or a map value at [key: K]
+      case AST.ExprAt(collection: AST.Expr, index: AST.Expr, loc) =>
         val eIndex = applyExpr(index, bindings, ctx)
-        val eArray = applyExpr(array, bindings, ctx)
-        val t = (eIndex.wdlType, eArray.wdlType) match {
-          case (T_Int, T_Array(elementType, _)) => elementType
+        val eCollection = applyExpr(collection, bindings, ctx)
+        val t = (eIndex.wdlType, eCollection.wdlType) match {
+          case (T_Int, T_Array(elementType, _))                                  => elementType
+          case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
           case (T_Int, _) =>
-            handleError(s"${exprToString(eIndex)} must be an integer", loc)
+            handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
             eIndex.wdlType
           case (_, _) =>
-            handleError(s"expression ${exprToString(eArray)} must be an array", eArray.loc)
-            eArray.wdlType
+            handleError(s"expression ${prettyFormatExpr(eCollection)} must be an array",
+                        eCollection.loc)
+            eCollection.wdlType
         }
-        TAT.ExprAt(eArray, eIndex, t, loc)
+        TAT.ExprAt(eCollection, eIndex, t, loc)
 
       // conditional:
       // if (x == 1) then "Sunday" else "Weekday"
@@ -482,7 +492,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
         val t = {
           if (eCond.wdlType != T_Boolean) {
-            handleError(s"condition ${exprToString(eCond)} must be a boolean", eCond.loc)
+            handleError(s"condition ${prettyFormatExpr(eCond)} must be a boolean", eCond.loc)
             eCond.wdlType
           } else {
             try {
@@ -492,8 +502,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 val msg =
                   s"""|The branches of a conditional expression must be coercable to the same type
                       |expression
-                      |  true branch: ${typeToString(eTrueBranch.wdlType)}
-                      |  flase branch: ${typeToString(eFalseBranch.wdlType)}
+                      |  true branch: ${prettyFormatType(eTrueBranch.wdlType)}
+                      |  flase branch: ${prettyFormatType(eFalseBranch.wdlType)}
                       |""".stripMargin
                 handleError(msg, expr.loc)
                 eTrueBranch.wdlType
@@ -569,6 +579,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tDecl = decl.expr match {
       // Int x
       case None =>
+        // TODO: this shouldn't be possible - there are separate types
+        //  for input and output declarations, and non-input declarations
+        //  must have a value
         TAT.Declaration(decl.name, lhsType, None, decl.loc)
       case Some(expr) =>
         val e = applyExpr(expr, bindings, ctx)
@@ -577,9 +590,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           lhsType
         } else {
           val msg =
-            s"""|${decl.name} is of type ${typeToString(lhsType)}
-                |but is assigned ${typeToString(rhsType)}
-                |${exprToString(e)}
+            s"""|${decl.name} is of type ${prettyFormatType(lhsType)}
+                |but is assigned ${prettyFormatType(rhsType)}
+                |${prettyFormatExpr(e)}
                 |""".stripMargin.replaceAll("\n", " ")
           handleError(msg, decl.loc)
           lhsType
@@ -821,10 +834,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         case T_Optional(x) if isPrimitive(x) => e
         case _ =>
           handleError(
-              s"Expression ${exprToString(e)} in the command section is not coercible to a string",
+              s"Expression ${prettyFormatExpr(e)} in the command section is not coercible to a string",
               expr.loc
           )
-          TAT.ValueString(exprToString(e), T_String, e.loc)
+          TAT.ValueString(prettyFormatExpr(e), T_String, e.loc)
       }
     }
     val tCommand = TAT.CommandSection(cmdParts, task.command.loc)
@@ -921,7 +934,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           // type-check input argument
           val errorMsg = callee.input.get(argName) match {
             case None =>
-              Some(s"call ${call} has argument ${argName} that does not exist in the callee")
+              Some(s"call ${call.name} has argument ${argName} that does not exist in the callee")
             case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
@@ -1039,7 +1052,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case other =>
-        handleError(s"Collection in scatter (${scatter}) is not an array type", scatter.loc)
+        handleError(s"Scatter collection ${scatter.identifier} is not an array type", scatter.loc)
         other
     }
     // add a binding for the iteration variable
@@ -1095,7 +1108,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter) match {
       case e if e.wdlType == T_Boolean => e
       case e =>
-        handleError(s"Expression ${exprToString(e)} must have boolean type", cond.loc)
+        handleError(s"Expression ${prettyFormatExpr(e)} must have boolean type", cond.loc)
         TAT.ValueBoolean(value = false, T_Boolean, e.loc)
     }
 

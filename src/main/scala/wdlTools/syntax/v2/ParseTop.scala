@@ -133,7 +133,7 @@ wdl_type
 
   override def visitNumber(ctx: WdlV2Parser.NumberContext): Expr = {
     if (ctx.IntLiteral() != null) {
-      return ExprInt(ctx.getText.toInt, getSourceLocation(grammar.docSource, ctx))
+      return ExprInt(ctx.getText.toLong, getSourceLocation(grammar.docSource, ctx))
     }
     if (ctx.FloatLiteral() != null) {
       return ExprFloat(ctx.getText.toDouble, getSourceLocation(grammar.docSource, ctx))
@@ -631,7 +631,7 @@ any_decls
       return MetaValueBoolean(value, getSourceLocation(grammar.docSource, ctx))
     }
     if (ctx.MetaInt() != null) {
-      return MetaValueInt(ctx.MetaInt().getText.toInt, getSourceLocation(grammar.docSource, ctx))
+      return MetaValueInt(ctx.MetaInt().getText.toLong, getSourceLocation(grammar.docSource, ctx))
     }
     if (ctx.MetaFloat() != null) {
       return MetaValueFloat(ctx.MetaFloat().getText.toDouble,
