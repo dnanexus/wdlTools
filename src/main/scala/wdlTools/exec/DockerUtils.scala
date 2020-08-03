@@ -91,7 +91,7 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
         None
       case Some(JsString(repo)) =>
         Some(repo)
-      case Some(JsArray(elements)) if (elements.isEmpty) =>
+      case Some(JsArray(elements)) if elements.isEmpty =>
         logger.warning("RepoTags has an empty array")
         None
       case Some(JsArray(elements)) =>
@@ -147,9 +147,11 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
       )
       repo match {
         case None =>
-          val dockerLoadRegexp = "^Loaded image: (.+)$".r
+          val dockerRepoRegexp = "^Loaded image: (.+)$".r
+          val dockerHashRegexp = "^Loaded image ID: (.+)$".r
           outstr.trim match {
-            case dockerLoadRegexp(r) => r
+            case dockerRepoRegexp(r) => r
+            case dockerHashRegexp(h) => h
             case _ =>
               throw new Exception(
                   s"Could not determine the repo name from either the manifest or the 'docker load' output ${outstr}"
