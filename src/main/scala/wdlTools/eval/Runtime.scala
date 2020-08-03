@@ -68,15 +68,18 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 }
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
-                          ctx: Context,
                           evaluator: Eval,
+                          ctx: Option[Context] = None,
                           userDefaultValues: Map[String, V] = Map.empty,
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map.empty
 
   override protected def applyKv(id: String, expr: TAT.Expr): V = {
-    evaluator.applyExpr(expr, ctx)
+    ctx match {
+      case Some(c) => evaluator.applyExpr(expr, c)
+      case None    => evaluator.applyConst(expr)
+    }
   }
 
   lazy val container: Vector[String] = {
@@ -103,8 +106,8 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
       case None           => None
       case Some(V_Int(i)) => Some(i)
       case Some(V_String(s)) =>
-        val d = Util.sizeStringToFloat(s, getSourceLocation(Runtime.Keys.Memory))
-        Some(Util.floatToInt(d))
+        val d = Utils.sizeStringToFloat(s, getSourceLocation(Runtime.Keys.Memory))
+        Some(Utils.floatToInt(d))
       case other =>
         throw new EvalException(s"Invalid ${Runtime.Keys.Memory} value ${other}",
                                 getSourceLocation(Runtime.Keys.Memory))
@@ -120,8 +123,8 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 }
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
-                     ctx: Context,
                      evaluator: Eval,
+                     ctx: Option[Context] = None,
                      userDefaultValues: Map[String, V] = Map.empty,
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -139,7 +142,10 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 
   protected def applyKv(id: String, expr: TAT.Expr): V = {
     def getValue(allowed: Vector[WdlTypes.T]): V = {
-      evaluator.applyExprAndCoerce(expr, allowed, ctx)
+      ctx match {
+        case Some(c) => evaluator.applyExprAndCoerce(expr, allowed, c)
+        case None    => evaluator.applyConstAndCoerce(expr, allowed)
+      }
     }
 
     id match {
@@ -154,8 +160,8 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_String)) match {
           case i: V_Int => i
           case V_String(s) =>
-            val d = Util.sizeStringToFloat(s, expr.loc)
-            V_Int(Util.floatToInt(d))
+            val d = Utils.sizeStringToFloat(s, expr.loc)
+            V_Int(Utils.floatToInt(d))
           case other =>
             throw new EvalException(s"Invalid ${Runtime.Keys.Memory} value ${other}",
                                     getSourceLocation(Runtime.Keys.Memory))
@@ -232,21 +238,21 @@ object Runtime {
 
   def fromTask(
       task: TAT.Task,
-      ctx: Context,
       evaluator: Eval,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, V] = Map.empty
   ): Runtime = {
     create(task.runtime,
-           ctx,
            evaluator,
+           ctx,
            defaultValues,
            Some(task.runtime.map(_.loc).getOrElse(task.loc)))
   }
 
   def create(
       runtime: Option[TAT.RuntimeSection],
-      ctx: Context,
       evaluator: Eval,
+      ctx: Option[Context] = None,
       defaultValues: Map[String, V] = Map.empty,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {
@@ -257,8 +263,8 @@ object Runtime {
           throw new RuntimeException("either 'runtime' or 'runtimeLocation' must be nonEmpty")
       )
     evaluator.wdlVersion match {
-      case WdlVersion.V2 => V2Runtime(runtime, ctx, evaluator, defaultValues, loc)
-      case _             => DefaultRuntime(runtime, ctx, evaluator, defaultValues, loc)
+      case WdlVersion.V2 => V2Runtime(runtime, evaluator, ctx, defaultValues, loc)
+      case _             => DefaultRuntime(runtime, evaluator, ctx, defaultValues, loc)
     }
   }
 
@@ -279,38 +285,38 @@ object Runtime {
   ): Vector[(Long, Option[String], Option[String])] = {
     value match {
       case V_Int(i) =>
-        val bytes = Util.floatToInt(Util.sizeToFloat(i.toDouble, "GiB", loc))
+        val bytes = Utils.floatToInt(Utils.sizeToFloat(i.toDouble, "GiB", loc))
         Vector((bytes, defaultMountPoint, defaultDiskType))
       case V_Array(a) =>
         a.flatMap(v => parseDisks(v, defaultMountPoint, defaultDiskType, loc))
       case V_String(s) =>
         val t = s.split("\\s").toVector match {
           case Vector(size) =>
-            val bytes = Util.floatToInt(Util.sizeStringToFloat(size, loc, "GiB"))
+            val bytes = Utils.floatToInt(Utils.sizeStringToFloat(size, loc, "GiB"))
             (bytes, defaultMountPoint, defaultDiskType)
           case Vector(a, b) =>
             try {
               // "<size> <suffix>"
-              (Util.floatToInt(Util.sizeToFloat(a.toDouble, b, loc)),
+              (Utils.floatToInt(Utils.sizeToFloat(a.toDouble, b, loc)),
                defaultMountPoint,
                defaultDiskType)
             } catch {
               case _: Throwable =>
-                (Util.floatToInt(Util.sizeStringToFloat(b, loc, "GiB")), Some(a), defaultDiskType)
+                (Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")), Some(a), defaultDiskType)
             }
           case Vector(a, b, c) =>
             try {
               // "<mount-point> <size> <suffix>"
-              (Util.floatToInt(Util.sizeToFloat(b.toDouble, c, loc)),
+              (Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc)),
                defaultMountPoint,
                defaultDiskType)
             } catch {
               case _: Throwable =>
                 // "<mount-point> <size> <disk type>"
-                (Util.floatToInt(Util.sizeStringToFloat(b, loc, "GiB")), Some(a), Some(c))
+                (Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")), Some(a), Some(c))
             }
           case Vector(a, b, c, d) =>
-            val bytes = Util.floatToInt(Util.sizeToFloat(b.toDouble, c, loc))
+            val bytes = Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc))
             (bytes, Some(a), Some(d))
         }
         Vector(t)

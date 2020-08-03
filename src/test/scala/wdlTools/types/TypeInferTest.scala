@@ -65,6 +65,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       // expressions
       "expressions.wdl" -> TResult(correct = true),
       "expressions_bad.wdl" -> TResult(correct = false),
+      "map_index.wdl" -> TResult(correct = true),
       // metadata
       "meta_null_value.wdl" -> TResult(correct = true),
       "meta_section_compound.wdl" -> TResult(correct = true),

@@ -77,34 +77,41 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
   //          "2652f5844803bcf8615bec64abd20959c023d34644104245b905bb9b08667c8d/layer.tar",
   //          ]}
   // ]
-  private[exec] def readManifestGetDockerImageName(buf: String): String = {
+  private[exec] def readManifestGetDockerImageName(buf: String): Option[String] = {
     val jso = buf.parseJson
     val elem = jso match {
       case JsArray(elements) if elements.nonEmpty => elements.head
       case other =>
-        throw new Exception(s"bad value ${other} for manifest, expecting non empty array")
+        logger.warning(s"bad value ${other} for manifest, expecting non empty array")
+        return None
     }
-    val repo: String = elem.asJsObject.fields.get("RepoTags") match {
-      case None =>
-        throw new Exception("The repository is not specified for the image")
+    elem.asJsObject.fields.get("RepoTags") match {
+      case None | Some(JsNull) =>
+        logger.warning("The repository is not specified for the image")
+        None
       case Some(JsString(repo)) =>
-        repo
+        Some(repo)
+      case Some(JsArray(elements)) if elements.isEmpty =>
+        logger.warning("RepoTags has an empty array")
+        None
       case Some(JsArray(elements)) =>
-        if (elements.isEmpty)
-          throw new Exception("RepoTags has an empty array")
         elements.head match {
-          case JsString(repo) => repo
-          case other          => throw new Exception(s"bad value ${other} in RepoTags manifest field")
+          case JsString(repo) => Some(repo)
+          case other =>
+            logger.warning(s"bad value ${other} in RepoTags manifest field")
+            None
         }
       case other =>
-        throw new Exception(s"bad value ${other} in RepoTags manifest field")
+        logger.warning(s"bad value ${other} in RepoTags manifest field")
+        None
     }
-    repo
   }
 
-  // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using `IoSupp.downloadFile`
-  // and loaded using `docker load`. Otherwise, it is assumed to be an image name and is pulled
-  // with `pullImage`. Requires Docker client to be installed.
+  // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using the fileReSovler,
+  // and loaded using `docker load`. The image name is preferentially taken from the tar
+  // manifest, but the output of `docker load` is used as a fallback. Otherwise, it is assumed
+  // to be an image name and is pulled with `pullImage`. Requires Docker client to be installed.
+  // TODO: I'm not sure that the manifest should take priority over the output of 'docker load'
   def getImage(nameOrUrl: String, loc: SourceLocation): String = {
     if (nameOrUrl.contains("://")) {
       // a tarball created with "docker save".
@@ -138,7 +145,20 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
               |stderr:
               |${errstr}""".stripMargin
       )
-      repo
+      repo match {
+        case None =>
+          val dockerRepoRegexp = "^Loaded image: (.+)$".r
+          val dockerHashRegexp = "^Loaded image ID: (.+)$".r
+          outstr.trim match {
+            case dockerRepoRegexp(r) => r
+            case dockerHashRegexp(h) => h
+            case _ =>
+              throw new Exception(
+                  s"Could not determine the repo name from either the manifest or the 'docker load' output ${outstr}"
+              )
+          }
+        case Some(r) => r
+      }
     } else {
       pullImage(nameOrUrl, loc)
     }
