@@ -2,7 +2,7 @@ package wdlTools.generators.project
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.Utils.exprToString
+import wdlTools.syntax.Utils.prettyFormatExpr
 import wdlTools.syntax.{Comment, Parsers}
 import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
 
@@ -131,14 +131,14 @@ object DocumentationGenerator {
           case ExprObject(value, text) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => exprToString(v.key) -> getValueDocumentation(v.value, text.line))
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
                   .toMap,
                 comment
             )
           case ExprMap(value, text) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => exprToString(v.key) -> getValueDocumentation(v.value, text.line))
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
                   .toMap,
                 comment
             )
@@ -174,7 +174,7 @@ object DocumentationGenerator {
             case kv: MetaKV if kv.id == d.name => kv.value
           })
           val default = if (defaultAllowed) {
-            d.expr.map(e => exprToString(e))
+            d.expr.map(e => prettyFormatExpr(e))
           } else {
             None
           }

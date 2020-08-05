@@ -5,7 +5,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.WdlVersion
+import wdlTools.syntax.{Builtins, WdlVersion}
 
 case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
@@ -299,27 +299,6 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       )
     }
 
-    def unary(oper: String, value: Expr): Sized = {
-      val operSized = Literal(oper)
-      Sequence(Vector(operSized, nested(value, inOperation = true)))
-    }
-
-    def operation(oper: String, lhs: Expr, rhs: Expr): Sized = {
-      Operation(
-          oper,
-          nested(lhs,
-                 inPlaceholder = inStringOrCommand,
-                 inOperation = true,
-                 parentOperation = Some(oper)),
-          nested(rhs,
-                 inPlaceholder = inStringOrCommand,
-                 inOperation = true,
-                 parentOperation = Some(oper)),
-          grouped = inOperation && !parentOperation.contains(oper),
-          inString = inStringOrCommand
-      )
-    }
-
     def option(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
@@ -406,23 +385,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       // appear in a string or command block
       case other =>
         val sized = other match {
-          case ExprUnaryPlus(value, _, _)  => unary(Symbols.UnaryPlus, value)
-          case ExprUnaryMinus(value, _, _) => unary(Symbols.UnaryMinus, value)
-          case ExprNegate(value, _, _)     => unary(Symbols.LogicalNot, value)
-          case ExprLor(a, b, _, _)         => operation(Symbols.LogicalOr, a, b)
-          case ExprLand(a, b, _, _)        => operation(Symbols.LogicalAnd, a, b)
-          case ExprEqeq(a, b, _, _)        => operation(Symbols.Equality, a, b)
-          case ExprLt(a, b, _, _)          => operation(Symbols.LessThan, a, b)
-          case ExprLte(a, b, _, _)         => operation(Symbols.LessThanOrEqual, a, b)
-          case ExprGt(a, b, _, _)          => operation(Symbols.GreaterThan, a, b)
-          case ExprGte(a, b, _, _)         => operation(Symbols.GreaterThanOrEqual, a, b)
-          case ExprNeq(a, b, _, _)         => operation(Symbols.Inequality, a, b)
-          case ExprAdd(a, b, _, _)         => operation(Symbols.Addition, a, b)
-          case ExprSub(a, b, _, _)         => operation(Symbols.Subtraction, a, b)
-          case ExprMul(a, b, _, _)         => operation(Symbols.Multiplication, a, b)
-          case ExprDivide(a, b, _, _)      => operation(Symbols.Division, a, b)
-          case ExprMod(a, b, _, _)         => operation(Symbols.Remainder, a, b)
-          case ExprIdentifier(id, _, _)    => Literal(id)
+          case ExprIdentifier(id, _, _) => Literal(id)
           case ExprAt(array, index, _, _) =>
             val arraySized = nested(array, inPlaceholder = inStringOrCommand)
             val prefix = Sequence(
@@ -448,6 +411,23 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                     fSized
                 ),
                 wrapping = Wrapping.AsNeeded
+            )
+          case ExprApply(oper, _, Vector(value), _, _) if Builtins.AllOperators.contains(oper) =>
+            val operSized = Literal(oper)
+            Sequence(Vector(operSized, nested(value, inOperation = true)))
+          case ExprApply(oper, _, Vector(lhs, rhs), _, _) if Builtins.AllOperators.contains(oper) =>
+            Operation(
+                oper,
+                nested(lhs,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper)),
+                nested(rhs,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper)),
+                grouped = inOperation && !parentOperation.contains(oper),
+                inString = inStringOrCommand
             )
           case ExprApply(funcName, _, elements, _, _) =>
             val prefix = Sequence(

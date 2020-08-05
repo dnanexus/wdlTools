@@ -12,110 +12,83 @@ object Utils {
     *                 can be used to provide custom formatting for some or all parts of a nested
     *                 expression.
     */
-  def exprToString(expr: Expr, callback: Option[Expr => Option[String]] = None): String = {
-    if (callback.isDefined) {
-      val s = callback.get(expr)
-      if (s.isDefined) {
-        return s.get
+  def prettyFormatExpr(expr: Expr, callback: Option[Expr => Option[String]] = None): String = {
+    def inner(innerExpr: Expr): String = {
+      val callbackValue = callback.flatMap(_(innerExpr))
+      if (callbackValue.isDefined) {
+        return callbackValue.get
+      }
+      innerExpr match {
+        case ValueNone(_)                    => "None"
+        case ValueString(value, _)           => value
+        case ValueBoolean(value: Boolean, _) => value.toString
+        case ValueInt(value, _)              => value.toString
+        case ValueFloat(value, _)            => value.toString
+        case ExprIdentifier(id: String, _)   => id
+
+        case ExprCompoundString(value: Vector[Expr], _) =>
+          val vec = value.map(x => inner(x)).mkString(", ")
+          s"ExprCompoundString(${vec})"
+        case ExprPair(l, r, _) => s"(${inner(l)}, ${inner(r)})"
+        case ExprArray(value: Vector[Expr], _) =>
+          "[" + value.map(x => inner(x)).mkString(", ") + "]"
+        case ExprMember(key, value, _) =>
+          s"${inner(key)} : ${inner(value)}"
+        case ExprMap(value: Vector[ExprMember], _) =>
+          val m = value
+            .map(x => inner(x))
+            .mkString(", ")
+          "{ " + m + " }"
+        case ExprObject(value: Vector[ExprMember], _) =>
+          val m = value
+            .map(x => inner(x))
+            .mkString(", ")
+          s"object($m)"
+        // ~{true="--yes" false="--no" boolean_value}
+        case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
+          s"{true=${inner(t)} false=${inner(f)} ${inner(value)}"
+
+        // ~{default="foo" optional_value}
+        case ExprPlaceholderDefault(default: Expr, value: Expr, _) =>
+          s"{default=${inner(default)} ${inner(value)}}"
+
+        // ~{sep=", " array_value}
+        case ExprPlaceholderSep(sep: Expr, value: Expr, _) =>
+          s"{sep=${prettyFormatExpr(sep, callback)} ${inner(value)}"
+
+        // Access an array element at [index]
+        case ExprAt(array: Expr, index: Expr, _) =>
+          s"${inner(array)}[${index}]"
+
+        // conditional:
+        // if (x == 1) then "Sunday" else "Weekday"
+        case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
+          s"if (${inner(cond)}) then ${inner(tBranch)} else ${inner(fBranch)}"
+
+        // Apply a builtin unary operator
+        case ExprApply(funcName: String, Vector(unaryValue), _)
+            if Builtins.AllOperators.contains(funcName) =>
+          s"${funcName}${inner(unaryValue)}"
+        // Apply a buildin binary operator
+        case ExprApply(funcName: String, Vector(lhs, rhs), _)
+            if Builtins.AllOperators.contains(funcName) =>
+          s"${inner(lhs)} ${funcName} ${inner(rhs)}"
+
+        // Apply a standard library function to arguments. For example:
+        //   read_int("4")
+        case ExprApply(funcName: String, elements: Vector[Expr], _) =>
+          val args = elements.map(x => inner(x)).mkString(", ")
+          s"${funcName}(${args})"
+
+        case ExprGetName(e: Expr, id: String, _) =>
+          s"${inner(e)}.${id}"
       }
     }
-
-    expr match {
-      case ValueNone(_)                    => "None"
-      case ValueString(value, _)           => value
-      case ValueBoolean(value: Boolean, _) => value.toString
-      case ValueInt(value, _)              => value.toString
-      case ValueFloat(value, _)            => value.toString
-      case ExprIdentifier(id: String, _)   => id
-
-      case ExprCompoundString(value: Vector[Expr], _) =>
-        val vec = value.map(x => exprToString(x, callback)).mkString(", ")
-        s"ExprCompoundString(${vec})"
-      case ExprPair(l, r, _) => s"(${exprToString(l, callback)}, ${exprToString(r, callback)})"
-      case ExprArray(value: Vector[Expr], _) =>
-        "[" + value.map(x => exprToString(x, callback)).mkString(", ") + "]"
-      case ExprMember(key, value, _) =>
-        s"${exprToString(key, callback)} : ${exprToString(value, callback)}"
-      case ExprMap(value: Vector[ExprMember], _) =>
-        val m = value
-          .map(x => exprToString(x, callback))
-          .mkString(", ")
-        "{ " + m + " }"
-      case ExprObject(value: Vector[ExprMember], _) =>
-        val m = value
-          .map(x => exprToString(x, callback))
-          .mkString(", ")
-        s"object($m)"
-      // ~{true="--yes" false="--no" boolean_value}
-      case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
-        s"{true=${exprToString(t, callback)} false=${exprToString(f, callback)} ${exprToString(value, callback)}"
-
-      // ~{default="foo" optional_value}
-      case ExprPlaceholderDefault(default: Expr, value: Expr, _) =>
-        s"{default=${exprToString(default, callback)} ${exprToString(value, callback)}}"
-
-      // ~{sep=", " array_value}
-      case ExprPlaceholderSep(sep: Expr, value: Expr, _) =>
-        s"{sep=${exprToString(sep, callback)} ${exprToString(value, callback)}"
-
-      // operators on one argument
-      case ExprUnaryPlus(value: Expr, _) =>
-        s"+ ${exprToString(value, callback)}"
-      case ExprUnaryMinus(value: Expr, _) =>
-        s"- ${exprToString(value, callback)}"
-      case ExprNegate(value: Expr, _) =>
-        s"not(${exprToString(value, callback)})"
-
-      // operators on two arguments
-      case ExprLor(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} || ${exprToString(b, callback)}"
-      case ExprLand(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} && ${exprToString(b, callback)}"
-      case ExprEqeq(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} == ${exprToString(b, callback)}"
-      case ExprLt(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} < ${exprToString(b, callback)}"
-      case ExprGte(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} >= ${exprToString(b, callback)}"
-      case ExprNeq(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} != ${exprToString(b, callback)}"
-      case ExprLte(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} <= ${exprToString(b, callback)}"
-      case ExprGt(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} > ${exprToString(b, callback)}"
-      case ExprAdd(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} + ${exprToString(b, callback)}"
-      case ExprSub(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} - ${exprToString(b, callback)}"
-      case ExprMod(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} % ${exprToString(b, callback)}"
-      case ExprMul(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} * ${exprToString(b, callback)}"
-      case ExprDivide(a: Expr, b: Expr, _) =>
-        s"${exprToString(a, callback)} / ${exprToString(b, callback)}"
-
-      // Access an array element at [index]
-      case ExprAt(array: Expr, index: Expr, _) =>
-        s"${exprToString(array, callback)}[${index}]"
-
-      // conditional:
-      // if (x == 1) then "Sunday" else "Weekday"
-      case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
-        s"if (${exprToString(cond, callback)}) then ${exprToString(tBranch, callback)} else ${exprToString(fBranch, callback)}"
-
-      // Apply a standard library function to arguments. For example:
-      //   read_int("4")
-      case ExprApply(funcName: String, elements: Vector[Expr], _) =>
-        val args = elements.map(x => exprToString(x, callback)).mkString(", ")
-        s"${funcName}(${args})"
-
-      case ExprGetName(e: Expr, id: String, _) =>
-        s"${exprToString(e, callback)}.${id}"
-    }
+    inner(expr)
   }
 
-  def metaValueToString(value: MetaValue,
-                        callback: Option[MetaValue => Option[String]] = None): String = {
+  def prettyFormatMetaValue(value: MetaValue,
+                            callback: Option[MetaValue => Option[String]] = None): String = {
     if (callback.isDefined) {
       val s = callback.get(value)
       if (s.isDefined) {
@@ -129,10 +102,10 @@ object Utils {
       case MetaValueInt(value, _)              => value.toString
       case MetaValueFloat(value, _)            => value.toString
       case MetaValueArray(value, _) =>
-        "[" + value.map(x => metaValueToString(x, callback)).mkString(", ") + "]"
+        "[" + value.map(x => prettyFormatMetaValue(x, callback)).mkString(", ") + "]"
       case MetaValueObject(value, _) =>
         val m = value
-          .map(x => s"${x.id} : ${metaValueToString(x.value, callback)}")
+          .map(x => s"${x.id} : ${prettyFormatMetaValue(x.value, callback)}")
           .mkString(", ")
         s"{$m}"
     }

@@ -14,7 +14,7 @@ case class Unification(regime: TypeCheckingRegime) {
   // This is used when we have polymorphic types,
   // such as when calling standard library functions. We need to keep
   // track of the latest value for each type variable.
-  type TypeUnificationContext = Map[T_Var, T]
+  type TypeUnificationContext = Map[Int, T]
 
   private def isCoercibleTo2(left: T, right: T): Boolean = {
     (left, right) match {
@@ -52,7 +52,9 @@ case class Unification(regime: TypeCheckingRegime) {
       case (_: T_Struct, T_Object) => true
       case (_: T_Struct, _: T_Map) => true
 
-      case (T_Var(i), T_Var(j)) if i == j => true
+      case (T_Var(i, iBounds), T_Var(j, jBounds))
+          if i == j && (iBounds.isEmpty || jBounds.isEmpty || (iBounds | jBounds).nonEmpty) =>
+        true
 
       case (_, T_Any) => true
       case _          => false
@@ -135,33 +137,51 @@ case class Unification(regime: TypeCheckingRegime) {
       case (T_Identifier(l), T_Identifier(r)) if l == r =>
         // a user defined type
         (T_Identifier(l), ctx)
-      case (T_Var(i), T_Var(j)) if i == j =>
-        (T_Var(i), ctx)
+      case (T_Var(i, iBounds), T_Var(j, jBounds)) if i == j =>
+        val bounds: Set[T] = (iBounds, jBounds) match {
+          case (a, b) if a.nonEmpty && b.nonEmpty =>
+            val isect = iBounds & jBounds
+            if (isect.isEmpty) {
+              throw new TypeUnificationException(
+                  s"""Type variables have non-intersecting bounds: 
+                     |${iBounds} != ${jBounds}""".stripMargin
+              )
+            }
+            isect
+          case (a, _) if a.nonEmpty => a
+          case (_, b) if b.nonEmpty => b
+          case _                    => Set.empty
+        }
+        (T_Var(i, bounds), ctx)
 
-      case (a: T_Var, b: T_Var) =>
+      case (a: T_Var, b: T_Var)
+          if a.bounds.isEmpty || b.bounds.isEmpty || (a.bounds & b.bounds).nonEmpty =>
         // found a type equality between two variables
-        val ctx3: TypeUnificationContext = (ctx.get(a), ctx.get(b)) match {
+        val ctx3: TypeUnificationContext = (ctx.get(a.index), ctx.get(b.index)) match {
           case (None, None) =>
-            ctx + (a -> b)
-          case (None, Some(z)) =>
-            ctx + (a -> z)
-          case (Some(z), None) =>
-            ctx + (b -> z)
+            ctx + (a.index -> b)
+          case (None, Some(z: T_Var)) if a.bounds.isEmpty || (a.bounds & z.bounds).nonEmpty =>
+            ctx + (a.index -> z)
+          case (None, Some(z)) if a.bounds.isEmpty || a.bounds.contains(z) =>
+            ctx + (a.index -> z)
+          case (Some(z: T_Var), None) if b.bounds.isEmpty || (b.bounds & z.bounds).nonEmpty =>
+            ctx + (b.index -> z)
+          case (Some(z), None) if b.bounds.isEmpty || b.bounds.contains(z) =>
+            ctx + (b.index -> z)
           case (Some(z), Some(w)) =>
             val (_, ctx2) = unify(z, w, ctx)
             ctx2
         }
-        (ctx3(a), ctx3)
+        (ctx3(a.index), ctx3)
 
       case (a: T_Var, z) =>
-        if (!(ctx contains a)) {
-          // found a binding for a type variable
-          (z, ctx + (a -> z))
-        } else {
-          // a binding already exists, choose the more general
-          // type
-          val w = ctx(a)
-          unify(w, z, ctx)
+        ctx.get(a.index) match {
+          case None if a.bounds.isEmpty || a.bounds.contains(z) =>
+            // found a binding for a type variable
+            (z, ctx + (a.index -> z))
+          case Some(w) =>
+            // a binding already exists, choose the more general type
+            unify(w, z, ctx)
         }
 
       case _ =>
@@ -190,7 +210,7 @@ case class Unification(regime: TypeCheckingRegime) {
   def unifyFunctionArguments(x: Vector[T],
                              y: Vector[T],
                              ctx: TypeUnificationContext): (Vector[T], TypeUnificationContext) = {
-    (x zip y).foldLeft((Vector.empty[T], ctx)) {
+    x.zip(y).foldLeft((Vector.empty[T], ctx)) {
       case ((tVec, ctx), (lt, rt)) =>
         val (t, ctx2) = unify(lt, rt, ctx)
         (tVec :+ t, ctx2)
@@ -208,15 +228,15 @@ case class Unification(regime: TypeCheckingRegime) {
   }
 
   // substitute the type variables for the values in type 't'
-  def substitute(t: T, typeBindings: Map[T_Var, T]): T = {
+  def substitute(t: T, typeBindings: TypeUnificationContext): T = {
     def sub(t: T): T = {
       t match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => t
-        case a: T_Var if !(typeBindings contains a) =>
+        case a: T_Var if !typeBindings.contains(a.index) =>
           throw new SubstitutionException(
               s"type variable ${prettyFormatType(a)} does not have a binding"
           )
-        case a: T_Var       => typeBindings(a)
+        case a: T_Var       => typeBindings(a.index)
         case x: T_Struct    => x
         case T_Pair(l, r)   => T_Pair(sub(l), sub(r))
         case T_Array(t, _)  => T_Array(sub(t))

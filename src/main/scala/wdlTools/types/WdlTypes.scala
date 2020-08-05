@@ -6,11 +6,13 @@ object WdlTypes {
 
   // primitive types
   case object T_Boolean extends T
-  case object T_Int extends T
-  case object T_Float extends T
+  sealed trait T_Numeric extends T
+  case object T_Int extends T_Numeric
+  case object T_Float extends T_Numeric
   case object T_String extends T
-  case object T_File extends T
-  case object T_Directory extends T
+  sealed trait T_Path extends T
+  case object T_File extends T_Path
+  case object T_Directory extends T_Path
 
   // There are cases where we don't know the type. For example, an empty array, or an empty map.
   // While evaluating the right hand side we don't know the type.
@@ -20,8 +22,23 @@ object WdlTypes {
   //
   case object T_Any extends T
 
-  // Polymorphic functions are another place where type variables appear
-  case class T_Var(i: Int) extends T
+  /**
+    * A polymorphic function can accept multiple parameter types and there is covariance of multiple
+    * parameters.
+    *
+    * @param index the type variable index - all variables with the same index must be coercible to the same type
+    * @param bounds an optional set of allowed types
+    * @example
+    * Take the add operator for example:
+    *    1 + 1 = 2
+    *    1.0 + 1.0 = 2.0
+    *    "a" + "b" = "ab"
+    *
+    * The type signature would be:
+    * val t0 = T_Var(0, Set(T_Int, T_Float, T_String))
+    * T_Function2("+", t0, t0, t0)
+    */
+  case class T_Var(index: Int, bounds: Set[T] = Set.empty) extends T
 
   // a user defined struct name
   case class T_Identifier(id: String) extends T

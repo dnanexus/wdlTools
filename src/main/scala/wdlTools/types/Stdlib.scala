@@ -1,7 +1,7 @@
 package wdlTools.types
 
-import WdlTypes._
-import wdlTools.syntax.WdlVersion
+import WdlTypes.{T_Function2, T_Var, _}
+import wdlTools.syntax.{Builtins, WdlVersion}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 
 case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
@@ -23,194 +23,524 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
   // return just one result. Therefore, we ended up with the prototype:
   //       T_File? -> T_Float
   // because with the current type system T_File? is more general than T_File.
-  // This is not pretty.
 
-  private val draft2Prototypes: Vector[T_Function] = Vector(
-      T_Function0("stdout", T_File),
-      T_Function0("stderr", T_File),
-      T_Function1("read_lines", T_File, T_Array(T_String)),
-      T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
-      T_Function1("read_map", T_File, T_Map(T_String, T_String)),
-      T_Function1("read_object", T_File, T_Object),
-      T_Function1("read_objects", T_File, T_Array(T_Object)),
-      T_Function1("read_json", T_File, T_Any),
-      T_Function1("read_int", T_File, T_Int),
-      T_Function1("read_string", T_File, T_String),
-      T_Function1("read_float", T_File, T_Float),
-      T_Function1("read_boolean", T_File, T_Boolean),
-      T_Function1("write_lines", T_Array(T_String), T_File),
-      T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
-      T_Function1("write_map", T_Map(T_String, T_String), T_File),
-      T_Function1("write_object", T_Object, T_File),
-      T_Function1("write_objects", T_Array(T_Object), T_File),
-      T_Function1("write_json", T_Any, T_File),
-      // Size can take several kinds of arguments.
-      T_Function1("size", T_Optional(T_File), T_Float),
-      // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      T_Function2("size", T_Optional(T_File), T_String, T_Float),
-      T_Function3("sub", T_String, T_String, T_String, T_String),
-      T_Function1("range", T_Int, T_Array(T_Int)),
-      // Array[Array[X]] transpose(Array[Array[X]])
-      T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
-      // Array[Pair(X,Y)] zip(Array[X], Array[Y])
-      T_Function2("zip", T_Array(T_Var(0)), T_Array(T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Array[Pair(X,Y)] cross(Array[X], Array[Y])
-      T_Function2("cross",
-                  T_Array(T_Var(0)),
-                  T_Array(T_Var(1)),
-                  T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Integer length(Array[X])
-      T_Function1("length", T_Array(T_Var(0)), T_Int),
-      // Array[X] flatten(Array[Array[X]])
-      T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
-      T_Function2("prefix", T_String, T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
-      T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
-      T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-      // simple functions again
-      // basename has two variants
-      T_Function1("basename", T_String, T_String),
-      T_Function2("basename", T_String, T_String, T_String),
-      T_Function1("floor", T_Float, T_Int),
-      T_Function1("ceil", T_Float, T_Int),
-      T_Function1("round", T_Float, T_Int),
-      // not mentioned in the specification
-      T_Function1("glob", T_String, T_Array(T_File))
-  )
+  private def unaryNumericPrototypes(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function1(funcName, T_Int, T_Int),
+        T_Function1(funcName, T_Float, T_Float)
+    )
+  }
+  private def comparisonPrototypes(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function2(funcName, T_Boolean, T_Boolean, T_Boolean),
+        T_Function2(funcName, T_Int, T_Int, T_Boolean),
+        T_Function2(funcName, T_Float, T_Float, T_Boolean),
+        T_Function2(funcName, T_String, T_String, T_Boolean),
+        T_Function2(funcName, T_Int, T_Float, T_Boolean),
+        T_Function2(funcName, T_Float, T_Int, T_Boolean)
+    )
+  }
+  private def binaryNumericPrototypes(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function2(funcName, T_Int, T_Int, T_Int),
+        T_Function2(funcName, T_Float, T_Float, T_Float),
+        T_Function2(funcName, T_Int, T_Float, T_Float),
+        T_Function2(funcName, T_Float, T_Int, T_Float)
+    )
+  }
 
-  private val v1Prototypes: Vector[T_Function] = Vector(
-      T_Function0("stdout", T_File),
-      T_Function0("stderr", T_File),
-      T_Function1("read_lines", T_File, T_Array(T_String)),
-      T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
-      T_Function1("read_map", T_File, T_Map(T_String, T_String)),
-      T_Function1("read_object", T_File, T_Object),
-      T_Function1("read_objects", T_File, T_Array(T_Object)),
-      T_Function1("read_json", T_File, T_Any),
-      T_Function1("read_int", T_File, T_Int),
-      T_Function1("read_string", T_File, T_String),
-      T_Function1("read_float", T_File, T_Float),
-      T_Function1("read_boolean", T_File, T_Boolean),
-      T_Function1("write_lines", T_Array(T_String), T_File),
-      T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
-      T_Function1("write_map", T_Map(T_String, T_String), T_File),
-      T_Function1("write_object", T_Object, T_File),
-      T_Function1("write_objects", T_Array(T_Object), T_File),
-      T_Function1("write_json", T_Any, T_File),
-      // Size can take several kinds of arguments.
-      T_Function1("size", T_Optional(T_File), T_Float),
-      T_Function1("size", T_Array(T_File), T_Float),
-      // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      T_Function2("size", T_Optional(T_File), T_String, T_Float),
-      T_Function2("size", T_Array(T_File), T_String, T_Float),
-      T_Function3("sub", T_String, T_String, T_String, T_String),
-      T_Function1("range", T_Int, T_Array(T_Int)),
-      // Array[Array[X]] transpose(Array[Array[X]])
-      T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
-      // Array[Pair(X,Y)] zip(Array[X], Array[Y])
-      T_Function2("zip", T_Array(T_Var(0)), T_Array(T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Array[Pair(X,Y)] cross(Array[X], Array[Y])
-      T_Function2("cross",
-                  T_Array(T_Var(0)),
-                  T_Array(T_Var(1)),
-                  T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Integer length(Array[X])
-      T_Function1("length", T_Array(T_Var(0)), T_Int),
-      // Array[X] flatten(Array[Array[X]])
-      T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
-      T_Function2("prefix", T_String, T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
-      T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
-      T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-      // simple functions again
-      // basename has two variants
-      T_Function1("basename", T_String, T_String),
-      T_Function2("basename", T_String, T_String, T_String),
-      T_Function1("floor", T_Float, T_Int),
-      T_Function1("ceil", T_Float, T_Int),
-      T_Function1("round", T_Float, T_Int),
-      // not mentioned in the specification
-      T_Function1("glob", T_String, T_Array(T_File))
-  )
+  private lazy val draft2Prototypes: Vector[T_Function] = Vector(
+      // unary numeric operators
+      unaryNumericPrototypes(Builtins.UnaryPlus),
+      unaryNumericPrototypes(Builtins.UnaryMinus),
+      // logical operators
+      Vector(
+          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+      ),
+      // comparison operators
+      // equal/not-equal comparisons are allowed for all primitive types
+      // prior to V2 Booleans and Strings could be compared by >/<; it is
+      // not explicitly stated in the spec, we assume
+      // * true > false
+      // * Strings are ordered lexicographically using Unicode code point number
+      //   for comparison of individual characters
+      comparisonPrototypes(Builtins.Equality),
+      comparisonPrototypes(Builtins.Inequality),
+      comparisonPrototypes(Builtins.LessThan),
+      comparisonPrototypes(Builtins.LessThanOrEqual),
+      comparisonPrototypes(Builtins.GreaterThan),
+      comparisonPrototypes(Builtins.GreaterThanOrEqual),
+      // equal/not-equal is allowed for File-String
+      // also, it is not explicitly stated in the spec, but we allow
+      // comparisons for any operands of the same type
+      Vector(
+          T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
+          T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
+          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+      ),
+      // the + function is overloaded for string expressions
+      // it is omitted from the spec, but we allow String + Boolean as well
+      Vector(
+          // if both arguments are non-optional, then the return type is non-optional
+          T_Function2(Builtins.Addition, T_File, T_File, T_File),
+          T_Function2(Builtins.Addition, T_File, T_String, T_File),
+          T_Function2(Builtins.Addition, T_String, T_File, T_File),
+          T_Function2(Builtins.Addition, T_String, T_String, T_String),
+          T_Function2(Builtins.Addition, T_Int, T_String, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Int, T_String),
+          T_Function2(Builtins.Addition, T_Float, T_String, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Float, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
+          T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
+          // within an interpolations, if either argument type is optional,
+          // then the return type is optional, and if either argument is
+          // None, then the final value is None; ialso, None is rendered as
+          // empty string
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_File),
+                      T_Optional(T_File),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_File),
+                      T_Optional(T_String),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_File),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Int),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Int),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Float),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Float),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Boolean),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Boolean),
+                      T_Optional(T_String))
+      ),
+      // binary numeric operators
+      binaryNumericPrototypes(Builtins.Addition),
+      binaryNumericPrototypes(Builtins.Subtraction),
+      binaryNumericPrototypes(Builtins.Multiplication),
+      binaryNumericPrototypes(Builtins.Division),
+      binaryNumericPrototypes(Builtins.Remainder),
+      // standard library functions
+      Vector(
+          T_Function0("stdout", T_File),
+          T_Function0("stderr", T_File),
+          T_Function1("read_lines", T_File, T_Array(T_String)),
+          T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
+          T_Function1("read_map", T_File, T_Map(T_String, T_String)),
+          T_Function1("read_object", T_File, T_Object),
+          T_Function1("read_objects", T_File, T_Array(T_Object)),
+          T_Function1("read_json", T_File, T_Any),
+          T_Function1("read_int", T_File, T_Int),
+          T_Function1("read_string", T_File, T_String),
+          T_Function1("read_float", T_File, T_Float),
+          T_Function1("read_boolean", T_File, T_Boolean),
+          T_Function1("write_lines", T_Array(T_String), T_File),
+          T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
+          T_Function1("write_map", T_Map(T_String, T_String), T_File),
+          T_Function1("write_object", T_Object, T_File),
+          T_Function1("write_objects", T_Array(T_Object), T_File),
+          T_Function1("write_json", T_Any, T_File),
+          // Size can take several kinds of arguments.
+          T_Function1("size", T_Optional(T_File), T_Float),
+          // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
+          T_Function2("size", T_Optional(T_File), T_String, T_Float),
+          T_Function3("sub", T_String, T_String, T_String, T_String),
+          T_Function1("range", T_Int, T_Array(T_Int)),
+          // Array[Array[X]] transpose(Array[Array[X]])
+          T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
+          // Array[Pair(X,Y)] zip(Array[X], Array[Y])
+          T_Function2("zip",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Array[Pair(X,Y)] cross(Array[X], Array[Y])
+          T_Function2("cross",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Integer length(Array[X])
+          T_Function1("length", T_Array(T_Var(0)), T_Int),
+          // Array[X] flatten(Array[Array[X]])
+          T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
+          T_Function2("prefix",
+                      T_String,
+                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
+          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
+          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
+          // simple functions again
+          // basename has two variants
+          T_Function1("basename", T_String, T_String),
+          T_Function2("basename", T_String, T_String, T_String),
+          T_Function1("floor", T_Float, T_Int),
+          T_Function1("ceil", T_Float, T_Int),
+          T_Function1("round", T_Float, T_Int),
+          // not mentioned in the specification
+          T_Function1("glob", T_String, T_Array(T_File))
+      )
+  ).flatten
 
-  // Add the signatures for draft2 and v2 here
-  private val v2Prototypes: Vector[T_Function] = Vector(
-      T_Function0("stdout", T_File),
-      T_Function0("stderr", T_File),
-      T_Function1("read_lines", T_File, T_Array(T_String)),
-      T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
-      T_Function1("read_map", T_File, T_Map(T_String, T_String)),
-      T_Function1("read_json", T_File, T_Any),
-      T_Function1("read_int", T_File, T_Int),
-      T_Function1("read_string", T_File, T_String),
-      T_Function1("read_float", T_File, T_Float),
-      T_Function1("read_boolean", T_File, T_Boolean),
-      T_Function1("write_lines", T_Array(T_String), T_File),
-      T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
-      T_Function1("write_map", T_Map(T_String, T_String), T_File),
-      T_Function1("write_json", T_Any, T_File),
-      // Size can take several kinds of arguments.
-      T_Function1("size", T_Optional(T_File), T_Float),
-      T_Function1("size", T_Array(T_File), T_Float),
-      // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
-      T_Function2("size", T_Optional(T_File), T_String, T_Float),
-      T_Function2("size", T_Array(T_File), T_String, T_Float),
-      T_Function3("sub", T_String, T_String, T_String, T_String),
-      T_Function1("range", T_Int, T_Array(T_Int)),
-      // Array[Array[X]] transpose(Array[Array[X]])
-      T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
-      // Array[Pair(X,Y)] zip(Array[X], Array[Y])
-      T_Function2("zip", T_Array(T_Var(0)), T_Array(T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Array[Pair(X,Y)] cross(Array[X], Array[Y])
-      T_Function2("cross",
-                  T_Array(T_Var(0)),
-                  T_Array(T_Var(1)),
-                  T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Array[Pair[X,Y]] as_pairs(Map[X,Y])
-      T_Function1("as_pairs", T_Map(T_Var(0), T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
-      // Map[X,Y] as_map(Array[Pair[X,Y]])
-      T_Function1("as_map", T_Array(T_Pair(T_Var(0), T_Var(1))), T_Map(T_Var(0), T_Var(1))),
-      // // Array[X] keys(Map[X,Y])
-      T_Function1("keys", T_Map(T_Var(0), T_Any), T_Array(T_Var(0))),
-      // Map[X,Array[Y]] collect_by_key(Array[Pair[X,Y]])
-      T_Function1("collect_by_keys",
-                  T_Array(T_Pair(T_Var(0), T_Var(1))),
-                  T_Map(T_Var(0), T_Array(T_Var(1)))),
-      // Integer length(Array[X])
-      T_Function1("length", T_Array(T_Var(0)), T_Int),
-      // Array[X] flatten(Array[Array[X]])
-      T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
-      T_Function2("prefix", T_String, T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function2("suffix", T_String, T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function1("quote", T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function1("squote", T_Array(T_Var(0)), T_Array(T_String)),
-      T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
-      T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
-      T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-      // simple functions again
-      // basename has two variants
-      T_Function1("basename", T_String, T_String),
-      T_Function2("basename", T_String, T_String, T_String),
-      T_Function1("floor", T_Float, T_Int),
-      T_Function1("ceil", T_Float, T_Int),
-      T_Function1("round", T_Float, T_Int),
-      // not mentioned in the specification
-      T_Function1("glob", T_String, T_Array(T_File)),
-      T_Function2("sep", T_String, T_Array(T_String), T_String)
+  private lazy val v1Prototypes: Vector[T_Function] = Vector(
+      // unary numeric operators
+      unaryNumericPrototypes(Builtins.UnaryPlus),
+      unaryNumericPrototypes(Builtins.UnaryMinus),
+      // logical operators
+      Vector(
+          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+      ),
+      // comparison operators
+      // equal/not-equal comparisons are allowed for all primitive types
+      // prior to V2 Booleans and Strings could be compared by >/<; it is
+      // not explicitly stated in the spec, we assume
+      // * true > false
+      // * Strings are ordered lexicographically using Unicode code point number
+      //   for comparison of individual characters
+      comparisonPrototypes(Builtins.Equality),
+      comparisonPrototypes(Builtins.Inequality),
+      comparisonPrototypes(Builtins.LessThan),
+      comparisonPrototypes(Builtins.LessThanOrEqual),
+      comparisonPrototypes(Builtins.GreaterThan),
+      comparisonPrototypes(Builtins.GreaterThanOrEqual),
+      // equal/not-equal is allowed for File-String
+      // also, it is not explicitly stated in the spec, but we allow
+      // comparisons for any operands of the same type
+      Vector(
+          T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
+          T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
+          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+      ),
+      // the + function is overloaded for string expressions
+      // it is omitted from the spec, but we allow String + Boolean as well
+      Vector(
+          // if both arguments are non-optional, then the return type is non-optional
+          T_Function2(Builtins.Addition, T_File, T_File, T_File),
+          T_Function2(Builtins.Addition, T_File, T_String, T_File),
+          T_Function2(Builtins.Addition, T_String, T_File, T_File),
+          T_Function2(Builtins.Addition, T_String, T_String, T_String),
+          T_Function2(Builtins.Addition, T_Int, T_String, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Int, T_String),
+          T_Function2(Builtins.Addition, T_Float, T_String, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Float, T_String),
+          T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
+          T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
+          // if either argument is optional, then the return type is optional
+          // also, within an interpolation, None is rendered as empty string
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_File),
+                      T_Optional(T_File),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_File),
+                      T_Optional(T_String),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_File),
+                      T_Optional(T_File)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Int),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Int),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Float),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Float),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_Boolean),
+                      T_Optional(T_String),
+                      T_Optional(T_String)),
+          T_Function2(Builtins.Addition,
+                      T_Optional(T_String),
+                      T_Optional(T_Boolean),
+                      T_Optional(T_String))
+      ),
+      // binary numeric operators
+      binaryNumericPrototypes(Builtins.Addition),
+      binaryNumericPrototypes(Builtins.Subtraction),
+      binaryNumericPrototypes(Builtins.Multiplication),
+      binaryNumericPrototypes(Builtins.Division),
+      binaryNumericPrototypes(Builtins.Remainder),
+      // standard library functions
+      Vector(
+          T_Function0("stdout", T_File),
+          T_Function0("stderr", T_File),
+          T_Function1("read_lines", T_File, T_Array(T_String)),
+          T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
+          T_Function1("read_map", T_File, T_Map(T_String, T_String)),
+          T_Function1("read_object", T_File, T_Object),
+          T_Function1("read_objects", T_File, T_Array(T_Object)),
+          T_Function1("read_json", T_File, T_Any),
+          T_Function1("read_int", T_File, T_Int),
+          T_Function1("read_string", T_File, T_String),
+          T_Function1("read_float", T_File, T_Float),
+          T_Function1("read_boolean", T_File, T_Boolean),
+          T_Function1("write_lines", T_Array(T_String), T_File),
+          T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
+          T_Function1("write_map", T_Map(T_String, T_String), T_File),
+          T_Function1("write_object", T_Object, T_File),
+          T_Function1("write_objects", T_Array(T_Object), T_File),
+          T_Function1("write_json", T_Any, T_File),
+          // Size can take several kinds of arguments.
+          T_Function1("size", T_Optional(T_File), T_Float),
+          T_Function1("size", T_Array(T_File), T_Float),
+          // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
+          T_Function2("size", T_Optional(T_File), T_String, T_Float),
+          T_Function2("size", T_Array(T_File), T_String, T_Float),
+          T_Function3("sub", T_String, T_String, T_String, T_String),
+          T_Function1("range", T_Int, T_Array(T_Int)),
+          // Array[Array[X]] transpose(Array[Array[X]])
+          T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
+          // Array[Pair(X,Y)] zip(Array[X], Array[Y])
+          T_Function2("zip",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Array[Pair(X,Y)] cross(Array[X], Array[Y])
+          T_Function2("cross",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Integer length(Array[X])
+          T_Function1("length", T_Array(T_Var(0)), T_Int),
+          // Array[X] flatten(Array[Array[X]])
+          T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
+          T_Function2("prefix",
+                      T_String,
+                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
+          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
+          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
+          // simple functions again
+          // basename has two variants
+          T_Function1("basename", T_String, T_String),
+          T_Function2("basename", T_String, T_String, T_String),
+          T_Function1("floor", T_Float, T_Int),
+          T_Function1("ceil", T_Float, T_Int),
+          T_Function1("round", T_Float, T_Int),
+          // not mentioned in the specification
+          T_Function1("glob", T_String, T_Array(T_File))
+      )
+  ).flatten
+
+  private def comparisonPrototypesV2(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function2(funcName, T_Int, T_Int, T_Boolean),
+        T_Function2(funcName, T_Int, T_Float, T_Boolean),
+        T_Function2(funcName, T_Float, T_Float, T_Boolean),
+        T_Function2(funcName, T_Float, T_Int, T_Boolean),
+        T_Function2(funcName, T_String, T_String, T_Boolean)
+    )
+  }
+
+  private lazy val v2Prototypes: Vector[T_Function] = Vector(
+      // unary numeric operators
+      unaryNumericPrototypes(Builtins.UnaryMinus),
+      // logical operators
+      Vector(
+          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+      ),
+      // comparison operators
+      comparisonPrototypesV2(Builtins.Equality),
+      comparisonPrototypesV2(Builtins.Inequality),
+      comparisonPrototypesV2(Builtins.LessThan),
+      comparisonPrototypesV2(Builtins.LessThanOrEqual),
+      comparisonPrototypesV2(Builtins.GreaterThan),
+      comparisonPrototypesV2(Builtins.GreaterThanOrEqual),
+      // it is not explicitly stated in the spec, but we allow equal/not-equal
+      // comparisons for any operands of the same type
+      Vector(
+          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+      ),
+      // the + function is overloaded for string expressions
+      // even worse, it has different semantics within an interpolation vs elsewhere
+      // https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#interpolating-and-concatenating-optional-strings
+      Vector(
+          // if both arguments are non-optional, then the return type is non-optional
+          // v2 inverts the argument order of File/String concatenation - we allow
+          // both in all versions
+          T_Function2(Builtins.Addition, T_File, T_String, T_File),
+          T_Function2(Builtins.Addition, T_String, T_File, T_File),
+          T_Function2(Builtins.Addition, T_String, T_String, T_String)
+      ),
+      // binary numeric operators
+      binaryNumericPrototypes(Builtins.Addition),
+      binaryNumericPrototypes(Builtins.Subtraction),
+      binaryNumericPrototypes(Builtins.Multiplication),
+      binaryNumericPrototypes(Builtins.Division),
+      binaryNumericPrototypes(Builtins.Remainder),
+      // standard library functions
+      Vector(
+          T_Function0("stdout", T_File),
+          T_Function0("stderr", T_File),
+          T_Function1("read_lines", T_File, T_Array(T_String)),
+          T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
+          T_Function1("read_map", T_File, T_Map(T_String, T_String)),
+          T_Function1("read_json", T_File, T_Any),
+          T_Function1("read_int", T_File, T_Int),
+          T_Function1("read_string", T_File, T_String),
+          T_Function1("read_float", T_File, T_Float),
+          T_Function1("read_boolean", T_File, T_Boolean),
+          T_Function1("write_lines", T_Array(T_String), T_File),
+          T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
+          T_Function1("write_map", T_Map(T_String, T_String), T_File),
+          T_Function1("write_json", T_Any, T_File),
+          // Size can take several kinds of arguments.
+          T_Function1("size", T_Optional(T_File), T_Float),
+          T_Function1("size", T_Array(T_File), T_Float),
+          // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
+          T_Function2("size", T_Optional(T_File), T_String, T_Float),
+          T_Function2("size", T_Array(T_File), T_String, T_Float),
+          T_Function3("sub", T_String, T_String, T_String, T_String),
+          T_Function1("range", T_Int, T_Array(T_Int)),
+          // Array[Array[X]] transpose(Array[Array[X]])
+          T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
+          // Array[Pair(X,Y)] zip(Array[X], Array[Y])
+          T_Function2("zip",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Array[Pair(X,Y)] cross(Array[X], Array[Y])
+          T_Function2("cross",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Array[Pair[X,Y]] as_pairs(Map[X,Y])
+          T_Function1("as_pairs", T_Map(T_Var(0), T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          // Map[X,Y] as_map(Array[Pair[X,Y]])
+          T_Function1("as_map", T_Array(T_Pair(T_Var(0), T_Var(1))), T_Map(T_Var(0), T_Var(1))),
+          // // Array[X] keys(Map[X,Y])
+          T_Function1("keys", T_Map(T_Var(0), T_Any), T_Array(T_Var(0))),
+          // Map[X,Array[Y]] collect_by_key(Array[Pair[X,Y]])
+          T_Function1("collect_by_keys",
+                      T_Array(T_Pair(T_Var(0), T_Var(1))),
+                      T_Map(T_Var(0), T_Array(T_Var(1)))),
+          // Integer length(Array[X])
+          T_Function1("length", T_Array(T_Var(0)), T_Int),
+          // Array[X] flatten(Array[Array[X]])
+          T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
+          T_Function2("prefix",
+                      T_String,
+                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function2("suffix",
+                      T_String,
+                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function1("quote", T_Array(T_Var(0, Utils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function1("squote", T_Array(T_Var(0, Utils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
+          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
+          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
+          // simple functions again
+          // basename has two variants
+          T_Function1("basename", T_String, T_String),
+          T_Function2("basename", T_String, T_String, T_String),
+          T_Function1("floor", T_Float, T_Int),
+          T_Function1("ceil", T_Float, T_Int),
+          T_Function1("round", T_Float, T_Int),
+          // not mentioned in the specification
+          T_Function1("glob", T_String, T_Array(T_File)),
+          T_Function2("sep", T_String, T_Array(T_String), T_String)
+      )
+  ).flatten
+
+  private lazy val v2PlaceholderPrototypes: Vector[T_Function] = Vector(
+      // if either argument is optional, then the return type is optional
+      // also, within an interpolation, None is rendered as empty string
+      T_Function2(Builtins.Addition, T_Optional(T_File), T_Optional(T_String), T_Optional(T_File)),
+      T_Function2(Builtins.Addition, T_Optional(T_String), T_Optional(T_File), T_Optional(T_File)),
+      T_Function2(Builtins.Addition,
+                  T_Optional(T_String),
+                  T_Optional(T_String),
+                  T_Optional(T_String)),
+      // these concatenations are no longer allowed generally, but
+      // I believe they should be allowed within placeholders - there
+      // is an open discussion https://github.com/openwdl/wdl/issues/391
+      T_Function2(Builtins.Addition, T_Int, T_String, T_String),
+      T_Function2(Builtins.Addition, T_String, T_Int, T_String),
+      T_Function2(Builtins.Addition, T_Float, T_String, T_String),
+      T_Function2(Builtins.Addition, T_String, T_Float, T_String),
+      T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
+      T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
+      T_Function2(Builtins.Addition, T_Optional(T_Int), T_Optional(T_String), T_Optional(T_String)),
+      T_Function2(Builtins.Addition, T_Optional(T_String), T_Optional(T_Int), T_Optional(T_String)),
+      T_Function2(Builtins.Addition,
+                  T_Optional(T_Float),
+                  T_Optional(T_String),
+                  T_Optional(T_String)),
+      T_Function2(Builtins.Addition,
+                  T_Optional(T_String),
+                  T_Optional(T_Float),
+                  T_Optional(T_String)),
+      T_Function2(Builtins.Addition,
+                  T_Optional(T_Boolean),
+                  T_Optional(T_String),
+                  T_Optional(T_String)),
+      T_Function2(Builtins.Addition,
+                  T_Optional(T_String),
+                  T_Optional(T_Boolean),
+                  T_Optional(T_String))
   )
 
   // choose the standard library prototypes according to the WDL version
-  private val protoTable: Vector[T_Function] = version match {
-    case WdlVersion.Draft_2 => draft2Prototypes
-    case WdlVersion.V1      => v1Prototypes
-    case WdlVersion.V2      => v2Prototypes
-    case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
+  private def protoTable(inPlaceholder: Boolean): Vector[T_Function] = version match {
+    case WdlVersion.Draft_2             => draft2Prototypes
+    case WdlVersion.V1                  => v1Prototypes
+    case WdlVersion.V2 if inPlaceholder => v2Prototypes ++ v2PlaceholderPrototypes
+    case WdlVersion.V2                  => v2Prototypes
+    case other                          => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
 
   // build a mapping from a function name to all of its prototypes.
   // Some functions are overloaded, so they may have several.
-  private val funcProtoMap: Map[String, Vector[T_Function]] = {
-    protoTable.foldLeft(Map.empty[String, Vector[T_Function]]) {
+  private def funcProtoMap(inPlaceholder: Boolean): Map[String, Vector[T_Function]] = {
+    protoTable(inPlaceholder).foldLeft(Map.empty[String, Vector[T_Function]]) {
       case (accu, funcDesc: T_Function) =>
         accu.get(funcDesc.name) match {
           case None =>
@@ -243,17 +573,26 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
     }
   }
 
-  def apply(funcName: String, inputTypes: Vector[T]): (T, T_Function) = {
-    val candidates = funcProtoMap.get(funcName) match {
+  /**
+    * Determines whether `funcName` is valid and whether there is a signature that
+    * matches `inputTypes`.
+    * @param funcName The function name
+    * @param inputTypes The input types
+    * @param inPlaceholder whether the function is being evaluated within a placeholder -
+    *                      this currently only pertains to the special handling of
+    *                      concatenation of optional types in V2+.
+    * @return
+    */
+  def apply(funcName: String, inputTypes: Vector[T], inPlaceholder: Boolean): (T, T_Function) = {
+    val candidates: Vector[T_Function] = funcProtoMap(inPlaceholder).get(funcName) match {
       case None =>
         throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
       case Some(protoVec) =>
         protoVec
     }
-
     // The function may be overloaded, taking several types of inputs. Try to
     // match all of them against the input.
-    val allCandidatePrototypes: Vector[Option[(T, T_Function)]] = candidates.map {
+    val viableCandidates: Vector[(T, T_Function)] = candidates.flatMap {
       try {
         evalOnePrototype(_, inputTypes)
       } catch {
@@ -261,9 +600,10 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
           throw new StdlibFunctionException(e.getMessage)
       }
     }
-    val results: Vector[(T, T_Function)] = allCandidatePrototypes.flatten
-    results.size match {
-      case 0 =>
+    viableCandidates match {
+      case Vector(result) =>
+        result
+      case Vector() =>
         val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
         val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
         val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
@@ -271,18 +611,15 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
                       |inputs: ${inputsStr}
                       |""".stripMargin
         throw new StdlibFunctionException(msg)
-      case 1 =>
-        results.head
-      case n =>
-        // Match more than one prototype. If they all have the same output type, then it doesn't matter
-        // though.
-        val prototypeDescriptions = results
+      case v =>
+        // Match more than one prototype.
+        val prototypeDescriptions = v
           .map {
             case (_, funcSig) =>
               Utils.prettyFormatType(funcSig)
           }
           .mkString("\n")
-        val msg = s"""|Call to ${funcName} matches ${n} prototypes
+        val msg = s"""|Call to ${funcName} matches ${v.size} prototypes
                       |inputTypes: ${inputTypes}
                       |prototypes:
                       |${prototypeDescriptions}

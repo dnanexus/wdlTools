@@ -27,9 +27,9 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   // Expected results for a test, and any additional flags required
   // to run it.
-  case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
+  private case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
 
-  val controlTable: Map[String, TResult] = Map(
+  private val controlTable: Map[String, TResult] = Map(
       // workflows
       "census.wdl" -> TResult(correct = true),
       "compound_expr_bug.wdl" -> TResult(correct = true),
