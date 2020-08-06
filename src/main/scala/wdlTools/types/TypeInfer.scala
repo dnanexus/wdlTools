@@ -21,7 +21,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
                      errorHandler: Option[Vector[TypeError] => Boolean] = None,
                      logger: Logger = Logger.get) {
-  private val unify = Unification(regime)
+  private val unify = Unification(regime, logger)
   // TODO: handle warnings similarly to errors - either have TypeError take an ErrorKind parameter
   //  or have a separate warningHandler parameter
   private var errors = Vector.empty[TypeError]
@@ -155,8 +155,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // All the sub-exressions have to be strings, or coercible to strings
         case AST.ExprCompoundString(vec, loc) =>
           if (inStringOrCommand || inPlaceholder) {
-            throw new TypeException(s"Found ExprCompoundString within string inside placeholder",
-                                    loc)
+            throw new TypeException(s"Found ExprCompoundString within string/placeholder", loc)
           }
           val initialType: T = T_String
           val (vec2, wdlType) = vec.foldLeft((Vector.empty[TAT.Expr], initialType)) {
@@ -231,7 +230,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // These are expressions like:
         // ${true="--yes" false="--no" boolean_value}
         case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
-          require(inStringOrCommand && !inPlaceholder)
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
           val te = inner(t, inStringOrCommand = true, inPlaceholder = true)
           val fe = inner(f, inStringOrCommand = true, inPlaceholder = true)
           val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
@@ -254,7 +255,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // An expression like:
         // ${default="foo" optional_value}
         case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
-          require(inStringOrCommand && !inPlaceholder)
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
           val de = inner(default, inStringOrCommand = true, inPlaceholder = true)
           val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
           val t = ve.wdlType match {
@@ -277,7 +280,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // An expression like:
         // ${sep=", " array_value}
         case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
-          require(inStringOrCommand && !inPlaceholder)
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
           val se = inner(sep, inStringOrCommand = true, inPlaceholder = true)
           if (se.wdlType != T_String)
             throw new TypeException(s"separator ${prettyFormatExpr(se)} must have string type", loc)
@@ -1000,9 +1005,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
+    val wdlVersion = doc.version.value
     val initCtx = Context(
-        version = doc.version.value,
-        stdlib = Stdlib(regime, doc.version.value),
+        version = wdlVersion,
+        stdlib = Stdlib(regime, wdlVersion, logger),
         docSource = doc.source
     )
 
@@ -1119,5 +1125,5 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 }
 
 object TypeInfer {
-  lazy val instance: TypeInfer = TypeInfer()
+  val instance: TypeInfer = TypeInfer()
 }

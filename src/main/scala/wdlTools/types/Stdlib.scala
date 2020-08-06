@@ -3,8 +3,9 @@ package wdlTools.types
 import WdlTypes.{T_Function2, T_Var, _}
 import wdlTools.syntax.{Builtins, WdlVersion}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
+import wdlTools.util.{Logger, TraceLevel}
 
-case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
+case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logger = Logger.get) {
   private val unify = Unification(regime)
 
   // Some functions are overloaded and can take several kinds of arguments.
@@ -48,6 +49,21 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
         T_Function2(funcName, T_Float, T_Int, T_Float)
     )
   }
+  // The + operator is overloaded for string arguments. If both arguments are non-optional,
+  // then the return type is non-optional. Within an interpolation, if either argument type
+  // is optional, then the return type is optional
+  private def optionalStringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
+    Vector(
+        T_Function2(Builtins.Addition, T_Optional(a), b, T_Optional(result)),
+        T_Function2(Builtins.Addition, a, T_Optional(b), T_Optional(result)),
+        T_Function2(Builtins.Addition, T_Optional(a), T_Optional(b), T_Optional(result))
+    )
+  }
+  private def stringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
+    Vector(
+        T_Function2(Builtins.Addition, a, b, result)
+    ) ++ optionalStringAdditionPrototypes(a, b, result)
+  }
 
   private lazy val draft2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
@@ -76,6 +92,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       // also, it is not explicitly stated in the spec, but we allow
       // comparisons for any operands of the same type
       Vector(
+          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
+          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
           T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
           T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
           T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
@@ -83,63 +101,16 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       ),
       // the + function is overloaded for string expressions
       // it is omitted from the spec, but we allow String + Boolean as well
-      Vector(
-          // if both arguments are non-optional, then the return type is non-optional
-          T_Function2(Builtins.Addition, T_File, T_File, T_File),
-          T_Function2(Builtins.Addition, T_File, T_String, T_File),
-          T_Function2(Builtins.Addition, T_String, T_File, T_File),
-          T_Function2(Builtins.Addition, T_String, T_String, T_String),
-          T_Function2(Builtins.Addition, T_Int, T_String, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Int, T_String),
-          T_Function2(Builtins.Addition, T_Float, T_String, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Float, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
-          T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
-          // within an interpolations, if either argument type is optional,
-          // then the return type is optional, and if either argument is
-          // None, then the final value is None; ialso, None is rendered as
-          // empty string
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_File),
-                      T_Optional(T_File),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_File),
-                      T_Optional(T_String),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_File),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Int),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Int),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Float),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Float),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Boolean),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Boolean),
-                      T_Optional(T_String))
-      ),
+      stringAdditionPrototypes(T_File, T_File, T_File),
+      stringAdditionPrototypes(T_File, T_String, T_File),
+      stringAdditionPrototypes(T_String, T_File, T_File),
+      stringAdditionPrototypes(T_String, T_String, T_String),
+      stringAdditionPrototypes(T_Int, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Int, T_String),
+      stringAdditionPrototypes(T_Float, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Float, T_String),
+      stringAdditionPrototypes(T_String, T_Boolean, T_String),
+      stringAdditionPrototypes(T_Boolean, T_String, T_String),
       // binary numeric operators
       binaryNumericPrototypes(Builtins.Addition),
       binaryNumericPrototypes(Builtins.Subtraction),
@@ -234,6 +205,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       // also, it is not explicitly stated in the spec, but we allow
       // comparisons for any operands of the same type
       Vector(
+          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
+          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
           T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
           T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
           T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
@@ -241,61 +214,16 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       ),
       // the + function is overloaded for string expressions
       // it is omitted from the spec, but we allow String + Boolean as well
-      Vector(
-          // if both arguments are non-optional, then the return type is non-optional
-          T_Function2(Builtins.Addition, T_File, T_File, T_File),
-          T_Function2(Builtins.Addition, T_File, T_String, T_File),
-          T_Function2(Builtins.Addition, T_String, T_File, T_File),
-          T_Function2(Builtins.Addition, T_String, T_String, T_String),
-          T_Function2(Builtins.Addition, T_Int, T_String, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Int, T_String),
-          T_Function2(Builtins.Addition, T_Float, T_String, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Float, T_String),
-          T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
-          T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
-          // if either argument is optional, then the return type is optional
-          // also, within an interpolation, None is rendered as empty string
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_File),
-                      T_Optional(T_File),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_File),
-                      T_Optional(T_String),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_File),
-                      T_Optional(T_File)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Int),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Int),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Float),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Float),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_Boolean),
-                      T_Optional(T_String),
-                      T_Optional(T_String)),
-          T_Function2(Builtins.Addition,
-                      T_Optional(T_String),
-                      T_Optional(T_Boolean),
-                      T_Optional(T_String))
-      ),
+      stringAdditionPrototypes(T_File, T_File, T_File),
+      stringAdditionPrototypes(T_File, T_String, T_File),
+      stringAdditionPrototypes(T_String, T_File, T_File),
+      stringAdditionPrototypes(T_String, T_String, T_String),
+      stringAdditionPrototypes(T_Int, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Int, T_String),
+      stringAdditionPrototypes(T_Float, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Float, T_String),
+      stringAdditionPrototypes(T_String, T_Boolean, T_String),
+      stringAdditionPrototypes(T_Boolean, T_String, T_String),
       // binary numeric operators
       binaryNumericPrototypes(Builtins.Addition),
       binaryNumericPrototypes(Builtins.Subtraction),
@@ -394,6 +322,10 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       // it is not explicitly stated in the spec, but we allow equal/not-equal
       // comparisons for any operands of the same type
       Vector(
+          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
+          T_Function2(Builtins.Equality, T_Directory, T_Directory, T_Boolean),
+          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
+          T_Function2(Builtins.Inequality, T_Directory, T_Directory, T_Boolean),
           T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
           T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
       ),
@@ -491,50 +423,31 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
   ).flatten
 
   private lazy val v2PlaceholderPrototypes: Vector[T_Function] = Vector(
-      // if either argument is optional, then the return type is optional
-      // also, within an interpolation, None is rendered as empty string
-      T_Function2(Builtins.Addition, T_Optional(T_File), T_Optional(T_String), T_Optional(T_File)),
-      T_Function2(Builtins.Addition, T_Optional(T_String), T_Optional(T_File), T_Optional(T_File)),
-      T_Function2(Builtins.Addition,
-                  T_Optional(T_String),
-                  T_Optional(T_String),
-                  T_Optional(T_String)),
+      optionalStringAdditionPrototypes(T_File, T_String, T_File),
+      optionalStringAdditionPrototypes(T_String, T_File, T_File),
+      optionalStringAdditionPrototypes(T_String, T_String, T_String),
       // these concatenations are no longer allowed generally, but
       // I believe they should be allowed within placeholders - there
       // is an open discussion https://github.com/openwdl/wdl/issues/391
-      T_Function2(Builtins.Addition, T_Int, T_String, T_String),
-      T_Function2(Builtins.Addition, T_String, T_Int, T_String),
-      T_Function2(Builtins.Addition, T_Float, T_String, T_String),
-      T_Function2(Builtins.Addition, T_String, T_Float, T_String),
-      T_Function2(Builtins.Addition, T_String, T_Boolean, T_String),
-      T_Function2(Builtins.Addition, T_Boolean, T_String, T_String),
-      T_Function2(Builtins.Addition, T_Optional(T_Int), T_Optional(T_String), T_Optional(T_String)),
-      T_Function2(Builtins.Addition, T_Optional(T_String), T_Optional(T_Int), T_Optional(T_String)),
-      T_Function2(Builtins.Addition,
-                  T_Optional(T_Float),
-                  T_Optional(T_String),
-                  T_Optional(T_String)),
-      T_Function2(Builtins.Addition,
-                  T_Optional(T_String),
-                  T_Optional(T_Float),
-                  T_Optional(T_String)),
-      T_Function2(Builtins.Addition,
-                  T_Optional(T_Boolean),
-                  T_Optional(T_String),
-                  T_Optional(T_String)),
-      T_Function2(Builtins.Addition,
-                  T_Optional(T_String),
-                  T_Optional(T_Boolean),
-                  T_Optional(T_String))
-  )
+      stringAdditionPrototypes(T_Int, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Int, T_String),
+      stringAdditionPrototypes(T_Float, T_String, T_String),
+      stringAdditionPrototypes(T_String, T_Float, T_String),
+      stringAdditionPrototypes(T_String, T_Boolean, T_String),
+      stringAdditionPrototypes(T_Boolean, T_String, T_String)
+  ).flatten
 
   // choose the standard library prototypes according to the WDL version
   private def protoTable(inPlaceholder: Boolean): Vector[T_Function] = version match {
-    case WdlVersion.Draft_2             => draft2Prototypes
-    case WdlVersion.V1                  => v1Prototypes
-    case WdlVersion.V2 if inPlaceholder => v2Prototypes ++ v2PlaceholderPrototypes
-    case WdlVersion.V2                  => v2Prototypes
-    case other                          => throw new RuntimeException(s"Unsupported WDL version ${other}")
+    case WdlVersion.Draft_2 =>
+      draft2Prototypes
+    case WdlVersion.V1 =>
+      v1Prototypes
+    case WdlVersion.V2 if inPlaceholder || regime <= TypeCheckingRegime.Lenient =>
+      v2Prototypes ++ v2PlaceholderPrototypes
+    case WdlVersion.V2 =>
+      v2Prototypes
+    case other => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
 
   // build a mapping from a function name to all of its prototypes.
@@ -551,12 +464,19 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
     }
   }
 
-  // evaluate the output type of a function. This may require calculation because
-  // some functions are polymorphic in their inputs.
-  private def evalOnePrototype(funcDesc: T_Function,
-                               inputTypes: Vector[T]): Option[(T, T_Function)] = {
+  /**
+    * Evaluate the output type of a function. This may require calculation because
+    * some functions are polymorphic in their inputs.
+    * @param funcProto The function prototype
+    * @param inputTypes The actual input types
+    * @return an optional (T, Boolean), where T is the actual output type, and the
+    *         second argument specifies whether all types in the signature were
+    *         matched exactly by the input types.
+    */
+  private def evalOnePrototype(funcProto: T_Function,
+                               inputTypes: Vector[T]): Option[(T, Boolean)] = {
     val arity = inputTypes.size
-    val args = (arity, funcDesc) match {
+    val args = (arity, funcProto) match {
       case (0, T_Function0(_, _))                   => Vector.empty
       case (1, T_Function1(_, arg1, _))             => Vector(arg1)
       case (2, T_Function2(_, arg1, arg2, _))       => Vector(arg1, arg2)
@@ -564,9 +484,10 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       case (_, _)                                   => return None
     }
     try {
-      val (_, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
-      val t = unify.substitute(funcDesc.output, ctx)
-      Some((t, funcDesc))
+      val (unifiedInputs, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
+      val allExact = unifiedInputs.forall(_._2)
+      val unifiedOutput = unify.substitute(funcProto.output, ctx)
+      Some((unifiedOutput, allExact))
     } catch {
       case _: TypeUnificationException =>
         None
@@ -590,20 +511,36 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
       case Some(protoVec) =>
         protoVec
     }
-    // The function may be overloaded, taking several types of inputs. Try to
-    // match all of them against the input.
-    val viableCandidates: Vector[(T, T_Function)] = candidates.flatMap {
+    // The function may be overloaded, taking several types of inputs. Try to match all
+    // prototypes against the input, preferring the one with exactly matching inputs (if any)
+    val viableCandidates: Vector[((T, T_Function), Boolean)] = candidates.flatMap { funcProto =>
       try {
-        evalOnePrototype(_, inputTypes)
+        evalOnePrototype(funcProto, inputTypes) match {
+          case None             => None
+          case Some((t, exact)) => Some(((t, funcProto), exact))
+        }
       } catch {
         case e: SubstitutionException =>
           throw new StdlibFunctionException(e.getMessage)
       }
     }
-    viableCandidates match {
-      case Vector(result) =>
-        result
-      case Vector() =>
+    viableCandidates.partition(_._2) match {
+      case (Vector(result), _) =>
+        // one exact match
+        logger.trace(
+            s"selected exact match prototype ${result}",
+            minLevel = TraceLevel.VVerbose
+        )
+        result._1
+      case (Vector(), Vector(result)) =>
+        // one coerced match
+        logger.trace(
+            s"selected coerced prototype ${result}",
+            minLevel = TraceLevel.VVerbose
+        )
+        result._1
+      case (Vector(), Vector()) =>
+        // no matches
         val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
         val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
         val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
@@ -611,11 +548,12 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion) {
                       |inputs: ${inputsStr}
                       |""".stripMargin
         throw new StdlibFunctionException(msg)
-      case v =>
+      case (v1, v2) =>
         // Match more than one prototype.
+        val v = if (v1.nonEmpty) v1 else v2
         val prototypeDescriptions = v
           .map {
-            case (_, funcSig) =>
+            case ((_, funcSig), _) =>
               Utils.prettyFormatType(funcSig)
           }
           .mkString("\n")

@@ -179,9 +179,17 @@ object Utils {
       case T_Function0(name, output) =>
         s"${name}() -> ${prettyFormatType(output)}"
 
+      // A built-in operator with one argument
+      case T_Function1(name, input, _) if Builtins.AllOperators.contains(name) =>
+        s"${name}${prettyFormatType(input)}"
+
       // A function with one argument
       case T_Function1(name, input, output) =>
         s"${name}(${prettyFormatType(input)}) -> ${prettyFormatType(output)}"
+
+      // A built-in operator with two arguments
+      case T_Function2(name, arg1, arg2, _) if Builtins.AllOperators.contains(name) =>
+        s"${prettyFormatType(arg1)} ${name} ${prettyFormatType(arg2)}"
 
       // A function with two arguments. For example:
       // Float size(File, [String])

@@ -4,7 +4,7 @@ import wdlTools.syntax.SourceLocation
 
 object TypeCheckingRegime extends Enumeration {
   type TypeCheckingRegime = Value
-  val Strict, Moderate, Lenient = Value
+  val Lenient, Moderate, Strict = Value
 }
 
 final case class TypeError(loc: SourceLocation, reason: String)

@@ -35,13 +35,13 @@ workflow foo {
   #
   # Adding a String and String?
   String? here = "here"
-  String buf = "not " + "invented " + here
+  String? buf = "not " + "invented " + here
 
   # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1207
   #
   # convert an optional int to string.
   Int? max_output = 3
-  String s1 = "MAX_OUTPUT=" + max_output
+  String? s1 = "MAX_OUTPUT=" + max_output
 
   # Check we can support place holders outside a command block
   String? ignore = "xx"
