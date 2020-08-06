@@ -1,26 +1,38 @@
 package wdlTools.types
 
 import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
+import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.FileSource
+import wdlTools.util.{FileSource, Logger}
 
-// An entire context
-//
-// There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
-// An additional variable holds a list of all imported namespaces.
-case class Context(version: WdlVersion,
-                   stdlib: Stdlib,
-                   docSource: FileSource,
-                   inputs: Map[String, WdlTypes.T] = Map.empty,
-                   outputs: Map[String, WdlTypes.T] = Map.empty,
-                   declarations: Map[String, WdlTypes.T] = Map.empty,
-                   aliases: Map[String, T_Struct] = Map.empty,
-                   callables: Map[String, T_Callable] = Map.empty,
-                   namespaces: Set[String] = Set.empty) {
+/**
+  * Type inference context.
+  * @param version WDL version of document being inferred
+  * @param stdlib Standard function library
+  * @param docSource WDL document source
+  * @param inputs Inputs namespace
+  * @param outputs Outputs namespace
+  * @param declarations Declarations namespace
+  * @param aliases Type alias namespace
+  * @param callables Callables namespace
+  * @param namespaces Set of all namespaces in the document tree
+  */
+case class Context(
+    version: WdlVersion,
+    stdlib: Stdlib,
+    docSource: FileSource,
+    inputs: Map[String, WdlTypes.T] = Map.empty,
+    outputs: Map[String, WdlTypes.T] = Map.empty,
+    declarations: Map[String, WdlTypes.T] = Map.empty,
+    aliases: Map[String, T_Struct] = Map.empty,
+    callables: Map[String, T_Callable] = Map.empty,
+    namespaces: Set[String] = Set.empty
+) {
   type WdlType = WdlTypes.T
+  type Bindings = Map[String, WdlType]
 
-  def lookup(varName: String, bindings: Map[String, WdlType]): Option[WdlType] = {
+  def lookup(varName: String, bindings: Bindings): Option[WdlType] = {
     inputs.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -56,28 +68,28 @@ case class Context(version: WdlVersion,
     this.copy(outputs = bindings)
   }
 
-  def bindVar(varName: String, wdlType: WdlType): Context = {
-    declarations.get(varName) match {
+  def bindDeclaration(name: String, wdlType: WdlType): Context = {
+    declarations.get(name) match {
       case None =>
-        this.copy(declarations = declarations + (varName -> wdlType))
+        this.copy(declarations = declarations + (name -> wdlType))
       case Some(_) =>
-        throw new DuplicateDeclarationException(s"variable ${varName} shadows an existing variable")
+        throw new DuplicateDeclarationException(s"variable ${name} shadows an existing variable")
     }
   }
 
-  // add a bunch of bindings
-  // the caller is responsible for ensuring that each binding is either
-  // not a duplicate of an existing variables or that its type extends Invalid
-  def bindVarList(bindings: Map[String, WdlType]): Context = {
-    val both = declarations.keys.toSet intersect bindings.keys.toSet
-    bindings.foreach {
-      case (name, _) if both.contains(name) =>
-        throw new DuplicateDeclarationException(
-            s"Trying to bind variable ${name} that has already been declared"
-        )
-      case _ => ()
+  /**
+    * Merge current declaration bindings.
+    * @return
+    */
+  def bindDeclarations(bindings: Bindings): Context = {
+    val both = declarations.keySet.intersect(bindings.keySet)
+    if (both.nonEmpty) {
+      throw new DuplicateDeclarationException(
+          s"Trying to bind variables that have already been declared: ${both.mkString(", ")}"
+      )
     }
-    this.copy(declarations = declarations ++ bindings)
+    this
+      .copy(declarations = declarations ++ bindings)
   }
 
   def bindStruct(s: T_Struct): Context = {
@@ -171,5 +183,16 @@ case class Context(version: WdlVersion,
                 callables = callables ++ iCallables,
                 namespaces = namespaces + namespace)
     }
+  }
+}
+
+object Context {
+  def create(doc: AST.Document, regime: TypeCheckingRegime, logger: Logger): Context = {
+    val wdlVersion = doc.version.value
+    Context(
+        version = wdlVersion,
+        stdlib = Stdlib(regime, wdlVersion, logger),
+        docSource = doc.source
+    )
   }
 }

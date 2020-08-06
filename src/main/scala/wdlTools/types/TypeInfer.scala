@@ -5,6 +5,7 @@ import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Utils.{isPrimitive, prettyFormatExpr, prettyFormatType}
 import TypeCheckingRegime._
+import wdlTools.types.ExprState.ExprState
 import wdlTools.util.{FileSourceResolver, Logger, TraceLevel, FileUtils => UUtil}
 
 /**
@@ -31,7 +32,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   type WdlType = WdlTypes.T
   type Bindings = Map[String, WdlType]
   object Bindings {
-    val empty = Map.empty[String, WdlType]
+    val empty: Bindings = Map.empty
   }
 
   // get type restrictions, on a per-version basis
@@ -128,45 +129,44 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // Add the type to an expression
   //
   private def applyExpr(expr: AST.Expr,
-                        bindings: Bindings,
                         ctx: Context,
-                        inCommand: Boolean = false): TAT.Expr = {
-    def inner(innerExpr: AST.Expr, inStringOrCommand: Boolean, inPlaceholder: Boolean): TAT.Expr = {
-      innerExpr match {
+                        bindings: Bindings = Bindings.empty,
+                        exprState: ExprState = ExprState.Start): TAT.Expr = {
+    def nested(nestedExpr: AST.Expr, nestedState: ExprState): TAT.Expr = {
+      nestedExpr match {
         // None can be any type optional
         case AST.ValueNone(loc)           => TAT.ValueNone(T_Optional(T_Any), loc)
         case AST.ValueBoolean(value, loc) => TAT.ValueBoolean(value, T_Boolean, loc)
         case AST.ValueInt(value, loc)     => TAT.ValueInt(value, T_Int, loc)
         case AST.ValueFloat(value, loc)   => TAT.ValueFloat(value, T_Float, loc)
         case AST.ValueString(value, loc)  => TAT.ValueString(value, T_String, loc)
-
-        // an identifier has to be bound to a known type. Lookup the the type,
-        // and add it to the expression.
-        case AST.ExprIdentifier(id, loc) =>
+        case AST.ExprIdentifier(id, loc)  =>
+          // an identifier has to be bound to a known type. Lookup the the type,
+          // and add it to the expression.
           val t = ctx.lookup(id, bindings) match {
             case None =>
-              handleError(s"Identifier ${id} is not defined", innerExpr.loc)
+              handleError(s"Identifier ${id} is not defined", nestedExpr.loc)
               T_Any
             case Some(t) =>
               t
           }
           TAT.ExprIdentifier(id, t, loc)
 
-        // All the sub-exressions have to be strings, or coercible to strings
         case AST.ExprCompoundString(vec, loc) =>
-          if (inStringOrCommand || inPlaceholder) {
-            throw new TypeException(s"Found ExprCompoundString within string/placeholder", loc)
+          // All the sub-exressions have to be strings, or coercible to strings
+          if (nestedState >= ExprState.InString) {
+            throw new TypeException(s"Nested ExprCompoundString", loc)
           }
           val initialType: T = T_String
           val (vec2, wdlType) = vec.foldLeft((Vector.empty[TAT.Expr], initialType)) {
             case ((v, t), subExpr) =>
-              val e2 = inner(subExpr, inStringOrCommand = true, inPlaceholder = false)
+              val e2 = nested(subExpr, ExprState.InString)
               val t2: T = if (unify.isCoercibleTo(T_String, e2.wdlType)) {
                 t
               } else {
                 handleError(
                     s"expression ${prettyFormatExpr(e2)} of type ${e2.wdlType} is not coercible to string",
-                    innerExpr.loc
+                    nestedExpr.loc
                 )
                 if (t == initialType) {
                   e2.wdlType
@@ -179,8 +179,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           TAT.ExprCompoundString(vec2, wdlType, loc)
 
         case AST.ExprPair(l, r, loc) =>
-          val l2 = inner(l, inStringOrCommand, inStringOrCommand)
-          val r2 = inner(r, inStringOrCommand, inStringOrCommand)
+          val l2 = nested(l, nestedState)
+          val r2 = nested(r, nestedState)
           val t = T_Pair(l2.wdlType, r2.wdlType)
           TAT.ExprPair(l2, r2, t, loc)
 
@@ -189,14 +189,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
 
         case AST.ExprArray(vec, loc) =>
-          val tVecExprs = vec.map(e => inner(e, inStringOrCommand, inStringOrCommand))
+          val tVecExprs = vec.map(e => nested(e, nestedState))
           val t =
             try {
               T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
             } catch {
               case _: TypeUnificationException =>
                 handleError("array elements must have the same type, or be coercible to one",
-                            innerExpr.loc)
+                            nestedExpr.loc)
                 tVecExprs.head.wdlType
             }
           TAT.ExprArray(tVecExprs, t, loc)
@@ -204,8 +204,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         case AST.ExprObject(members, loc) =>
           val members2 = members.map {
             case AST.ExprMember(key, value, _) =>
-              val k = inner(key, inStringOrCommand, inStringOrCommand)
-              val v = inner(value, inStringOrCommand, inStringOrCommand)
+              val k = nested(key, nestedState)
+              val v = nested(value, nestedState)
               k -> v
           }.toMap
           TAT.ExprObject(members2, T_Object, loc)
@@ -216,8 +216,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
         case AST.ExprMap(value, loc) =>
           val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
-            val k = inner(item.key, inStringOrCommand, inStringOrCommand)
-            val v = inner(item.value, inStringOrCommand, inStringOrCommand)
+            val k = nested(item.key, nestedState)
+            val v = nested(item.value, nestedState)
             k -> v
           }.toMap
           // unify the key types
@@ -230,12 +230,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // These are expressions like:
         // ${true="--yes" false="--no" boolean_value}
         case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
-          if (inPlaceholder) {
+          if (nestedState >= ExprState.InPlaceholder) {
             throw new TypeException(s"nested placeholder", loc)
           }
-          val te = inner(t, inStringOrCommand = true, inPlaceholder = true)
-          val fe = inner(f, inStringOrCommand = true, inPlaceholder = true)
-          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val te = nested(t, ExprState.InPlaceholder)
+          val fe = nested(f, ExprState.InPlaceholder)
+          val ve = nested(value, ExprState.InPlaceholder)
           val wdlType = if (te.wdlType != fe.wdlType) {
             handleError(
                 s"subexpressions ${prettyFormatExpr(te)} and ${prettyFormatExpr(fe)} must have the same type",
@@ -245,7 +245,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           } else if (ve.wdlType != T_Boolean) {
             val msg =
               s"condition ${prettyFormatExpr(ve)} should have boolean type, it has type ${prettyFormatType(ve.wdlType)} instead"
-            handleError(msg, innerExpr.loc)
+            handleError(msg, nestedExpr.loc)
             ve.wdlType
           } else {
             te.wdlType
@@ -255,11 +255,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // An expression like:
         // ${default="foo" optional_value}
         case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
-          if (inPlaceholder) {
+          if (nestedState >= ExprState.InPlaceholder) {
             throw new TypeException(s"nested placeholder", loc)
           }
-          val de = inner(default, inStringOrCommand = true, inPlaceholder = true)
-          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val de = nested(default, ExprState.InPlaceholder)
+          val ve = nested(value, ExprState.InPlaceholder)
           val t = ve.wdlType match {
             case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
             case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
@@ -272,7 +272,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                        ve.wdlType
                    )}) instead
                     |""".stripMargin.replaceAll("\n", " ")
-              handleError(msg, innerExpr.loc)
+              handleError(msg, nestedExpr.loc)
               ve.wdlType
           }
           TAT.ExprPlaceholderDefault(de, ve, t, loc)
@@ -280,13 +280,13 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // An expression like:
         // ${sep=", " array_value}
         case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
-          if (inPlaceholder) {
+          if (nestedState >= ExprState.InPlaceholder) {
             throw new TypeException(s"nested placeholder", loc)
           }
-          val se = inner(sep, inStringOrCommand = true, inPlaceholder = true)
+          val se = nested(sep, ExprState.InPlaceholder)
           if (se.wdlType != T_String)
             throw new TypeException(s"separator ${prettyFormatExpr(se)} must have string type", loc)
-          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val ve = nested(value, ExprState.InPlaceholder)
           val t = ve.wdlType match {
             case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
               T_String
@@ -300,8 +300,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
         // Access an array element at [index: Int] or a map value at [key: K]
         case AST.ExprAt(collection: AST.Expr, index: AST.Expr, loc) =>
-          val eIndex = inner(index, inStringOrCommand, inStringOrCommand)
-          val eCollection = inner(collection, inStringOrCommand, inStringOrCommand)
+          val eIndex = nested(index, nestedState)
+          val eCollection = nested(collection, nestedState)
           val t = (eIndex.wdlType, eCollection.wdlType) match {
             case (T_Int, T_Array(elementType, _))                                  => elementType
             case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
@@ -318,9 +318,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // conditional:
         // if (x == 1) then "Sunday" else "Weekday"
         case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, loc) =>
-          val eCond = inner(cond, inStringOrCommand, inStringOrCommand)
-          val eTrueBranch = inner(trueBranch, inStringOrCommand, inStringOrCommand)
-          val eFalseBranch = inner(falseBranch, inStringOrCommand, inStringOrCommand)
+          val eCond = nested(cond, nestedState)
+          val eTrueBranch = nested(trueBranch, nestedState)
+          val eFalseBranch = nested(falseBranch, nestedState)
           val t = {
             if (eCond.wdlType != T_Boolean) {
               handleError(s"condition ${prettyFormatExpr(eCond)} must be a boolean", eCond.loc)
@@ -336,7 +336,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                         |  true branch: ${prettyFormatType(eTrueBranch.wdlType)}
                         |  flase branch: ${prettyFormatType(eFalseBranch.wdlType)}
                         |""".stripMargin
-                  handleError(msg, innerExpr.loc)
+                  handleError(msg, nestedExpr.loc)
                   eTrueBranch.wdlType
               }
             }
@@ -346,26 +346,26 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // Apply a standard library function to arguments. For example:
         //   read_int("4")
         case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], loc) =>
-          val eElements = elements.map(e => inner(e, inStringOrCommand, inStringOrCommand))
+          val eElements = elements.map(e => nested(e, nestedState))
           try {
             val (outputType, funcSig) =
-              ctx.stdlib.apply(funcName, eElements.map(_.wdlType), inPlaceholder)
+              ctx.stdlib.apply(funcName, eElements.map(_.wdlType), nestedState)
             TAT.ExprApply(funcName, funcSig, eElements, outputType, loc)
           } catch {
             case e: StdlibFunctionException =>
-              handleError(e.getMessage, innerExpr.loc)
-              TAT.ValueNone(T_Any, innerExpr.loc)
+              handleError(e.getMessage, nestedExpr.loc)
+              TAT.ValueNone(T_Any, nestedExpr.loc)
           }
 
         // Access a field in a struct or an object. For example "x.a" in:
         //   Int z = x.a
         case AST.ExprGetName(expr: AST.Expr, id: String, loc) =>
-          val e = inner(expr, inStringOrCommand, inStringOrCommand)
+          val e = nested(expr, nestedState)
           val t = typeEvalExprGetName(e, id, ctx)
           TAT.ExprGetName(e, id, t, loc)
       }
     }
-    inner(expr, inCommand, inPlaceholder = false)
+    nested(expr, exprState)
   }
 
   private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: Context): WdlType = {
@@ -405,9 +405,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //   Int x = 5
   //   Int x = 7 + y
   private def applyDecl(decl: AST.Declaration,
-                        bindings: Map[String, WdlType],
                         ctx: Context,
-                        canShadow: Boolean = false): TAT.Declaration = {
+                        bindings: Bindings,
+                        canShadow: Boolean = false): (TAT.Declaration, Bindings) = {
 
     val lhsType = typeFromAst(decl.wdlType, decl.loc, ctx)
     val tDecl = decl.expr match {
@@ -418,7 +418,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         //  must have a value
         TAT.Declaration(decl.name, lhsType, None, decl.loc)
       case Some(expr) =>
-        val e = applyExpr(expr, bindings, ctx)
+        val e = applyExpr(expr, ctx, bindings)
         val rhsType = e.wdlType
         val wdlType = if (unify.isCoercibleTo(lhsType, rhsType)) {
           lhsType
@@ -440,14 +440,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       handleError(s"variable ${decl.name} shadows an existing variable", decl.loc)
     }
 
-    tDecl
+    (tDecl, bindings + (tDecl.name -> tDecl.wdlType))
   }
 
   // type check the input section, and see that there are no double definitions.
   // return input definitions
   //
   private def applyInputSection(inputSection: AST.InputSection,
-                                ctx: Context): Vector[TAT.InputDefinition] = {
+                                ctx: Context): (Vector[TAT.InputDefinition], Context) = {
     // translate each declaration
     val (tDecls, _, _) =
       inputSection.declarations
@@ -456,12 +456,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             if (names.contains(decl.name)) {
               handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
             }
-            val tDecl = applyDecl(decl, bindings, ctx)
-            (tDecls :+ tDecl, names + decl.name, bindings + (tDecl.name -> tDecl.wdlType))
+            val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings)
+            (tDecls :+ tDecl, names + decl.name, afterBindings)
         }
 
     // convert the typed declarations into input definitions
-    tDecls.map { tDecl =>
+    val tInputDefs = tDecls.map { tDecl =>
       // What kind of input is this?
       // compulsory, optional, one with a default
       tDecl.expr match {
@@ -477,11 +477,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
+
+    val afterCtx = ctx.bindInputSection(tInputDefs)
+    (tInputDefs, afterCtx)
   }
 
   // Calculate types for the outputs, and return a new typed output section
   private def applyOutputSection(outputSection: AST.OutputSection,
-                                 ctx: Context): Vector[TAT.OutputDefinition] = {
+                                 ctx: Context): (Vector[TAT.OutputDefinition], Context) = {
     // output variables can shadow input definitions, but not intermediate
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
@@ -499,13 +502,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             if (both.contains(decl.name)) {
               handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.loc)
             }
-            val tDecl = applyDecl(decl, bindings, ctx, canShadow = true)
-            val bindings2 = bindings + (tDecl.name -> tDecl.wdlType)
-            (tDecls :+ tDecl, names + tDecl.name, bindings2)
+            val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings, canShadow = true)
+            (tDecls :+ tDecl, names + tDecl.name, afterBindings)
         }
 
     // convert the declarations into output definitions
-    tDecls.map { tDecl =>
+    val outputDefs = tDecls.map { tDecl =>
       tDecl.expr match {
         case None =>
           throw new TypeException("Outputs must have expressions", tDecl.loc)
@@ -513,30 +515,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
-  }
 
-  // calculate the type signature of a workflow or a task
-  private def calcSignature(
-      inputSection: Vector[TAT.InputDefinition],
-      outputSection: Vector[TAT.OutputDefinition]
-  ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
-    val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
-      case d: TAT.RequiredInputDefinition =>
-        // input is compulsory
-        d.name -> (d.wdlType, false)
-      case d: TAT.OverridableInputDefinitionWithDefault =>
-        // input has a default value, caller may omit it.
-        d.name -> (d.wdlType, true)
-      case d: TAT.OptionalInputDefinition =>
-        // input is optional, caller can omit it.
-        d.name -> (d.wdlType, true)
-    }.toMap
-
-    val outputType: Map[String, WdlType] = outputSection.map { tDecl =>
-      tDecl.name -> tDecl.wdlType
-    }.toMap
-
-    (inputType, outputType)
+    val afterCtx = ctx.bindOutputSection(outputDefs)
+    (outputDefs, afterCtx)
   }
 
   // The runtime section can make use of values defined in declarations
@@ -544,7 +525,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
     val m = rtSection.kvs.map {
       case AST.RuntimeKV(id, expr, loc) =>
-        val tExpr = applyExpr(expr, Map.empty, ctx)
+        val tExpr = applyExpr(expr, ctx)
         // if there are type restrictions, check that the type of the expression is coercible to
         // one of the allowed types
         if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
@@ -619,6 +600,30 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     )
   }
 
+  // calculate the type signature of a workflow or a task
+  private def calcSignature(
+      inputSection: Vector[TAT.InputDefinition],
+      outputSection: Vector[TAT.OutputDefinition]
+  ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
+    val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
+      case d: TAT.RequiredInputDefinition =>
+        // input is compulsory
+        d.name -> (d.wdlType, false)
+      case d: TAT.OverridableInputDefinitionWithDefault =>
+        // input has a default value, caller may omit it.
+        d.name -> (d.wdlType, true)
+      case d: TAT.OptionalInputDefinition =>
+        // input is optional, caller can omit it.
+        d.name -> (d.wdlType, true)
+    }.toMap
+
+    val outputType: Map[String, WdlType] = outputSection.map { tDecl =>
+      tDecl.name -> tDecl.wdlType
+    }.toMap
+
+    (inputType, outputType)
+  }
+
   // TASK
   //
   // - An inputs type has to match the type of its default value (if any)
@@ -626,43 +631,37 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: AST.Task, ctxOuter: Context): TAT.Task = {
-    val (inputDefs, ctx) = task.input match {
-      case None =>
-        (Vector.empty, ctxOuter)
-      case Some(inpSection) =>
-        val tInpSection = applyInputSection(inpSection, ctxOuter)
-        val ctx = ctxOuter.bindInputSection(tInpSection)
-        (tInpSection, ctx)
+  private def applyTask(task: AST.Task, ctx: Context): TAT.Task = {
+    val (inputDefs, inputCtx) = task.input match {
+      case None               => (Vector.empty, ctx)
+      case Some(inputSection) => applyInputSection(inputSection, ctx)
     }
 
     // add types to the declarations, and accumulate context
-    val (tRawDecl, _) =
+    val (tDeclarations, _) =
       task.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty)) {
         case ((tDecls, bindings), decl) =>
-          val tDecl = applyDecl(decl, bindings, ctx)
-          (tDecls :+ tDecl, bindings + (tDecl.name -> tDecl.wdlType))
+          val (tDecl, afterBindings) = applyDecl(decl, inputCtx, bindings)
+          (tDecls :+ tDecl, afterBindings)
       }
-    val (tDeclarations, ctxDecl) = tRawDecl.foldLeft((Vector.empty[TAT.Declaration], ctx)) {
-      case ((tDecls, curCtx), tDecl) =>
-        val newCtx =
-          try {
-            curCtx.bindVar(tDecl.name, tDecl.wdlType)
-          } catch {
-            case e: DuplicateDeclarationException =>
-              handleError(e.getMessage, tDecl.loc)
-              curCtx
-          }
-        (tDecls :+ tDecl, newCtx)
+    val declCtx = tDeclarations.foldLeft(inputCtx) {
+      case (beforeCtx, tDecl) =>
+        try {
+          beforeCtx.bindDeclaration(tDecl.name, tDecl.wdlType)
+        } catch {
+          case e: DuplicateDeclarationException =>
+            handleError(e.getMessage, tDecl.loc)
+            beforeCtx
+        }
     }
 
-    val tRuntime = task.runtime.map(applyRuntime(_, ctxDecl))
-    val tHints = task.hints.map(applyHints(_, ctxDecl))
+    val tRuntime = task.runtime.map(applyRuntime(_, declCtx))
+    val tHints = task.hints.map(applyHints(_, declCtx))
 
     // check that all expressions can be coereced to a string inside
     // the command section
-    val cmdParts = task.command.parts.map { expr =>
-      val e = applyExpr(expr, Map.empty, ctxDecl, inCommand = true)
+    val tCommandParts = task.command.parts.map { expr =>
+      val e = applyExpr(expr, declCtx, exprState = ExprState.InString)
       e.wdlType match {
         case x if isPrimitive(x)             => e
         case T_Optional(x) if isPrimitive(x) => e
@@ -674,26 +673,22 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           TAT.ValueString(prettyFormatExpr(e), T_String, e.loc)
       }
     }
-    val tCommand = TAT.CommandSection(cmdParts, task.command.loc)
+    val tCommand = TAT.CommandSection(tCommandParts, task.command.loc)
 
-    val (outputDefs, ctxOutput) = task.output match {
-      case None =>
-        (Vector.empty, ctxDecl)
-      case Some(outSection) =>
-        val tOutSection = applyOutputSection(outSection, ctxDecl)
-        val ctx = ctxDecl.bindOutputSection(tOutSection)
-        (tOutSection, ctx)
+    val (outputDefs, outputCtx) = task.output match {
+      case None             => (Vector.empty, declCtx)
+      case Some(outSection) => applyOutputSection(outSection, declCtx)
     }
 
-    val tMeta = task.meta.map(applyMeta(_, ctxOutput))
-    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, ctxOutput))
+    val tMeta = task.meta.map(applyMeta(_, outputCtx))
+    val tParamMeta = task.parameterMeta.map(applyParamMeta(_, outputCtx))
 
     // calculate the type signature of the task
     val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
-
+    val taskType = T_Task(task.name, inputType, outputType)
     TAT.Task(
         name = task.name,
-        wdlType = T_Task(task.name, inputType, outputType),
+        wdlType = taskType,
         inputs = inputDefs,
         outputs = outputDefs,
         command = tCommand,
@@ -764,7 +759,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(AST.CallInputs(value, _)) =>
         value.map { inp =>
           val argName = inp.name
-          val tExpr = applyExpr(inp.expr, Map.empty, ctx)
+          val tExpr = applyExpr(inp.expr, ctx)
           // type-check input argument
           val errorMsg = callee.input.get(argName) match {
             case None =>
@@ -824,6 +819,85 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     )
   }
 
+  // The body of the scatter becomes accessible to statements that come after it.
+  // The iterator is not visible outside the scatter body.
+  //
+  // for (i in [1, 2, 3]) {
+  //    call A
+  // }
+  //
+  // Variable "i" is not visible after the scatter completes.
+  // A's members are arrays.
+  private def applyScatter(scatter: AST.Scatter, ctx: Context): (TAT.Scatter, Bindings) = {
+    val eCollection = applyExpr(scatter.expr, ctx)
+    val elementType = eCollection.wdlType match {
+      case T_Array(elementType, _) => elementType
+      case other =>
+        handleError(s"Scatter collection ${scatter.identifier} is not an array type", scatter.loc)
+        other
+    }
+    // add a binding for the iteration variable
+    //
+    // The iterator identifier is not exported outside the scatter
+    val bodyCtx =
+      try {
+        ctx.bindDeclaration(scatter.identifier, elementType)
+      } catch {
+        case e: DuplicateDeclarationException =>
+          handleError(e.getMessage, scatter.loc)
+          ctx
+      }
+
+    val (tBody, bindings) = applyWorkflowElements(scatter.body, bodyCtx)
+    assert(!bindings.contains(scatter.identifier))
+
+    // Add an array type to all variables defined in the scatter body
+    val gatherBindings =
+      bindings.map {
+        case (callName, callType: T_Call) =>
+          val callOutput = callType.output.map {
+            case (name, t) => name -> T_Array(t)
+          }
+          callName -> T_Call(callType.name, callOutput)
+        case (varName, typ: T) =>
+          varName -> T_Array(typ)
+      }
+
+    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tBody, scatter.loc)
+    (tScatter, gatherBindings)
+  }
+
+  // The body of a conditional is accessible to the statements that come after it.
+  // This is different than the scoping rules for other programming languages.
+  //
+  // Add an optional modifier to all the types inside the body.
+  private def applyConditional(cond: AST.Conditional, ctx: Context): (TAT.Conditional, Bindings) = {
+    val condExpr = applyExpr(cond.expr, ctx) match {
+      case e if e.wdlType == T_Boolean => e
+      case e =>
+        handleError(s"Expression ${prettyFormatExpr(e)} must have boolean type", cond.loc)
+        TAT.ValueBoolean(value = false, T_Boolean, e.loc)
+    }
+
+    // keep track of the inner/outer bindings. Within the block we need [inner],
+    // [outer] is what we produce, which has the optional modifier applied to
+    // everything.
+    val (wfElements, bindings) = applyWorkflowElements(cond.body, ctx)
+
+    val optionalBindings =
+      bindings.map {
+        case (callName, callType: T_Call) =>
+          val callOutput = callType.output.map {
+            case (name, t) => name -> Utils.makeOptional(t)
+          }
+          callName -> T_Call(callType.name, callOutput)
+        case (varName, typ: WdlType) =>
+          varName -> Utils.makeOptional(typ)
+      }
+
+    (TAT.Conditional(condExpr, wfElements, cond.loc), optionalBindings)
+  }
+
   // Add types to a block of workflow-elements:
   //
   // For example:
@@ -835,165 +909,62 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //  1) type bindings for this block (x --> Int, A ---> Call, ..)
   //  2) the typed workflow elements
   private def applyWorkflowElements(
-      ctx: Context,
-      body: Vector[AST.WorkflowElement]
-  ): (Bindings, Vector[TAT.WorkflowElement]) = {
-    body.foldLeft((Bindings.empty, Vector.empty[TAT.WorkflowElement])) {
-      case ((bindings, wElements), decl: AST.Declaration) =>
-        val tDecl = applyDecl(decl, bindings, ctx)
-        (bindings + (tDecl.name -> tDecl.wdlType), wElements :+ tDecl)
+      body: Vector[AST.WorkflowElement],
+      ctx: Context
+  ): (Vector[TAT.WorkflowElement], Bindings) = {
+    body.foldLeft((Vector.empty[TAT.WorkflowElement], Bindings.empty)) {
+      case ((tElements, bindings), decl: AST.Declaration) =>
+        val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings)
+        (tElements :+ tDecl, afterBindings)
 
-      case ((bindings, wElements), wElt) =>
+      case ((tElements, bindings), wfElement) =>
         val newCtx =
           try {
-            ctx.bindVarList(bindings)
+            ctx.bindDeclarations(bindings)
           } catch {
             case e: DuplicateDeclarationException =>
-              handleError(e.getMessage, wElt.loc)
+              handleError(e.getMessage, wfElement.loc)
               ctx
           }
-        wElt match {
+        wfElement match {
           case call: AST.Call =>
             val tCall = applyCall(call, newCtx)
-            (bindings + (tCall.actualName -> tCall.wdlType), wElements :+ tCall)
+            (tElements :+ tCall, bindings + (tCall.actualName -> tCall.wdlType))
 
-          case subSct: AST.Scatter =>
+          case scatter: AST.Scatter =>
             // a nested scatter
-            val (tScatter, sctBindings) = applyScatter(subSct, newCtx)
-            (bindings ++ sctBindings, wElements :+ tScatter)
+            val (tScatter, scatterBindings) = applyScatter(scatter, newCtx)
+            (tElements :+ tScatter, bindings ++ scatterBindings)
 
           case cond: AST.Conditional =>
             // a nested conditional
             val (tCond, condBindings) = applyConditional(cond, newCtx)
-            (bindings ++ condBindings, wElements :+ tCond)
+            (tElements :+ tCond, bindings ++ condBindings)
 
           case other => throw new RuntimeException(s"Unexpected workflow element ${other}")
         }
     }
   }
 
-  // The body of the scatter becomes accessible to statements that come after it.
-  // The iterator is not visible outside the scatter body.
-  //
-  // for (i in [1, 2, 3]) {
-  //    call A
-  // }
-  //
-  // Variable "i" is not visible after the scatter completes.
-  // A's members are arrays.
-  private def applyScatter(scatter: AST.Scatter, ctxOuter: Context): (TAT.Scatter, Bindings) = {
-    val eCollection = applyExpr(scatter.expr, Map.empty, ctxOuter)
-    val elementType = eCollection.wdlType match {
-      case T_Array(elementType, _) => elementType
-      case other =>
-        handleError(s"Scatter collection ${scatter.identifier} is not an array type", scatter.loc)
-        other
+  private def applyWorkflow(wf: AST.Workflow, ctx: Context): TAT.Workflow = {
+    val (inputDefs, inputCtx) = wf.input match {
+      case None               => (Vector.empty, ctx)
+      case Some(inputSection) => applyInputSection(inputSection, ctx)
     }
-    // add a binding for the iteration variable
-    //
-    // The iterator identifier is not exported outside the scatter
-    val (ctxInner, _) =
-      try {
-        (ctxOuter.bindVar(scatter.identifier, elementType), elementType)
-      } catch {
-        case e: DuplicateDeclarationException =>
-          handleError(e.getMessage, scatter.loc)
-          (ctxOuter, elementType)
-      }
-
-    val (bindings, tElements) = applyWorkflowElements(ctxInner, scatter.body)
-    assert(!(bindings contains scatter.identifier))
-
-    // Add an array type to all variables defined in the scatter body
-    val bindingsWithArray =
-      bindings.map {
-        case (callName, callType: T_Call) =>
-          val callOutput = callType.output.map {
-            case (name, t) => name -> T_Array(t)
-          }
-          callName -> T_Call(callType.name, callOutput)
-        case (varName, typ: T) =>
-          varName -> T_Array(typ)
-      }
-
-    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tElements, scatter.loc)
-    (tScatter, bindingsWithArray)
-  }
-
-  // Ensure that a type is optional, but avoid making it doubly so.
-  // For example:
-  //   Int --> Int?
-  //   Int? --> Int?
-  // Avoid this:
-  //   Int?  --> Int??
-  private def makeOptional(t: WdlType): WdlType = {
-    t match {
-      case T_Optional(x) => x
-      case x             => T_Optional(x)
+    val (wfElements, bindings) = applyWorkflowElements(wf.body, inputCtx)
+    val bodyCtx = inputCtx.bindDeclarations(bindings)
+    val (outputDefs, outputCtx) = wf.output match {
+      case None                => (Vector.empty, bodyCtx)
+      case Some(outputSection) => applyOutputSection(outputSection, bodyCtx)
     }
-  }
-
-  // The body of a conditional is accessible to the statements that come after it.
-  // This is different than the scoping rules for other programming languages.
-  //
-  // Add an optional modifier to all the types inside the body.
-  private def applyConditional(cond: AST.Conditional,
-                               ctxOuter: Context): (TAT.Conditional, Bindings) = {
-    val condExpr = applyExpr(cond.expr, Map.empty, ctxOuter) match {
-      case e if e.wdlType == T_Boolean => e
-      case e =>
-        handleError(s"Expression ${prettyFormatExpr(e)} must have boolean type", cond.loc)
-        TAT.ValueBoolean(value = false, T_Boolean, e.loc)
-    }
-
-    // keep track of the inner/outer bindings. Within the block we need [inner],
-    // [outer] is what we produce, which has the optional modifier applied to
-    // everything.
-    val (bindings, wfElements) = applyWorkflowElements(ctxOuter, cond.body)
-
-    val bindingsWithOpt =
-      bindings.map {
-        case (callName, callType: T_Call) =>
-          val callOutput = callType.output.map {
-            case (name, t) => name -> makeOptional(t)
-          }
-          callName -> T_Call(callType.name, callOutput)
-        case (varName, typ: WdlType) =>
-          varName -> makeOptional(typ)
-      }
-    (TAT.Conditional(condExpr, wfElements, cond.loc), bindingsWithOpt)
-  }
-
-  private def applyWorkflow(wf: AST.Workflow, ctxOuter: Context): TAT.Workflow = {
-    val (inputDefs, ctx) = wf.input match {
-      case None =>
-        (Vector.empty, ctxOuter)
-      case Some(inpSection) =>
-        val tInpSection = applyInputSection(inpSection, ctxOuter)
-        val ctx = ctxOuter.bindInputSection(tInpSection)
-        (tInpSection, ctx)
-    }
-
-    val (bindings, wfElements) = applyWorkflowElements(ctx, wf.body)
-    val ctxBody = ctx.bindVarList(bindings)
-
-    val (outputDefs, ctxOutput) = wf.output match {
-      case None =>
-        (Vector.empty, ctxBody)
-      case Some(outSection) =>
-        val tOutSection = applyOutputSection(outSection, ctxBody)
-        val ctx = ctxBody.bindOutputSection(tOutSection)
-        (tOutSection, ctx)
-    }
-
-    val tMeta = wf.meta.map(applyMeta(_, ctxOutput))
-    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, ctxOutput))
-
+    val tMeta = wf.meta.map(applyMeta(_, outputCtx))
+    val tParamMeta = wf.parameterMeta.map(applyParamMeta(_, outputCtx))
     // calculate the type signature of the workflow
     val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
+    val wfType = T_Workflow(wf.name, inputType, outputType)
     TAT.Workflow(
         name = wf.name,
-        wdlType = T_Workflow(wf.name, inputType, outputType),
+        wdlType = wfType,
         inputs = inputDefs,
         outputs = outputDefs,
         meta = tMeta,
@@ -1005,35 +976,30 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
-    val wdlVersion = doc.version.value
-    val initCtx = Context(
-        version = wdlVersion,
-        stdlib = Stdlib(regime, wdlVersion, logger),
-        docSource = doc.source
-    )
+    val emptyCtx = Context.create(doc, regime, logger)
 
     // translate each of the elements in the document
-    val (context, elements) =
-      doc.elements.foldLeft((initCtx, Vector.empty[TAT.DocumentElement])) {
-        case ((ctx, elems), task: AST.Task) =>
-          val task2 = applyTask(task, ctx)
-          val newCtx =
+    val (elements, elementCtx) =
+      doc.elements.foldLeft((Vector.empty[TAT.DocumentElement], emptyCtx)) {
+        case ((tElements, beforeCtx), task: AST.Task) =>
+          val tTask = applyTask(task, beforeCtx)
+          val afterCtx =
             try {
-              ctx.bindCallable(task2.wdlType)
+              beforeCtx.bindCallable(tTask.wdlType)
             } catch {
               case e: DuplicateDeclarationException =>
                 handleError(e.getMessage, task.loc)
-                ctx
+                beforeCtx
             }
-          (newCtx, elems :+ task2)
+          (tElements :+ tTask, afterCtx)
 
-        case ((ctx, elems), iStat: AST.ImportDoc) =>
+        case ((tElements, beforeCtx), importDoc: AST.ImportDoc) =>
           // recurse into the imported document, add types
-          logger.trace(s"inferring types in ${iStat.doc.get.source}",
+          logger.trace(s"inferring types in ${importDoc.doc.get.source}",
                        minLevel = TraceLevel.VVerbose)
-          val (iDoc, iCtx) = applyDoc(iStat.doc.get)
-          val name = iStat.name.map(_.value)
-          val addr = iStat.addr.value
+          val (tDoc, importCtx) = applyDoc(importDoc.doc.get)
+          val name = importDoc.name.map(_.value)
+          val addr = importDoc.addr.value
 
           // Figure out what to name the sub-document
           val namespace = name match {
@@ -1049,62 +1015,58 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case Some(x) => x
           }
 
-          val aliases = iStat.aliases.map {
+          val tAliases = importDoc.aliases.map {
             case AST.ImportAlias(id1, id2, loc) =>
-              TAT.ImportAlias(id1, id2, ctx.aliases(id1), loc)
+              TAT.ImportAlias(id1, id2, beforeCtx.aliases(id1), loc)
           }
 
-          val importDoc = TAT.ImportDoc(namespace, aliases, addr, iDoc, iStat.loc)
+          val tImportDoc = TAT.ImportDoc(namespace, tAliases, addr, tDoc, importDoc.loc)
 
           // add the externally visible definitions to the context
-          val newCtx =
+          val afterCtx =
             try {
-              ctx.bindImportedDoc(namespace, iCtx, iStat.aliases)
+              beforeCtx.bindImportedDoc(namespace, importCtx, importDoc.aliases)
             } catch {
               case e: DuplicateDeclarationException =>
-                handleError(e.getMessage, importDoc.loc)
-                ctx
+                handleError(e.getMessage, tImportDoc.loc)
+                beforeCtx
             }
-          (newCtx, elems :+ importDoc)
+          (tElements :+ tImportDoc, afterCtx)
 
-        case ((ctx, elems), struct: AST.TypeStruct) =>
+        case ((tElements, beforeCtx), struct: AST.TypeStruct) =>
           // Add the struct to the context
-          val tStruct = typeFromAst(struct, struct.loc, ctx).asInstanceOf[T_Struct]
-          val defStruct = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.loc)
-          val newCtx =
+          val tStruct = typeFromAst(struct, struct.loc, beforeCtx).asInstanceOf[T_Struct]
+          val tStructDef = TAT.StructDefinition(struct.name, tStruct, tStruct.members, struct.loc)
+          val afterCtx =
             try {
-              ctx.bindStruct(tStruct)
+              beforeCtx.bindStruct(tStruct)
             } catch {
               case e: DuplicateDeclarationException =>
                 handleError(e.getMessage, struct.loc)
-                ctx
+                beforeCtx
             }
-          (newCtx, elems :+ defStruct)
+          (tElements :+ tStructDef, afterCtx)
       }
 
     // now that we have types for everything else, we can check the workflow
-    val (tWf, contextFinal) = doc.workflow match {
-      case None => (None, context)
+    val (workflow, finalContext) = doc.workflow match {
+      case None => (None, elementCtx)
       case Some(wf) =>
-        val tWf = applyWorkflow(wf, context)
-        val ctxFinal =
+        val tWorkflow = applyWorkflow(wf, elementCtx)
+        val afterCtx =
           try {
-            context.bindCallable(tWf.wdlType)
+            elementCtx.bindCallable(tWorkflow.wdlType)
           } catch {
             case e: DuplicateDeclarationException =>
               handleError(e.getMessage, wf.loc)
-              context
+              elementCtx
           }
-        (Some(tWf), ctxFinal)
+        (Some(tWorkflow), afterCtx)
     }
 
-    val tDoc = TAT.Document(doc.source,
-                            TAT.Version(doc.version.value, doc.version.loc),
-                            elements,
-                            tWf,
-                            doc.loc,
-                            doc.comments)
-    (tDoc, contextFinal)
+    val tVersion = TAT.Version(doc.version.value, doc.version.loc)
+    val tDoc = TAT.Document(doc.source, tVersion, elements, workflow, doc.loc, doc.comments)
+    (tDoc, finalContext)
   }
 
   // Main entry point

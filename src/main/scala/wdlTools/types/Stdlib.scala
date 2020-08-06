@@ -2,6 +2,7 @@ package wdlTools.types
 
 import WdlTypes.{T_Function2, T_Var, _}
 import wdlTools.syntax.{Operator, WdlVersion}
+import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.{Logger, TraceLevel}
 
@@ -438,12 +439,13 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
   ).flatten
 
   // choose the standard library prototypes according to the WDL version
-  private def protoTable(inPlaceholder: Boolean): Vector[T_Function] = version match {
+  private def protoTable(exprState: ExprState): Vector[T_Function] = version match {
     case WdlVersion.Draft_2 =>
       draft2Prototypes
     case WdlVersion.V1 =>
       v1Prototypes
-    case WdlVersion.V2 if inPlaceholder || regime <= TypeCheckingRegime.Lenient =>
+    case WdlVersion.V2
+        if exprState >= ExprState.InPlaceholder || regime <= TypeCheckingRegime.Lenient =>
       v2Prototypes ++ v2PlaceholderPrototypes
     case WdlVersion.V2 =>
       v2Prototypes
@@ -452,8 +454,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
 
   // build a mapping from a function name to all of its prototypes.
   // Some functions are overloaded, so they may have several.
-  private def funcProtoMap(inPlaceholder: Boolean): Map[String, Vector[T_Function]] = {
-    protoTable(inPlaceholder).foldLeft(Map.empty[String, Vector[T_Function]]) {
+  private def funcProtoMap(exprState: ExprState): Map[String, Vector[T_Function]] = {
+    protoTable(exprState).foldLeft(Map.empty[String, Vector[T_Function]]) {
       case (accu, funcDesc: T_Function) =>
         accu.get(funcDesc.name) match {
           case None =>
@@ -499,13 +501,12 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
     * matches `inputTypes`.
     * @param funcName The function name
     * @param inputTypes The input types
-    * @param inPlaceholder whether the function is being evaluated within a placeholder -
-    *                      this currently only pertains to the special handling of
-    *                      concatenation of optional types in V2+.
+    * @param exprState the state of the expression at which point this function is
+    *                   being evaluated.
     * @return
     */
-  def apply(funcName: String, inputTypes: Vector[T], inPlaceholder: Boolean): (T, T_Function) = {
-    val candidates: Vector[T_Function] = funcProtoMap(inPlaceholder).get(funcName) match {
+  def apply(funcName: String, inputTypes: Vector[T], exprState: ExprState): (T, T_Function) = {
+    val candidates: Vector[T_Function] = funcProtoMap(exprState).get(funcName) match {
       case None =>
         throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
       case Some(protoVec) =>
