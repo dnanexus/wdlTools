@@ -2,7 +2,7 @@ package wdlTools.syntax.v2
 
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v2.{ConcreteSyntax => CST}
-import wdlTools.syntax.{SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
+import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
 import wdlTools.util.{FileSource, FileSourceResolver, Logger, StringFileSource}
 
 // parse and follow imports
@@ -66,39 +66,57 @@ case class ParseAll(followImports: Boolean = false,
 
         // operators on one argument
         case CST.ExprUnaryPlus(value, srcText) =>
-          AST.ExprUnaryPlus(translateExpr(value), srcText)
+          AST.ExprApply(Operator.UnaryPlus.name, Vector(translateExpr(value)), srcText)
         case CST.ExprUnaryMinus(value, srcText) =>
-          AST.ExprUnaryMinus(translateExpr(value), srcText)
+          AST.ExprApply(Operator.UnaryMinus.name, Vector(translateExpr(value)), srcText)
         case CST.ExprNegate(value, srcText) =>
-          AST.ExprNegate(translateExpr(value), srcText)
+          AST.ExprApply(Operator.LogicalNot.name, Vector(translateExpr(value)), srcText)
 
         // operators on two arguments
         case CST.ExprLor(a, b, srcText) =>
-          AST.ExprLor(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.LogicalOr.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprLand(a, b, srcText) =>
-          AST.ExprLand(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.LogicalAnd.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprEqeq(a, b, srcText) =>
-          AST.ExprEqeq(translateExpr(a), translateExpr(b), srcText)
-        case CST.ExprLt(a, b, srcText) =>
-          AST.ExprLt(translateExpr(a), translateExpr(b), srcText)
-        case CST.ExprGte(a, b, srcText) =>
-          AST.ExprGte(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Equality.name, Vector(translateExpr(a), translateExpr(b)), srcText)
         case CST.ExprNeq(a, b, srcText) =>
-          AST.ExprNeq(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Inequality.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
+        case CST.ExprLt(a, b, srcText) =>
+          AST.ExprApply(Operator.LessThan.name, Vector(translateExpr(a), translateExpr(b)), srcText)
         case CST.ExprLte(a, b, srcText) =>
-          AST.ExprLte(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.LessThanOrEqual.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprGt(a, b, srcText) =>
-          AST.ExprGt(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.GreaterThan.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
+        case CST.ExprGte(a, b, srcText) =>
+          AST.ExprApply(Operator.GreaterThanOrEqual.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprAdd(a, b, srcText) =>
-          AST.ExprAdd(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Addition.name, Vector(translateExpr(a), translateExpr(b)), srcText)
         case CST.ExprSub(a, b, srcText) =>
-          AST.ExprSub(translateExpr(a), translateExpr(b), srcText)
-        case CST.ExprMod(a, b, srcText) =>
-          AST.ExprMod(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Subtraction.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprMul(a, b, srcText) =>
-          AST.ExprMul(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Multiplication.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
         case CST.ExprDivide(a, b, srcText) =>
-          AST.ExprDivide(translateExpr(a), translateExpr(b), srcText)
+          AST.ExprApply(Operator.Division.name, Vector(translateExpr(a), translateExpr(b)), srcText)
+        case CST.ExprMod(a, b, srcText) =>
+          AST.ExprApply(Operator.Remainder.name,
+                        Vector(translateExpr(a), translateExpr(b)),
+                        srcText)
 
         // Access an array element at [index]
         case CST.ExprAt(array, index, srcText) =>
@@ -110,6 +128,10 @@ case class ParseAll(followImports: Boolean = false,
                              translateExpr(fBranch),
                              srcText)
         case CST.ExprApply(funcName, elements, srcText) =>
+          if (Operator.All.contains(funcName)) {
+            throw new SyntaxException(s"${funcName} is reserved and not a valid function name",
+                                      srcText)
+          }
           AST.ExprApply(funcName, elements.map(translateExpr), srcText)
         case CST.ExprGetName(e, id, srcText) =>
           AST.ExprGetName(translateExpr(e), id, srcText)

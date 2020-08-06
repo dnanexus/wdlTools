@@ -61,26 +61,6 @@ object AbstractSyntax {
   case class ExprPlaceholderDefault(default: Expr, value: Expr, loc: SourceLocation) extends Expr
   case class ExprPlaceholderSep(sep: Expr, value: Expr, loc: SourceLocation) extends Expr
 
-  // operators on one argument
-  case class ExprUnaryPlus(value: Expr, loc: SourceLocation) extends Expr
-  case class ExprUnaryMinus(value: Expr, loc: SourceLocation) extends Expr
-  case class ExprNegate(value: Expr, loc: SourceLocation) extends Expr
-
-  // operators on two arguments
-  case class ExprLor(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLand(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprEqeq(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLt(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprGte(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprNeq(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLte(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprGt(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprAdd(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprSub(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprMod(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprMul(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprDivide(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-
   // Access an array element at [index]
   case class ExprAt(array: Expr, index: Expr, loc: SourceLocation) extends Expr
 

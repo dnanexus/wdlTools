@@ -7,8 +7,8 @@ import kantan.csv._
 import kantan.csv.ops._
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.{SourceLocation, WdlVersion}
-import wdlTools.types.WdlTypes._
+import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
+import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
 import wdlTools.util.{FileSourceResolver, Logger}
 
 import scala.io.Source
@@ -21,144 +21,188 @@ case class Stdlib(paths: EvalPaths,
 
   private val ioSupport: IoSupport = IoSupport(paths, fileResolver, logger)
 
-  private val draft2FuncTable: Map[String, FunctionImpl] = Map(
-      "stdout" -> stdout,
-      "stderr" -> stderr,
-      // read from a file
-      "read_lines" -> read_lines,
-      "read_tsv" -> read_tsv,
-      "read_map" -> read_map,
-      "read_object" -> read_object,
-      "read_objects" -> read_objects,
-      "read_json" -> read_json,
-      "read_int" -> read_int,
-      "read_string" -> read_string,
-      "read_float" -> read_float,
-      "read_boolean" -> read_boolean,
-      // write to a file
-      "write_lines" -> write_lines,
-      "write_tsv" -> write_tsv,
-      "write_map" -> write_map,
-      "write_object" -> write_object,
-      "write_objects" -> write_objects,
-      "write_json" -> write_json,
-      // other functions
-      "size" -> size,
-      "sub" -> sub,
-      "range" -> range,
-      "transpose" -> transpose,
-      "zip" -> zip,
-      "cross" -> cross,
-      "length" -> length,
-      "flatten" -> flatten,
-      "prefix" -> prefix,
-      "select_first" -> select_first,
-      "select_all" -> select_all,
-      "defined" -> defined,
-      "basename" -> basename,
-      "floor" -> floor,
-      "ceil" -> ceil,
-      "round" -> round,
-      "glob" -> glob
+  // built-in operators
+  private val builtinFuncTable: Map[String, FunctionImpl] = Map(
+      Operator.UnaryMinus.name -> unaryMinus,
+      Operator.UnaryPlus.name -> unaryPlus,
+      Operator.LogicalNot.name -> logicalNot,
+      Operator.LogicalAnd.name -> logicalAnd,
+      Operator.LogicalOr.name -> logicalOr,
+      Operator.Equality.name -> equality,
+      Operator.Inequality.name -> inequality,
+      Operator.LessThan.name -> lessThan,
+      Operator.LessThanOrEqual.name -> lessThanOrEqual,
+      Operator.GreaterThan.name -> greaterThan,
+      Operator.GreaterThanOrEqual.name -> greaterThanOrEqual,
+      Operator.Addition.name -> addition,
+      Operator.Subtraction.name -> subtraction,
+      Operator.Multiplication.name -> multiplication,
+      Operator.Division.name -> division,
+      Operator.Remainder.name -> remainder
   )
 
-  val v1FuncTable: Map[String, FunctionImpl] = Map(
-      "stdout" -> stdout,
-      "stderr" -> stderr,
+  private lazy val draft2FuncTable: Map[String, FunctionImpl] = Map(
+      // standard library functions
+      Builtins.Stdout -> stdout,
+      Builtins.Stderr -> stderr,
       // read from a file
-      "read_lines" -> read_lines,
-      "read_tsv" -> read_tsv,
-      "read_map" -> read_map,
-      "read_object" -> read_object,
-      "read_objects" -> read_objects,
-      "read_json" -> read_json,
-      "read_int" -> read_int,
-      "read_string" -> read_string,
-      "read_float" -> read_float,
-      "read_boolean" -> read_boolean,
+      Builtins.ReadLines -> read_lines,
+      Builtins.ReadTsv -> read_tsv,
+      Builtins.ReadMap -> read_map,
+      Builtins.ReadObject -> read_object,
+      Builtins.ReadObjects -> read_objects,
+      Builtins.ReadJson -> read_json,
+      Builtins.ReadInt -> read_int,
+      Builtins.ReadString -> read_string,
+      Builtins.ReadFloat -> read_float,
+      Builtins.ReadBoolean -> read_boolean,
       // write to a file
-      "write_lines" -> write_lines,
-      "write_tsv" -> write_tsv,
-      "write_map" -> write_map,
-      "write_object" -> write_object,
-      "write_objects" -> write_objects,
-      "write_json" -> write_json,
+      Builtins.WriteLines -> write_lines,
+      Builtins.WriteTsv -> write_tsv,
+      Builtins.WriteMap -> write_map,
+      Builtins.WriteObject -> write_object,
+      Builtins.WriteObjects -> write_objects,
+      Builtins.WriteJson -> write_json,
       // other functions
-      "size" -> size,
-      "sub" -> sub,
-      "range" -> range,
-      "transpose" -> transpose,
-      "zip" -> zip,
-      "cross" -> cross,
-      "length" -> length,
-      "flatten" -> flatten,
-      "prefix" -> prefix,
-      "select_first" -> select_first,
-      "select_all" -> select_all,
-      "defined" -> defined,
-      "basename" -> basename,
-      "floor" -> floor,
-      "ceil" -> ceil,
-      "round" -> round,
-      "glob" -> glob
+      Builtins.Size -> size,
+      Builtins.Sub -> sub,
+      Builtins.Range -> range,
+      Builtins.Transpose -> transpose,
+      Builtins.Zip -> zip,
+      Builtins.Cross -> cross,
+      Builtins.Length -> length,
+      Builtins.Flatten -> flatten,
+      Builtins.Prefix -> prefix,
+      Builtins.SelectFirst -> select_first,
+      Builtins.SelectAll -> select_all,
+      Builtins.Defined -> defined,
+      Builtins.Basename -> basename,
+      Builtins.Floor -> floor,
+      Builtins.Ceil -> ceil,
+      Builtins.Round -> round,
+      Builtins.Glob -> glob
   )
 
-  val v2FuncTable: Map[String, FunctionImpl] = Map(
-      "stdout" -> stdout,
-      "stderr" -> stderr,
+  private lazy val v1FuncTable: Map[String, FunctionImpl] = Map(
+      Builtins.UnaryMinus -> unaryMinus,
+      Builtins.UnaryMinus -> unaryPlus,
+      Builtins.LogicalNot -> logicalNot,
+      Builtins.LogicalAnd -> logicalAnd,
+      Builtins.LogicalOr -> logicalOr,
+      Builtins.Equality -> equality,
+      Builtins.Inequality -> inequality,
+      Builtins.LessThan -> lessThan,
+      Builtins.LessThanOrEqual -> lessThanOrEqual,
+      Builtins.GreaterThan -> greaterThan,
+      Builtins.GreaterThanOrEqual -> greaterThanOrEqual,
+      Builtins.Stdout -> stdout,
+      Builtins.Stderr -> stderr,
       // read from a file
-      "read_lines" -> read_lines,
-      "read_tsv" -> read_tsv,
-      "read_map" -> read_map,
-      "read_json" -> read_json,
-      "read_int" -> read_int,
-      "read_string" -> read_string,
-      "read_float" -> read_float,
-      "read_boolean" -> read_boolean,
+      Builtins.ReadLines -> read_lines,
+      Builtins.ReadTsv -> read_tsv,
+      Builtins.ReadMap -> read_map,
+      Builtins.ReadObject -> read_object,
+      Builtins.ReadObjects -> read_objects,
+      Builtins.ReadJson -> read_json,
+      Builtins.ReadInt -> read_int,
+      Builtins.ReadString -> read_string,
+      Builtins.ReadFloat -> read_float,
+      Builtins.ReadBoolean -> read_boolean,
       // write to a file
-      "write_lines" -> write_lines,
-      "write_tsv" -> write_tsv,
-      "write_map" -> write_map,
-      "write_json" -> write_json,
+      Builtins.WriteLines -> write_lines,
+      Builtins.WriteTsv -> write_tsv,
+      Builtins.WriteMap -> write_map,
+      Builtins.WriteObject -> write_object,
+      Builtins.WriteObjects -> write_objects,
+      Builtins.WriteJson -> write_json,
       // other functions
-      "size" -> size,
-      "sub" -> sub,
-      "range" -> range,
-      "transpose" -> transpose,
-      "zip" -> zip,
-      "cross" -> cross,
-      "as_pairs" -> as_pairs,
-      "as_map" -> as_map,
-      "keys" -> keys,
-      "collect_by_key" -> collect_by_key,
-      "length" -> length,
-      "flatten" -> flatten,
-      "prefix" -> prefix,
-      "suffix" -> suffix,
-      "quote" -> quote,
-      "squote" -> squote,
-      "select_first" -> select_first,
-      "select_all" -> select_all,
-      "defined" -> defined,
-      "basename" -> basename,
-      "floor" -> floor,
-      "ceil" -> ceil,
-      "round" -> round,
-      "glob" -> glob,
-      "sep" -> sep
+      Builtins.Size -> size,
+      Builtins.Sub -> sub,
+      Builtins.Range -> range,
+      Builtins.Transpose -> transpose,
+      Builtins.Zip -> zip,
+      Builtins.Cross -> cross,
+      Builtins.Length -> length,
+      Builtins.Flatten -> flatten,
+      Builtins.Prefix -> prefix,
+      Builtins.SelectFirst -> select_first,
+      Builtins.SelectAll -> select_all,
+      Builtins.Defined -> defined,
+      Builtins.Basename -> basename,
+      Builtins.Floor -> floor,
+      Builtins.Ceil -> ceil,
+      Builtins.Round -> round,
+      Builtins.Glob -> glob
+  )
+
+  private lazy val v2FuncTable: Map[String, FunctionImpl] = Map(
+      Builtins.UnaryMinus -> unaryMinus,
+      Builtins.UnaryMinus -> unaryPlus,
+      Builtins.LogicalNot -> logicalNot,
+      Builtins.LogicalAnd -> logicalAnd,
+      Builtins.LogicalOr -> logicalOr,
+      Builtins.Equality -> equality,
+      Builtins.Inequality -> inequality,
+      Builtins.LessThan -> lessThan,
+      Builtins.LessThanOrEqual -> lessThanOrEqual,
+      Builtins.GreaterThan -> greaterThan,
+      Builtins.GreaterThanOrEqual -> greaterThanOrEqual,
+      Builtins.Stdout -> stdout,
+      Builtins.Stderr -> stderr,
+      // read from a file
+      Builtins.ReadLines -> read_lines,
+      Builtins.ReadTsv -> read_tsv,
+      Builtins.ReadMap -> read_map,
+      Builtins.ReadJson -> read_json,
+      Builtins.ReadInt -> read_int,
+      Builtins.ReadString -> read_string,
+      Builtins.ReadFloat -> read_float,
+      Builtins.ReadBoolean -> read_boolean,
+      // write to a file
+      Builtins.WriteLines -> write_lines,
+      Builtins.WriteTsv -> write_tsv,
+      Builtins.WriteMap -> write_map,
+      Builtins.WriteJson -> write_json,
+      // other functions
+      Builtins.Size -> size,
+      Builtins.Sub -> sub,
+      Builtins.Range -> range,
+      Builtins.Transpose -> transpose,
+      Builtins.Zip -> zip,
+      Builtins.Cross -> cross,
+      Builtins.AsPairs -> as_pairs,
+      Builtins.AsMap -> as_map,
+      Builtins.Keys -> keys,
+      Builtins.CollectByKey -> collect_by_key,
+      Builtins.Length -> length,
+      Builtins.Flatten -> flatten,
+      Builtins.Prefix -> prefix,
+      Builtins.Suffix -> suffix,
+      Builtins.Quote -> quote,
+      Builtins.Squote -> squote,
+      Builtins.SelectFirst -> select_first,
+      Builtins.SelectAll -> select_all,
+      Builtins.Defined -> defined,
+      Builtins.Basename -> basename,
+      Builtins.Floor -> floor,
+      Builtins.Ceil -> ceil,
+      Builtins.Round -> round,
+      Builtins.Glob -> glob,
+      Builtins.Sep -> sep
   )
 
   // choose the standard library prototypes according to the WDL version
   private val funcTable: Map[String, FunctionImpl] = version match {
-    case WdlVersion.Draft_2 => draft2FuncTable
-    case WdlVersion.V1      => v1FuncTable
-    case WdlVersion.V2      => v2FuncTable
+    case WdlVersion.Draft_2 => builtinFuncTable ++ draft2FuncTable
+    case WdlVersion.V1      => builtinFuncTable ++ v1FuncTable
+    case WdlVersion.V2      => builtinFuncTable ++ v2FuncTable
     case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
 
   def call(funcName: String, args: Vector[V], loc: SourceLocation): V = {
-    if (!(funcTable contains funcName))
+    if (!(funcTable contains funcName)) {
       throw new EvalException(s"stdlib function ${funcName} not implemented", loc)
+    }
     val impl = funcTable(funcName)
     try {
       impl(args, loc)
@@ -173,59 +217,335 @@ case class Stdlib(paths: EvalPaths,
     }
   }
 
-  protected def getWdlFile(args: Vector[V], loc: SourceLocation): V_File = {
-    // process arguments
-    assert(args.size == 1)
-    Coercion.coerceTo(T_File, args.head, loc).asInstanceOf[V_File]
+  private def getWdlFile(arg: V, loc: SourceLocation): V_File = {
+    Coercion.coerceTo(T_File, arg, loc) match {
+      case f: V_File => f
+      case _         => throw new RuntimeException("Invalid coercion")
+    }
   }
 
-  protected def getWdlInt(arg: V, loc: SourceLocation): Long = {
-    val n = Coercion.coerceTo(T_Int, arg, loc).asInstanceOf[V_Int]
-    n.value
+  private def getWdlInt(arg: V, loc: SourceLocation): Long = {
+    Coercion.coerceTo(T_Int, arg, loc) match {
+      case V_Int(value) => value
+      case _            => throw new RuntimeException("Invalid coercion")
+    }
   }
 
-  protected def getWdlFloat(arg: V, loc: SourceLocation): Double = {
-    val x = Coercion.coerceTo(T_Float, arg, loc).asInstanceOf[V_Float]
-    x.value
+  private def getWdlFloat(arg: V, loc: SourceLocation): Double = {
+    Coercion.coerceTo(T_Float, arg, loc) match {
+      case V_Float(f) => f
+      case _          => throw new RuntimeException("Invalid coercion")
+    }
   }
 
-  protected def getWdlString(arg: V, loc: SourceLocation): String = {
-    val s = Coercion.coerceTo(T_String, arg, loc).asInstanceOf[V_String]
-    s.value
+  private def getWdlString(arg: V, loc: SourceLocation): String = {
+    Coercion.coerceTo(T_String, arg, loc) match {
+      case V_String(s) => s
+      case _           => throw new RuntimeException("Invalid coercion")
+    }
   }
 
-  protected def getWdlVector(value: V, loc: SourceLocation): Vector[V] = {
+  private def getWdlBoolean(arg: V, loc: SourceLocation): Boolean = {
+    Coercion.coerceTo(T_Boolean, arg, loc) match {
+      case V_Boolean(b) => b
+      case _            => throw new RuntimeException("Invalid coercion")
+    }
+  }
+
+  private def getWdlVector(value: V, loc: SourceLocation): Vector[V] = {
     value match {
       case V_Array(ar) => ar
       case other       => throw new EvalException(s"${other} should be an array", loc)
     }
   }
 
-  protected def getWdlMap(value: V, loc: SourceLocation): Map[V, V] = {
+  private def getWdlMap(value: V, loc: SourceLocation): Map[V, V] = {
     value match {
       case V_Map(m) => m
       case other    => throw new EvalException(s"${other} should be a map", loc)
     }
   }
 
-  protected def getWdlPair(value: V, loc: SourceLocation): (V, V) = {
+  private def getWdlPair(value: V, loc: SourceLocation): (V, V) = {
     value match {
       case V_Pair(l, r) => (l, r)
       case other        => throw new EvalException(s"${other} should be a pair", loc)
     }
   }
 
+  // built-in operators
+  private def unaryMinus(args: Vector[V], loc: SourceLocation): V_Numeric = {
+    require(args.size == 1)
+    args.head match {
+      case V_Int(i)   => V_Int(-i)
+      case V_Float(f) => V_Float(-f)
+      case other      => throw new EvalException(s"Invalid operand of unary minus ${other}", loc)
+    }
+  }
+
+  private def unaryPlus(args: Vector[V], loc: SourceLocation): V_Numeric = {
+    require(args.size == 1)
+    args.head match {
+      case i: V_Int   => i
+      case f: V_Float => f
+      case other      => throw new EvalException(s"Invalid operand of unary plus ${other}", loc)
+    }
+  }
+
+  private def logicalNot(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    require(args.size == 1)
+    V_Boolean(!getWdlBoolean(args.head, loc))
+  }
+
+  private def logicalBinary(args: Vector[V],
+                            op: (Boolean, Boolean) => Boolean,
+                            loc: SourceLocation): V_Boolean = {
+    require(args.size == 2)
+    args match {
+      case Vector(V_Boolean(a), V_Boolean(b)) =>
+        V_Boolean(op(a, b))
+      case _ =>
+        throw new EvalException(s"Invalid operands of logical operator ${args}", loc)
+    }
+  }
+
+  private def logicalAnd(args: Vector[V], loc: SourceLocation): V_Boolean =
+    logicalBinary(args, _ && _, loc)
+
+  private def logicalOr(args: Vector[V], loc: SourceLocation): V_Boolean =
+    logicalBinary(args, _ || _, loc)
+
+  private def equality(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    def inner(l: V, r: V): Boolean = {
+      (l, r) match {
+        case (V_Null, V_Null)               => true
+        case (V_Int(n1), V_Int(n2))         => n1 == n2
+        case (V_Float(x1), V_Int(n2))       => x1 == n2
+        case (V_Int(n1), V_Float(x2))       => n1 == x2
+        case (V_Float(x1), V_Float(x2))     => x1 == x2
+        case (V_String(s1), V_String(s2))   => s1 == s2
+        case (V_Boolean(b1), V_Boolean(b2)) => b1 == b2
+        case (V_File(f1), V_File(f2))       => f1 == f2
+        case (V_File(p1), V_String(p2))     => p1 == p2
+        case (V_Pair(l1, r1), V_Pair(l2, r2)) =>
+          inner(l1, l2) && inner(r1, r2)
+        case (V_Array(a1), V_Array(a2)) if a1.size != a2.size => false
+        case (V_Array(a1), V_Array(a2))                       =>
+          // All array elements must be equal
+          a1.zip(a2).forall {
+            case (x, y) => inner(x, y)
+          }
+        case (V_Map(m1), V_Map(m2)) if m1.size != m2.size => false
+        case (V_Map(m1), V_Map(m2)) =>
+          val keysEqual = m1.keySet.zip(m2.keySet).forall {
+            case (k1, k2) => inner(k1, k2)
+          }
+          if (!keysEqual) {
+            false
+          } else {
+            // now we know the keys are all equal
+            m1.keys.forall(k => inner(m1(k), m2(k)))
+          }
+        case (V_Optional(v1), V_Optional(v2)) =>
+          inner(v1, v2)
+        case (V_Optional(v1), v2) =>
+          inner(v1, v2)
+        case (v1, V_Optional(v2)) =>
+          inner(v1, v2)
+        case (V_Struct(name1, _), V_Struct(name2, _)) if name1 != name2 => false
+        case (V_Struct(name, members1), V_Struct(_, members2))
+            if members1.keySet != members2.keySet =>
+          // We need the type definition here. The other option is to assume it has already
+          // been cleared at compile time.
+          throw new EvalException(s"""struct ${name} does not have the correct number of members:
+                                     |${members1.size} != ${members2.size}""".stripMargin, loc)
+        case (V_Struct(_, members1), V_Struct(_, members2)) =>
+          members1.keys.forall(k => inner(members1(k), members2(k)))
+        case (V_Object(members1), V_Object(members2)) if members1.keySet != members2.keySet => false
+        case (V_Object(members1), V_Object(members2)) =>
+          members1.forall {
+            case (k, v) => inner(v, members2(k))
+          }
+        case other =>
+          throw new EvalException(s"Invalid operands to == ${other}", loc)
+      }
+    }
+    args match {
+      case Vector(l, r) => V_Boolean(inner(l, r))
+      case _            => throw new RuntimeException(s"Invalid number of operands to ==")
+    }
+  }
+
+  private def inequality(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    require(args.size == 2)
+    V_Boolean(!equality(args, loc).value)
+  }
+
+  private def lessThan(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    val result = args match {
+      case Vector(V_Null, V_Null)               => false
+      case Vector(V_Int(n1), V_Int(n2))         => n1 < n2
+      case Vector(V_Float(x1), V_Int(n2))       => x1 < n2
+      case Vector(V_Int(n1), V_Float(x2))       => n1 < x2
+      case Vector(V_Float(x1), V_Float(x2))     => x1 < x2
+      case Vector(V_String(s1), V_String(s2))   => s1 < s2
+      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 < b2
+      case other =>
+        throw new EvalException(s"Invalid operands to < ${other}", loc)
+    }
+    V_Boolean(result)
+  }
+
+  private def lessThanOrEqual(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    val result = args match {
+      case Vector(V_Null, V_Null)               => false
+      case Vector(V_Int(n1), V_Int(n2))         => n1 <= n2
+      case Vector(V_Float(x1), V_Int(n2))       => x1 <= n2
+      case Vector(V_Int(n1), V_Float(x2))       => n1 <= x2
+      case Vector(V_Float(x1), V_Float(x2))     => x1 <= x2
+      case Vector(V_String(s1), V_String(s2))   => s1 <= s2
+      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 <= b2
+      case other =>
+        throw new EvalException(s"Invalid operands to <= ${other}", loc)
+    }
+    V_Boolean(result)
+  }
+
+  private def greaterThan(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    val result = args match {
+      case Vector(V_Null, V_Null)               => false
+      case Vector(V_Int(n1), V_Int(n2))         => n1 > n2
+      case Vector(V_Float(x1), V_Int(n2))       => x1 > n2
+      case Vector(V_Int(n1), V_Float(x2))       => n1 > x2
+      case Vector(V_Float(x1), V_Float(x2))     => x1 > x2
+      case Vector(V_String(s1), V_String(s2))   => s1 > s2
+      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 > b2
+      case other =>
+        throw new EvalException(s"Invalid operands to > ${other}", loc)
+    }
+    V_Boolean(result)
+  }
+
+  private def greaterThanOrEqual(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    val result = args match {
+      case Vector(V_Null, V_Null)               => false
+      case Vector(V_Int(n1), V_Int(n2))         => n1 >= n2
+      case Vector(V_Float(x1), V_Int(n2))       => x1 >= n2
+      case Vector(V_Int(n1), V_Float(x2))       => n1 >= x2
+      case Vector(V_Float(x1), V_Float(x2))     => x1 >= x2
+      case Vector(V_String(s1), V_String(s2))   => s1 >= s2
+      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 >= b2
+      case other =>
+        throw new EvalException(s"Invalid operands to >= ${other}", loc)
+    }
+    V_Boolean(result)
+  }
+
+  private def addition(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 2)
+    args match {
+      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 + n2)
+      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 + n2)
+      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 + x2)
+      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 + x2)
+      // files
+      case Vector(V_File(s1), V_String(s2)) => V_File(s1 + s2)
+      case Vector(V_File(s1), V_File(s2))   => V_File(s1 + s2)
+      // adding a string string to anything results in a string
+      case Vector(V_String(s1), V_String(s2))  => V_String(s1 + s2)
+      case Vector(V_String(s1), V_Int(n2))     => V_String(s1 + n2.toString)
+      case Vector(V_Int(n1), V_String(s2))     => V_String(n1.toString + s2)
+      case Vector(V_String(s1), V_Float(x2))   => V_String(s1 + x2.toString)
+      case Vector(V_Float(x1), V_String(s2))   => V_String(x1.toString + s2)
+      case Vector(V_String(s1), V_Boolean(b2)) => V_String(s1 + b2.toString)
+      case Vector(V_Boolean(b1), V_String(s2)) => V_String(b1.toString + s2)
+      case Vector(V_String(s1), V_File(s2))    => V_String(s1 + s2)
+      // Addition of arguments with optional types is allowed within interpolations
+      case Vector(V_Null, _)                      => V_Null
+      case Vector(_, V_Null)                      => V_Null
+      case Vector(V_Optional(v1), V_Optional(v2)) => V_Optional(addition(Vector(v1, v2), loc))
+      case Vector(V_Optional(v1), v2)             => V_Optional(addition(Vector(v1, v2), loc))
+      case Vector(v1, V_Optional(v2))             => V_Optional(addition(Vector(v1, v2), loc))
+      case other =>
+        throw new EvalException(s"cannot add values ${other}", loc)
+    }
+  }
+
+  private def subtraction(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 2)
+    args match {
+      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 - n2)
+      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 - n2)
+      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
+      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 - x2)
+      case other =>
+        throw new EvalException(
+            s"cannot subtract values ${other}; arguments must be integers or floats",
+            loc
+        )
+    }
+  }
+
+  private def multiplication(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 2)
+    args match {
+      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 * n2)
+      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 * n2)
+      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
+      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 * x2)
+      case other =>
+        throw new EvalException(
+            s"cannot multiply values ${other}; arguments must be integers or floats",
+            loc
+        )
+    }
+  }
+
+  private def division(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 2)
+    args match {
+      case Vector(_, denominator: V_Numeric) if denominator.floatValue == 0 =>
+        throw new EvalException("DivisionByZero", loc)
+      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 / n2)
+      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 / n2)
+      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 / x2)
+      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 / x2)
+      case other =>
+        throw new EvalException(
+            s"cannot divide values ${other}; arguments must be integers or floats",
+            loc
+        )
+    }
+  }
+
+  private def remainder(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 2)
+    args match {
+      case Vector(_, denominator: V_Numeric) if denominator.floatValue == 0 =>
+        throw new EvalException("DivisionByZero", loc)
+      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 % n2)
+      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 % n2)
+      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 % x2)
+      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 % x2)
+      case other =>
+        throw new EvalException(
+            s"cannot take modulus of values ${other}; arguments must be integers or floats",
+            loc
+        )
+    }
+  }
+
   // since: draft-1
-  protected def stdout(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.isEmpty)
+  private def stdout(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.isEmpty)
     val stdoutFile = paths.getStdoutFile(true)
     ioSupport.ensureFileExists(stdoutFile, "stdout", loc)
     V_File(stdoutFile.toString)
   }
 
   // since: draft-1
-  protected def stderr(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.isEmpty)
+  private def stderr(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.isEmpty)
     val stderrFile = paths.getStdoutFile(true)
     ioSupport.ensureFileExists(stderrFile, "stderr", loc)
     V_File(stderrFile.toString)
@@ -235,8 +555,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_lines(args: Vector[V], loc: SourceLocation): V_Array = {
-    val file = getWdlFile(args, loc)
+  private def read_lines(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     V_Array(Source.fromString(content).getLines.map(x => V_String(x)).toVector)
   }
@@ -247,8 +568,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_tsv(args: Vector[V], loc: SourceLocation): V_Array = {
-    val file = getWdlFile(args, loc)
+  private def read_tsv(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     val reader = content.asCsvReader[Vector[String]](tsvConf)
     V_Array(reader.map {
@@ -262,8 +584,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_map(args: Vector[V], loc: SourceLocation): V_Map = {
-    val file = getWdlFile(args, loc)
+  private def read_map(args: Vector[V], loc: SourceLocation): V_Map = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     val reader = content.asCsvReader[(String, String)](tsvConf)
     V_Map(
@@ -284,8 +607,9 @@ case class Stdlib(paths: EvalPaths,
   // deprecation:
   // * beginning in draft-2, URI parameter is not supported
   // * removed in Version 2
-  protected def read_object(args: Vector[V], loc: SourceLocation): V_Object = {
-    val file = getWdlFile(args, loc)
+  private def read_object(args: Vector[V], loc: SourceLocation): V_Object = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     val lines: Vector[Vector[String]] = content
       .asCsvReader[Vector[String]](tsvConf)
@@ -310,8 +634,9 @@ case class Stdlib(paths: EvalPaths,
   // deprecation:
   // * beginning in draft-2, URI parameter is not supported
   // * removed in Version 2
-  protected def read_objects(args: Vector[V], loc: SourceLocation): V_Array = {
-    val file = getWdlFile(args, loc)
+  private def read_objects(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     val lines = content
       .asCsvReader[Vector[String]](tsvConf)
@@ -350,8 +675,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_json(args: Vector[V], loc: SourceLocation): V = {
-    val file = getWdlFile(args, loc)
+  private def read_json(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     try {
       JsonSerde.deserialize(content.parseJson)
@@ -365,8 +691,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_int(args: Vector[V], loc: SourceLocation): V_Int = {
-    val file = getWdlFile(args, loc)
+  private def read_int(args: Vector[V], loc: SourceLocation): V_Int = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     try {
       V_Int(content.trim.toInt)
@@ -384,8 +711,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_string(args: Vector[V], loc: SourceLocation): V_String = {
-    val file = getWdlFile(args, loc)
+  private def read_string(args: Vector[V], loc: SourceLocation): V_String = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     val lines = content.split("\n")
     if (lines.isEmpty) {
@@ -400,8 +728,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_float(args: Vector[V], loc: SourceLocation): V_Float = {
-    val file = getWdlFile(args, loc)
+  private def read_float(args: Vector[V], loc: SourceLocation): V_Float = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     try {
       V_Float(content.trim.toDouble)
@@ -415,8 +744,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  protected def read_boolean(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    val file = getWdlFile(args, loc)
+  private def read_boolean(args: Vector[V], loc: SourceLocation): V_Boolean = {
+    require(args.size == 1)
+    val file = getWdlFile(args.head, loc)
     val content = ioSupport.readFile(file.value, loc)
     content.trim.toLowerCase() match {
       case "false" => V_Boolean(false)
@@ -429,8 +759,8 @@ case class Stdlib(paths: EvalPaths,
   // File write_lines(Array[String])
   //
   // since: draft-1
-  protected def write_lines(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_lines(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val array: V_Array =
       Coercion.coerceTo(T_Array(T_String), args.head, loc).asInstanceOf[V_Array]
     val strRepr: String = array.value
@@ -449,8 +779,8 @@ case class Stdlib(paths: EvalPaths,
   // File write_tsv(Array[Array[String]])
   //
   // since: draft-1
-  protected def write_tsv(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_tsv(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val arAr: V_Array =
       Coercion.coerceTo(T_Array(T_Array(T_String)), args.head, loc).asInstanceOf[V_Array]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
@@ -477,8 +807,8 @@ case class Stdlib(paths: EvalPaths,
   // File write_map(Map[String, String])
   //
   // since: draft-1
-  protected def write_map(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_map(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val m: V_Map =
       Coercion.coerceTo(T_Map(T_String, T_String), args.head, loc).asInstanceOf[V_Map]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
@@ -506,8 +836,8 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: removed in Version 2
-  protected def write_object(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_object(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val obj = Coercion.coerceTo(T_Object, args.head, loc).asInstanceOf[V_Object]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
@@ -524,8 +854,8 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: removed in Version 2
-  protected def write_objects(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_objects(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val objs = Coercion.coerceTo(T_Array(T_Object), args.head, loc).asInstanceOf[V_Array]
     val objArray = objs.value.asInstanceOf[Vector[V_Object]]
     if (objArray.isEmpty) {
@@ -557,8 +887,8 @@ case class Stdlib(paths: EvalPaths,
   // File write_json(mixed)
   //
   // since: draft-1
-  protected def write_json(args: Vector[V], loc: SourceLocation): V_File = {
-    assert(args.size == 1)
+  private def write_json(args: Vector[V], loc: SourceLocation): V_File = {
+    require(args.size == 1)
     val jsv =
       try {
         JsonSerde.serialize(args.head)
@@ -605,7 +935,7 @@ case class Stdlib(paths: EvalPaths,
   // version differences: in 1.0, the spec was updated to explicitly support compount argument types;
   //  however, our implementation supports compound types for all versions, and goes further than the
   //  spec requires to support nested collections.
-  protected def size(args: Vector[V], loc: SourceLocation): V_Float = {
+  private def size(args: Vector[V], loc: SourceLocation): V_Float = {
     args.size match {
       case 1 =>
         V_Float(sizeCore(args.head, loc))
@@ -626,8 +956,8 @@ case class Stdlib(paths: EvalPaths,
   // replace. pattern is expected to be a regular expression.
   //
   // since: draft-2
-  protected def sub(args: Vector[V], loc: SourceLocation): V_String = {
-    assert(args.size == 3)
+  private def sub(args: Vector[V], loc: SourceLocation): V_String = {
+    require(args.size == 3)
     val input = getWdlString(args(0), loc)
     val pattern = getWdlString(args(1), loc)
     val replace = getWdlString(args(2), loc)
@@ -637,8 +967,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[Int] range(Int)
   //
   // since: draft-2
-  protected def range(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def range(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val n = getWdlInt(args.head, loc).toInt
     val vec: Vector[V] = Vector.tabulate(n)(i => V_Int(i))
     V_Array(vec)
@@ -647,8 +977,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[Array[X]] transpose(Array[Array[X]])
   //
   // since: draft-2
-  protected def transpose(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def transpose(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val vec: Vector[V] = getWdlVector(args.head, loc)
     val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, loc))
     val trValue = vec_vec.transpose
@@ -658,8 +988,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[Pair(X,Y)] zip(Array[X], Array[Y])
   //
   // since: draft-2
-  protected def zip(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 2)
+  private def zip(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 2)
     val ax = getWdlVector(args(0), loc)
     val ay = getWdlVector(args(1), loc)
 
@@ -673,8 +1003,8 @@ case class Stdlib(paths: EvalPaths,
   // cartesian product of two arrays. Results in an n x m sized array of pairs.
   //
   // since: draft-2
-  protected def cross(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 2)
+  private def cross(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 2)
     val ax = getWdlVector(args(0), loc)
     val ay = getWdlVector(args(1), loc)
 
@@ -689,8 +1019,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[Pair[X,Y]] as_pairs(Map[X,Y])
   //
   // since: V2
-  protected def as_pairs(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def as_pairs(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val map = getWdlMap(args.head, loc)
     V_Array(map.map {
       case (key, value) => V_Pair(key, value)
@@ -700,8 +1030,8 @@ case class Stdlib(paths: EvalPaths,
   // Map[X,Y] as_map(Array[Pair[X,Y]])
   //
   // since: V2
-  protected def as_map(args: Vector[V], loc: SourceLocation): V_Map = {
-    assert(args.size == 1)
+  private def as_map(args: Vector[V], loc: SourceLocation): V_Map = {
+    require(args.size == 1)
     val vec = getWdlVector(args.head, loc)
     V_Map(vec.map(item => getWdlPair(item, loc)).toMap)
   }
@@ -709,8 +1039,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[X] keys(Map[X,Y])
   //
   // since: V2
-  protected def keys(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def keys(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val map = getWdlMap(args.head, loc)
     V_Array(map.keys.toVector)
   }
@@ -718,8 +1048,8 @@ case class Stdlib(paths: EvalPaths,
   // Map[X,Array[Y]] collect_by_key(Array[Pair[X,Y]])
   //
   // since: V2
-  protected def collect_by_key(args: Vector[V], loc: SourceLocation): V_Map = {
-    assert(args.size == 1)
+  private def collect_by_key(args: Vector[V], loc: SourceLocation): V_Map = {
+    require(args.size == 1)
     val vec: Vector[(V, V)] = getWdlVector(args.head, loc).map(item => getWdlPair(item, loc))
     V_Map(
         vec.groupBy(_._1).map {
@@ -731,8 +1061,8 @@ case class Stdlib(paths: EvalPaths,
   // Integer length(Array[X])
   //
   // since: draft-2
-  protected def length(args: Vector[V], loc: SourceLocation): V_Int = {
-    assert(args.size == 1)
+  private def length(args: Vector[V], loc: SourceLocation): V_Int = {
+    require(args.size == 1)
     val vec = getWdlVector(args.head, loc)
     V_Int(vec.size)
   }
@@ -740,8 +1070,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[X] flatten(Array[Array[X]])
   //
   // since: draft-2
-  protected def flatten(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def flatten(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val vec: Vector[V] = getWdlVector(args.head, loc)
     val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, loc))
     V_Array(vec_vec.flatten)
@@ -755,8 +1085,8 @@ case class Stdlib(paths: EvalPaths,
   // string.
   //
   // since: draft-2
-  protected def prefix(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 2)
+  private def prefix(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 2)
     val pref = getWdlString(args(0), loc)
     val vec = getStringVector(args(1), loc)
     V_Array(vec.map(str => V_String(pref + str)))
@@ -770,8 +1100,8 @@ case class Stdlib(paths: EvalPaths,
   // string.
   //
   // since: V2
-  protected def suffix(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 2)
+  private def suffix(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 2)
     val suff = getWdlString(args(0), loc)
     val vec = getStringVector(args(1), loc)
     V_Array(vec.map(str => V_String(str + suff)))
@@ -780,8 +1110,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[String] quote(Array[X])
   //
   // since: V2
-  protected def quote(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def quote(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val vec = getStringVector(args(1), loc)
     val dquote = '"'
     V_Array(vec.map(str => V_String(s"${dquote}${str}${dquote}")))
@@ -790,8 +1120,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[String] squote(Array[X])
   //
   // since: V2
-  protected def squote(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def squote(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val vec = getStringVector(args(1), loc)
     V_Array(vec.map(str => V_String(s"'${str}'")))
   }
@@ -805,8 +1135,8 @@ case class Stdlib(paths: EvalPaths,
   // return the first none null element. Throw an exception if nothing is found
   //
   // since: draft-2
-  protected def select_first(args: Vector[V], loc: SourceLocation): V = {
-    assert(args.size == 1)
+  private def select_first(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 1)
     val vec = getWdlVector(args(0), loc)
     val values = vec.flatMap {
       case V_Null        => None
@@ -821,8 +1151,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[X] select_all(Array[X?])
   //
   // since: draft-2
-  protected def select_all(args: Vector[V], loc: SourceLocation): V = {
-    assert(args.size == 1)
+  private def select_all(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 1)
     val vec = getWdlVector(args(0), loc)
     val values = vec.flatMap {
       case V_Null        => None
@@ -835,8 +1165,8 @@ case class Stdlib(paths: EvalPaths,
   // Boolean defined(X?)
   //
   // since: draft-2
-  protected def defined(args: Vector[V], loc: SourceLocation): V = {
-    assert(args.size == 1)
+  private def defined(args: Vector[V], loc: SourceLocation): V = {
+    require(args.size == 1)
     args.head match {
       case V_Null => V_Boolean(false)
       case _      => V_Boolean(true)
@@ -858,7 +1188,7 @@ case class Stdlib(paths: EvalPaths,
   // This function returns the basename of a file path passed to it: basename("/path/to/file.txt") returns "file.txt".
   // Also supports an optional parameter, suffix to remove: basename("/path/to/file.txt", ".txt") returns "file".
   //
-  protected def basename(args: Vector[V], loc: SourceLocation): V_String = {
+  private def basename(args: Vector[V], loc: SourceLocation): V_String = {
     args.size match {
       case 1 =>
         val s = basenameCore(args.head, loc)
@@ -872,26 +1202,26 @@ case class Stdlib(paths: EvalPaths,
     }
   }
 
-  protected def floor(args: Vector[V], loc: SourceLocation): V_Int = {
-    assert(args.size == 1)
+  private def floor(args: Vector[V], loc: SourceLocation): V_Int = {
+    require(args.size == 1)
     val x = getWdlFloat(args.head, loc)
     V_Int(Math.floor(x).toInt)
   }
 
-  protected def ceil(args: Vector[V], loc: SourceLocation): V_Int = {
-    assert(args.size == 1)
+  private def ceil(args: Vector[V], loc: SourceLocation): V_Int = {
+    require(args.size == 1)
     val x = getWdlFloat(args.head, loc)
     V_Int(Math.ceil(x).toInt)
   }
 
-  protected def round(args: Vector[V], loc: SourceLocation): V_Int = {
-    assert(args.size == 1)
+  private def round(args: Vector[V], loc: SourceLocation): V_Int = {
+    require(args.size == 1)
     val x = getWdlFloat(args.head, loc)
     V_Int(Math.round(x).toInt)
   }
 
-  protected def glob(args: Vector[V], loc: SourceLocation): V_Array = {
-    assert(args.size == 1)
+  private def glob(args: Vector[V], loc: SourceLocation): V_Array = {
+    require(args.size == 1)
     val pattern = getWdlString(args.head, loc)
     val filenames = ioSupport.glob(pattern)
     V_Array(filenames.map { filepath =>
@@ -899,7 +1229,7 @@ case class Stdlib(paths: EvalPaths,
     })
   }
 
-  protected def sep(args: Vector[V], loc: SourceLocation): V_String = {
+  private def sep(args: Vector[V], loc: SourceLocation): V_String = {
     val separator = getWdlString(args(0), loc)
     val strings = getWdlVector(args(1), loc).map(x => getWdlString(x, loc))
     V_String(strings.mkString(separator))

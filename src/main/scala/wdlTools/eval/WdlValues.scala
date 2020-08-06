@@ -4,12 +4,22 @@ package wdlTools.eval
 object WdlValues {
   // any WDL value
   sealed trait V
+  sealed trait V_Numeric extends V {
+    def intValue: Long
+    def floatValue: Double
+  }
 
   // primitive values
   case object V_Null extends V
   case class V_Boolean(value: Boolean) extends V
-  case class V_Int(value: Long) extends V
-  case class V_Float(value: Double) extends V
+  case class V_Int(value: Long) extends V_Numeric {
+    def intValue: Long = value
+    lazy val floatValue: Double = value.toDouble
+  }
+  case class V_Float(value: Double) extends V_Numeric {
+    def intValue: Long = value.toLong
+    lazy val floatValue: Double = value
+  }
   case class V_String(value: String) extends V
   case class V_File(value: String) extends V
   case class V_Directory(value: String) extends V

@@ -145,13 +145,17 @@ wdl_type
   /* string_part
   : StringPart*
   ; */
-  override def visitString_part(ctx: WdlV2Parser.String_partContext): ExprCompoundString = {
-    val parts: Vector[Expr] = ctx
+  override def visitString_part(ctx: WdlV2Parser.String_partContext): Expr = {
+    ctx
       .StringPart()
       .asScala
       .map(x => ExprString(x.getText, getSourceLocation(grammar.docSource, x)))
-      .toVector
-    ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      .filterNot(_.value.isEmpty)
+      .toVector match {
+      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
+      case Vector(e) => e
+      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /* string_expr_with_string_part
@@ -159,10 +163,14 @@ wdl_type
   ; */
   override def visitString_expr_with_string_part(
       ctx: WdlV2Parser.String_expr_with_string_partContext
-  ): ExprCompoundString = {
+  ): Expr = {
     val exprPart = visitExpr(ctx.string_expr_part().expr())
-    val strPart = visitString_part(ctx.string_part())
-    ExprCompoundString(Vector(exprPart, strPart), getSourceLocation(grammar.docSource, ctx))
+    val stringPart = visitString_part(ctx.string_part())
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
+    }
   }
 
   /*
@@ -174,18 +182,21 @@ string
   override def visitString(ctx: WdlV2Parser.StringContext): Expr = {
     val stringPart =
       ExprString(ctx.string_part().getText, getSourceLocation(grammar.docSource, ctx.string_part()))
-    val exprPart: Vector[ExprCompoundString] = ctx
+    val exprPart: Vector[Expr] = ctx
       .string_expr_with_string_part()
       .asScala
       .map(visitString_expr_with_string_part)
       .toVector
-    val exprPart2: Vector[Expr] = exprPart.flatMap(_.value)
-    if (exprPart2.isEmpty) {
-      // A string  literal
-      stringPart
-    } else {
-      // A string that includes interpolation
-      ExprCompoundString(Vector(stringPart) ++ exprPart2, getSourceLocation(grammar.docSource, ctx))
+      .flatMap {
+        case ExprCompoundString(v, _) => v
+        case e                        => Vector(e)
+      }
+    (stringPart, exprPart) match {
+      case (s: ExprString, Vector()) => s
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      case (s, parts) =>
+        ExprCompoundString(s +: parts, getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -814,12 +825,17 @@ task_input
     ; */
   override def visitTask_command_expr_with_string(
       ctx: WdlV2Parser.Task_command_expr_with_stringContext
-  ): ExprCompoundString = {
+  ): Expr = {
     val exprPart: Expr = visitExpr(ctx.task_command_expr_part().expr())
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    ExprCompoundString(Vector(exprPart, stringPart), getSourceLocation(grammar.docSource, ctx))
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => e
+      case (ExprString(e, _), s) if e.isEmpty => s
+      case (e, s) =>
+        ExprCompoundString(Vector(e, s), getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /* task_command
@@ -833,16 +849,12 @@ task_input
       .asScala
       .map(x => visitTask_command_expr_with_string(x))
       .toVector
-
-    val allParts: Vector[Expr] = start +: parts
-
     // discard empty strings, and flatten compound vectors of strings
-    val cleanedParts = allParts.flatMap {
+    val cleanedParts = (start +: parts).flatMap {
       case ExprString(x, _) if x.isEmpty => Vector.empty
       case ExprCompoundString(v, _)      => v
       case other                         => Vector(other)
     }
-
     CommandSection(cleanedParts, getSourceLocation(grammar.docSource, ctx))
   }
 

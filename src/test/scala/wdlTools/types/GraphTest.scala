@@ -35,10 +35,8 @@ class GraphTest extends AnyFlatSpec with Matchers {
     }
     tasks.size shouldBe 1
     val (graph, variables) = ExprGraph.buildFromTask(tasks.head)
-    println(graph)
     val ordered = GraphUtils.toOrderedVector(graph)
     ordered.size shouldBe 9
-    println(ordered)
     // there are mutliple equally valid sortings - we just need to make sure
     // the contents of each 'block' are the same and the blocks are ordered
     val expected: Vector[Set[String]] = Vector(

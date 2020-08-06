@@ -13,10 +13,10 @@ struct House {
 }
 
 workflow census {
-  Person p1 = {
-    "name" : "Carly",
-    "height" : 168,
-    "age" : 40
+  Person p1 = object {
+    name : "Carly",
+    height : 168,
+    age : 40
   }
 
   output {

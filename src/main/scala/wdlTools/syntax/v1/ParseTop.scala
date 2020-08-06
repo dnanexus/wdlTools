@@ -140,6 +140,22 @@ wdl_type
                               getSourceLocation(grammar.docSource, ctx))
   }
 
+  /* string_part
+  : StringPart*
+  ; */
+  override def visitString_part(ctx: WdlV1Parser.String_partContext): Expr = {
+    ctx
+      .StringPart()
+      .asScala
+      .map(x => ExprString(x.getText, getSourceLocation(grammar.docSource, x)))
+      .filterNot(_.value.isEmpty)
+      .toVector match {
+      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
+      case Vector(e) => e
+      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+    }
+  }
+
   /* expression_placeholder_option
   : BoolLiteral EQUAL (string | number)
   | DEFAULT EQUAL (string | number)
@@ -176,6 +192,61 @@ wdl_type
     }
     throw new SyntaxException(s"Not one of three known variants of a placeholder",
                               getSourceLocation(grammar.docSource, ctx))
+  }
+
+  /* string_expr_part
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
+  ; */
+  override def visitString_expr_part(ctx: WdlV1Parser.String_expr_partContext): Expr = {
+    val pHolder: Vector[PlaceHolderPart] = ctx
+      .expression_placeholder_option()
+      .asScala
+      .map(visitExpression_placeholder_option)
+      .toVector
+    val expr = visitExpr(ctx.expr())
+    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
+  }
+
+  /* string_expr_with_string_part
+  : string_expr_part string_part
+  ; */
+  override def visitString_expr_with_string_part(
+      ctx: WdlV1Parser.String_expr_with_string_partContext
+  ): Expr = {
+    val exprPart = visitString_expr_part(ctx.string_expr_part())
+    val stringPart = visitString_part(ctx.string_part())
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
+    }
+  }
+
+  /*
+string
+  : DQUOTE string_part string_expr_with_string_part* DQUOTE
+  | SQUOTE string_part string_expr_with_string_part* SQUOTE
+  ;
+   */
+  override def visitString(ctx: WdlV1Parser.StringContext): Expr = {
+    val stringPart =
+      ExprString(ctx.string_part().getText, getSourceLocation(grammar.docSource, ctx.string_part()))
+    val exprPart: Vector[Expr] = ctx
+      .string_expr_with_string_part()
+      .asScala
+      .map(visitString_expr_with_string_part)
+      .toVector
+      .flatMap {
+        case ExprCompoundString(v, _) => v
+        case e                        => Vector(e)
+      }
+    (stringPart, exprPart) match {
+      case (s: ExprString, Vector()) => s
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      case (s, parts) =>
+        ExprCompoundString(s +: parts, getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // These are full expressions of the same kind
@@ -226,66 +297,6 @@ wdl_type
     }
 
     throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
-  }
-
-  /* string_part
-  : StringPart*
-  ; */
-  override def visitString_part(ctx: WdlV1Parser.String_partContext): ExprCompoundString = {
-    val parts: Vector[Expr] = ctx
-      .StringPart()
-      .asScala
-      .map(x => ExprString(x.getText, getSourceLocation(grammar.docSource, x)))
-      .toVector
-    ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
-  }
-
-  /* string_expr_part
-  : StringCommandStart (expression_placeholder_option)* expr RBRACE
-  ; */
-  override def visitString_expr_part(ctx: WdlV1Parser.String_expr_partContext): Expr = {
-    val pHolder: Vector[PlaceHolderPart] = ctx
-      .expression_placeholder_option()
-      .asScala
-      .map(visitExpression_placeholder_option)
-      .toVector
-    val expr = visitExpr(ctx.expr())
-    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
-  }
-
-  /* string_expr_with_string_part
-  : string_expr_part string_part
-  ; */
-  override def visitString_expr_with_string_part(
-      ctx: WdlV1Parser.String_expr_with_string_partContext
-  ): ExprCompoundString = {
-    val exprPart = visitString_expr_part(ctx.string_expr_part())
-    val strPart = visitString_part(ctx.string_part())
-    ExprCompoundString(Vector(exprPart, strPart), getSourceLocation(grammar.docSource, ctx))
-  }
-
-  /*
-string
-  : DQUOTE string_part string_expr_with_string_part* DQUOTE
-  | SQUOTE string_part string_expr_with_string_part* SQUOTE
-  ;
-   */
-  override def visitString(ctx: WdlV1Parser.StringContext): Expr = {
-    val stringPart =
-      ExprString(ctx.string_part().getText, getSourceLocation(grammar.docSource, ctx.string_part()))
-    val exprPart: Vector[ExprCompoundString] = ctx
-      .string_expr_with_string_part()
-      .asScala
-      .map(visitString_expr_with_string_part)
-      .toVector
-    val exprPart2: Vector[Expr] = exprPart.flatMap(_.value)
-    if (exprPart2.isEmpty) {
-      // A string  literal
-      stringPart
-    } else {
-      // A string that includes interpolation
-      ExprCompoundString(Vector(stringPart) ++ exprPart2, getSourceLocation(grammar.docSource, ctx))
-    }
   }
 
   /* primitive_literal
@@ -907,12 +918,17 @@ task_input
     ; */
   override def visitTask_command_expr_with_string(
       ctx: WdlV1Parser.Task_command_expr_with_stringContext
-  ): ExprCompoundString = {
+  ): Expr = {
     val exprPart: Expr = visitTask_command_expr_part(ctx.task_command_expr_part())
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    ExprCompoundString(Vector(exprPart, stringPart), getSourceLocation(grammar.docSource, ctx))
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => e
+      case (ExprString(e, _), s) if e.isEmpty => s
+      case (e, s) =>
+        ExprCompoundString(Vector(e, s), getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /* task_command
@@ -926,16 +942,12 @@ task_input
       .asScala
       .map(x => visitTask_command_expr_with_string(x))
       .toVector
-
-    val allParts: Vector[Expr] = start +: parts
-
     // discard empty strings, and flatten compound vectors of strings
-    val cleanedParts = allParts.flatMap {
+    val cleanedParts = (start +: parts).flatMap {
       case ExprString(x, _) if x.isEmpty => Vector.empty
       case ExprCompoundString(v, _)      => v
       case other                         => Vector(other)
     }
-
     CommandSection(cleanedParts, getSourceLocation(grammar.docSource, ctx))
   }
 

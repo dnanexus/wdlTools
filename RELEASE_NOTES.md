@@ -1,3 +1,11 @@
+# v0.5.0 (dev)
+
+* Breaking change: the operator case classes have been removed from AST and TST. Operators are now represented by `ExprApply` with special names. The names can be looked up in `wdlTools.syntax.Operator`.
+
+# v0.4.0 (2020-07-16)
+
+* Add stand-alone task executor, and `exec` command
+
 # v0.3.0 (2020-07-07)
 
 * Add new WDL v2 `sep` function

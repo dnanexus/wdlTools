@@ -64,35 +64,6 @@ object TypedAbstractSyntax {
   case class ExprPlaceholderSep(sep: Expr, value: Expr, wdlType: WdlType, loc: SourceLocation)
       extends ExprPlaceholder
 
-  // operators on one argument
-  sealed trait ExprOperator1 extends Expr {
-    val value: Expr
-  }
-  case class ExprUnaryPlus(value: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator1
-  case class ExprUnaryMinus(value: Expr, wdlType: WdlType, loc: SourceLocation)
-      extends ExprOperator1
-  case class ExprNegate(value: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator1
-
-  // operators on two arguments
-  sealed trait ExprOperator2 extends Expr {
-    val a: Expr
-    val b: Expr
-  }
-  case class ExprLor(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprLand(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprEqeq(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprLt(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprGte(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprNeq(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprLte(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprGt(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprAdd(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprSub(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprMod(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprMul(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation) extends ExprOperator2
-  case class ExprDivide(a: Expr, b: Expr, wdlType: WdlType, loc: SourceLocation)
-      extends ExprOperator2
-
   // Access an array element at [index]
   case class ExprAt(array: Expr, index: Expr, wdlType: WdlType, loc: SourceLocation) extends Expr
 

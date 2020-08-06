@@ -1,5 +1,6 @@
 package wdlTools.types
 
+import wdlTools.syntax.Operator
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
@@ -44,6 +45,7 @@ case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
 }
 
 object Utils {
+  val PrimitiveTypes: Set[T] = Set(T_String, T_File, T_Directory, T_Boolean, T_Int, T_Float)
 
   /**
     * Checks if the right hand side of an assignment matches the left hand side.
@@ -62,12 +64,7 @@ object Utils {
     *   String s = "Ford model T"
     *   String s2 = 5
     */
-  def isPrimitive(t: T): Boolean = {
-    t match {
-      case T_String | T_File | T_Directory | T_Boolean | T_Int | T_Float => true
-      case _                                                             => false
-    }
-  }
+  def isPrimitive(t: T): Boolean = PrimitiveTypes.contains(t)
 
   def isPrimitiveValue(expr: TAT.Expr): Boolean = {
     expr match {
@@ -122,7 +119,7 @@ object Utils {
       case T_File           => "File"
       case T_Directory      => "Directory"
       case T_Any            => "Any"
-      case T_Var(i)         => s"Var($i)"
+      case T_Var(i, _)      => s"Var($i)"
       case T_Identifier(id) => s"Id(${id})"
       case T_Object         => "Object"
       case T_Pair(l, r) =>
@@ -182,9 +179,19 @@ object Utils {
       case T_Function0(name, output) =>
         s"${name}() -> ${prettyFormatType(output)}"
 
+      // A built-in operator with one argument
+      case T_Function1(name, input, _) if Operator.All.contains(name) =>
+        val symbol = Operator.All(name).symbol
+        s"${symbol}${prettyFormatType(input)}"
+
       // A function with one argument
       case T_Function1(name, input, output) =>
         s"${name}(${prettyFormatType(input)}) -> ${prettyFormatType(output)}"
+
+      // A built-in operator with two arguments
+      case T_Function2(name, arg1, arg2, _) if Operator.All.contains(name) =>
+        val symbol = Operator.All(name).symbol
+        s"${prettyFormatType(arg1)} ${symbol} ${prettyFormatType(arg2)}"
 
       // A function with two arguments. For example:
       // Float size(File, [String])
@@ -250,124 +257,99 @@ object Utils {
     *                 Some(string), string is returned rather than the default formatting. This
     *                 can be used to provide custom formatting for some or all parts of a nested
     *                 expression.
-    * @param disableQuoting whether to disable quoting of strings
+    * @param noQuoting whether to disable quoting of strings
     */
   def prettyFormatExpr(expr: TAT.Expr,
                        callback: Option[TAT.Expr => Option[String]] = None,
-                       disableQuoting: Boolean = false): String = {
-    if (callback.isDefined) {
-      val s = callback.get(expr)
-      if (s.isDefined) {
-        return s.get
+                       noQuoting: Boolean = false): String = {
+
+    def inner(innerExpr: TAT.Expr, disableQuoting: Boolean): String = {
+      val callbackValue = callback.flatMap(_(innerExpr))
+      if (callbackValue.isDefined) {
+        return callbackValue.get
+      }
+      innerExpr match {
+        case TAT.ValueNull(_, _)                    => "null"
+        case TAT.ValueNone(_, _)                    => "None"
+        case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
+        case TAT.ValueInt(value, _, _)              => value.toString
+        case TAT.ValueFloat(value, _, _)            => value.toString
+
+        // add double quotes around string-like value unless disableQuoting = true
+        case TAT.ValueString(value, _, _) =>
+          if (disableQuoting) value else s""""$value""""
+        case TAT.ValueFile(value, _, _) =>
+          if (disableQuoting) value else s""""$value""""
+        case TAT.ValueDirectory(value, _, _) =>
+          if (disableQuoting) value else s""""$value""""
+
+        case TAT.ExprIdentifier(id: String, _, _) => id
+
+        case TAT.ExprCompoundString(value, _, _) =>
+          val vec = value.map(x => inner(x, disableQuoting)).mkString(", ")
+          s"ExprCompoundString(${vec})"
+        case TAT.ExprPair(l, r, _, _) =>
+          s"(${inner(l, disableQuoting)}, ${inner(r, disableQuoting)})"
+        case TAT.ExprArray(value, _, _) =>
+          "[" + value.map(x => inner(x, disableQuoting)).mkString(", ") + "]"
+        case TAT.ExprMap(value, _, _) =>
+          val m2 = value
+            .map {
+              case (k, v) => s"${inner(k, disableQuoting)} : ${inner(v, disableQuoting)}"
+            }
+            .mkString(", ")
+          s"{$m2}"
+        case TAT.ExprObject(value, _, _) =>
+          val m2 = value
+            .map {
+              case (k, v) =>
+                s"${inner(k, disableQuoting = true)} : ${inner(v, disableQuoting)}"
+            }
+            .mkString(", ")
+          s"object {$m2}"
+
+        // ~{true="--yes" false="--no" boolean_value}
+        case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
+          s"{true=${inner(t, disableQuoting)} false=${inner(f, disableQuoting)} ${inner(value, disableQuoting)}"
+
+        // ~{default="foo" optional_value}
+        case TAT.ExprPlaceholderDefault(default, value, _, _) =>
+          s"{default=${inner(default, disableQuoting)} ${inner(value, disableQuoting)}}"
+
+        // ~{sep=", " array_value}
+        case TAT.ExprPlaceholderSep(sep, value, _, _) =>
+          s"{sep=${inner(sep, disableQuoting)} ${inner(value, disableQuoting)}"
+
+        // Access an array element at [index]
+        case TAT.ExprAt(array, index, _, _) =>
+          s"${inner(array, disableQuoting)}[${index}]"
+
+        // conditional:
+        // if (x == 1) then "Sunday" else "Weekday"
+        case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
+          s"if (${inner(cond, disableQuoting)}) then ${inner(tBranch, disableQuoting)} else ${inner(fBranch, disableQuoting)}"
+
+        // Apply a builtin unary operator
+        case TAT.ExprApply(oper: String, _, Vector(unaryValue), _, _)
+            if Operator.All.contains(oper) =>
+          val symbol = Operator.All(oper).symbol
+          s"${symbol}${inner(unaryValue, disableQuoting)}"
+        // Apply a buildin binary operator
+        case TAT.ExprApply(oper: String, _, Vector(lhs, rhs), _, _)
+            if Operator.All.contains(oper) =>
+          val symbol = Operator.All(oper).symbol
+          s"${inner(lhs, disableQuoting)} ${symbol} ${inner(rhs, disableQuoting)}"
+        // Apply a standard library function to arguments. For example:
+        //   read_int("4")
+        case TAT.ExprApply(funcName, _, elements, _, _) =>
+          val args = elements.map(x => inner(x, disableQuoting)).mkString(", ")
+          s"${funcName}(${args})"
+
+        case TAT.ExprGetName(e, id: String, _, _) =>
+          s"${inner(e, disableQuoting)}.${id}"
       }
     }
-
-    expr match {
-      case TAT.ValueNull(_, _)                    => "null"
-      case TAT.ValueNone(_, _)                    => "None"
-      case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
-      case TAT.ValueInt(value, _, _)              => value.toString
-      case TAT.ValueFloat(value, _, _)            => value.toString
-
-      // add double quotes around string-like value unless disableQuoting = true
-      case TAT.ValueString(value, _, _) =>
-        if (disableQuoting) value else s""""$value""""
-      case TAT.ValueFile(value, _, _) =>
-        if (disableQuoting) value else s""""$value""""
-      case TAT.ValueDirectory(value, _, _) =>
-        if (disableQuoting) value else s""""$value""""
-
-      case TAT.ExprIdentifier(id: String, _, _) => id
-
-      case TAT.ExprCompoundString(value, _, _) =>
-        val vec = value.map(x => prettyFormatExpr(x, callback)).mkString(", ")
-        s"ExprCompoundString(${vec})"
-      case TAT.ExprPair(l, r, _, _) =>
-        s"(${prettyFormatExpr(l, callback)}, ${prettyFormatExpr(r, callback)})"
-      case TAT.ExprArray(value, _, _) =>
-        "[" + value.map(x => prettyFormatExpr(x, callback)).mkString(", ") + "]"
-      case TAT.ExprMap(value, _, _) =>
-        val m2 = value
-          .map {
-            case (k, v) => s"${prettyFormatExpr(k, callback)} : ${prettyFormatExpr(v, callback)}"
-          }
-          .mkString(", ")
-        s"{$m2}"
-      case TAT.ExprObject(value, _, _) =>
-        val m2 = value
-          .map {
-            case (k, v) =>
-              s"${prettyFormatExpr(k, callback, disableQuoting = true)} : ${prettyFormatExpr(v, callback)}"
-          }
-          .mkString(", ")
-        s"object {$m2}"
-
-      // ~{true="--yes" false="--no" boolean_value}
-      case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
-        s"{true=${prettyFormatExpr(t, callback)} false=${prettyFormatExpr(f, callback)} ${prettyFormatExpr(value, callback)}"
-
-      // ~{default="foo" optional_value}
-      case TAT.ExprPlaceholderDefault(default, value, _, _) =>
-        s"{default=${prettyFormatExpr(default, callback)} ${prettyFormatExpr(value, callback)}}"
-
-      // ~{sep=", " array_value}
-      case TAT.ExprPlaceholderSep(sep, value, _, _) =>
-        s"{sep=${prettyFormatExpr(sep, callback)} ${prettyFormatExpr(value, callback)}"
-
-      // operators on one argument
-      case TAT.ExprUnaryPlus(value, _, _) =>
-        s"+ ${prettyFormatExpr(value, callback)}"
-      case TAT.ExprUnaryMinus(value, _, _) =>
-        s"- ${prettyFormatExpr(value, callback)}"
-      case TAT.ExprNegate(value, _, _) =>
-        s"not(${prettyFormatExpr(value, callback)})"
-
-      // operators on two arguments
-      case TAT.ExprLor(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} || ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprLand(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} && ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprEqeq(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} == ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprLt(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} < ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprGte(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} >= ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprNeq(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} != ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprLte(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} <= ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprGt(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} > ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprAdd(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} + ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprSub(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} - ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprMod(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} % ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprMul(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} * ${prettyFormatExpr(b, callback)}"
-      case TAT.ExprDivide(a, b, _, _) =>
-        s"${prettyFormatExpr(a, callback)} / ${prettyFormatExpr(b, callback)}"
-
-      // Access an array element at [index]
-      case TAT.ExprAt(array, index, _, _) =>
-        s"${prettyFormatExpr(array, callback)}[${index}]"
-
-      // conditional:
-      // if (x == 1) then "Sunday" else "Weekday"
-      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
-        s"if (${prettyFormatExpr(cond, callback)}) then ${prettyFormatExpr(tBranch, callback)} else ${prettyFormatExpr(fBranch, callback)}"
-
-      // Apply a standard library function to arguments. For example:
-      //   read_int("4")
-      case TAT.ExprApply(funcName, _, elements, _, _) =>
-        val args = elements.map(x => prettyFormatExpr(x, callback)).mkString(", ")
-        s"${funcName}(${args})"
-
-      case TAT.ExprGetName(e, id: String, _, _) =>
-        s"${prettyFormatExpr(e, callback)}.${id}"
-    }
+    inner(expr, noQuoting)
   }
 
   /**
@@ -409,12 +391,6 @@ object Utils {
         exprDependencies(default) ++ exprDependencies(value)
       case TAT.ExprPlaceholderSep(sep: TAT.Expr, value: TAT.Expr, _, _) =>
         exprDependencies(sep) ++ exprDependencies(value)
-      // operators on one argument
-      case oper1: TAT.ExprOperator1 =>
-        exprDependencies(oper1.value)
-      // operators on two arguments
-      case oper2: TAT.ExprOperator2 =>
-        exprDependencies(oper2.a) ++ exprDependencies(oper2.b)
       // Access an array element at [index]
       case TAT.ExprAt(value, index, _, _) =>
         exprDependencies(value) ++ exprDependencies(index)

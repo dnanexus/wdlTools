@@ -4,7 +4,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{CommentMap, Parsers, SourceLocation, WdlVersion}
+import wdlTools.syntax.{CommentMap, Operator, Parsers, SourceLocation, WdlVersion}
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 import scala.collection.BufferedIterator
@@ -50,8 +50,8 @@ case class WdlV1Formatter(followImports: Boolean = false,
   }
 
   private object Literal {
-    def fromStart(value: Any, textSource: SourceLocation, quoting: Boolean = false): Literal = {
-      Literal(value, quoting, textSource.line, (Some(textSource.col), None))
+    def fromStart(value: Any, loc: SourceLocation, quoting: Boolean = false): Literal = {
+      Literal(value, quoting, loc.line, (Some(loc.col), None))
     }
 
     def fromStartPosition(value: Any,
@@ -61,8 +61,8 @@ case class WdlV1Formatter(followImports: Boolean = false,
       Literal(value, quoting, line, (Some(column), None))
     }
 
-    def fromEnd(value: Any, textSource: SourceLocation, quoted: Boolean = false): Literal = {
-      Literal(value, quoted, textSource.endLine, (None, Some(textSource.endCol)))
+    def fromEnd(value: Any, loc: SourceLocation, quoted: Boolean = false): Literal = {
+      Literal(value, quoted, loc.endLine, (None, Some(loc.endCol)))
     }
 
     def fromEndPosition(value: Any,
@@ -281,10 +281,10 @@ case class WdlV1Formatter(followImports: Boolean = false,
   private object DataType {
     def buildDataType(name: String,
                       quantifiers: Vector[Span] = Vector.empty,
-                      textSource: SourceLocation,
+                      loc: SourceLocation,
                       inner1: Option[Span] = None,
                       inner2: Option[Span] = None): Span = {
-      val nameLiteral: Literal = Literal.fromStart(name, textSource)
+      val nameLiteral: Literal = Literal.fromStart(name, loc)
       if (inner1.isDefined) {
         // making the assumption that the open token comes directly after the name
         val openLiteral = Literal.fromPrev(Symbols.TypeParamOpen, nameLiteral)
@@ -295,13 +295,13 @@ case class WdlV1Formatter(followImports: Boolean = false,
               Vector(Literal.fromNext(Symbols.TypeParamClose, quantifiers.head)) ++ quantifiers
           )
         } else {
-          Literal.fromEnd(Symbols.TypeParamClose, textSource)
+          Literal.fromEnd(Symbols.TypeParamClose, loc)
         }
         BoundedContainer(
             Vector(inner1, inner2).flatten,
             Some((prefix, suffix)),
             Some(Symbols.ArrayDelimiter),
-            textSource
+            loc
         )
       } else if (quantifiers.nonEmpty) {
         SpanSequence(Vector(nameLiteral) ++ quantifiers)
@@ -463,28 +463,6 @@ case class WdlV1Formatter(followImports: Boolean = false,
       )
     }
 
-    def unary(oper: String, value: Expr, textSource: SourceLocation): Span = {
-      val operSpan = Literal.fromStart(oper, textSource)
-      SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
-    }
-
-    def operation(oper: String, lhs: Expr, rhs: Expr, textSource: SourceLocation): Span = {
-      Operation(
-          oper,
-          nested(lhs,
-                 inPlaceholder = inStringOrCommand,
-                 inOperation = true,
-                 parentOperation = Some(oper)),
-          nested(rhs,
-                 inPlaceholder = inStringOrCommand,
-                 inOperation = true,
-                 parentOperation = Some(oper)),
-          grouped = inOperation && !parentOperation.contains(oper),
-          inString = inStringOrCommand,
-          textSource
-      )
-    }
-
     def option(name: String, value: Expr): Span = {
       val exprSpan = nested(value, inPlaceholder = true)
       val eqLiteral = Literal.fromNext(Symbols.Assignment, exprSpan)
@@ -571,37 +549,12 @@ case class WdlV1Formatter(followImports: Boolean = false,
                     inString = inStringOrCommand,
                     bounds = text)
       case ExprCompoundString(value, text) if !inPlaceholder =>
-        // Often/always an ExprCompoundString contains one or more empty
-        // ValueStrings that we want to get rid of because they're useless
-        // and can mess up formatting
-        val filteredExprs = value.filter {
-          case ValueString(s, _) => s.nonEmpty
-          case _                 => true
-        }
-        CompoundString(filteredExprs.map(nested(_, inString = true)),
-                       quoting = !inStringOrCommand,
-                       text)
+        CompoundString(value.map(nested(_, inString = true)), quoting = !inStringOrCommand, text)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
         val span = other match {
-          case ExprUnaryPlus(value, text)  => unary(Symbols.UnaryPlus, value, text)
-          case ExprUnaryMinus(value, text) => unary(Symbols.UnaryMinus, value, text)
-          case ExprNegate(value, text)     => unary(Symbols.LogicalNot, value, text)
-          case ExprLor(a, b, text)         => operation(Symbols.LogicalOr, a, b, text)
-          case ExprLand(a, b, text)        => operation(Symbols.LogicalAnd, a, b, text)
-          case ExprEqeq(a, b, text)        => operation(Symbols.Equality, a, b, text)
-          case ExprLt(a, b, text)          => operation(Symbols.LessThan, a, b, text)
-          case ExprLte(a, b, text)         => operation(Symbols.LessThanOrEqual, a, b, text)
-          case ExprGt(a, b, text)          => operation(Symbols.GreaterThan, a, b, text)
-          case ExprGte(a, b, text)         => operation(Symbols.GreaterThanOrEqual, a, b, text)
-          case ExprNeq(a, b, text)         => operation(Symbols.Inequality, a, b, text)
-          case ExprAdd(a, b, text)         => operation(Symbols.Addition, a, b, text)
-          case ExprSub(a, b, text)         => operation(Symbols.Subtraction, a, b, text)
-          case ExprMul(a, b, text)         => operation(Symbols.Multiplication, a, b, text)
-          case ExprDivide(a, b, text)      => operation(Symbols.Division, a, b, text)
-          case ExprMod(a, b, text)         => operation(Symbols.Remainder, a, b, text)
-          case ExprIdentifier(id, text)    => Literal.fromStart(id, text)
+          case ExprIdentifier(id, text) => Literal.fromStart(id, text)
           case ExprAt(array, index, text) =>
             val arraySpan = nested(array, inPlaceholder = inStringOrCommand)
             val prefix = SpanSequence(
@@ -630,6 +583,26 @@ case class WdlV1Formatter(followImports: Boolean = false,
                 ),
                 wrapping = Wrapping.AsNeeded,
                 bounds = text
+            )
+          case ExprApply(oper, Vector(value), loc) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            val operSpan = Literal.fromStart(symbol, loc)
+            SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
+          case ExprApply(oper, Vector(lhs, rhs), loc) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            Operation(
+                symbol,
+                nested(lhs,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper)),
+                nested(rhs,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper)),
+                grouped = inOperation && !parentOperation.contains(oper),
+                inString = inStringOrCommand,
+                loc
             )
           case ExprApply(funcName, elements, text) =>
             val prefix = SpanSequence(

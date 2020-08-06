@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Utils => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
-import wdlTools.types.Utils.{prettyFormatExpr, isPrimitive, prettyFormatType}
+import wdlTools.types.Utils.{isPrimitive, prettyFormatExpr, prettyFormatType}
 import TypeCheckingRegime._
 import wdlTools.util.{FileSourceResolver, Logger, TraceLevel, FileUtils => UUtil}
 
@@ -21,7 +21,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
                      errorHandler: Option[Vector[TypeError] => Boolean] = None,
                      logger: Logger = Logger.get) {
-  private val unify = Unification(regime)
+  private val unify = Unification(regime, logger)
   // TODO: handle warnings similarly to errors - either have TypeError take an ErrorKind parameter
   //  or have a separate warningHandler parameter
   private var errors = Vector.empty[TypeError]
@@ -57,125 +57,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   private def handleError(reason: String, locSource: SourceLocation): Unit = {
     errors = errors :+ TypeError(locSource, reason)
-  }
-
-  // The add operation is overloaded.
-  // 1) The result of adding two integers is an integer
-  // 2)    -"-                   floats   -"-   float
-  // 3)    -"-                   strings  -"-   string
-  private def typeEvalAdd(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
-    def isPseudoString(x: WdlType): Boolean = {
-      x match {
-        case T_String             => true
-        case T_Optional(T_String) => true
-        case T_File               => true
-        case T_Optional(T_File)   => true
-        // Directory to String coercion is disallowed by the spec
-        case T_Directory             => false
-        case T_Optional(T_Directory) => false
-        case _                       => false
-      }
-    }
-    val t = (a.wdlType, b.wdlType) match {
-      case (T_Int, T_Int)     => T_Int
-      case (T_Float, T_Int)   => T_Float
-      case (T_Int, T_Float)   => T_Float
-      case (T_Float, T_Float) => T_Float
-
-      // if we are adding strings, the result is a string
-      case (T_String, T_String) => T_String
-      case (T_String, T_Int)    => T_String
-      case (T_String, T_Float)  => T_String
-      case (T_Int, T_String)    => T_String
-      case (T_Float, T_String)  => T_String
-
-      // NON STANDARD
-      // there are WDL programs where we add optional strings
-      case (T_String, x) if isPseudoString(x)                   => T_String
-      case (T_String, T_Optional(T_Int)) if regime == Lenient   => T_String
-      case (T_String, T_Optional(T_Float)) if regime == Lenient => T_String
-
-      // adding files/directories is equivalent to concatenating paths
-      case (T_File, T_String | T_File)           => T_File
-      case (T_Directory, T_String | T_Directory) => T_Directory
-
-      case (t, _) =>
-        handleError(
-            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} cannot be added",
-            a.loc
-        )
-        t
-    }
-    t
-  }
-
-  // math operation on a single argument
-  private def typeEvalMathOp(expr: TypedAbstractSyntax.Expr) = {
-    expr.wdlType match {
-      case T_Int   => T_Int
-      case T_Float => T_Float
-      case other =>
-        handleError(s"${prettyFormatExpr(expr)} must be an integer or a float", expr.loc)
-        other
-    }
-  }
-
-  private def typeEvalMathOp(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
-    (a.wdlType, b.wdlType) match {
-      case (T_Int, T_Int)     => T_Int
-      case (T_Float, T_Int)   => T_Float
-      case (T_Int, T_Float)   => T_Float
-      case (T_Float, T_Float) => T_Float
-      case (t, _) =>
-        handleError(
-            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must be integers or floats",
-            a.loc
-        )
-        t
-    }
-  }
-
-  private def typeEvalLogicalOp(expr: TypedAbstractSyntax.Expr) = {
-    expr.wdlType match {
-      case T_Boolean => T_Boolean
-      case other =>
-        handleError(
-            s"${prettyFormatExpr(expr)} must be a boolean, it is ${prettyFormatType(other)}",
-            expr.loc
-        )
-        other
-    }
-  }
-
-  private def typeEvalLogicalOp(a: TypedAbstractSyntax.Expr, b: TypedAbstractSyntax.Expr) = {
-    (a.wdlType, b.wdlType) match {
-      case (T_Boolean, T_Boolean) => T_Boolean
-      case (t, _) =>
-        handleError(s"${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must have boolean type",
-                    a.loc)
-        t
-    }
-  }
-
-  private def typeEvalCompareOp(a: TypedAbstractSyntax.Expr,
-                                b: TypedAbstractSyntax.Expr): WdlType = {
-    if (a.wdlType == b.wdlType) {
-      // These could be complex types, such as Array[Array[Int]].
-      return T_Boolean
-    }
-
-    // Even if the types are not the same, there are cases where they can
-    // be compared.
-    (a.wdlType, b.wdlType) match {
-      case (T_Int, T_Float) => T_Boolean
-      case (T_Float, T_Int) => T_Boolean
-      case (t, _) =>
-        handleError(
-            s"Expressions ${prettyFormatExpr(a)} and ${prettyFormatExpr(b)} must have the same type",
-            a.loc
-        )
-        t
-    }
   }
 
   private def typeEvalExprGetName(expr: TAT.Expr, id: String, ctx: Context): WdlType = {
@@ -246,292 +127,245 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Add the type to an expression
   //
-  private def applyExpr(expr: AST.Expr, bindings: Bindings, ctx: Context): TAT.Expr = {
-    expr match {
-      // None can be any type optional
-      case AST.ValueNone(loc)           => TAT.ValueNone(T_Optional(T_Any), loc)
-      case AST.ValueBoolean(value, loc) => TAT.ValueBoolean(value, T_Boolean, loc)
-      case AST.ValueInt(value, loc)     => TAT.ValueInt(value, T_Int, loc)
-      case AST.ValueFloat(value, loc)   => TAT.ValueFloat(value, T_Float, loc)
-      case AST.ValueString(value, loc)  => TAT.ValueString(value, T_String, loc)
+  private def applyExpr(expr: AST.Expr,
+                        bindings: Bindings,
+                        ctx: Context,
+                        inCommand: Boolean = false): TAT.Expr = {
+    def inner(innerExpr: AST.Expr, inStringOrCommand: Boolean, inPlaceholder: Boolean): TAT.Expr = {
+      innerExpr match {
+        // None can be any type optional
+        case AST.ValueNone(loc)           => TAT.ValueNone(T_Optional(T_Any), loc)
+        case AST.ValueBoolean(value, loc) => TAT.ValueBoolean(value, T_Boolean, loc)
+        case AST.ValueInt(value, loc)     => TAT.ValueInt(value, T_Int, loc)
+        case AST.ValueFloat(value, loc)   => TAT.ValueFloat(value, T_Float, loc)
+        case AST.ValueString(value, loc)  => TAT.ValueString(value, T_String, loc)
 
-      // an identifier has to be bound to a known type. Lookup the the type,
-      // and add it to the expression.
-      case AST.ExprIdentifier(id, loc) =>
-        val t = ctx.lookup(id, bindings) match {
-          case None =>
-            handleError(s"Identifier ${id} is not defined", expr.loc)
-            T_Any
-          case Some(t) =>
-            t
-        }
-        TAT.ExprIdentifier(id, t, loc)
-
-      // All the sub-exressions have to be strings, or coercible to strings
-      case AST.ExprCompoundString(vec, loc) =>
-        val initialType: T = T_String
-        val (vec2, wdlType) = vec.foldLeft((Vector.empty[TAT.Expr], initialType)) {
-          case ((v, t), subExpr) =>
-            val e2 = applyExpr(subExpr, bindings, ctx)
-            val t2: T = if (unify.isCoercibleTo(T_String, e2.wdlType)) {
+        // an identifier has to be bound to a known type. Lookup the the type,
+        // and add it to the expression.
+        case AST.ExprIdentifier(id, loc) =>
+          val t = ctx.lookup(id, bindings) match {
+            case None =>
+              handleError(s"Identifier ${id} is not defined", innerExpr.loc)
+              T_Any
+            case Some(t) =>
               t
-            } else {
-              handleError(
-                  s"expression ${prettyFormatExpr(e2)} of type ${e2.wdlType} is not coercible to string",
-                  expr.loc
-              )
-              if (t == initialType) {
-                e2.wdlType
-              } else {
-                t
-              }
-            }
-            (v :+ e2, t2)
-        }
-        TAT.ExprCompoundString(vec2, wdlType, loc)
-
-      case AST.ExprPair(l, r, loc) =>
-        val l2 = applyExpr(l, bindings, ctx)
-        val r2 = applyExpr(r, bindings, ctx)
-        val t = T_Pair(l2.wdlType, r2.wdlType)
-        TAT.ExprPair(l2, r2, t, loc)
-
-      case AST.ExprArray(vec, loc) if vec.isEmpty =>
-        // The array is empty, we can't tell what the array type is.
-        TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
-
-      case AST.ExprArray(vec, loc) =>
-        val tVecExprs = vec.map(applyExpr(_, bindings, ctx))
-        val t =
-          try {
-            T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
-          } catch {
-            case _: TypeUnificationException =>
-              handleError("array elements must have the same type, or be coercible to one",
-                          expr.loc)
-              tVecExprs.head.wdlType
           }
-        TAT.ExprArray(tVecExprs, t, loc)
+          TAT.ExprIdentifier(id, t, loc)
 
-      case AST.ExprObject(members, loc) =>
-        val members2 = members.map {
-          case AST.ExprMember(key, value, _) =>
-            applyExpr(key, bindings, ctx) -> applyExpr(value, bindings, ctx)
-        }.toMap
-        TAT.ExprObject(members2, T_Object, loc)
+        // All the sub-exressions have to be strings, or coercible to strings
+        case AST.ExprCompoundString(vec, loc) =>
+          if (inStringOrCommand || inPlaceholder) {
+            throw new TypeException(s"Found ExprCompoundString within string/placeholder", loc)
+          }
+          val initialType: T = T_String
+          val (vec2, wdlType) = vec.foldLeft((Vector.empty[TAT.Expr], initialType)) {
+            case ((v, t), subExpr) =>
+              val e2 = inner(subExpr, inStringOrCommand = true, inPlaceholder = false)
+              val t2: T = if (unify.isCoercibleTo(T_String, e2.wdlType)) {
+                t
+              } else {
+                handleError(
+                    s"expression ${prettyFormatExpr(e2)} of type ${e2.wdlType} is not coercible to string",
+                    innerExpr.loc
+                )
+                if (t == initialType) {
+                  e2.wdlType
+                } else {
+                  t
+                }
+              }
+              (v :+ e2, t2)
+          }
+          TAT.ExprCompoundString(vec2, wdlType, loc)
 
-      case AST.ExprMap(m, loc) if m.isEmpty =>
-        // The key and value types are unknown.
-        TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), loc)
+        case AST.ExprPair(l, r, loc) =>
+          val l2 = inner(l, inStringOrCommand, inStringOrCommand)
+          val r2 = inner(r, inStringOrCommand, inStringOrCommand)
+          val t = T_Pair(l2.wdlType, r2.wdlType)
+          TAT.ExprPair(l2, r2, t, loc)
 
-      case AST.ExprMap(value, loc) =>
-        val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
-          applyExpr(item.key, bindings, ctx) -> applyExpr(item.value, bindings, ctx)
-        }.toMap
-        // unify the key types
-        val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc)
-        // unify the value types
-        val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc)
-        T_Map(tk, tv)
-        TAT.ExprMap(m, T_Map(tk, tv), loc)
+        case AST.ExprArray(vec, loc) if vec.isEmpty =>
+          // The array is empty, we can't tell what the array type is.
+          TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
 
-      // These are expressions like:
-      // ${true="--yes" false="--no" boolean_value}
-      case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
-        val te = applyExpr(t, bindings, ctx)
-        val fe = applyExpr(f, bindings, ctx)
-        val ve = applyExpr(value, bindings, ctx)
-        val wdlType = if (te.wdlType != fe.wdlType) {
-          handleError(
-              s"subexpressions ${prettyFormatExpr(te)} and ${prettyFormatExpr(fe)} must have the same type",
-              loc
-          )
-          te.wdlType
-        } else if (ve.wdlType != T_Boolean) {
-          val msg =
-            s"condition ${prettyFormatExpr(ve)} should have boolean type, it has type ${prettyFormatType(ve.wdlType)} instead"
-          handleError(msg, expr.loc)
-          ve.wdlType
-        } else {
-          te.wdlType
-        }
-        TAT.ExprPlaceholderEqual(te, fe, ve, wdlType, loc)
-
-      // An expression like:
-      // ${default="foo" optional_value}
-      case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
-        val de = applyExpr(default, bindings, ctx)
-        val ve = applyExpr(value, bindings, ctx)
-        val t = ve.wdlType match {
-          case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
-          case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
-            // another unsavory case. The optional_value is NOT optional.
-            de.wdlType
-          case _ =>
-            val msg = s"""|Expression (${prettyFormatExpr(ve)}) must have type coercible to
-                          |(${prettyFormatType(de.wdlType)}), it has type (${prettyFormatType(
-                             ve.wdlType
-                         )}) instead
-                          |""".stripMargin.replaceAll("\n", " ")
-            handleError(msg, expr.loc)
-            ve.wdlType
-        }
-        TAT.ExprPlaceholderDefault(de, ve, t, loc)
-
-      // An expression like:
-      // ${sep=", " array_value}
-      case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
-        val se = applyExpr(sep, bindings, ctx)
-        if (se.wdlType != T_String)
-          throw new TypeException(s"separator ${prettyFormatExpr(se)} must have string type", loc)
-        val ve = applyExpr(value, bindings, ctx)
-        val t = ve.wdlType match {
-          case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
-            T_String
-          case other =>
-            val msg =
-              s"expression ${prettyFormatExpr(ve)} should be coercible to Array[String], but it is ${prettyFormatType(other)}"
-            handleError(msg, ve.loc)
-            other
-        }
-        TAT.ExprPlaceholderSep(se, ve, t, loc)
-
-      // math operators on one argument
-      case AST.ExprUnaryPlus(value, loc) =>
-        val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUnaryPlus(ve, typeEvalMathOp(ve), loc)
-      case AST.ExprUnaryMinus(value, loc) =>
-        val ve = applyExpr(value, bindings, ctx)
-        TAT.ExprUnaryMinus(ve, typeEvalMathOp(ve), loc)
-
-      // logical operators
-      case AST.ExprLor(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLor(ae, be, typeEvalLogicalOp(ae, be), loc)
-      case AST.ExprLand(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLand(ae, be, typeEvalLogicalOp(ae, be), loc)
-      case AST.ExprNegate(value: AST.Expr, loc) =>
-        val e = applyExpr(value, bindings, ctx)
-        TAT.ExprNegate(e, typeEvalLogicalOp(e), loc)
-
-      // equality comparisons
-      case AST.ExprEqeq(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprEqeq(ae, be, typeEvalCompareOp(ae, be), loc)
-      case AST.ExprNeq(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprNeq(ae, be, typeEvalCompareOp(ae, be), loc)
-      case AST.ExprLt(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLt(ae, be, typeEvalCompareOp(ae, be), loc)
-      case AST.ExprGte(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprGte(ae, be, typeEvalCompareOp(ae, be), loc)
-      case AST.ExprLte(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprLte(ae, be, typeEvalCompareOp(ae, be), loc)
-      case AST.ExprGt(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprGt(ae, be, typeEvalCompareOp(ae, be), loc)
-
-      // add is overloaded, it is a special case
-      case AST.ExprAdd(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprAdd(ae, be, typeEvalAdd(ae, be), loc)
-
-      // math operators on two arguments
-      case AST.ExprSub(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprSub(ae, be, typeEvalMathOp(ae, be), loc)
-      case AST.ExprMod(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprMod(ae, be, typeEvalMathOp(ae, be), loc)
-      case AST.ExprMul(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprMul(ae, be, typeEvalMathOp(ae, be), loc)
-      case AST.ExprDivide(a: AST.Expr, b: AST.Expr, loc) =>
-        val ae = applyExpr(a, bindings, ctx)
-        val be = applyExpr(b, bindings, ctx)
-        TAT.ExprDivide(ae, be, typeEvalMathOp(ae, be), loc)
-
-      // Access an array element at [index: Int] or a map value at [key: K]
-      case AST.ExprAt(collection: AST.Expr, index: AST.Expr, loc) =>
-        val eIndex = applyExpr(index, bindings, ctx)
-        val eCollection = applyExpr(collection, bindings, ctx)
-        val t = (eIndex.wdlType, eCollection.wdlType) match {
-          case (T_Int, T_Array(elementType, _))                                  => elementType
-          case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
-          case (T_Int, _) =>
-            handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
-            eIndex.wdlType
-          case (_, _) =>
-            handleError(s"expression ${prettyFormatExpr(eCollection)} must be an array",
-                        eCollection.loc)
-            eCollection.wdlType
-        }
-        TAT.ExprAt(eCollection, eIndex, t, loc)
-
-      // conditional:
-      // if (x == 1) then "Sunday" else "Weekday"
-      case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, loc) =>
-        val eCond = applyExpr(cond, bindings, ctx)
-        val eTrueBranch = applyExpr(trueBranch, bindings, ctx)
-        val eFalseBranch = applyExpr(falseBranch, bindings, ctx)
-        val t = {
-          if (eCond.wdlType != T_Boolean) {
-            handleError(s"condition ${prettyFormatExpr(eCond)} must be a boolean", eCond.loc)
-            eCond.wdlType
-          } else {
+        case AST.ExprArray(vec, loc) =>
+          val tVecExprs = vec.map(e => inner(e, inStringOrCommand, inStringOrCommand))
+          val t =
             try {
-              unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)._1
+              T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
             } catch {
               case _: TypeUnificationException =>
-                val msg =
-                  s"""|The branches of a conditional expression must be coercable to the same type
-                      |expression
-                      |  true branch: ${prettyFormatType(eTrueBranch.wdlType)}
-                      |  flase branch: ${prettyFormatType(eFalseBranch.wdlType)}
-                      |""".stripMargin
-                handleError(msg, expr.loc)
-                eTrueBranch.wdlType
+                handleError("array elements must have the same type, or be coercible to one",
+                            innerExpr.loc)
+                tVecExprs.head.wdlType
+            }
+          TAT.ExprArray(tVecExprs, t, loc)
+
+        case AST.ExprObject(members, loc) =>
+          val members2 = members.map {
+            case AST.ExprMember(key, value, _) =>
+              val k = inner(key, inStringOrCommand, inStringOrCommand)
+              val v = inner(value, inStringOrCommand, inStringOrCommand)
+              k -> v
+          }.toMap
+          TAT.ExprObject(members2, T_Object, loc)
+
+        case AST.ExprMap(m, loc) if m.isEmpty =>
+          // The key and value types are unknown.
+          TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), loc)
+
+        case AST.ExprMap(value, loc) =>
+          val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
+            val k = inner(item.key, inStringOrCommand, inStringOrCommand)
+            val v = inner(item.value, inStringOrCommand, inStringOrCommand)
+            k -> v
+          }.toMap
+          // unify the key types
+          val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc)
+          // unify the value types
+          val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc)
+          T_Map(tk, tv)
+          TAT.ExprMap(m, T_Map(tk, tv), loc)
+
+        // These are expressions like:
+        // ${true="--yes" false="--no" boolean_value}
+        case AST.ExprPlaceholderEqual(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
+          val te = inner(t, inStringOrCommand = true, inPlaceholder = true)
+          val fe = inner(f, inStringOrCommand = true, inPlaceholder = true)
+          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val wdlType = if (te.wdlType != fe.wdlType) {
+            handleError(
+                s"subexpressions ${prettyFormatExpr(te)} and ${prettyFormatExpr(fe)} must have the same type",
+                loc
+            )
+            te.wdlType
+          } else if (ve.wdlType != T_Boolean) {
+            val msg =
+              s"condition ${prettyFormatExpr(ve)} should have boolean type, it has type ${prettyFormatType(ve.wdlType)} instead"
+            handleError(msg, innerExpr.loc)
+            ve.wdlType
+          } else {
+            te.wdlType
+          }
+          TAT.ExprPlaceholderEqual(te, fe, ve, wdlType, loc)
+
+        // An expression like:
+        // ${default="foo" optional_value}
+        case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
+          val de = inner(default, inStringOrCommand = true, inPlaceholder = true)
+          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val t = ve.wdlType match {
+            case T_Optional(vt2) if unify.isCoercibleTo(de.wdlType, vt2) => de.wdlType
+            case vt2 if unify.isCoercibleTo(de.wdlType, vt2)             =>
+              // another unsavory case. The optional_value is NOT optional.
+              de.wdlType
+            case _ =>
+              val msg =
+                s"""|Expression (${prettyFormatExpr(ve)}) must have type coercible to
+                    |(${prettyFormatType(de.wdlType)}), it has type (${prettyFormatType(
+                       ve.wdlType
+                   )}) instead
+                    |""".stripMargin.replaceAll("\n", " ")
+              handleError(msg, innerExpr.loc)
+              ve.wdlType
+          }
+          TAT.ExprPlaceholderDefault(de, ve, t, loc)
+
+        // An expression like:
+        // ${sep=", " array_value}
+        case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
+          if (inPlaceholder) {
+            throw new TypeException(s"nested placeholder", loc)
+          }
+          val se = inner(sep, inStringOrCommand = true, inPlaceholder = true)
+          if (se.wdlType != T_String)
+            throw new TypeException(s"separator ${prettyFormatExpr(se)} must have string type", loc)
+          val ve = inner(value, inStringOrCommand = true, inPlaceholder = true)
+          val t = ve.wdlType match {
+            case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
+              T_String
+            case other =>
+              val msg =
+                s"expression ${prettyFormatExpr(ve)} should be coercible to Array[String], but it is ${prettyFormatType(other)}"
+              handleError(msg, ve.loc)
+              other
+          }
+          TAT.ExprPlaceholderSep(se, ve, t, loc)
+
+        // Access an array element at [index: Int] or a map value at [key: K]
+        case AST.ExprAt(collection: AST.Expr, index: AST.Expr, loc) =>
+          val eIndex = inner(index, inStringOrCommand, inStringOrCommand)
+          val eCollection = inner(collection, inStringOrCommand, inStringOrCommand)
+          val t = (eIndex.wdlType, eCollection.wdlType) match {
+            case (T_Int, T_Array(elementType, _))                                  => elementType
+            case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
+            case (T_Int, _) =>
+              handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
+              eIndex.wdlType
+            case (_, _) =>
+              handleError(s"expression ${prettyFormatExpr(eCollection)} must be an array",
+                          eCollection.loc)
+              eCollection.wdlType
+          }
+          TAT.ExprAt(eCollection, eIndex, t, loc)
+
+        // conditional:
+        // if (x == 1) then "Sunday" else "Weekday"
+        case AST.ExprIfThenElse(cond: AST.Expr, trueBranch: AST.Expr, falseBranch: AST.Expr, loc) =>
+          val eCond = inner(cond, inStringOrCommand, inStringOrCommand)
+          val eTrueBranch = inner(trueBranch, inStringOrCommand, inStringOrCommand)
+          val eFalseBranch = inner(falseBranch, inStringOrCommand, inStringOrCommand)
+          val t = {
+            if (eCond.wdlType != T_Boolean) {
+              handleError(s"condition ${prettyFormatExpr(eCond)} must be a boolean", eCond.loc)
+              eCond.wdlType
+            } else {
+              try {
+                unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)._1
+              } catch {
+                case _: TypeUnificationException =>
+                  val msg =
+                    s"""|The branches of a conditional expression must be coercable to the same type
+                        |expression
+                        |  true branch: ${prettyFormatType(eTrueBranch.wdlType)}
+                        |  flase branch: ${prettyFormatType(eFalseBranch.wdlType)}
+                        |""".stripMargin
+                  handleError(msg, innerExpr.loc)
+                  eTrueBranch.wdlType
+              }
             }
           }
-        }
-        TAT.ExprIfThenElse(eCond, eTrueBranch, eFalseBranch, t, loc)
+          TAT.ExprIfThenElse(eCond, eTrueBranch, eFalseBranch, t, loc)
 
-      // Apply a standard library function to arguments. For example:
-      //   read_int("4")
-      case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], loc) =>
-        val eElements = elements.map(applyExpr(_, bindings, ctx))
-        try {
-          val (outputType, funcSig) = ctx.stdlib.apply(funcName, eElements.map(_.wdlType))
-          TAT.ExprApply(funcName, funcSig, eElements, outputType, loc)
-        } catch {
-          case e: StdlibFunctionException =>
-            handleError(e.getMessage, expr.loc)
-            TAT.ValueNone(T_Any, expr.loc)
-        }
+        // Apply a standard library function to arguments. For example:
+        //   read_int("4")
+        case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], loc) =>
+          val eElements = elements.map(e => inner(e, inStringOrCommand, inStringOrCommand))
+          try {
+            val (outputType, funcSig) =
+              ctx.stdlib.apply(funcName, eElements.map(_.wdlType), inPlaceholder)
+            TAT.ExprApply(funcName, funcSig, eElements, outputType, loc)
+          } catch {
+            case e: StdlibFunctionException =>
+              handleError(e.getMessage, innerExpr.loc)
+              TAT.ValueNone(T_Any, innerExpr.loc)
+          }
 
-      // Access a field in a struct or an object. For example "x.a" in:
-      //   Int z = x.a
-      case AST.ExprGetName(expr: AST.Expr, id: String, loc) =>
-        val e = applyExpr(expr, bindings, ctx)
-        val t = typeEvalExprGetName(e, id, ctx)
-        TAT.ExprGetName(e, id, t, loc)
+        // Access a field in a struct or an object. For example "x.a" in:
+        //   Int z = x.a
+        case AST.ExprGetName(expr: AST.Expr, id: String, loc) =>
+          val e = inner(expr, inStringOrCommand, inStringOrCommand)
+          val t = typeEvalExprGetName(e, id, ctx)
+          TAT.ExprGetName(e, id, t, loc)
+      }
     }
+    inner(expr, inCommand, inPlaceholder = false)
   }
 
   private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: Context): WdlType = {
@@ -744,7 +578,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             loc
         )
       case other =>
-        handleError(s"${SUtil.metaValueToString(other)} is an invalid meta value", expr.loc)
+        handleError(s"${SUtil.prettyFormatMetaValue(other)} is an invalid meta value", expr.loc)
         TAT.MetaValueNull(other.loc)
     }
   }
@@ -828,7 +662,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // check that all expressions can be coereced to a string inside
     // the command section
     val cmdParts = task.command.parts.map { expr =>
-      val e = applyExpr(expr, Map.empty, ctxDecl)
+      val e = applyExpr(expr, Map.empty, ctxDecl, inCommand = true)
       e.wdlType match {
         case x if isPrimitive(x)             => e
         case T_Optional(x) if isPrimitive(x) => e
@@ -1171,9 +1005,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
+    val wdlVersion = doc.version.value
     val initCtx = Context(
-        version = doc.version.value,
-        stdlib = Stdlib(regime, doc.version.value),
+        version = wdlVersion,
+        stdlib = Stdlib(regime, wdlVersion, logger),
         docSource = doc.source
     )
 
@@ -1290,5 +1125,5 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 }
 
 object TypeInfer {
-  lazy val instance: TypeInfer = TypeInfer()
+  val instance: TypeInfer = TypeInfer()
 }
