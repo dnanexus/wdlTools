@@ -36,7 +36,9 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
       case (T_Float, T_String) if regime <= Lenient =>
         logger.trace(s"lenient coercion from ${right} to T_Float")
         true
-      case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
+      // TODO: these coercions to String should only be allowed 1. in Lenient
+      //  regime, or 2. within string interpolation
+      case (T_String, T_Boolean | T_Int | T_Float) => // if regime <= Lenient =>
         logger.trace(s"lenient coercion from ${right} to T_String")
         true
 

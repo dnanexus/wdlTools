@@ -4,7 +4,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Builtins, CommentMap, Parsers, SourceLocation, WdlVersion}
+import wdlTools.syntax.{CommentMap, Operator, Parsers, SourceLocation, WdlVersion}
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 import scala.collection.BufferedIterator
@@ -584,12 +584,14 @@ case class WdlV1Formatter(followImports: Boolean = false,
                 wrapping = Wrapping.AsNeeded,
                 bounds = text
             )
-          case ExprApply(oper, Vector(value), loc) if Builtins.AllOperators.contains(oper) =>
-            val operSpan = Literal.fromStart(oper, loc)
+          case ExprApply(oper, Vector(value), loc) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            val operSpan = Literal.fromStart(symbol, loc)
             SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
-          case ExprApply(oper, Vector(lhs, rhs), loc) if Builtins.AllOperators.contains(oper) =>
+          case ExprApply(oper, Vector(lhs, rhs), loc) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
             Operation(
-                oper,
+                symbol,
                 nested(lhs,
                        inPlaceholder = inStringOrCommand,
                        inOperation = true,

@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.syntax.Builtins
+import wdlTools.syntax.Operator
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
@@ -180,16 +180,18 @@ object Utils {
         s"${name}() -> ${prettyFormatType(output)}"
 
       // A built-in operator with one argument
-      case T_Function1(name, input, _) if Builtins.AllOperators.contains(name) =>
-        s"${name}${prettyFormatType(input)}"
+      case T_Function1(name, input, _) if Operator.All.contains(name) =>
+        val symbol = Operator.All(name).symbol
+        s"${symbol}${prettyFormatType(input)}"
 
       // A function with one argument
       case T_Function1(name, input, output) =>
         s"${name}(${prettyFormatType(input)}) -> ${prettyFormatType(output)}"
 
       // A built-in operator with two arguments
-      case T_Function2(name, arg1, arg2, _) if Builtins.AllOperators.contains(name) =>
-        s"${prettyFormatType(arg1)} ${name} ${prettyFormatType(arg2)}"
+      case T_Function2(name, arg1, arg2, _) if Operator.All.contains(name) =>
+        val symbol = Operator.All(name).symbol
+        s"${prettyFormatType(arg1)} ${symbol} ${prettyFormatType(arg2)}"
 
       // A function with two arguments. For example:
       // Float size(File, [String])
@@ -329,12 +331,14 @@ object Utils {
 
         // Apply a builtin unary operator
         case TAT.ExprApply(oper: String, _, Vector(unaryValue), _, _)
-            if Builtins.AllOperators.contains(oper) =>
-          s"${oper}${inner(unaryValue, disableQuoting)}"
+            if Operator.All.contains(oper) =>
+          val symbol = Operator.All(oper).symbol
+          s"${symbol}${inner(unaryValue, disableQuoting)}"
         // Apply a buildin binary operator
         case TAT.ExprApply(oper: String, _, Vector(lhs, rhs), _, _)
-            if Builtins.AllOperators.contains(oper) =>
-          s"${inner(lhs, disableQuoting)} ${oper} ${inner(rhs, disableQuoting)}"
+            if Operator.All.contains(oper) =>
+          val symbol = Operator.All(oper).symbol
+          s"${inner(lhs, disableQuoting)} ${symbol} ${inner(rhs, disableQuoting)}"
         // Apply a standard library function to arguments. For example:
         //   read_int("4")
         case TAT.ExprApply(funcName, _, elements, _, _) =>

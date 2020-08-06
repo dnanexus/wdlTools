@@ -59,6 +59,7 @@ object Utils {
     }
   }
 
+  // TODO: within string interpolation, V_Null should render as empty string
   @scala.annotation.tailrec
   def primitiveValueToString(wv: V, loc: SourceLocation): String = {
     wv match {

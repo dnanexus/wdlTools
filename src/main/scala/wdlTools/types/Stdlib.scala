@@ -1,7 +1,7 @@
 package wdlTools.types
 
 import WdlTypes.{T_Function2, T_Var, _}
-import wdlTools.syntax.{Builtins, WdlVersion}
+import wdlTools.syntax.{Operator, WdlVersion}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.{Logger, TraceLevel}
 
@@ -54,26 +54,26 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
   // is optional, then the return type is optional
   private def optionalStringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
     Vector(
-        T_Function2(Builtins.Addition, T_Optional(a), b, T_Optional(result)),
-        T_Function2(Builtins.Addition, a, T_Optional(b), T_Optional(result)),
-        T_Function2(Builtins.Addition, T_Optional(a), T_Optional(b), T_Optional(result))
+        T_Function2(Operator.Addition.name, T_Optional(a), b, T_Optional(result)),
+        T_Function2(Operator.Addition.name, a, T_Optional(b), T_Optional(result)),
+        T_Function2(Operator.Addition.name, T_Optional(a), T_Optional(b), T_Optional(result))
     )
   }
   private def stringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
     Vector(
-        T_Function2(Builtins.Addition, a, b, result)
+        T_Function2(Operator.Addition.name, a, b, result)
     ) ++ optionalStringAdditionPrototypes(a, b, result)
   }
 
   private lazy val draft2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
-      unaryNumericPrototypes(Builtins.UnaryPlus),
-      unaryNumericPrototypes(Builtins.UnaryMinus),
+      unaryNumericPrototypes(Operator.UnaryPlus.name),
+      unaryNumericPrototypes(Operator.UnaryMinus.name),
       // logical operators
       Vector(
-          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+          T_Function1(Operator.LogicalNot.name, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalOr.name, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
       // equal/not-equal comparisons are allowed for all primitive types
@@ -82,22 +82,22 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
       // * true > false
       // * Strings are ordered lexicographically using Unicode code point number
       //   for comparison of individual characters
-      comparisonPrototypes(Builtins.Equality),
-      comparisonPrototypes(Builtins.Inequality),
-      comparisonPrototypes(Builtins.LessThan),
-      comparisonPrototypes(Builtins.LessThanOrEqual),
-      comparisonPrototypes(Builtins.GreaterThan),
-      comparisonPrototypes(Builtins.GreaterThanOrEqual),
+      comparisonPrototypes(Operator.Equality.name),
+      comparisonPrototypes(Operator.Inequality.name),
+      comparisonPrototypes(Operator.LessThan.name),
+      comparisonPrototypes(Operator.LessThanOrEqual.name),
+      comparisonPrototypes(Operator.GreaterThan.name),
+      comparisonPrototypes(Operator.GreaterThanOrEqual.name),
       // equal/not-equal is allowed for File-String
       // also, it is not explicitly stated in the spec, but we allow
       // comparisons for any operands of the same type
       Vector(
-          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
-          T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
-          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Equality.name, T_File, T_String, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_File, T_String, T_Boolean),
+          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
       // the + function is overloaded for string expressions
       // it is omitted from the spec, but we allow String + Boolean as well
@@ -112,11 +112,11 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
       stringAdditionPrototypes(T_String, T_Boolean, T_String),
       stringAdditionPrototypes(T_Boolean, T_String, T_String),
       // binary numeric operators
-      binaryNumericPrototypes(Builtins.Addition),
-      binaryNumericPrototypes(Builtins.Subtraction),
-      binaryNumericPrototypes(Builtins.Multiplication),
-      binaryNumericPrototypes(Builtins.Division),
-      binaryNumericPrototypes(Builtins.Remainder),
+      binaryNumericPrototypes(Operator.Addition.name),
+      binaryNumericPrototypes(Operator.Subtraction.name),
+      binaryNumericPrototypes(Operator.Multiplication.name),
+      binaryNumericPrototypes(Operator.Division.name),
+      binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
           T_Function0("stdout", T_File),
@@ -180,13 +180,13 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
 
   private lazy val v1Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
-      unaryNumericPrototypes(Builtins.UnaryPlus),
-      unaryNumericPrototypes(Builtins.UnaryMinus),
+      unaryNumericPrototypes(Operator.UnaryPlus.name),
+      unaryNumericPrototypes(Operator.UnaryMinus.name),
       // logical operators
       Vector(
-          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+          T_Function1(Operator.LogicalNot.name, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalOr.name, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
       // equal/not-equal comparisons are allowed for all primitive types
@@ -195,22 +195,22 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
       // * true > false
       // * Strings are ordered lexicographically using Unicode code point number
       //   for comparison of individual characters
-      comparisonPrototypes(Builtins.Equality),
-      comparisonPrototypes(Builtins.Inequality),
-      comparisonPrototypes(Builtins.LessThan),
-      comparisonPrototypes(Builtins.LessThanOrEqual),
-      comparisonPrototypes(Builtins.GreaterThan),
-      comparisonPrototypes(Builtins.GreaterThanOrEqual),
+      comparisonPrototypes(Operator.Equality.name),
+      comparisonPrototypes(Operator.Inequality.name),
+      comparisonPrototypes(Operator.LessThan.name),
+      comparisonPrototypes(Operator.LessThanOrEqual.name),
+      comparisonPrototypes(Operator.GreaterThan.name),
+      comparisonPrototypes(Operator.GreaterThanOrEqual.name),
       // equal/not-equal is allowed for File-String
       // also, it is not explicitly stated in the spec, but we allow
       // comparisons for any operands of the same type
       Vector(
-          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Equality, T_File, T_String, T_Boolean),
-          T_Function2(Builtins.Inequality, T_File, T_String, T_Boolean),
-          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Equality.name, T_File, T_String, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_File, T_String, T_Boolean),
+          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
       // the + function is overloaded for string expressions
       // it is omitted from the spec, but we allow String + Boolean as well
@@ -225,11 +225,11 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
       stringAdditionPrototypes(T_String, T_Boolean, T_String),
       stringAdditionPrototypes(T_Boolean, T_String, T_String),
       // binary numeric operators
-      binaryNumericPrototypes(Builtins.Addition),
-      binaryNumericPrototypes(Builtins.Subtraction),
-      binaryNumericPrototypes(Builtins.Multiplication),
-      binaryNumericPrototypes(Builtins.Division),
-      binaryNumericPrototypes(Builtins.Remainder),
+      binaryNumericPrototypes(Operator.Addition.name),
+      binaryNumericPrototypes(Operator.Subtraction.name),
+      binaryNumericPrototypes(Operator.Multiplication.name),
+      binaryNumericPrototypes(Operator.Division.name),
+      binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
           T_Function0("stdout", T_File),
@@ -305,29 +305,29 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
 
   private lazy val v2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
-      unaryNumericPrototypes(Builtins.UnaryMinus),
+      unaryNumericPrototypes(Operator.UnaryMinus.name),
       // logical operators
       Vector(
-          T_Function1(Builtins.LogicalNot, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalOr, T_Boolean, T_Boolean, T_Boolean),
-          T_Function2(Builtins.LogicalAnd, T_Boolean, T_Boolean, T_Boolean)
+          T_Function1(Operator.LogicalNot.name, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalOr.name, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
-      comparisonPrototypesV2(Builtins.Equality),
-      comparisonPrototypesV2(Builtins.Inequality),
-      comparisonPrototypesV2(Builtins.LessThan),
-      comparisonPrototypesV2(Builtins.LessThanOrEqual),
-      comparisonPrototypesV2(Builtins.GreaterThan),
-      comparisonPrototypesV2(Builtins.GreaterThanOrEqual),
+      comparisonPrototypesV2(Operator.Equality.name),
+      comparisonPrototypesV2(Operator.Inequality.name),
+      comparisonPrototypesV2(Operator.LessThan.name),
+      comparisonPrototypesV2(Operator.LessThanOrEqual.name),
+      comparisonPrototypesV2(Operator.GreaterThan.name),
+      comparisonPrototypesV2(Operator.GreaterThanOrEqual.name),
       // it is not explicitly stated in the spec, but we allow equal/not-equal
       // comparisons for any operands of the same type
       Vector(
-          T_Function2(Builtins.Equality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Equality, T_Directory, T_Directory, T_Boolean),
-          T_Function2(Builtins.Inequality, T_File, T_File, T_Boolean),
-          T_Function2(Builtins.Inequality, T_Directory, T_Directory, T_Boolean),
-          T_Function2(Builtins.Equality, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Builtins.Inequality, T_Var(0), T_Var(0), T_Boolean)
+          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Equality.name, T_Directory, T_Directory, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
+          T_Function2(Operator.Inequality.name, T_Directory, T_Directory, T_Boolean),
+          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
+          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
       // the + function is overloaded for string expressions
       // even worse, it has different semantics within an interpolation vs elsewhere
@@ -336,16 +336,16 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           // if both arguments are non-optional, then the return type is non-optional
           // v2 inverts the argument order of File/String concatenation - we allow
           // both in all versions
-          T_Function2(Builtins.Addition, T_File, T_String, T_File),
-          T_Function2(Builtins.Addition, T_String, T_File, T_File),
-          T_Function2(Builtins.Addition, T_String, T_String, T_String)
+          T_Function2(Operator.Addition.name, T_File, T_String, T_File),
+          T_Function2(Operator.Addition.name, T_String, T_File, T_File),
+          T_Function2(Operator.Addition.name, T_String, T_String, T_String)
       ),
       // binary numeric operators
-      binaryNumericPrototypes(Builtins.Addition),
-      binaryNumericPrototypes(Builtins.Subtraction),
-      binaryNumericPrototypes(Builtins.Multiplication),
-      binaryNumericPrototypes(Builtins.Division),
-      binaryNumericPrototypes(Builtins.Remainder),
+      binaryNumericPrototypes(Operator.Addition.name),
+      binaryNumericPrototypes(Operator.Subtraction.name),
+      binaryNumericPrototypes(Operator.Multiplication.name),
+      binaryNumericPrototypes(Operator.Division.name),
+      binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
           T_Function0("stdout", T_File),

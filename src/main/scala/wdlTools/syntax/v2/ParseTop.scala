@@ -167,12 +167,9 @@ wdl_type
     val exprPart = visitExpr(ctx.string_expr_part().expr())
     val stringPart = visitString_part(ctx.string_part())
     val loc = getSourceLocation(grammar.docSource, ctx)
-    Vector(exprPart, stringPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector() => ExprString("", loc)
-      case v        => ExprCompoundString(v, loc)
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
     }
   }
 
@@ -194,14 +191,12 @@ string
         case ExprCompoundString(v, _) => v
         case e                        => Vector(e)
       }
-    val loc = getSourceLocation(grammar.docSource, ctx)
-    (stringPart +: exprPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector()  => ExprString("", loc)
-      case Vector(e) => e
-      case parts     => ExprCompoundString(parts, loc)
+    (stringPart, exprPart) match {
+      case (s: ExprString, Vector()) => s
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      case (s, parts) =>
+        ExprCompoundString(s +: parts, getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -835,16 +830,11 @@ task_input
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    Vector(exprPart, stringPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector() =>
-        ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) =>
-        e
-      case filteredParts =>
-        ExprCompoundString(filteredParts, getSourceLocation(grammar.docSource, ctx))
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => e
+      case (ExprString(e, _), s) if e.isEmpty => s
+      case (e, s) =>
+        ExprCompoundString(Vector(e, s), getSourceLocation(grammar.docSource, ctx))
     }
   }
 

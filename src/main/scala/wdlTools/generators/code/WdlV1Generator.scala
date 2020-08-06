@@ -5,7 +5,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Builtins, WdlVersion}
+import wdlTools.syntax.{Operator, WdlVersion}
 
 case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
@@ -412,12 +412,13 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
                 ),
                 wrapping = Wrapping.AsNeeded
             )
-          case ExprApply(oper, _, Vector(value), _, _) if Builtins.AllOperators.contains(oper) =>
-            val operSized = Literal(oper)
-            Sequence(Vector(operSized, nested(value, inOperation = true)))
-          case ExprApply(oper, _, Vector(lhs, rhs), _, _) if Builtins.AllOperators.contains(oper) =>
+          case ExprApply(oper, _, Vector(value), _, _) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            Sequence(Vector(Literal(symbol), nested(value, inOperation = true)))
+          case ExprApply(oper, _, Vector(lhs, rhs), _, _) if Operator.All.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
             Operation(
-                oper,
+                symbol,
                 nested(lhs,
                        inPlaceholder = inStringOrCommand,
                        inOperation = true,

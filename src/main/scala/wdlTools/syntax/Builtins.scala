@@ -65,8 +65,32 @@ trait BuiltinSymbols {
   val Zip = "zip"
 }
 
-object Builtins extends BuiltinSymbols {
-  lazy val AllOperators: Set[String] = Set(
+object Builtins extends BuiltinSymbols
+
+sealed abstract class Operator(val name: String, val symbol: String, val precedence: Int)
+    extends Ordered[Operator] {
+  def compare(that: Operator): Int = this.precedence - that.precedence
+}
+
+object Operator {
+  case object UnaryPlus extends Operator("{plus}", Builtins.UnaryPlus, 8)
+  case object UnaryMinus extends Operator("{minus}", Builtins.UnaryMinus, 8)
+  case object LogicalNot extends Operator("{not}", Builtins.LogicalNot, 8)
+  case object LogicalOr extends Operator("{or}", Builtins.LogicalOr, 2)
+  case object LogicalAnd extends Operator("{and}", Builtins.LogicalAnd, 3)
+  case object Equality extends Operator("{eq}", Builtins.Equality, 4)
+  case object Inequality extends Operator("{neq}", Builtins.Inequality, 4)
+  case object LessThan extends Operator("{lt}", Builtins.LessThan, 5)
+  case object LessThanOrEqual extends Operator("{lte}", Builtins.LessThanOrEqual, 5)
+  case object GreaterThan extends Operator("{gt}", Builtins.GreaterThan, 5)
+  case object GreaterThanOrEqual extends Operator("{gte}", Builtins.GreaterThanOrEqual, 5)
+  case object Addition extends Operator("{add}", Builtins.Addition, 6)
+  case object Subtraction extends Operator("{sub}", Builtins.Subtraction, 6)
+  case object Multiplication extends Operator("{mul}", Builtins.Multiplication, 7)
+  case object Division extends Operator("{div}", Builtins.Division, 7)
+  case object Remainder extends Operator("{mod}", Builtins.Remainder, 7)
+
+  lazy val All: Map[String, Operator] = Set(
       UnaryPlus,
       UnaryMinus,
       LogicalNot,
@@ -83,5 +107,5 @@ object Builtins extends BuiltinSymbols {
       Multiplication,
       Division,
       Remainder
-  )
+  ).map(o => o.name -> o).toMap
 }

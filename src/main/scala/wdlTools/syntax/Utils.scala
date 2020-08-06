@@ -67,12 +67,13 @@ object Utils {
 
         // Apply a builtin unary operator
         case ExprApply(funcName: String, Vector(unaryValue), _)
-            if Builtins.AllOperators.contains(funcName) =>
-          s"${funcName}${inner(unaryValue)}"
+            if Operator.All.contains(funcName) =>
+          val symbol = Operator.All(funcName).symbol
+          s"${symbol}${inner(unaryValue)}"
         // Apply a buildin binary operator
-        case ExprApply(funcName: String, Vector(lhs, rhs), _)
-            if Builtins.AllOperators.contains(funcName) =>
-          s"${inner(lhs)} ${funcName} ${inner(rhs)}"
+        case ExprApply(funcName: String, Vector(lhs, rhs), _) if Operator.All.contains(funcName) =>
+          val symbol = Operator.All(funcName).symbol
+          s"${inner(lhs)} ${symbol} ${inner(rhs)}"
 
         // Apply a standard library function to arguments. For example:
         //   read_int("4")

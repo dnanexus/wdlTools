@@ -7,7 +7,7 @@ import kantan.csv._
 import kantan.csv.ops._
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.{Builtins, SourceLocation, WdlVersion}
+import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
 import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
 import wdlTools.util.{FileSourceResolver, Logger}
 
@@ -23,22 +23,22 @@ case class Stdlib(paths: EvalPaths,
 
   // built-in operators
   private val builtinFuncTable: Map[String, FunctionImpl] = Map(
-      Builtins.UnaryMinus -> unaryMinus,
-      Builtins.UnaryMinus -> unaryPlus,
-      Builtins.LogicalNot -> logicalNot,
-      Builtins.LogicalAnd -> logicalAnd,
-      Builtins.LogicalOr -> logicalOr,
-      Builtins.Equality -> equality,
-      Builtins.Inequality -> inequality,
-      Builtins.LessThan -> lessThan,
-      Builtins.LessThanOrEqual -> lessThanOrEqual,
-      Builtins.GreaterThan -> greaterThan,
-      Builtins.GreaterThanOrEqual -> greaterThanOrEqual,
-      Builtins.Addition -> addition,
-      Builtins.Subtraction -> subtraction,
-      Builtins.Multiplication -> multiplication,
-      Builtins.Division -> division,
-      Builtins.Remainder -> remainder
+      Operator.UnaryMinus.name -> unaryMinus,
+      Operator.UnaryPlus.name -> unaryPlus,
+      Operator.LogicalNot.name -> logicalNot,
+      Operator.LogicalAnd.name -> logicalAnd,
+      Operator.LogicalOr.name -> logicalOr,
+      Operator.Equality.name -> equality,
+      Operator.Inequality.name -> inequality,
+      Operator.LessThan.name -> lessThan,
+      Operator.LessThanOrEqual.name -> lessThanOrEqual,
+      Operator.GreaterThan.name -> greaterThan,
+      Operator.GreaterThanOrEqual.name -> greaterThanOrEqual,
+      Operator.Addition.name -> addition,
+      Operator.Subtraction.name -> subtraction,
+      Operator.Multiplication.name -> multiplication,
+      Operator.Division.name -> division,
+      Operator.Remainder.name -> remainder
   )
 
   private lazy val draft2FuncTable: Map[String, FunctionImpl] = Map(

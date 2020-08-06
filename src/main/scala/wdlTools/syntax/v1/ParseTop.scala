@@ -156,6 +156,44 @@ wdl_type
     }
   }
 
+  /* expression_placeholder_option
+  : BoolLiteral EQUAL (string | number)
+  | DEFAULT EQUAL (string | number)
+  | SEP EQUAL (string | number)
+  ; */
+  override def visitExpression_placeholder_option(
+      ctx: WdlV1Parser.Expression_placeholder_optionContext
+  ): PlaceHolderPart = {
+    val expr: Expr =
+      try {
+        visitString(ctx.string())
+      } catch {
+        case _: NullPointerException =>
+          val loc = getSourceLocation(grammar.docSource, ctx)
+          if (ctx.number() != null) {
+            grammar.logger.warning(
+                s"""A placeholder option at ${loc} has a numeric value;
+                   |only string values are allowed.""".stripMargin
+            )
+            visitNumber(ctx.number())
+          } else {
+            throw new SyntaxException("Placeholder options must be strings", loc)
+          }
+      }
+    if (ctx.BoolLiteral() != null) {
+      val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
+      return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    if (ctx.DEFAULT() != null) {
+      return ExprPlaceholderPartDefault(expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    if (ctx.SEP() != null) {
+      return ExprPlaceholderPartSep(expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    throw new SyntaxException(s"Not one of three known variants of a placeholder",
+                              getSourceLocation(grammar.docSource, ctx))
+  }
+
   /* string_expr_part
   : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ; */
@@ -178,12 +216,9 @@ wdl_type
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val stringPart = visitString_part(ctx.string_part())
     val loc = getSourceLocation(grammar.docSource, ctx)
-    Vector(exprPart, stringPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector() => ExprString("", loc)
-      case v        => ExprCompoundString(v, loc)
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
     }
   }
 
@@ -205,14 +240,12 @@ string
         case ExprCompoundString(v, _) => v
         case e                        => Vector(e)
       }
-    val loc = getSourceLocation(grammar.docSource, ctx)
-    (stringPart +: exprPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector()  => ExprString("", loc)
-      case Vector(e) => e
-      case parts     => ExprCompoundString(parts, loc)
+    (stringPart, exprPart) match {
+      case (s: ExprString, Vector()) => s
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      case (s, parts) =>
+        ExprCompoundString(s +: parts, getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -264,44 +297,6 @@ string
     }
 
     throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
-  }
-
-  /* expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
-  | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
-  ; */
-  override def visitExpression_placeholder_option(
-      ctx: WdlV1Parser.Expression_placeholder_optionContext
-  ): PlaceHolderPart = {
-    val expr: Expr =
-      try {
-        visitString(ctx.string())
-      } catch {
-        case _: NullPointerException =>
-          val loc = getSourceLocation(grammar.docSource, ctx)
-          if (ctx.number() != null) {
-            grammar.logger.warning(
-                s"""A placeholder option at ${loc} has a numeric value;
-                   |only string values are allowed.""".stripMargin
-            )
-            visitNumber(ctx.number())
-          } else {
-            throw new SyntaxException("Placeholder options must be strings", loc)
-          }
-      }
-    if (ctx.BoolLiteral() != null) {
-      val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
-      return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.DEFAULT() != null) {
-      return ExprPlaceholderPartDefault(expr, getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.SEP() != null) {
-      return ExprPlaceholderPartSep(expr, getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException(s"Not one of three known variants of a placeholder",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   /* primitive_literal
@@ -928,16 +923,11 @@ task_input
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
-    Vector(exprPart, stringPart).filter {
-      case ExprString(s, _) if s.isEmpty => false
-      case _                             => true
-    } match {
-      case Vector() =>
-        ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) =>
-        e
-      case filteredParts =>
-        ExprCompoundString(filteredParts, getSourceLocation(grammar.docSource, ctx))
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => e
+      case (ExprString(e, _), s) if e.isEmpty => s
+      case (e, s) =>
+        ExprCompoundString(Vector(e, s), getSourceLocation(grammar.docSource, ctx))
     }
   }
 
