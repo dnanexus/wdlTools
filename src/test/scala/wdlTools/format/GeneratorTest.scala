@@ -4,12 +4,11 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval
-import wdlTools.eval.{Context, EvalPaths}
-import wdlTools.generators.code
+import wdlTools.eval.{Eval, EvalPaths, WdlValues}
+import wdlTools.generators.code.WdlV1Generator
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSource, FileSourceResolver, LinesFileSource}
+import wdlTools.util.{Bindings, FileSource, FileSourceResolver, LinesFileSource}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {
@@ -21,11 +20,11 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   }
 
   private def evalCommand(tDoc: TAT.Document): Vector[String] = {
-    val evaluator = eval.Eval(EvalPaths.empty, wdlTools.syntax.WdlVersion.V1)
-    tDoc.elements should not be empty
+    val evaluator = Eval(EvalPaths.empty, wdlTools.syntax.WdlVersion.V1)
+    tDoc.elements.size should not be 0
     tDoc.elements.collect {
       case task: TAT.Task =>
-        val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
+        val ctx = evaluator.applyDeclarations(task.declarations, Bindings.empty[WdlValues.V])
         evaluator.applyCommand(task.command, ctx)
     }
   }
@@ -39,7 +38,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val beforeSrc = getWdlSource(fname = fname, subdir = "before")
     val doc = Parsers.instance.parseDocument(beforeSrc)
     val (tDoc, _) = TypeInfer.instance.apply(doc)
-    val generator = code.WdlV1Generator()
+    val generator = WdlV1Generator()
     val gLines = LinesFileSource(generator.generateDocument(tDoc))
     if (validateContentSelf) {
       gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")

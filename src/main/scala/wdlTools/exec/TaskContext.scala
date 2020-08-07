@@ -4,9 +4,9 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, Runtime, JsonSerde, WdlValues, Context => EvalContext}
+import wdlTools.eval.{Eval, Runtime, JsonSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger}
 
 trait FileSourceLocalizer {
   def localizeFile(uri: String): Path
@@ -60,7 +60,7 @@ case class SafeFileSourceLocalizer(root: Path, subdirPrefix: String = "input")
 }
 
 case class TaskContext(task: Task,
-                       inputContext: EvalContext,
+                       inputBindings: Bindings[V],
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
                        defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
@@ -73,15 +73,15 @@ case class TaskContext(task: Task,
   }
   // The inputs and runtime section are evaluated using the host paths
   // (which will be the same as the guest paths, unless we're running in a container)
-  private lazy val evalContext: EvalContext = {
-    val fullContext = hostEvaluator.applyDeclarations(task.declarations, inputContext)
+  private lazy val evalBindings: Bindings[V] = {
+    val bindings = hostEvaluator.applyDeclarations(task.declarations, inputBindings)
     // If there is a command to evaluate, pre-localize all the files/dirs, otherwise
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
     if (hasCommand) {
       val localizer =
         SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true))
-      EvalContext(fullContext.bindings.map {
+      Bindings(bindings.all.map {
         case (name, V_File(uri)) =>
           val localizedPath = localizer.localizeFile(uri)
           name -> V_File(localizedPath.toString)
@@ -91,17 +91,17 @@ case class TaskContext(task: Task,
         case other => other
       })
     } else {
-      fullContext
+      bindings
     }
   }
   lazy val runtime: Runtime =
-    Runtime.fromTask(task, hostEvaluator, Some(evalContext), defaultRuntimeValues)
+    Runtime.fromTask(task, hostEvaluator, Some(evalBindings), defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
   // the guest system (i.e. container) if applicable, otherwise host and guest are the same
   lazy val command: Option[String] = if (hasCommand) {
     val guestEval = guestEvaluator.getOrElse(hostEvaluator)
-    guestEval.applyCommand(task.command, evalContext) match {
+    guestEval.applyCommand(task.command, evalBindings) match {
       case s if s.trim.isEmpty => None
       case s                   => Some(s)
     }
@@ -118,7 +118,7 @@ case class TaskContext(task: Task,
                 "sourceLocation" -> JsString(task.loc.locationString)
             )
         ),
-        "inputs" -> JsObject(JsonSerde.serialize(evalContext.bindings)),
+        "inputs" -> JsObject(JsonSerde.serialize(evalBindings)),
         "command" -> JsString(command.getOrElse("")),
         "runtime" -> JsObject(JsonSerde.serialize(runtime.getAll))
     )
@@ -133,11 +133,11 @@ case class TaskContext(task: Task,
     }
   }
 
-  lazy val outputContext: EvalContext = {
-    task.outputs.foldLeft(evalContext) {
+  lazy val outputBindings: Bindings[V] = {
+    task.outputs.foldLeft(evalBindings) {
       case (accu, output) =>
         val outputValue = hostEvaluator.applyExpr(output.expr, accu)
-        accu.addBinding(output.name, outputValue)
+        accu.add(output.name, outputValue)
     }
   }
 
@@ -145,7 +145,7 @@ case class TaskContext(task: Task,
     val outputFileResolver =
       fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getHomeDir()))
     task.outputs.map { output =>
-      val value = outputContext.bindings.get(output.name)
+      val value = outputBindings.get(output.name)
       val resolved: WdlValues.V =
         InputOutput.resolveWdlValue(output.name,
                                     output.wdlType,

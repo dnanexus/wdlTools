@@ -2,45 +2,50 @@ package wdlTools.eval
 
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
-import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSourceResolver, LocalFileSource, Logger}
-
-case class Context(bindings: Map[String, WdlValues.V]) {
-  def addBinding(name: String, value: WdlValues.V): Context = {
-    assert(!(bindings contains name))
-    this.copy(bindings = bindings + (name -> value))
-  }
-}
-
-object Context {
-  def createFromEnv(env: Map[String, (WdlTypes.T, WdlValues.V)]): Context = {
-    Context(env.map { case (name, (_, v)) => name -> v })
-  }
-
-  lazy val empty: Context = Context(Map.empty)
-}
+import wdlTools.types.ExprState.ExprState
+import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
+import wdlTools.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 case class Eval(paths: EvalPaths,
                 wdlVersion: WdlVersion,
                 fileResovler: FileSourceResolver = FileSourceResolver.get,
                 logger: Logger = Logger.get) {
+  type WdlValue = WdlValues.V
+
   // choose the standard library implementation based on version
   private val standardLibrary = Stdlib(paths, wdlVersion, fileResovler, logger)
 
-  private def getStringVal(value: V, loc: SourceLocation): String = {
-    value match {
-      case V_Boolean(b) => b.toString
-      case V_Int(i)     => i.toString
-      case V_Float(x)   => x.toString
-      case V_String(s)  => s
-      case V_File(s)    => s
-      case other        => throw new EvalException(s"bad value ${other}", loc)
+  private case class Context(bindings: Bindings[WdlValue] = Bindings.empty[WdlValue],
+                             exprState: ExprState = ExprState.Start) {
+
+    def apply(name: String): WdlValue = {
+      bindings
+        .get(name)
+        .getOrElse(
+            throw new EvalException(s"accessing undefined variable ${name}")
+        )
     }
+
+    def advanceState(condition: Option[ExprState] = None): Context = {
+      if (condition.exists(exprState >= _)) {
+        throw new Exception(s"Context in an invalid state ${exprState} >= ${condition.get}")
+      }
+      val newState = exprState match {
+        case ExprState.Start    => ExprState.InString
+        case ExprState.InString => ExprState.InPlaceholder
+        case _                  => throw new Exception(s"Cannot advance state from ${exprState}")
+      }
+      copy(exprState = newState)
+    }
+  }
+
+  private object Context {
+    def empty: Context = Context()
   }
 
   // Access a field in a struct or an object. For example:
   //   Int z = x.a
-  private def exprGetName(value: V, id: String, loc: SourceLocation) = {
+  private def exprGetName(value: V, id: String, loc: SourceLocation): WdlValue = {
     value match {
       case V_Struct(name, members) =>
         members.get(id) match {
@@ -74,87 +79,112 @@ case class Eval(paths: EvalPaths,
     }
   }
 
+  // within an interpolation, null/None renders as empty string
+  private def interpolationValueToString(wdlValue: WdlValue, loc: SourceLocation): String = {
+    wdlValue match {
+      // within an interpolation, null/None renders as empty string
+      case V_Null | V_Optional(V_Null) => ""
+      case other =>
+        Utils.primitiveValueToString(other, loc)
+    }
+  }
+
   private def apply(expr: TAT.Expr, ctx: Context): WdlValues.V = {
     expr match {
-      case _: TAT.ValueNull    => V_Null
-      case _: TAT.ValueNone    => V_Null
-      case x: TAT.ValueBoolean => V_Boolean(x.value)
-      case x: TAT.ValueInt     => V_Int(x.value)
-      case x: TAT.ValueFloat   => V_Float(x.value)
-      case x: TAT.ValueString  => V_String(x.value)
-      case x: TAT.ValueFile    => V_File(x.value)
+      case _: TAT.ValueNull      => V_Null
+      case _: TAT.ValueNone      => V_Null
+      case x: TAT.ValueBoolean   => V_Boolean(x.value)
+      case x: TAT.ValueInt       => V_Int(x.value)
+      case x: TAT.ValueFloat     => V_Float(x.value)
+      case x: TAT.ValueString    => V_String(x.value)
+      case x: TAT.ValueFile      => V_File(x.value)
+      case x: TAT.ValueDirectory => V_Directory(x.value)
 
-      // accessing a variable
-      case eid: TAT.ExprIdentifier if !(ctx.bindings contains eid.id) =>
-        throw new EvalException(s"accessing undefined variable ${eid.id}")
-      case eid: TAT.ExprIdentifier =>
-        ctx.bindings(eid.id)
-
-      // concatenate an array of strings inside a command block
-      case ecs: TAT.ExprCompoundString =>
-        val strArray: Vector[String] = ecs.value.map { x =>
-          val xv = apply(x, ctx)
-          getStringVal(xv, x.loc)
-        }
-        V_String(strArray.mkString(""))
-
-      case ep: TAT.ExprPair => V_Pair(apply(ep.l, ctx), apply(ep.r, ctx))
-      case ea: TAT.ExprArray =>
-        V_Array(ea.value.map { x =>
+      // complex types
+      case TAT.ExprPair(left, right, _, _) =>
+        V_Pair(apply(left, ctx), apply(right, ctx))
+      case TAT.ExprArray(value, _, _) =>
+        V_Array(value.map { x =>
           apply(x, ctx)
         })
-      case em: TAT.ExprMap =>
-        V_Map(em.value.map {
+      case TAT.ExprMap(value, _, _) =>
+        V_Map(value.map {
           case (k, v) => apply(k, ctx) -> apply(v, ctx)
         })
-
-      case eObj: TAT.ExprObject =>
-        V_Object(eObj.value.map {
+      case TAT.ExprObject(value, _, _) =>
+        V_Object(value.map {
           case (k, v) =>
             // an object literal key can be a string or identifier
             val key = apply(k, ctx) match {
               case V_String(s) => s
               case _ =>
-                throw new EvalException(s"bad value ${k}, object literal key must be a string",
-                                        expr.loc)
+                throw new EvalException(
+                    s"invalid key ${k}, object literal key must be a string",
+                    expr.loc
+                )
             }
             key -> apply(v, ctx)
         })
 
-      // ~{true="--yes" false="--no" boolean_value}
-      case TAT.ExprPlaceholderEqual(t, f, boolExpr, _, _) =>
-        apply(boolExpr, ctx) match {
-          case V_Boolean(true)  => apply(t, ctx)
-          case V_Boolean(false) => apply(f, ctx)
-          case other =>
-            throw new EvalException(s"bad value ${other}, should be a boolean", expr.loc)
-        }
+      case TAT.ExprIdentifier(id, _, _) =>
+        // accessing a variable
+        ctx.bindings(id)
 
-      // ~{default="foo" optional_value}
+      // interpolation
+      case TAT.ExprCompoundString(value, _, _) =>
+        // concatenate an array of strings inside an expression/command block
+        val strArray: Vector[String] = value.map { expr =>
+          val v = apply(expr, ctx.advanceState(Some(ExprState.InString)))
+          interpolationValueToString(v, expr.loc)
+        }
+        V_String(strArray.mkString(""))
+      case TAT.ExprPlaceholderEqual(t, f, boolExpr, _, _) =>
+        // ~{true="--yes" false="--no" boolean_value}
+        apply(boolExpr, ctx.advanceState(Some(ExprState.InPlaceholder))) match {
+          case V_Boolean(true) =>
+            apply(t, ctx.advanceState(Some(ExprState.InPlaceholder)))
+          case V_Boolean(false) =>
+            apply(f, ctx.advanceState(Some(ExprState.InPlaceholder)))
+          case other =>
+            throw new EvalException(
+                s"invalid boolean value ${other}, should be a boolean",
+                expr.loc
+            )
+        }
       case TAT.ExprPlaceholderDefault(defaultVal, optVal, _, _) =>
-        apply(optVal, ctx) match {
-          case V_Null => apply(defaultVal, ctx)
+        // ~{default="foo" optional_value}
+        apply(optVal, ctx.advanceState(Some(ExprState.InPlaceholder))) match {
+          case V_Null => apply(defaultVal, ctx.advanceState(Some(ExprState.InPlaceholder)))
           case other  => other
         }
-
-      // ~{sep=", " array_value}
       case TAT.ExprPlaceholderSep(sep: TAT.Expr, arrayVal: TAT.Expr, _, _) =>
-        val sep2 = getStringVal(apply(sep, ctx), sep.loc)
-        apply(arrayVal, ctx) match {
-          case V_Array(ar) =>
-            val elements: Vector[String] = ar.map { x =>
-              getStringVal(x, expr.loc)
-            }
-            V_String(elements.mkString(sep2))
+        // ~{sep=", " array_value}
+        val sepString = interpolationValueToString(
+            apply(sep, ctx.advanceState(Some(ExprState.InPlaceholder))),
+            sep.loc
+        )
+        apply(arrayVal, ctx.advanceState(Some(ExprState.InPlaceholder))) match {
+          case V_Array(array) =>
+            val elements: Vector[String] = array.map(interpolationValueToString(_, expr.loc))
+            V_String(elements.mkString(sepString))
           case other =>
-            throw new EvalException(s"bad value ${other}, should be a string", expr.loc)
+            throw new EvalException(s"invalid array value ${other}, should be a string", expr.loc)
         }
 
-      // Access an array element at [index: Int] or map value at [key: K]
+      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, loc) =>
+        // if (x == 1) then "Sunday" else "Weekday"
+        apply(cond, ctx) match {
+          case V_Boolean(true)  => apply(tBranch, ctx)
+          case V_Boolean(false) => apply(fBranch, ctx)
+          case _ =>
+            throw new EvalException(s"condition is not boolean", loc)
+        }
+
       case TAT.ExprAt(collection, index, _, loc) =>
-        val collection_v = apply(collection, ctx)
-        val index_v = apply(index, ctx)
-        (collection_v, index_v) match {
+        // Access an array element at [index: Int] or map value at [key: K]
+        val collectionVal = apply(collection, ctx)
+        val indexVal = apply(index, ctx)
+        (collectionVal, indexVal) match {
           case (V_Array(av), V_Int(n)) if n < av.size =>
             av(n.toInt)
           case (V_Array(av), V_Int(n)) =>
@@ -174,39 +204,29 @@ case class Eval(paths: EvalPaths,
             )
           case _ =>
             throw new EvalException(
-                s"Invalid array/map ${collection_v} and/or index ${index_v}"
+                s"Invalid array/map ${collectionVal} and/or index ${indexVal}"
             )
         }
 
-      // conditional:
-      // if (x == 1) then "Sunday" else "Weekday"
-      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, loc) =>
-        val cond_v = apply(cond, ctx)
-        cond_v match {
-          case V_Boolean(true)  => apply(tBranch, ctx)
-          case V_Boolean(false) => apply(fBranch, ctx)
-          case _ =>
-            throw new EvalException(s"condition is not boolean", loc)
-        }
-
-      // Apply a standard library function to arguments. For example:
-      //   read_int("4")
-      case TAT.ExprApply(funcName, _, elements, _, loc) =>
-        val funcArgs = elements.map(e => apply(e, ctx))
-        standardLibrary.call(funcName, funcArgs, loc)
-
-      // Access a field in a struct or an object. For example:
-      //   Int z = x.a
-      //
-      // shortcut. The environment has a bindings for "x.a"
       case TAT.ExprGetName(TAT.ExprIdentifier(id, _: WdlTypes.T_Call, _), fieldName, _, _)
-          if ctx.bindings contains s"$id.$fieldName" =>
+          if ctx.bindings.contains(s"$id.$fieldName") =>
+        // Access the output of a call - the env has bindings for the fully-qualified name
+        // For example:
+        //   Int z = x.a
         ctx.bindings(s"$id.$fieldName")
 
-      // normal path, first, evaluate the expression "x" then access field "a"
       case TAT.ExprGetName(e: TAT.Expr, fieldName, _, loc) =>
+        // Evaluate the expression, then access the field
         val ev = apply(e, ctx)
         exprGetName(ev, fieldName, loc)
+
+      case TAT.ExprApply(funcName, _, elements, _, loc) =>
+        // Apply a standard library function (including built-in operators)
+        // to arguments. For example:
+        //   1 + 1
+        //   read_int("4")
+        val funcArgs = elements.map(e => apply(e, ctx))
+        standardLibrary.call(funcName, funcArgs, loc, ctx.exprState)
 
       case other =>
         throw new Exception(s"sanity: expression ${other} not implemented")
@@ -215,8 +235,9 @@ case class Eval(paths: EvalPaths,
 
   // public entry points
   //
-  def applyExpr(expr: TAT.Expr, ctx: Context): WdlValues.V = {
-    apply(expr, ctx)
+  def applyExpr(expr: TAT.Expr,
+                bindings: Bindings[WdlValue] = Bindings.empty[WdlValue]): WdlValues.V = {
+    apply(expr, Context(bindings))
   }
 
   /**
@@ -226,28 +247,34 @@ case class Eval(paths: EvalPaths,
     * requires casting from string to float
     * @param expr expression
     * @param wdlType allowed type
-    * @param ctx context
+    * @param bindings context
     * @return
     */
-  def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, ctx: Context): WdlValues.V = {
-    val value = apply(expr, ctx)
+  def applyExprAndCoerce(expr: TAT.Expr,
+                         wdlType: WdlTypes.T,
+                         bindings: Bindings[WdlValue]): WdlValues.V = {
+    val value = applyExpr(expr, bindings)
     Coercion.coerceTo(wdlType, value, expr.loc)
   }
 
   def applyExprAndCoerce(expr: TAT.Expr,
                          wdlTypes: Vector[WdlTypes.T],
-                         ctx: Context): WdlValues.V = {
-    val value = apply(expr, ctx)
+                         bindings: Bindings[WdlValue]): WdlValues.V = {
+    val value = applyExpr(expr, bindings)
     Coercion.coerceToFirst(wdlTypes, value, expr.loc)
   }
 
   // Evaluate all the declarations and return a Context
-  def applyDeclarations(decls: Vector[TAT.Declaration], ctx: Context): Context = {
-    decls.foldLeft(ctx) {
+  def applyDeclarations(
+      decls: Vector[TAT.Declaration],
+      bindings: Bindings[WdlValue] = Bindings.empty[WdlValue]
+  ): Bindings[WdlValue] = {
+    decls.foldLeft(bindings) {
       case (accu, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
-        val value = apply(expr, accu)
+        val ctx = Context(accu)
+        val value = apply(expr, ctx)
         val coerced = Coercion.coerceTo(wdlType, value, loc)
-        accu.addBinding(name, coerced)
+        accu.add(name, coerced)
       case (_, ast) =>
         throw new Exception(s"Cannot evaluate element ${ast.getClass}")
     }
@@ -375,15 +402,24 @@ case class Eval(paths: EvalPaths,
 
   // evaluate all the parts of a command section.
   //
-  def applyCommand(command: TAT.CommandSection, ctx: Context): String = {
+  def applyCommand(command: TAT.CommandSection,
+                   bindings: Bindings[WdlValue] = Bindings.empty[WdlValue]): String = {
+    val ctx = Context(bindings, ExprState.InString)
     val commandStr = command.parts
       .map { expr =>
-        val value = apply(expr, ctx)
-        val str = Utils.primitiveValueToString(value, expr.loc)
-        str
+        apply(expr, ctx) match {
+          case V_Null => ""
+          case value  => Utils.primitiveValueToString(value, expr.loc)
+        }
       }
       .mkString("")
     // strip off common leading whitespace
     stripLeadingWhitespace(commandStr)
+  }
+}
+
+object Eval {
+  def createBindingsFromEnv(env: Map[String, (WdlTypes.T, WdlValues.V)]): Bindings[WdlValues.V] = {
+    Bindings(env.map { case (name, (_, v)) => name -> v })
   }
 }

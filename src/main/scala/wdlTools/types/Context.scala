@@ -1,26 +1,37 @@
 package wdlTools.types
 
 import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
+import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.FileSource
+import wdlTools.util.{Bindings, DuplicateBindingException, FileSource, Logger}
 
-// An entire context
-//
-// There are separate namespaces for variables, struct definitions, and callables (tasks/workflows).
-// An additional variable holds a list of all imported namespaces.
-case class Context(version: WdlVersion,
-                   stdlib: Stdlib,
-                   docSource: FileSource,
-                   inputs: Map[String, WdlTypes.T] = Map.empty,
-                   outputs: Map[String, WdlTypes.T] = Map.empty,
-                   declarations: Map[String, WdlTypes.T] = Map.empty,
-                   aliases: Map[String, T_Struct] = Map.empty,
-                   callables: Map[String, T_Callable] = Map.empty,
-                   namespaces: Set[String] = Set.empty) {
+/**
+  * Type inference context.
+  * @param version WDL version of document being inferred
+  * @param stdlib Standard function library
+  * @param docSource WDL document source
+  * @param inputs Inputs namespace
+  * @param outputs Outputs namespace
+  * @param declarations Declarations namespace
+  * @param aliases Type alias namespace
+  * @param callables Callables namespace
+  * @param namespaces Set of all namespaces in the document tree
+  */
+case class Context(
+    version: WdlVersion,
+    stdlib: Stdlib,
+    docSource: FileSource,
+    inputs: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "input"),
+    outputs: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "output"),
+    declarations: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "declaration"),
+    aliases: Bindings[T_Struct] = Bindings[WdlTypes.T_Struct](elementType = "struct"),
+    callables: Bindings[T_Callable] = Bindings[WdlTypes.T_Callable](elementType = "callable"),
+    namespaces: Set[String] = Set.empty
+) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName: String, bindings: Map[String, WdlType]): Option[WdlType] = {
+  def lookup(varName: String, bindings: Bindings[WdlType]): Option[WdlType] = {
     inputs.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -45,7 +56,7 @@ case class Context(version: WdlVersion,
     val bindings = inputSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
-    this.copy(inputs = bindings)
+    this.copy(inputs = inputs.update(bindings))
   }
 
   def bindOutputSection(oututSection: Vector[TAT.OutputDefinition]): Context = {
@@ -53,57 +64,34 @@ case class Context(version: WdlVersion,
     val bindings = oututSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
-    this.copy(outputs = bindings)
+    this.copy(outputs = outputs.update(bindings))
   }
 
-  def bindVar(varName: String, wdlType: WdlType): Context = {
-    declarations.get(varName) match {
-      case None =>
-        this.copy(declarations = declarations + (varName -> wdlType))
-      case Some(_) =>
-        throw new DuplicateDeclarationException(s"variable ${varName} shadows an existing variable")
-    }
+  def bindDeclaration(name: String, wdlType: WdlType): Context = {
+    this.copy(declarations = declarations.add(name, wdlType))
   }
 
-  // add a bunch of bindings
-  // the caller is responsible for ensuring that each binding is either
-  // not a duplicate of an existing variables or that its type extends Invalid
-  def bindVarList(bindings: Map[String, WdlType]): Context = {
-    val both = declarations.keys.toSet intersect bindings.keys.toSet
-    bindings.foreach {
-      case (name, _) if both.contains(name) =>
-        throw new DuplicateDeclarationException(
-            s"Trying to bind variable ${name} that has already been declared"
-        )
-      case _ => ()
-    }
-    this.copy(declarations = declarations ++ bindings)
+  /**
+    * Merge current declaration bindings.
+    * @return
+    */
+  def bindDeclarations(bindings: Bindings[WdlType]): Context = {
+    this.copy(declarations = declarations.update(bindings))
   }
 
   def bindStruct(s: T_Struct): Context = {
     aliases.get(s.name) match {
-      case None =>
-        this.copy(aliases = aliases + (s.name -> s))
-      case Some(existingStruct: T_Struct) if s != existingStruct =>
-        throw new DuplicateDeclarationException(s"struct ${s.name} is already declared")
-      case Some(_: T_Struct) =>
+      case Some(existingStruct: T_Struct) if s == existingStruct =>
         // The struct is defined a second time, with the exact same definition. Ignore.
         this
-      case Some(_) =>
-        throw new DuplicateDeclarationException(s"struct ${s.name} overrides an existing alias")
+      case _ =>
+        this.copy(aliases = aliases.add(s.name, s))
     }
   }
 
   // add a callable (task/workflow)
   def bindCallable(callable: T_Callable): Context = {
-    callables.get(callable.name) match {
-      case None =>
-        this.copy(callables = callables + (callable.name -> callable))
-      case Some(_) =>
-        throw new DuplicateDeclarationException(
-            s"a callable named ${callable.name} is already declared"
-        )
-    }
+    this.copy(callables = callables.add(callable.name, callable))
   }
 
   // When we import another document all of its definitions are prefixed with the
@@ -119,14 +107,14 @@ case class Context(version: WdlVersion,
   //    call lib.act
   // }
   def bindImportedDoc(namespace: String,
-                      iCtx: Context,
-                      aliases: Vector[AST.ImportAlias]): Context = {
-    if (this.namespaces contains namespace) {
-      throw new DuplicateDeclarationException(s"namespace ${namespace} already exists")
+                      importContext: Context,
+                      typeAliases: Vector[AST.ImportAlias]): Context = {
+    if (this.namespaces.contains(namespace)) {
+      throw new DuplicateBindingException(s"namespace ${namespace} already exists")
     }
 
     // There cannot be any collisions because this is a new namespace
-    val iCallables = iCtx.callables.map {
+    val importCallables = importContext.callables.all.map {
       case (name, taskSig: T_Task) =>
         val fqn = namespace + "." + name
         fqn -> taskSig.copy(name = fqn)
@@ -144,32 +132,44 @@ case class Context(version: WdlVersion,
     //     alias Child as Child2
     //     alias GrandChild as GrandChild2
     //
-    val iAliasesTranslations: Map[String, String] = aliases.map {
+    val aliasMapping: Map[String, String] = typeAliases.map {
       case AST.ImportAlias(src, dest, _) => src -> dest
     }.toMap
-    val iAliases: Map[String, T_Struct] = iCtx.aliases.map {
-      case (name, iStruct: T_Struct) =>
-        iAliasesTranslations.get(name) match {
-          case None          => name -> iStruct
-          case Some(altName) => altName -> T_Struct(altName, iStruct.members)
+    val importAliases: Map[String, T_Struct] = importContext.aliases.all.map {
+      case (name, importedStruct: T_Struct) =>
+        aliasMapping.get(name) match {
+          case None          => name -> importedStruct
+          case Some(altName) => altName -> T_Struct(altName, importedStruct.members)
         }
       case (_, other) =>
         throw new RuntimeException(s"Expecting a struct but got ${other}")
     }
 
     // check that the imported structs do not step over existing definitions
-    val doublyDefinedStructs =
-      (this.aliases.keys.toSet intersect iAliases.keys.toSet).filter(sname =>
-        this.aliases(sname) != iAliases(sname)
-      )
+    val (redefinedStructs, newStructs) = importAliases.partition {
+      case (k, _) => aliases.contains(k)
+    }
+    val doublyDefinedStructs = redefinedStructs.collect {
+      case (name, struct) if aliases(name) != struct => name
+    }
     if (doublyDefinedStructs.nonEmpty) {
-      throw new DuplicateDeclarationException(
+      throw new DuplicateBindingException(
           s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way"
       )
-    } else {
-      this.copy(aliases = this.aliases ++ iAliases,
-                callables = callables ++ iCallables,
-                namespaces = namespaces + namespace)
     }
+    this.copy(aliases = aliases.update(newStructs),
+              callables = callables.update(importCallables),
+              namespaces = namespaces + namespace)
+  }
+}
+
+object Context {
+  def create(doc: AST.Document, regime: TypeCheckingRegime, logger: Logger): Context = {
+    val wdlVersion = doc.version.value
+    Context(
+        version = wdlVersion,
+        stdlib = Stdlib(regime, wdlVersion, logger),
+        docSource = doc.source
+    )
   }
 }

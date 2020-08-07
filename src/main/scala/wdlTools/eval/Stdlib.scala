@@ -8,6 +8,8 @@ import kantan.csv.ops._
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
+import wdlTools.types.ExprState
+import wdlTools.types.ExprState.ExprState
 import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
 import wdlTools.util.{FileSourceResolver, Logger}
 
@@ -17,7 +19,43 @@ case class Stdlib(paths: EvalPaths,
                   version: WdlVersion,
                   fileResolver: FileSourceResolver = FileSourceResolver.get,
                   logger: Logger = Logger.get) {
-  type FunctionImpl = (Vector[WdlValues.V], SourceLocation) => V
+  private case class FunctionContext(args: Vector[WdlValues.V],
+                                     exprState: ExprState,
+                                     loc: SourceLocation) {
+    def assertNoArgs(): Unit = {
+      if (args.nonEmpty) {
+        throw new EvalException(s"Invalid arguments ${args}, expected none", loc)
+      }
+    }
+
+    def getOneArg: V = {
+      args match {
+        case Vector(arg) => arg
+        case _ =>
+          throw new EvalException(s"Invalid arguments ${args}, expected exactly one", loc)
+      }
+    }
+
+    def getTwoArgs: (V, V) = {
+      args match {
+        case Vector(arg1, arg2) =>
+          (arg1, arg2)
+        case _ =>
+          throw new EvalException(s"Invalid arguments ${args}, expected exactly two", loc)
+      }
+    }
+
+    def getThreeArgs: (V, V, V) = {
+      args match {
+        case Vector(arg1, arg2, arg3) =>
+          (arg1, arg2, arg3)
+        case _ =>
+          throw new EvalException(s"Invalid arguments ${args}, expected exactly three", loc)
+      }
+    }
+  }
+
+  private type FunctionImpl = FunctionContext => V
 
   private val ioSupport: IoSupport = IoSupport(paths, fileResolver, logger)
 
@@ -199,13 +237,17 @@ case class Stdlib(paths: EvalPaths,
     case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
 
-  def call(funcName: String, args: Vector[V], loc: SourceLocation): V = {
-    if (!(funcTable contains funcName)) {
+  def call(funcName: String,
+           args: Vector[V],
+           loc: SourceLocation,
+           exprState: ExprState = ExprState.Start): V = {
+    if (!funcTable.contains(funcName)) {
       throw new EvalException(s"stdlib function ${funcName} not implemented", loc)
     }
+    val ctx = FunctionContext(args, exprState, loc)
     val impl = funcTable(funcName)
     try {
-      impl(args, loc)
+      impl(ctx)
     } catch {
       case e: EvalException =>
         throw e
@@ -274,48 +316,53 @@ case class Stdlib(paths: EvalPaths,
   }
 
   // built-in operators
-  private def unaryMinus(args: Vector[V], loc: SourceLocation): V_Numeric = {
-    require(args.size == 1)
-    args.head match {
+  private def unaryMinus(ctx: FunctionContext): V_Numeric = {
+    ctx.getOneArg match {
       case V_Int(i)   => V_Int(-i)
       case V_Float(f) => V_Float(-f)
-      case other      => throw new EvalException(s"Invalid operand of unary minus ${other}", loc)
+      case other =>
+        throw new EvalException(
+            s"Invalid operand of unary minus ${other}",
+            ctx.loc
+        )
     }
   }
 
-  private def unaryPlus(args: Vector[V], loc: SourceLocation): V_Numeric = {
-    require(args.size == 1)
-    args.head match {
+  private def unaryPlus(ctx: FunctionContext): V_Numeric = {
+    ctx.getOneArg match {
       case i: V_Int   => i
       case f: V_Float => f
-      case other      => throw new EvalException(s"Invalid operand of unary plus ${other}", loc)
+      case other =>
+        throw new EvalException(
+            s"Invalid operand of unary plus ${other}",
+            ctx.loc
+        )
     }
   }
 
-  private def logicalNot(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    require(args.size == 1)
-    V_Boolean(!getWdlBoolean(args.head, loc))
+  private def logicalNot(ctx: FunctionContext): V_Boolean = {
+    V_Boolean(!getWdlBoolean(ctx.getOneArg, ctx.loc))
   }
 
-  private def logicalBinary(args: Vector[V],
-                            op: (Boolean, Boolean) => Boolean,
-                            loc: SourceLocation): V_Boolean = {
-    require(args.size == 2)
-    args match {
-      case Vector(V_Boolean(a), V_Boolean(b)) =>
+  private def logicalBinary(ctx: FunctionContext, op: (Boolean, Boolean) => Boolean): V_Boolean = {
+    ctx.getTwoArgs match {
+      case (V_Boolean(a), V_Boolean(b)) =>
         V_Boolean(op(a, b))
       case _ =>
-        throw new EvalException(s"Invalid operands of logical operator ${args}", loc)
+        throw new EvalException(
+            s"Invalid operands of logical operator ${ctx.args}",
+            ctx.loc
+        )
     }
   }
 
-  private def logicalAnd(args: Vector[V], loc: SourceLocation): V_Boolean =
-    logicalBinary(args, _ && _, loc)
+  private def logicalAnd(ctx: FunctionContext): V_Boolean =
+    logicalBinary(ctx, _ && _)
 
-  private def logicalOr(args: Vector[V], loc: SourceLocation): V_Boolean =
-    logicalBinary(args, _ || _, loc)
+  private def logicalOr(ctx: FunctionContext): V_Boolean =
+    logicalBinary(ctx, _ || _)
 
-  private def equality(args: Vector[V], loc: SourceLocation): V_Boolean = {
+  private def equality(ctx: FunctionContext): V_Boolean = {
     def inner(l: V, r: V): Boolean = {
       (l, r) match {
         case (V_Null, V_Null)               => true
@@ -358,7 +405,7 @@ case class Stdlib(paths: EvalPaths,
           // We need the type definition here. The other option is to assume it has already
           // been cleared at compile time.
           throw new EvalException(s"""struct ${name} does not have the correct number of members:
-                                     |${members1.size} != ${members2.size}""".stripMargin, loc)
+                                     |${members1.size} != ${members2.size}""".stripMargin, ctx.loc)
         case (V_Struct(_, members1), V_Struct(_, members2)) =>
           members1.keys.forall(k => inner(members1(k), members2(k)))
         case (V_Object(members1), V_Object(members2)) if members1.keySet != members2.keySet => false
@@ -367,187 +414,186 @@ case class Stdlib(paths: EvalPaths,
             case (k, v) => inner(v, members2(k))
           }
         case other =>
-          throw new EvalException(s"Invalid operands to == ${other}", loc)
+          throw new EvalException(s"Invalid operands to == ${other}", ctx.loc)
       }
     }
-    args match {
-      case Vector(l, r) => V_Boolean(inner(l, r))
-      case _            => throw new RuntimeException(s"Invalid number of operands to ==")
+    ctx.getTwoArgs match {
+      case (l, r) => V_Boolean(inner(l, r))
+      case _      => throw new RuntimeException(s"Invalid number of operands to ==")
     }
   }
 
-  private def inequality(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    require(args.size == 2)
-    V_Boolean(!equality(args, loc).value)
+  private def inequality(ctx: FunctionContext): V_Boolean = {
+    V_Boolean(!equality(ctx).value)
   }
 
-  private def lessThan(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    val result = args match {
-      case Vector(V_Null, V_Null)               => false
-      case Vector(V_Int(n1), V_Int(n2))         => n1 < n2
-      case Vector(V_Float(x1), V_Int(n2))       => x1 < n2
-      case Vector(V_Int(n1), V_Float(x2))       => n1 < x2
-      case Vector(V_Float(x1), V_Float(x2))     => x1 < x2
-      case Vector(V_String(s1), V_String(s2))   => s1 < s2
-      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 < b2
+  private def lessThan(ctx: FunctionContext): V_Boolean = {
+    val result = ctx.getTwoArgs match {
+      case (V_Null, V_Null)               => false
+      case (V_Int(n1), V_Int(n2))         => n1 < n2
+      case (V_Float(x1), V_Int(n2))       => x1 < n2
+      case (V_Int(n1), V_Float(x2))       => n1 < x2
+      case (V_Float(x1), V_Float(x2))     => x1 < x2
+      case (V_String(s1), V_String(s2))   => s1 < s2
+      case (V_Boolean(b1), V_Boolean(b2)) => b1 < b2
       case other =>
-        throw new EvalException(s"Invalid operands to < ${other}", loc)
+        throw new EvalException(s"Invalid operands to < ${other}", ctx.loc)
     }
     V_Boolean(result)
   }
 
-  private def lessThanOrEqual(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    val result = args match {
-      case Vector(V_Null, V_Null)               => false
-      case Vector(V_Int(n1), V_Int(n2))         => n1 <= n2
-      case Vector(V_Float(x1), V_Int(n2))       => x1 <= n2
-      case Vector(V_Int(n1), V_Float(x2))       => n1 <= x2
-      case Vector(V_Float(x1), V_Float(x2))     => x1 <= x2
-      case Vector(V_String(s1), V_String(s2))   => s1 <= s2
-      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 <= b2
+  private def lessThanOrEqual(ctx: FunctionContext): V_Boolean = {
+    val result = ctx.getTwoArgs match {
+      case (V_Null, V_Null)               => false
+      case (V_Int(n1), V_Int(n2))         => n1 <= n2
+      case (V_Float(x1), V_Int(n2))       => x1 <= n2
+      case (V_Int(n1), V_Float(x2))       => n1 <= x2
+      case (V_Float(x1), V_Float(x2))     => x1 <= x2
+      case (V_String(s1), V_String(s2))   => s1 <= s2
+      case (V_Boolean(b1), V_Boolean(b2)) => b1 <= b2
       case other =>
-        throw new EvalException(s"Invalid operands to <= ${other}", loc)
+        throw new EvalException(s"Invalid operands to <= ${other}", ctx.loc)
     }
     V_Boolean(result)
   }
 
-  private def greaterThan(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    val result = args match {
-      case Vector(V_Null, V_Null)               => false
-      case Vector(V_Int(n1), V_Int(n2))         => n1 > n2
-      case Vector(V_Float(x1), V_Int(n2))       => x1 > n2
-      case Vector(V_Int(n1), V_Float(x2))       => n1 > x2
-      case Vector(V_Float(x1), V_Float(x2))     => x1 > x2
-      case Vector(V_String(s1), V_String(s2))   => s1 > s2
-      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 > b2
+  private def greaterThan(ctx: FunctionContext): V_Boolean = {
+    val result = ctx.getTwoArgs match {
+      case (V_Null, V_Null)               => false
+      case (V_Int(n1), V_Int(n2))         => n1 > n2
+      case (V_Float(x1), V_Int(n2))       => x1 > n2
+      case (V_Int(n1), V_Float(x2))       => n1 > x2
+      case (V_Float(x1), V_Float(x2))     => x1 > x2
+      case (V_String(s1), V_String(s2))   => s1 > s2
+      case (V_Boolean(b1), V_Boolean(b2)) => b1 > b2
       case other =>
-        throw new EvalException(s"Invalid operands to > ${other}", loc)
+        throw new EvalException(s"Invalid operands to > ${other}", ctx.loc)
     }
     V_Boolean(result)
   }
 
-  private def greaterThanOrEqual(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    val result = args match {
-      case Vector(V_Null, V_Null)               => false
-      case Vector(V_Int(n1), V_Int(n2))         => n1 >= n2
-      case Vector(V_Float(x1), V_Int(n2))       => x1 >= n2
-      case Vector(V_Int(n1), V_Float(x2))       => n1 >= x2
-      case Vector(V_Float(x1), V_Float(x2))     => x1 >= x2
-      case Vector(V_String(s1), V_String(s2))   => s1 >= s2
-      case Vector(V_Boolean(b1), V_Boolean(b2)) => b1 >= b2
+  private def greaterThanOrEqual(ctx: FunctionContext): V_Boolean = {
+    val result = ctx.getTwoArgs match {
+      case (V_Null, V_Null)               => false
+      case (V_Int(n1), V_Int(n2))         => n1 >= n2
+      case (V_Float(x1), V_Int(n2))       => x1 >= n2
+      case (V_Int(n1), V_Float(x2))       => n1 >= x2
+      case (V_Float(x1), V_Float(x2))     => x1 >= x2
+      case (V_String(s1), V_String(s2))   => s1 >= s2
+      case (V_Boolean(b1), V_Boolean(b2)) => b1 >= b2
       case other =>
-        throw new EvalException(s"Invalid operands to >= ${other}", loc)
+        throw new EvalException(s"Invalid operands to >= ${other}", ctx.loc)
     }
     V_Boolean(result)
   }
 
-  private def addition(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 2)
-    args match {
-      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 + n2)
-      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 + n2)
-      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 + x2)
-      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 + x2)
+  private def addition(ctx: FunctionContext): V = {
+    ctx.getTwoArgs match {
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 + n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 + n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 + x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 + x2)
       // files
-      case Vector(V_File(s1), V_String(s2)) => V_File(s1 + s2)
-      case Vector(V_File(s1), V_File(s2))   => V_File(s1 + s2)
+      case (V_File(s1), V_String(s2)) => V_File(s1 + s2)
+      case (V_File(s1), V_File(s2))   => V_File(s1 + s2)
       // adding a string string to anything results in a string
-      case Vector(V_String(s1), V_String(s2))  => V_String(s1 + s2)
-      case Vector(V_String(s1), V_Int(n2))     => V_String(s1 + n2.toString)
-      case Vector(V_Int(n1), V_String(s2))     => V_String(n1.toString + s2)
-      case Vector(V_String(s1), V_Float(x2))   => V_String(s1 + x2.toString)
-      case Vector(V_Float(x1), V_String(s2))   => V_String(x1.toString + s2)
-      case Vector(V_String(s1), V_Boolean(b2)) => V_String(s1 + b2.toString)
-      case Vector(V_Boolean(b1), V_String(s2)) => V_String(b1.toString + s2)
-      case Vector(V_String(s1), V_File(s2))    => V_String(s1 + s2)
+      case (V_String(s1), V_String(s2))  => V_String(s1 + s2)
+      case (V_String(s1), V_Int(n2))     => V_String(s1 + n2.toString)
+      case (V_Int(n1), V_String(s2))     => V_String(n1.toString + s2)
+      case (V_String(s1), V_Float(x2))   => V_String(s1 + x2.toString)
+      case (V_Float(x1), V_String(s2))   => V_String(x1.toString + s2)
+      case (V_String(s1), V_Boolean(b2)) => V_String(s1 + b2.toString)
+      case (V_Boolean(b1), V_String(s2)) => V_String(b1.toString + s2)
+      case (V_String(s1), V_File(s2))    => V_String(s1 + s2)
       // Addition of arguments with optional types is allowed within interpolations
-      case Vector(V_Null, _)                      => V_Null
-      case Vector(_, V_Null)                      => V_Null
-      case Vector(V_Optional(v1), V_Optional(v2)) => V_Optional(addition(Vector(v1, v2), loc))
-      case Vector(V_Optional(v1), v2)             => V_Optional(addition(Vector(v1, v2), loc))
-      case Vector(v1, V_Optional(v2))             => V_Optional(addition(Vector(v1, v2), loc))
+      case (V_Null, _) if ctx.exprState >= ExprState.InPlaceholder =>
+        V_Null
+      case (_, V_Null) if ctx.exprState >= ExprState.InPlaceholder =>
+        V_Null
+      case (V_Optional(v1), V_Optional(v2)) if ctx.exprState >= ExprState.InPlaceholder =>
+        V_Optional(addition(ctx.copy(Vector(v1, v2))))
+      case (V_Optional(v1), v2) if ctx.exprState >= ExprState.InPlaceholder =>
+        V_Optional(addition(ctx.copy(Vector(v1, v2))))
+      case (v1, V_Optional(v2)) if ctx.exprState >= ExprState.InPlaceholder =>
+        V_Optional(addition(ctx.copy(Vector(v1, v2))))
       case other =>
-        throw new EvalException(s"cannot add values ${other}", loc)
+        throw new EvalException(s"cannot add values ${other}", ctx.loc)
     }
   }
 
-  private def subtraction(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 2)
-    args match {
-      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 - n2)
-      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 - n2)
-      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
-      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 - x2)
+  private def subtraction(ctx: FunctionContext): V = {
+    ctx.getTwoArgs match {
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 - n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 - n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 - x2)
       case other =>
         throw new EvalException(
             s"cannot subtract values ${other}; arguments must be integers or floats",
-            loc
+            ctx.loc
         )
     }
   }
 
-  private def multiplication(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 2)
-    args match {
-      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 * n2)
-      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 * n2)
-      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
-      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 * x2)
+  private def multiplication(ctx: FunctionContext): V = {
+    ctx.getTwoArgs match {
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 * n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 * n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 * x2)
       case other =>
         throw new EvalException(
             s"cannot multiply values ${other}; arguments must be integers or floats",
-            loc
+            ctx.loc
         )
     }
   }
 
-  private def division(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 2)
-    args match {
-      case Vector(_, denominator: V_Numeric) if denominator.floatValue == 0 =>
-        throw new EvalException("DivisionByZero", loc)
-      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 / n2)
-      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 / n2)
-      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 / x2)
-      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 / x2)
+  private def division(ctx: FunctionContext): V = {
+    ctx.getTwoArgs match {
+      case (_, denominator: V_Numeric) if denominator.floatValue == 0 =>
+        throw new EvalException("DivisionByZero", ctx.loc)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 / n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 / n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 / x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 / x2)
       case other =>
         throw new EvalException(
             s"cannot divide values ${other}; arguments must be integers or floats",
-            loc
+            ctx.loc
         )
     }
   }
 
-  private def remainder(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 2)
-    args match {
-      case Vector(_, denominator: V_Numeric) if denominator.floatValue == 0 =>
-        throw new EvalException("DivisionByZero", loc)
-      case Vector(V_Int(n1), V_Int(n2))     => V_Int(n1 % n2)
-      case Vector(V_Float(x1), V_Int(n2))   => V_Float(x1 % n2)
-      case Vector(V_Int(n1), V_Float(x2))   => V_Float(n1 % x2)
-      case Vector(V_Float(x1), V_Float(x2)) => V_Float(x1 % x2)
+  private def remainder(ctx: FunctionContext): V = {
+    ctx.getTwoArgs match {
+      case (_, denominator: V_Numeric) if denominator.floatValue == 0 =>
+        throw new EvalException("DivisionByZero", ctx.loc)
+      case (V_Int(n1), V_Int(n2))     => V_Int(n1 % n2)
+      case (V_Float(x1), V_Int(n2))   => V_Float(x1 % n2)
+      case (V_Int(n1), V_Float(x2))   => V_Float(n1 % x2)
+      case (V_Float(x1), V_Float(x2)) => V_Float(x1 % x2)
       case other =>
         throw new EvalException(
             s"cannot take modulus of values ${other}; arguments must be integers or floats",
-            loc
+            ctx.loc
         )
     }
   }
 
   // since: draft-1
-  private def stdout(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.isEmpty)
+  private def stdout(ctx: FunctionContext): V_File = {
+    ctx.assertNoArgs()
     val stdoutFile = paths.getStdoutFile(true)
-    ioSupport.ensureFileExists(stdoutFile, "stdout", loc)
+    ioSupport.ensureFileExists(stdoutFile, "stdout", ctx.loc)
     V_File(stdoutFile.toString)
   }
 
   // since: draft-1
-  private def stderr(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.isEmpty)
+  private def stderr(ctx: FunctionContext): V_File = {
+    ctx.assertNoArgs()
     val stderrFile = paths.getStdoutFile(true)
-    ioSupport.ensureFileExists(stderrFile, "stderr", loc)
+    ioSupport.ensureFileExists(stderrFile, "stderr", ctx.loc)
     V_File(stderrFile.toString)
   }
 
@@ -555,10 +601,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_lines(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_lines(ctx: FunctionContext): V_Array = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     V_Array(Source.fromString(content).getLines.map(x => V_String(x)).toVector)
   }
 
@@ -568,14 +613,13 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_tsv(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_tsv(ctx: FunctionContext): V_Array = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     val reader = content.asCsvReader[Vector[String]](tsvConf)
     V_Array(reader.map {
       case Left(err) =>
-        throw new EvalException(s"Invalid tsv file ${file}: ${err}", loc)
+        throw new EvalException(s"Invalid tsv file ${file}: ${err}", ctx.loc)
       case Right(row) => V_Array(row.map(x => V_String(x)))
     }.toVector)
   }
@@ -584,16 +628,15 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_map(args: Vector[V], loc: SourceLocation): V_Map = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_map(ctx: FunctionContext): V_Map = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     val reader = content.asCsvReader[(String, String)](tsvConf)
     V_Map(
         reader
           .map {
             case Left(err) =>
-              throw new EvalException(s"Invalid tsv file ${file}: ${err}", loc)
+              throw new EvalException(s"Invalid tsv file ${file}: ${err}", ctx.loc)
             case Right((key, value)) => V_String(key) -> V_String(value)
           }
           .toVector
@@ -607,10 +650,9 @@ case class Stdlib(paths: EvalPaths,
   // deprecation:
   // * beginning in draft-2, URI parameter is not supported
   // * removed in Version 2
-  private def read_object(args: Vector[V], loc: SourceLocation): V_Object = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_object(ctx: FunctionContext): V_Object = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     val lines: Vector[Vector[String]] = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
@@ -619,11 +661,11 @@ case class Stdlib(paths: EvalPaths,
       }
       .toVector
     lines match {
-      case Vector(keys, values) => kvToObject(keys, values, loc)
+      case Vector(keys, values) => kvToObject(keys, values, ctx.loc)
       case _ =>
         throw new EvalException(
             s"read_object : file ${file.toString} must contain exactly two lines",
-            loc
+            ctx.loc
         )
     }
   }
@@ -634,10 +676,9 @@ case class Stdlib(paths: EvalPaths,
   // deprecation:
   // * beginning in draft-2, URI parameter is not supported
   // * removed in Version 2
-  private def read_objects(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_objects(ctx: FunctionContext): V_Array = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     val lines = content
       .asCsvReader[Vector[String]](tsvConf)
       .map {
@@ -646,10 +687,11 @@ case class Stdlib(paths: EvalPaths,
       }
       .toVector
     if (lines.size < 2) {
-      throw new EvalException(s"read_object : file ${file.toString} must contain at least two", loc)
+      throw new EvalException(s"read_object : file ${file.toString} must contain at least two",
+                              ctx.loc)
     }
     val keys = lines.head
-    V_Array(lines.tail.map(values => kvToObject(keys, values, loc)))
+    V_Array(lines.tail.map(values => kvToObject(keys, values, ctx.loc)))
   }
 
   private def kvToObject(keys: Vector[String],
@@ -675,15 +717,14 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_json(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_json(ctx: FunctionContext): V = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     try {
       JsonSerde.deserialize(content.parseJson)
     } catch {
       case e: JsonSerializationException =>
-        throw new EvalException(e.getMessage, loc)
+        throw new EvalException(e.getMessage, ctx.loc)
     }
   }
 
@@ -691,15 +732,14 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_int(args: Vector[V], loc: SourceLocation): V_Int = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_int(ctx: FunctionContext): V_Int = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     try {
       V_Int(content.trim.toInt)
     } catch {
       case _: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to an integer", loc)
+        throw new EvalException(s"could not convert (${content}) to an integer", ctx.loc)
     }
   }
 
@@ -711,10 +751,9 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_string(args: Vector[V], loc: SourceLocation): V_String = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_string(ctx: FunctionContext): V_String = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     val lines = content.split("\n")
     if (lines.isEmpty) {
       // There are no lines in the file, should we throw an exception instead?
@@ -728,15 +767,14 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_float(args: Vector[V], loc: SourceLocation): V_Float = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_float(ctx: FunctionContext): V_Float = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     try {
       V_Float(content.trim.toDouble)
     } catch {
       case _: Throwable =>
-        throw new EvalException(s"could not convert (${content}) to a float", loc)
+        throw new EvalException(s"could not convert (${content}) to a float", ctx.loc)
     }
   }
 
@@ -744,45 +782,42 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
-  private def read_boolean(args: Vector[V], loc: SourceLocation): V_Boolean = {
-    require(args.size == 1)
-    val file = getWdlFile(args.head, loc)
-    val content = ioSupport.readFile(file.value, loc)
+  private def read_boolean(ctx: FunctionContext): V_Boolean = {
+    val file = getWdlFile(ctx.getOneArg, ctx.loc)
+    val content = ioSupport.readFile(file.value, ctx.loc)
     content.trim.toLowerCase() match {
       case "false" => V_Boolean(false)
       case "true"  => V_Boolean(true)
       case _ =>
-        throw new EvalException(s"could not convert (${content}) to a boolean", loc)
+        throw new EvalException(s"could not convert (${content}) to a boolean", ctx.loc)
     }
   }
 
   // File write_lines(Array[String])
   //
   // since: draft-1
-  private def write_lines(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
+  private def write_lines(ctx: FunctionContext): V_File = {
     val array: V_Array =
-      Coercion.coerceTo(T_Array(T_String), args.head, loc).asInstanceOf[V_Array]
+      Coercion.coerceTo(T_Array(T_String), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
     val strRepr: String = array.value
       .map {
         case V_String(x) => x
         case other =>
-          throw new EvalException(s"write_lines: element ${other} should be a string", loc)
+          throw new EvalException(s"write_lines: element ${other} should be a string", ctx.loc)
       }
       // note: '\n' line endings explicitly specified in the spec
       .mkString("\n")
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
-    ioSupport.writeFile(tmpFile, strRepr, loc)
+    ioSupport.writeFile(tmpFile, strRepr, ctx.loc)
     V_File(tmpFile.toString)
   }
 
   // File write_tsv(Array[Array[String]])
   //
   // since: draft-1
-  private def write_tsv(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
+  private def write_tsv(ctx: FunctionContext): V_File = {
     val arAr: V_Array =
-      Coercion.coerceTo(T_Array(T_Array(T_String)), args.head, loc).asInstanceOf[V_Array]
+      Coercion.coerceTo(T_Array(T_Array(T_String)), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
@@ -792,11 +827,11 @@ case class Stdlib(paths: EvalPaths,
             val row = a.map {
               case V_String(s) => s
               case other =>
-                throw new EvalException(s"${other} should be a string", loc)
+                throw new EvalException(s"${other} should be a string", ctx.loc)
             }
             writer.write(row)
           case other =>
-            throw new EvalException(s"${other} should be an array", loc)
+            throw new EvalException(s"${other} should be an array", ctx.loc)
         }
     } finally {
       writer.close()
@@ -807,10 +842,9 @@ case class Stdlib(paths: EvalPaths,
   // File write_map(Map[String, String])
   //
   // since: draft-1
-  private def write_map(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
+  private def write_map(ctx: FunctionContext): V_File = {
     val m: V_Map =
-      Coercion.coerceTo(T_Map(T_String, T_String), args.head, loc).asInstanceOf[V_Map]
+      Coercion.coerceTo(T_Map(T_String, T_String), ctx.getOneArg, ctx.loc).asInstanceOf[V_Map]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[(String, String)](tsvConf)
     try {
@@ -818,7 +852,7 @@ case class Stdlib(paths: EvalPaths,
         .foreach {
           case (V_String(key), V_String(value)) => writer.write((key, value))
           case (k, v) =>
-            throw new EvalException(s"${k} ${v} should both be strings", loc)
+            throw new EvalException(s"${k} ${v} should both be strings", ctx.loc)
         }
     } finally {
       writer.close()
@@ -836,14 +870,13 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: removed in Version 2
-  private def write_object(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
-    val obj = Coercion.coerceTo(T_Object, args.head, loc).asInstanceOf[V_Object]
+  private def write_object(ctx: FunctionContext): V_File = {
+    val obj = Coercion.coerceTo(T_Object, ctx.getOneArg, ctx.loc).asInstanceOf[V_Object]
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(obj.members.keys.toVector)
-      writer.write(lineFromObject(obj, loc))
+      writer.write(lineFromObject(obj, ctx.loc))
     } finally {
       writer.close()
     }
@@ -854,12 +887,11 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   // deprecation: removed in Version 2
-  private def write_objects(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
-    val objs = Coercion.coerceTo(T_Array(T_Object), args.head, loc).asInstanceOf[V_Array]
+  private def write_objects(ctx: FunctionContext): V_File = {
+    val objs = Coercion.coerceTo(T_Array(T_Object), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
     val objArray = objs.value.asInstanceOf[Vector[V_Object]]
     if (objArray.isEmpty) {
-      throw new EvalException("write_objects: empty input array", loc)
+      throw new EvalException("write_objects: empty input array", ctx.loc)
     }
 
     // check that all objects have the same keys
@@ -869,7 +901,7 @@ case class Stdlib(paths: EvalPaths,
       if (obj.members.keys.toSet != keys)
         throw new EvalException(
             "write_objects: the keys are not the same for all objects in the array",
-            loc
+            ctx.loc
         )
     }
 
@@ -877,7 +909,7 @@ case class Stdlib(paths: EvalPaths,
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
       writer.write(fstObj.members.keys.toVector)
-      objArray.foreach(obj => writer.write(lineFromObject(obj, loc)))
+      objArray.foreach(obj => writer.write(lineFromObject(obj, ctx.loc)))
     } finally {
       writer.close()
     }
@@ -887,17 +919,16 @@ case class Stdlib(paths: EvalPaths,
   // File write_json(mixed)
   //
   // since: draft-1
-  private def write_json(args: Vector[V], loc: SourceLocation): V_File = {
-    require(args.size == 1)
+  private def write_json(ctx: FunctionContext): V_File = {
     val jsv =
       try {
-        JsonSerde.serialize(args.head)
+        JsonSerde.serialize(ctx.getOneArg)
       } catch {
         case e: JsonSerializationException =>
-          throw new EvalException(e.getMessage, loc)
+          throw new EvalException(e.getMessage, ctx.loc)
       }
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".json")
-    ioSupport.writeFile(tmpFile, jsv.prettyPrint, loc)
+    ioSupport.writeFile(tmpFile, jsv.prettyPrint, ctx.loc)
     V_File(tmpFile.toString)
   }
 
@@ -935,17 +966,20 @@ case class Stdlib(paths: EvalPaths,
   // version differences: in 1.0, the spec was updated to explicitly support compount argument types;
   //  however, our implementation supports compound types for all versions, and goes further than the
   //  spec requires to support nested collections.
-  private def size(args: Vector[V], loc: SourceLocation): V_Float = {
-    args.size match {
+  private def size(ctx: FunctionContext): V_Float = {
+    ctx.args.size match {
       case 1 =>
-        V_Float(sizeCore(args.head, loc))
+        V_Float(sizeCore(ctx.args.head, ctx.loc))
       case 2 =>
-        val sUnit = getWdlString(args(1), loc)
-        val nBytesInUnit = Utils.sizeUnit(sUnit, loc)
-        val nBytes = sizeCore(args.head, loc)
+        val sUnit = getWdlString(ctx.args(1), ctx.loc)
+        val nBytesInUnit = Utils.sizeUnit(sUnit, ctx.loc)
+        val nBytes = sizeCore(ctx.args.head, ctx.loc)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
-        throw new EvalException("size: called with wrong number of arguments", loc)
+        throw new EvalException(
+            "size: called with wrong number of arguments",
+            ctx.loc
+        )
     }
   }
 
@@ -956,20 +990,19 @@ case class Stdlib(paths: EvalPaths,
   // replace. pattern is expected to be a regular expression.
   //
   // since: draft-2
-  private def sub(args: Vector[V], loc: SourceLocation): V_String = {
-    require(args.size == 3)
-    val input = getWdlString(args(0), loc)
-    val pattern = getWdlString(args(1), loc)
-    val replace = getWdlString(args(2), loc)
+  private def sub(ctx: FunctionContext): V_String = {
+    val (a, b, c) = ctx.getThreeArgs
+    val input = getWdlString(a, ctx.loc)
+    val pattern = getWdlString(b, ctx.loc)
+    val replace = getWdlString(c, ctx.loc)
     V_String(input.replaceAll(pattern, replace))
   }
 
   // Array[Int] range(Int)
   //
   // since: draft-2
-  private def range(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val n = getWdlInt(args.head, loc).toInt
+  private def range(ctx: FunctionContext): V_Array = {
+    val n = getWdlInt(ctx.getOneArg, ctx.loc).toInt
     val vec: Vector[V] = Vector.tabulate(n)(i => V_Int(i))
     V_Array(vec)
   }
@@ -977,10 +1010,9 @@ case class Stdlib(paths: EvalPaths,
   // Array[Array[X]] transpose(Array[Array[X]])
   //
   // since: draft-2
-  private def transpose(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val vec: Vector[V] = getWdlVector(args.head, loc)
-    val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, loc))
+  private def transpose(ctx: FunctionContext): V_Array = {
+    val vec: Vector[V] = getWdlVector(ctx.getOneArg, ctx.loc)
+    val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, ctx.loc))
     val trValue = vec_vec.transpose
     V_Array(trValue.map(vec => V_Array(vec)))
   }
@@ -988,11 +1020,10 @@ case class Stdlib(paths: EvalPaths,
   // Array[Pair(X,Y)] zip(Array[X], Array[Y])
   //
   // since: draft-2
-  private def zip(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 2)
-    val ax = getWdlVector(args(0), loc)
-    val ay = getWdlVector(args(1), loc)
-
+  private def zip(ctx: FunctionContext): V_Array = {
+    val (x, y) = ctx.getTwoArgs
+    val ax = getWdlVector(x, ctx.loc)
+    val ay = getWdlVector(y, ctx.loc)
     V_Array((ax zip ay).map {
       case (x, y) => V_Pair(x, y)
     })
@@ -1003,11 +1034,10 @@ case class Stdlib(paths: EvalPaths,
   // cartesian product of two arrays. Results in an n x m sized array of pairs.
   //
   // since: draft-2
-  private def cross(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 2)
-    val ax = getWdlVector(args(0), loc)
-    val ay = getWdlVector(args(1), loc)
-
+  private def cross(ctx: FunctionContext): V_Array = {
+    val (x, y) = ctx.getTwoArgs
+    val ax = getWdlVector(x, ctx.loc)
+    val ay = getWdlVector(y, ctx.loc)
     val vv = ax.map { x =>
       ay.map { y =>
         V_Pair(x, y)
@@ -1019,9 +1049,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[Pair[X,Y]] as_pairs(Map[X,Y])
   //
   // since: V2
-  private def as_pairs(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val map = getWdlMap(args.head, loc)
+  private def as_pairs(ctx: FunctionContext): V_Array = {
+    val map = getWdlMap(ctx.getOneArg, ctx.loc)
     V_Array(map.map {
       case (key, value) => V_Pair(key, value)
     }.toVector)
@@ -1030,27 +1059,25 @@ case class Stdlib(paths: EvalPaths,
   // Map[X,Y] as_map(Array[Pair[X,Y]])
   //
   // since: V2
-  private def as_map(args: Vector[V], loc: SourceLocation): V_Map = {
-    require(args.size == 1)
-    val vec = getWdlVector(args.head, loc)
-    V_Map(vec.map(item => getWdlPair(item, loc)).toMap)
+  private def as_map(ctx: FunctionContext): V_Map = {
+    val vec = getWdlVector(ctx.getOneArg, ctx.loc)
+    V_Map(vec.map(item => getWdlPair(item, ctx.loc)).toMap)
   }
 
   // Array[X] keys(Map[X,Y])
   //
   // since: V2
-  private def keys(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val map = getWdlMap(args.head, loc)
+  private def keys(ctx: FunctionContext): V_Array = {
+    val map = getWdlMap(ctx.getOneArg, ctx.loc)
     V_Array(map.keys.toVector)
   }
 
   // Map[X,Array[Y]] collect_by_key(Array[Pair[X,Y]])
   //
   // since: V2
-  private def collect_by_key(args: Vector[V], loc: SourceLocation): V_Map = {
-    require(args.size == 1)
-    val vec: Vector[(V, V)] = getWdlVector(args.head, loc).map(item => getWdlPair(item, loc))
+  private def collect_by_key(ctx: FunctionContext): V_Map = {
+    val vec: Vector[(V, V)] =
+      getWdlVector(ctx.getOneArg, ctx.loc).map(item => getWdlPair(item, ctx.loc))
     V_Map(
         vec.groupBy(_._1).map {
           case (key, values: Vector[(V, V)]) => key -> V_Array(values.map(_._2))
@@ -1061,19 +1088,17 @@ case class Stdlib(paths: EvalPaths,
   // Integer length(Array[X])
   //
   // since: draft-2
-  private def length(args: Vector[V], loc: SourceLocation): V_Int = {
-    require(args.size == 1)
-    val vec = getWdlVector(args.head, loc)
+  private def length(ctx: FunctionContext): V_Int = {
+    val vec = getWdlVector(ctx.getOneArg, ctx.loc)
     V_Int(vec.size)
   }
 
   // Array[X] flatten(Array[Array[X]])
   //
   // since: draft-2
-  private def flatten(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val vec: Vector[V] = getWdlVector(args.head, loc)
-    val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, loc))
+  private def flatten(ctx: FunctionContext): V_Array = {
+    val vec: Vector[V] = getWdlVector(ctx.getOneArg, ctx.loc)
+    val vec_vec: Vector[Vector[V]] = vec.map(v => getWdlVector(v, ctx.loc))
     V_Array(vec_vec.flatten)
   }
 
@@ -1085,10 +1110,10 @@ case class Stdlib(paths: EvalPaths,
   // string.
   //
   // since: draft-2
-  private def prefix(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 2)
-    val pref = getWdlString(args(0), loc)
-    val vec = getStringVector(args(1), loc)
+  private def prefix(ctx: FunctionContext): V_Array = {
+    val (x, y) = ctx.getTwoArgs
+    val pref = getWdlString(x, ctx.loc)
+    val vec = getStringVector(y, ctx.loc)
     V_Array(vec.map(str => V_String(pref + str)))
   }
 
@@ -1100,19 +1125,18 @@ case class Stdlib(paths: EvalPaths,
   // string.
   //
   // since: V2
-  private def suffix(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 2)
-    val suff = getWdlString(args(0), loc)
-    val vec = getStringVector(args(1), loc)
+  private def suffix(ctx: FunctionContext): V_Array = {
+    val (x, y) = ctx.getTwoArgs
+    val suff = getWdlString(x, ctx.loc)
+    val vec = getStringVector(y, ctx.loc)
     V_Array(vec.map(str => V_String(str + suff)))
   }
 
   // Array[String] quote(Array[X])
   //
   // since: V2
-  private def quote(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val vec = getStringVector(args(1), loc)
+  private def quote(ctx: FunctionContext): V_Array = {
+    val vec = getStringVector(ctx.getOneArg, ctx.loc)
     val dquote = '"'
     V_Array(vec.map(str => V_String(s"${dquote}${str}${dquote}")))
   }
@@ -1120,9 +1144,8 @@ case class Stdlib(paths: EvalPaths,
   // Array[String] squote(Array[X])
   //
   // since: V2
-  private def squote(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val vec = getStringVector(args(1), loc)
+  private def squote(ctx: FunctionContext): V_Array = {
+    val vec = getStringVector(ctx.getOneArg, ctx.loc)
     V_Array(vec.map(str => V_String(s"'${str}'")))
   }
 
@@ -1135,25 +1158,23 @@ case class Stdlib(paths: EvalPaths,
   // return the first none null element. Throw an exception if nothing is found
   //
   // since: draft-2
-  private def select_first(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 1)
-    val vec = getWdlVector(args(0), loc)
+  private def select_first(ctx: FunctionContext): V = {
+    val vec = getWdlVector(ctx.getOneArg, ctx.loc)
     val values = vec.flatMap {
       case V_Null        => None
       case V_Optional(x) => Some(x)
       case x             => Some(x)
     }
     if (values.isEmpty)
-      throw new EvalException("select_first: found no non-null elements", loc)
+      throw new EvalException("select_first: found no non-null elements", ctx.loc)
     values.head
   }
 
   // Array[X] select_all(Array[X?])
   //
   // since: draft-2
-  private def select_all(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 1)
-    val vec = getWdlVector(args(0), loc)
+  private def select_all(ctx: FunctionContext): V = {
+    val vec = getWdlVector(ctx.getOneArg, ctx.loc)
     val values = vec.flatMap {
       case V_Null        => None
       case V_Optional(x) => Some(x)
@@ -1165,9 +1186,8 @@ case class Stdlib(paths: EvalPaths,
   // Boolean defined(X?)
   //
   // since: draft-2
-  private def defined(args: Vector[V], loc: SourceLocation): V = {
-    require(args.size == 1)
-    args.head match {
+  private def defined(ctx: FunctionContext): V = {
+    ctx.getOneArg match {
       case V_Null => V_Boolean(false)
       case _      => V_Boolean(true)
     }
@@ -1188,50 +1208,47 @@ case class Stdlib(paths: EvalPaths,
   // This function returns the basename of a file path passed to it: basename("/path/to/file.txt") returns "file.txt".
   // Also supports an optional parameter, suffix to remove: basename("/path/to/file.txt", ".txt") returns "file".
   //
-  private def basename(args: Vector[V], loc: SourceLocation): V_String = {
-    args.size match {
+  private def basename(ctx: FunctionContext): V_String = {
+    ctx.args.size match {
       case 1 =>
-        val s = basenameCore(args.head, loc)
+        val s = basenameCore(ctx.args.head, ctx.loc)
         V_String(s)
       case 2 =>
-        val s = basenameCore(args(0), loc)
-        val suff = getWdlString(args(1), loc)
+        val s = basenameCore(ctx.args(0), ctx.loc)
+        val suff = getWdlString(ctx.args(1), ctx.loc)
         V_String(s.stripSuffix(suff))
       case _ =>
-        throw new EvalException(s"basename: wrong number of arguments", loc)
+        throw new EvalException(s"basename: wrong number of arguments", ctx.loc)
     }
   }
 
-  private def floor(args: Vector[V], loc: SourceLocation): V_Int = {
-    require(args.size == 1)
-    val x = getWdlFloat(args.head, loc)
+  private def floor(ctx: FunctionContext): V_Int = {
+    val x = getWdlFloat(ctx.getOneArg, ctx.loc)
     V_Int(Math.floor(x).toInt)
   }
 
-  private def ceil(args: Vector[V], loc: SourceLocation): V_Int = {
-    require(args.size == 1)
-    val x = getWdlFloat(args.head, loc)
+  private def ceil(ctx: FunctionContext): V_Int = {
+    val x = getWdlFloat(ctx.getOneArg, ctx.loc)
     V_Int(Math.ceil(x).toInt)
   }
 
-  private def round(args: Vector[V], loc: SourceLocation): V_Int = {
-    require(args.size == 1)
-    val x = getWdlFloat(args.head, loc)
+  private def round(ctx: FunctionContext): V_Int = {
+    val x = getWdlFloat(ctx.getOneArg, ctx.loc)
     V_Int(Math.round(x).toInt)
   }
 
-  private def glob(args: Vector[V], loc: SourceLocation): V_Array = {
-    require(args.size == 1)
-    val pattern = getWdlString(args.head, loc)
+  private def glob(ctx: FunctionContext): V_Array = {
+    val pattern = getWdlString(ctx.getOneArg, ctx.loc)
     val filenames = ioSupport.glob(pattern)
     V_Array(filenames.map { filepath =>
       V_File(filepath)
     })
   }
 
-  private def sep(args: Vector[V], loc: SourceLocation): V_String = {
-    val separator = getWdlString(args(0), loc)
-    val strings = getWdlVector(args(1), loc).map(x => getWdlString(x, loc))
+  private def sep(ctx: FunctionContext): V_String = {
+    val (x, y) = ctx.getTwoArgs
+    val separator = getWdlString(x, ctx.loc)
+    val strings = getWdlVector(y, ctx.loc).map(x => getWdlString(x, ctx.loc))
     V_String(strings.mkString(separator))
   }
 }

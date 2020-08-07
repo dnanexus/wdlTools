@@ -71,7 +71,7 @@ object Utils {
       case V_File(value)    => value
       case V_Optional(x)    => primitiveValueToString(x, loc)
       case other =>
-        throw new EvalException(s"prefix: ${other} is not a primitive value", loc)
+        throw new EvalException(s"${other} is not a primitive value", loc)
     }
   }
 }

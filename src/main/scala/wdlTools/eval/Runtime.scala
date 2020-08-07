@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.SymmetricBiMap
+import wdlTools.util.{Bindings, SymmetricBiMap}
 
 abstract class Runtime(runtime: Map[String, TAT.Expr],
                        userDefaultValues: Map[String, V],
@@ -69,7 +69,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
-                          ctx: Option[Context] = None,
+                          ctx: Option[Bindings[V]] = None,
                           userDefaultValues: Map[String, V] = Map.empty,
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -124,7 +124,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
-                     ctx: Option[Context] = None,
+                     ctx: Option[Bindings[V]] = None,
                      userDefaultValues: Map[String, V] = Map.empty,
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -239,7 +239,7 @@ object Runtime {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[Context] = None,
+      ctx: Option[Bindings[V]] = None,
       defaultValues: Map[String, V] = Map.empty
   ): Runtime = {
     create(task.runtime,
@@ -252,7 +252,7 @@ object Runtime {
   def create(
       runtime: Option[TAT.RuntimeSection],
       evaluator: Eval,
-      ctx: Option[Context] = None,
+      ctx: Option[Bindings[V]] = None,
       defaultValues: Map[String, V] = Map.empty,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {

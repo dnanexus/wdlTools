@@ -3,14 +3,7 @@ package wdlTools.exec
 import java.nio.file.Files
 
 import spray.json._
-import wdlTools.eval.{
-  Eval,
-  EvalException,
-  JsonSerde,
-  JsonSerializationException,
-  WdlValues,
-  Context => EvalContext
-}
+import wdlTools.eval.{Eval, EvalException, JsonSerde, JsonSerializationException, WdlValues}
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax.{
   InputDefinition,
@@ -20,20 +13,21 @@ import wdlTools.types.TypedAbstractSyntax.{
   RequiredInputDefinition
 }
 import wdlTools.types.WdlTypes
-import wdlTools.util.{FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSourceResolver, Logger}
 
 /**
   * Implemention of the JSON Input Format in the WDL specification
   * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
   */
 object InputOutput {
+  type WdlValue = WdlValues.V
 
   def taskInputFromJson(jsInputs: Map[String, JsValue],
                         taskName: String,
                         taskInputDefinitions: Vector[InputDefinition],
                         evaluator: Eval,
                         logger: Logger = Logger.Quiet,
-                        strict: Boolean = false): EvalContext = {
+                        strict: Boolean = false): Bindings[WdlValue] = {
     val taskInputs = taskInputDefinitions.map(inp => inp.name -> inp).toMap
     val typesAndValues: Map[String, (WdlTypes.T, Option[WdlValues.V])] = taskInputs.map {
       case (declName, inp) =>
@@ -53,7 +47,7 @@ object InputOutput {
         declName -> (wdlType, wdlValue)
     }
     val (defined, undefined) = typesAndValues.partition(_._2._2.isDefined)
-    val definedContext = EvalContext(defined.map {
+    val definedContext = Bindings(defined.map {
       case (declName, (_, Some(wdlValue))) => declName -> wdlValue
     })
     if (undefined.isEmpty) {
@@ -86,7 +80,7 @@ object InputOutput {
                   )
               }
           }
-          ctx.addBinding(declName, wdlValue)
+          ctx.add(declName, wdlValue)
       }
     }
   }
