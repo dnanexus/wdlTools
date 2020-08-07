@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
+import wdlTools.util.{Bindings, FileSourceResolver, Logger, FileUtils => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
@@ -20,6 +20,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val linesep = System.lineSeparator()
   private val evalPaths: EvalPaths = EvalPaths.createFromTemp()
   private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
+  private type WdlValue = WdlValues.V
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parsers.parseDocument(fileResolver.fromPath(UUtil.absolutePath(file)))
@@ -30,22 +31,18 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
-
-    tDoc.workflow should not be empty
+    tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
-
     val decls: Vector[TAT.Declaration] = wf.body.collect {
       case x: TAT.Declaration => x
     }
-
     (evaluator, decls)
   }
 
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
-    val bindings = ctxEnd.bindings
+    val bindings = evaluator.applyDeclarations(decls, Bindings())
     bindings("k0") shouldBe V_Int(-1)
     bindings("k1") shouldBe V_Int(1)
 
@@ -85,41 +82,40 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val ctx = Context(Map.empty).addBinding("empty_string", V_Null)
-    val ctxEnd = evaluator.applyDeclarations(decls, ctx)
-    val bd = ctxEnd.bindings
+    val ctx = Bindings[WdlValue]().add("empty_string", V_Null)
+    val bindings = evaluator.applyDeclarations(decls, ctx)
 
-    bd("x") shouldBe V_Float(1.4)
-    bd("n1") shouldBe V_Int(1)
-    bd("n2") shouldBe V_Int(2)
-    bd("n3") shouldBe V_Int(1)
-    bd("cities2") shouldBe V_Array(
+    bindings("x") shouldBe V_Float(1.4)
+    bindings("n1") shouldBe V_Int(1)
+    bindings("n2") shouldBe V_Int(2)
+    bindings("n3") shouldBe V_Int(1)
+    bindings("cities2") shouldBe V_Array(
         Vector(V_String("LA"), V_String("Seattle"), V_String("San Francisco"))
     )
 
-    bd("table2") shouldBe V_Array(
+    bindings("table2") shouldBe V_Array(
         Vector(
             V_Array(Vector(V_String("A"), V_String("allow"))),
             V_Array(Vector(V_String("B"), V_String("big"))),
             V_Array(Vector(V_String("C"), V_String("clam")))
         )
     )
-    bd("m2") shouldBe V_Map(
+    bindings("m2") shouldBe V_Map(
         Map(V_String("name") -> V_String("hawk"), V_String("kind") -> V_String("bird"))
     )
 
     // sub
-    bd("sentence1") shouldBe V_String(
+    bindings("sentence1") shouldBe V_String(
         "She visited three places on his trip: Aa, Ab, C, D, and E"
     )
-    bd("sentence2") shouldBe V_String(
+    bindings("sentence2") shouldBe V_String(
         "He visited three places on his trip: Berlin, Berlin, C, D, and E"
     )
-    bd("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
+    bindings("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
 
     // transpose
-    bd("ar3") shouldBe V_Array(Vector(V_Int(0), V_Int(1), V_Int(2)))
-    bd("ar_ar2") shouldBe V_Array(
+    bindings("ar3") shouldBe V_Array(Vector(V_Int(0), V_Int(1), V_Int(2)))
+    bindings("ar_ar2") shouldBe V_Array(
         Vector(
             V_Array(Vector(V_Int(1), V_Int(4))),
             V_Array(Vector(V_Int(2), V_Int(5))),
@@ -128,7 +124,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     )
 
     // zip
-    bd("zlf") shouldBe V_Array(
+    bindings("zlf") shouldBe V_Array(
         Vector(
             V_Pair(V_String("A"), V_Boolean(true)),
             V_Pair(V_String("B"), V_Boolean(false)),
@@ -137,7 +133,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     )
 
     // cross
-    inside(bd("cln")) {
+    inside(bindings("cln")) {
       case V_Array(vec) =>
         // the order of the cross product is unspecified
         Vector(
@@ -150,34 +146,34 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         ).foreach(pair => vec contains pair)
     }
 
-    bd("l1") shouldBe V_Int(2)
-    bd("l2") shouldBe V_Int(6)
+    bindings("l1") shouldBe V_Int(2)
+    bindings("l2") shouldBe V_Int(6)
 
-    bd("files2") shouldBe V_Array(
+    bindings("files2") shouldBe V_Array(
         Vector(V_File("A"), V_File("B"), V_File("C"), V_File("G"), V_File("J"), V_File("K"))
     )
 
-    bd("pref2") shouldBe V_Array(
+    bindings("pref2") shouldBe V_Array(
         Vector(V_String("i_1"), V_String("i_3"), V_String("i_5"), V_String("i_7"))
     )
-    bd("pref3") shouldBe V_Array(
+    bindings("pref3") shouldBe V_Array(
         Vector(V_String("sub_1.0"), V_String("sub_3.4"), V_String("sub_5.1"))
     )
 
-    bd("sel1") shouldBe V_String("A")
-    bd("sel2") shouldBe V_String("Henry")
-    bd("sel3") shouldBe V_Array(Vector(V_String("Henry"), V_String("bear"), V_String("tree")))
+    bindings("sel1") shouldBe V_String("A")
+    bindings("sel2") shouldBe V_String("Henry")
+    bindings("sel3") shouldBe V_Array(Vector(V_String("Henry"), V_String("bear"), V_String("tree")))
 
-    bd("d1") shouldBe V_Boolean(true)
-    bd("d2") shouldBe V_Boolean(false)
-    bd("d3") shouldBe V_Boolean(true)
+    bindings("d1") shouldBe V_Boolean(true)
+    bindings("d2") shouldBe V_Boolean(false)
+    bindings("d3") shouldBe V_Boolean(true)
 
     // basename
-    bd("path1") shouldBe V_String("C.txt")
-    bd("path2") shouldBe V_String("nuts_and_bolts.txt")
-    bd("path3") shouldBe V_String("docs.md")
-    bd("path4") shouldBe V_String("C")
-    bd("path5") shouldBe V_String("C.txt")
+    bindings("path1") shouldBe V_String("C.txt")
+    bindings("path2") shouldBe V_String("nuts_and_bolts.txt")
+    bindings("path3") shouldBe V_String("docs.md")
+    bindings("path4") shouldBe V_String("C")
+    bindings("path5") shouldBe V_String("C.txt")
 
     // read/write object
     val obj1 = V_Object(
@@ -190,47 +186,45 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
             "year" -> V_String("1975"),
             "title" -> V_String("The Periodic Table"))
     )
-    bd("o2") shouldBe obj1
-    bd("arObj") shouldBe V_Array(Vector(obj1, obj2))
-    bd("houseObj") shouldBe V_Object(
+    bindings("o2") shouldBe obj1
+    bindings("arObj") shouldBe V_Array(Vector(obj1, obj2))
+    bindings("houseObj") shouldBe V_Object(
         Map("city" -> V_String("Seattle"),
             "team" -> V_String("Trail Blazers"),
             "zipcode" -> V_Int(98109))
     )
-
   }
 
   it should "perform coercions" in {
     val file = srcDir.resolve("coercions.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map.empty))
-    val bd = ctxEnd.bindings
+    val bindings = evaluator.applyDeclarations(decls, Bindings())
 
-    bd("i1") shouldBe V_Int(13)
-    bd("i2") shouldBe V_Int(13)
-    bd("i3") shouldBe V_Int(8)
+    bindings("i1") shouldBe V_Int(13)
+    bindings("i2") shouldBe V_Int(13)
+    bindings("i3") shouldBe V_Int(8)
 
-    bd("x1") shouldBe V_Float(3)
-    bd("x2") shouldBe V_Float(13)
-    bd("x3") shouldBe V_Float(44.3)
-    bd("x4") shouldBe V_Float(44.3)
-    bd("x5") shouldBe V_Float(4.5)
+    bindings("x1") shouldBe V_Float(3)
+    bindings("x2") shouldBe V_Float(13)
+    bindings("x3") shouldBe V_Float(44.3)
+    bindings("x4") shouldBe V_Float(44.3)
+    bindings("x5") shouldBe V_Float(4.5)
 
-    bd("s1") shouldBe V_String("true")
-    bd("s2") shouldBe V_String("3")
-    bd("s3") shouldBe V_String("4.3")
-    bd("s4") shouldBe V_String("hello")
-    bd("s5") shouldBe V_Optional(V_String("hello"))
+    bindings("s1") shouldBe V_String("true")
+    bindings("s2") shouldBe V_String("3")
+    bindings("s3") shouldBe V_String("4.3")
+    bindings("s4") shouldBe V_String("hello")
+    bindings("s5") shouldBe V_Optional(V_String("hello"))
   }
 
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
     val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
-
-    tDoc.elements should not be empty
+    val elts: Vector[TAT.DocumentElement] = tDoc.elements
+    elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyDeclarations(task.declarations, Context(Map.empty))
+    val ctx = evaluator.applyDeclarations(task.declarations, Bindings())
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -283,24 +277,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("bad_coercion.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     assertThrows[EvalException] {
-      val _ = evaluator.applyDeclarations(decls, Context(Map.empty))
+      val _ = evaluator.applyDeclarations(decls, Bindings())
     }
   }
 
   it should "handle null and optionals" taggedAs Edge in {
     val file = srcDir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-
-    val ctxEnd = evaluator.applyDeclarations(decls, Context(Map("i2" -> V_Null)))
-    val bd = ctxEnd.bindings
-
+    val bd = evaluator.applyDeclarations(decls, Bindings(Map("i2" -> V_Null)))
     bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 
   it should "handle accessing pair values" in {
     val file = srcDir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    evaluator.applyDeclarations(decls, Context(Map("i2" -> V_Null)))
+    evaluator.applyDeclarations(decls, Bindings(Map("i2" -> V_Null)))
   }
 
   it should "handle empty stdout/stderr" in {

@@ -1,8 +1,10 @@
 package wdlTools.eval
 
+import wdlTools.eval.WdlValues.V
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax.{HintsSection, RuntimeSection}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.util.Bindings
 
 /**
   * Unification of runtime and hints sections, to enable accessing runtime attributes in
@@ -25,7 +27,7 @@ object RuntimeAttributes {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[Context] = None,
+      ctx: Option[Bindings[V]] = None,
       defaultValues: Map[String, WdlValues.V] = Map.empty
   ): RuntimeAttributes = {
     create(task.runtime, task.hints, evaluator, ctx, defaultValues, Some(task.loc))
@@ -35,7 +37,7 @@ object RuntimeAttributes {
       runtimeSection: Option[RuntimeSection],
       hintsSection: Option[HintsSection],
       evaluator: Eval,
-      ctx: Option[Context] = None,
+      ctx: Option[Bindings[V]] = None,
       defaultValues: Map[String, WdlValues.V] = Map.empty,
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
