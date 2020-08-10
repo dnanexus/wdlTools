@@ -2,19 +2,13 @@ package wdlTools.types
 
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-import wdlTools.util.FileSource
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
-class VisitorContext[E <: Element](val element: E, val parent: Option[VisitorContext[_]] = None) {
-  lazy val docSource: FileSource = element match {
-    case d: Document => d.source
-    case _           => findAncestor[Document].get.element.source
-  }
-
+case class VisitorContext[E <: Element](element: E, parent: Option[VisitorContext[_]] = None) {
   def createChildContext[C <: Element](element: C): VisitorContext[C] = {
-    new VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
+    VisitorContext[C](element, Some(this.asInstanceOf[VisitorContext[Element]]))
   }
 
   /**
@@ -90,8 +84,6 @@ class VisitorContext[E <: Element](val element: E, val parent: Option[VisitorCon
 class TypedAbstractSyntaxTreeVisitor {
   type WdlType = WdlTypes.T
 
-  def visitDocument(ctx: VisitorContext[Document]): Unit = {}
-
   /**
     * Visit a name in the WDL document's namespace. Does not visit "hidden" names (e.g. a call name
     * is hidden when it has an alias - the alias is the "visible" name in the document's namespace).
@@ -102,6 +94,8 @@ class TypedAbstractSyntaxTreeVisitor {
     * Visit a key of a metadata, runtime, or hints section.
     */
   def visitKey[P <: Element](key: String, parent: VisitorContext[P]): Unit = {}
+
+  def visitDocument(ctx: VisitorContext[Document]): Unit = {}
 
   def visitVersion(ctx: VisitorContext[Version]): Unit = {}
 
@@ -147,6 +141,11 @@ class TypedAbstractSyntaxTreeVisitor {
       traverseExpression(ctx.createChildContext[Expr](e))
     }
   }
+
+  def visitDefinition[P <: Element](name: String,
+                                    wdlType: T,
+                                    expr: Option[Expr],
+                                    parent: VisitorContext[P]): Unit = {}
 
   def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
 
@@ -411,10 +410,6 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   }
 
   def apply(doc: Document): Unit = {
-    visitDocument(createRootContext(doc))
-  }
-
-  protected def createRootContext(doc: Document): VisitorContext[Document] = {
-    new VisitorContext[Document](doc)
+    visitDocument(VisitorContext[Document](doc))
   }
 }

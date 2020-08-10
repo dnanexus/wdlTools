@@ -84,7 +84,7 @@ case class Linter(rules: Map[String, Severity] = Rules.defaultRules,
                         typesContext
                     )
                 }.toVector
-                val astWalker = LinterASTWalker(astVisitors, followImports)
+                val astWalker = LinterAbstractSyntaxTreeWalker(astVisitors, followImports)
                 astWalker.apply(doc)
                 astVisitors.flatMap(_.getEvents)
               } else {
