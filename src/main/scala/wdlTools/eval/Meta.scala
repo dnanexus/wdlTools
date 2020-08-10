@@ -44,9 +44,9 @@ class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlVa
   }
 }
 
-case class Draft2Meta(meta: Option[TAT.MetaSection],
+case class Draft2Meta(meta: Map[String, TAT.MetaValue] = Map.empty,
                       userDefaultValues: Map[String, WdlValues.V] = Map.empty)
-    extends Meta(meta.map(_.kvs).getOrElse(Map.empty), userDefaultValues) {
+    extends Meta(meta, userDefaultValues) {
   override protected def applyKv(id: String,
                                  value: TAT.MetaValue,
                                  wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
@@ -59,22 +59,23 @@ case class Draft2Meta(meta: Option[TAT.MetaSection],
   }
 }
 
-case class V1Meta(meta: Option[TAT.MetaSection],
+case class V1Meta(meta: Map[String, TAT.MetaValue] = Map.empty,
                   userDefaultValues: Map[String, WdlValues.V] = Map.empty)
-    extends Meta(meta.map(_.kvs).getOrElse(Map.empty), userDefaultValues)
+    extends Meta(meta, userDefaultValues)
 
 object Meta {
   def create(version: WdlVersion,
              meta: Option[TAT.MetaSection],
              userDefaultValues: Map[String, WdlValues.V] = Map.empty): Meta = {
+    val kvs = meta.map(_.kvs).getOrElse(Map.empty)
     version match {
-      case WdlVersion.Draft_2 => Draft2Meta(meta, userDefaultValues)
-      case _                  => V1Meta(meta, userDefaultValues)
+      case WdlVersion.Draft_2 => Draft2Meta(kvs, userDefaultValues)
+      case _                  => V1Meta(kvs, userDefaultValues)
     }
   }
 }
 
-case class Hints(hints: Option[TAT.HintsSection],
+case class Hints(hints: Option[TAT.MetaSection],
                  userDefaultValues: Map[String, WdlValues.V] = Map.empty)
     extends Meta(hints.map(_.kvs).getOrElse(Map.empty), userDefaultValues) {
   override val defaults: Map[String, WdlValues.V] = Map(
@@ -127,7 +128,7 @@ object Hints {
     val Outputs = "outputs"
   }
 
-  def create(hints: Option[TAT.HintsSection],
+  def create(hints: Option[TAT.MetaSection],
              userDefaultValues: Map[String, WdlValues.V] = Map.empty): Hints =
     Hints(hints, userDefaultValues)
 }

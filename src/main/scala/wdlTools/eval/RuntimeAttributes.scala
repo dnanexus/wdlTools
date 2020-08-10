@@ -2,7 +2,7 @@ package wdlTools.eval
 
 import wdlTools.eval.WdlValues.V
 import wdlTools.syntax.SourceLocation
-import wdlTools.types.TypedAbstractSyntax.{HintsSection, RuntimeSection}
+import wdlTools.types.TypedAbstractSyntax.{MetaSection, RuntimeSection}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.util.Bindings
 
@@ -35,7 +35,7 @@ object RuntimeAttributes {
 
   def create(
       runtimeSection: Option[RuntimeSection],
-      hintsSection: Option[HintsSection],
+      hintsSection: Option[MetaSection],
       evaluator: Eval,
       ctx: Option[Bindings[V]] = None,
       defaultValues: Map[String, WdlValues.V] = Map.empty,

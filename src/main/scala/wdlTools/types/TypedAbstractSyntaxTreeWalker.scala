@@ -175,9 +175,9 @@ class TypedAbstractSyntaxTreeVisitor {
 
   def visitParameterMetaKV(key: String,
                            value: MetaValue,
-                           parent: VisitorContext[ParameterMetaSection]): Unit = {}
+                           parent: VisitorContext[MetaSection]): Unit = {}
 
-  def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {}
+  def visitParameterMetaSection(ctx: VisitorContext[MetaSection]): Unit = {}
 
   def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {}
 
@@ -187,9 +187,9 @@ class TypedAbstractSyntaxTreeVisitor {
 
   def visitRuntimeSection(ctx: VisitorContext[RuntimeSection]): Unit = {}
 
-  def visitHintsKV(key: String, value: MetaValue, parent: VisitorContext[HintsSection]): Unit = {}
+  def visitHintsKV(key: String, value: MetaValue, parent: VisitorContext[MetaSection]): Unit = {}
 
-  def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {}
+  def visitHintsSection(ctx: VisitorContext[MetaSection]): Unit = {}
 
   def visitTask(ctx: VisitorContext[Task]): Unit = {}
 }
@@ -320,12 +320,12 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
 
   override def visitParameterMetaKV(key: String,
                                     value: MetaValue,
-                                    parent: VisitorContext[ParameterMetaSection]): Unit = {
+                                    parent: VisitorContext[MetaSection]): Unit = {
     visitKey(key, parent)
     visitMetaValue(parent.createChildContext[MetaValue](value))
   }
 
-  override def visitParameterMetaSection(ctx: VisitorContext[ParameterMetaSection]): Unit = {
+  override def visitParameterMetaSection(ctx: VisitorContext[MetaSection]): Unit = {
     ctx.element.kvs.foreach {
       case (key, value) => visitParameterMetaKV(key, value, ctx)
     }
@@ -345,7 +345,7 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
     }
     if (ctx.element.parameterMeta.isDefined) {
       visitParameterMetaSection(
-          ctx.createChildContext[ParameterMetaSection](ctx.element.parameterMeta.get)
+          ctx.createChildContext[MetaSection](ctx.element.parameterMeta.get)
       )
     }
   }
@@ -371,12 +371,12 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
 
   override def visitHintsKV(key: String,
                             value: MetaValue,
-                            parent: VisitorContext[HintsSection]): Unit = {
+                            parent: VisitorContext[MetaSection]): Unit = {
     visitName(key, parent)
     visitMetaValue(parent.createChildContext[MetaValue](value))
   }
 
-  override def visitHintsSection(ctx: VisitorContext[HintsSection]): Unit = {
+  override def visitHintsSection(ctx: VisitorContext[MetaSection]): Unit = {
     ctx.element.kvs.foreach {
       case (key, value) => visitHintsKV(key, value, ctx)
     }
@@ -398,14 +398,14 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
       visitRuntimeSection(ctx.createChildContext[RuntimeSection](ctx.element.runtime.get))
     }
     if (ctx.element.hints.isDefined) {
-      visitHintsSection(ctx.createChildContext[HintsSection](ctx.element.hints.get))
+      visitHintsSection(ctx.createChildContext[MetaSection](ctx.element.hints.get))
     }
     if (ctx.element.meta.isDefined) {
       visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
     }
     if (ctx.element.parameterMeta.isDefined) {
       visitParameterMetaSection(
-          ctx.createChildContext[ParameterMetaSection](ctx.element.parameterMeta.get)
+          ctx.createChildContext[MetaSection](ctx.element.parameterMeta.get)
       )
     }
   }

@@ -566,8 +566,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
-                             ctx: Context): TAT.ParameterMetaSection = {
-    TAT.ParameterMetaSection(
+                             ctx: Context): TAT.MetaSection = {
+    TAT.MetaSection(
         paramMetaSection.kvs.map { kv: AST.MetaKV =>
           val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
             applyMetaValue(kv.value, ctx)
@@ -584,8 +584,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     )
   }
 
-  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.HintsSection = {
-    TAT.HintsSection(
+  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.MetaSection = {
+    TAT.MetaSection(
         hintsSection.kvs.map {
           case AST.MetaKV(k, v, _) =>
             k -> applyMetaValue(v, ctx)

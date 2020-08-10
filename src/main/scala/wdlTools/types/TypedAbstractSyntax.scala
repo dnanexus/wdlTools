@@ -171,10 +171,7 @@ object TypedAbstractSyntax {
   case class MetaValueArray(value: Vector[MetaValue], loc: SourceLocation) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
-  case class ParameterMetaSection(kvs: Map[String, MetaValue], loc: SourceLocation) extends Element
   case class MetaSection(kvs: Map[String, MetaValue], loc: SourceLocation) extends Element
-  // hints section
-  case class HintsSection(kvs: Map[String, MetaValue], loc: SourceLocation) extends Element
 
   case class Version(value: WdlVersion, loc: SourceLocation) extends Element
 
@@ -203,9 +200,9 @@ object TypedAbstractSyntax {
                   command: CommandSection, // the command section is required
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
-                  parameterMeta: Option[ParameterMetaSection],
+                  parameterMeta: Option[MetaSection],
                   runtime: Option[RuntimeSection],
-                  hints: Option[HintsSection],
+                  hints: Option[MetaSection],
                   loc: SourceLocation)
       extends DocumentElement
       with Callable
@@ -251,7 +248,7 @@ object TypedAbstractSyntax {
                       inputs: Vector[InputDefinition],
                       outputs: Vector[OutputDefinition],
                       meta: Option[MetaSection],
-                      parameterMeta: Option[ParameterMetaSection],
+                      parameterMeta: Option[MetaSection],
                       body: Vector[WorkflowElement],
                       loc: SourceLocation)
       extends Element
