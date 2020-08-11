@@ -18,9 +18,9 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def contains(id: String): Boolean = runtime.contains(id)
 
-  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Option[WdlTypes.T] = None): V
+  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[WdlTypes.T] = Vector.empty): V
 
-  def get(id: String, wdlType: Option[WdlTypes.T] = None): Option[V] = {
+  def get(id: String, wdlType: Vector[WdlTypes.T] = Vector.empty): Option[V] = {
     if (!cache.contains(id)) {
       val value = runtime.get(id) match {
         case Some(expr) =>
@@ -90,12 +90,12 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
   override protected def applyKv(id: String,
                                  expr: TAT.Expr,
-                                 wdlType: Option[WdlTypes.T] = None): V = {
+                                 wdlType: Vector[WdlTypes.T] = Vector.empty): V = {
     (ctx, wdlType) match {
-      case (Some(c), None)    => evaluator.applyExpr(expr, c)
-      case (Some(c), Some(t)) => evaluator.applyExprAndCoerce(expr, t, c)
-      case (None, None)       => evaluator.applyConst(expr)
-      case (None, Some(t))    => evaluator.applyConstAndCoerce(expr, t)
+      case (Some(c), Vector()) => evaluator.applyExpr(expr, c)
+      case (Some(c), v)        => evaluator.applyExprAndCoerce(expr, v, c)
+      case (None, Vector())    => evaluator.applyConst(expr)
+      case (None, v)           => evaluator.applyConstAndCoerce(expr, v)
     }
   }
 
@@ -183,19 +183,32 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   override val aliases: SymmetricBiMap[String] =
     SymmetricBiMap(Map(Runtime.Keys.Docker -> Runtime.Keys.Container))
 
-  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Option[WdlTypes.T] = None): V = {
+  private def intersectTypes(t1: Vector[WdlTypes.T], t2: Vector[WdlTypes.T]): Vector[WdlTypes.T] = {
+    (t1, t2) match {
+      case (Vector(), v) => v
+      case (v, Vector()) => v
+      case (v1, v2) =>
+        val intersection = (v1.toSet & v2.toSet).toVector
+        if (intersection.isEmpty) {
+          throw new EvalException(s"incompatible types ${t1} does not intersect ${t2}")
+        }
+        intersection
+    }
+  }
+
+  protected def applyKv(id: String,
+                        expr: TAT.Expr,
+                        wdlType: Vector[WdlTypes.T] = Vector.empty): V = {
     def getValue(allowed: Vector[WdlTypes.T]): V = {
       (ctx, wdlType) match {
-        case (Some(c), None) =>
+        case (Some(c), Vector()) =>
           evaluator.applyExprAndCoerce(expr, allowed, c)
-        case (Some(c), Some(t)) =>
-          assert(allowed.contains(t))
-          evaluator.applyExprAndCoerce(expr, t, c)
-        case (None, None) =>
+        case (Some(c), v) =>
+          evaluator.applyExprAndCoerce(expr, intersectTypes(allowed, v), c)
+        case (None, Vector()) =>
           evaluator.applyConstAndCoerce(expr, allowed)
-        case (None, Some(t)) =>
-          assert(allowed.contains(t))
-          evaluator.applyConstAndCoerce(expr, t)
+        case (None, v) =>
+          evaluator.applyConstAndCoerce(expr, intersectTypes(allowed, v))
       }
     }
 

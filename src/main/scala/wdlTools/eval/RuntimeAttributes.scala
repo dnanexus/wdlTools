@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues.V
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax.{MetaSection, RuntimeSection}
-import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 import wdlTools.util.Bindings
 
 /**
@@ -15,15 +15,15 @@ import wdlTools.util.Bindings
 case class RuntimeAttributes(runtime: Option[Runtime],
                              hints: Option[Hints],
                              defaultValues: Map[String, WdlValues.V]) {
-  def get(id: String): Option[WdlValues.V] = {
+  def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
     val value = if (runtime.exists(_.allows(id))) {
-      runtime.get.get(id)
+      runtime.get.get(id, wdlTypes)
     } else {
       None
     }
     value
-      .orElse(hints.flatMap(_.get(id)))
-      .orElse(defaultValues.get(id))
+      .orElse(hints.flatMap(_.get(id, wdlTypes)))
+      .orElse(defaultValues.get(id)) // TODO: type check
   }
 }
 
