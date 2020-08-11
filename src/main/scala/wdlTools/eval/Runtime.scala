@@ -5,6 +5,8 @@ import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 import wdlTools.util.{Bindings, SymmetricBiMap}
 
+case class DiskRequest(size: Long, mountPoint: Option[String], diskType: Option[String])
+
 abstract class Runtime(runtime: Map[String, TAT.Expr],
                        userDefaultValues: Map[String, V],
                        runtimeLocation: SourceLocation) {
@@ -54,7 +56,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def memory: Option[Long]
 
-  def disks: Vector[(Long, Option[String], Option[String])]
+  def disks: Vector[DiskRequest]
 
   def isValidReturnCode(returnCode: Int): Boolean = {
     val loc = getSourceLocation(Runtime.Keys.ReturnCodes)
@@ -143,7 +145,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
-  lazy val disks: Vector[(Long, Option[String], Option[String])] = {
+  lazy val disks: Vector[DiskRequest] = {
     get(Runtime.Keys.Disks) match {
       case None    => Vector.empty
       case Some(v) => Runtime.parseDisks(v, loc = getSourceLocation(Runtime.Keys.Disks))
@@ -276,14 +278,14 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
-  lazy val disks: Vector[(Long, Option[String], Option[String])] = {
+  lazy val disks: Vector[DiskRequest] = {
     val loc = getSourceLocation(Runtime.Keys.Disks)
     get(Runtime.Keys.Disks) match {
       case None =>
         throw new EvalException(s"No value for 'disks'", loc)
       case Some(v) =>
         Runtime.parseDisks(v, loc = loc).map {
-          case (_, _, Some(diskType)) =>
+          case DiskRequest(_, _, Some(diskType)) =>
             throw new EvalException(
                 s"In WDL 2.0, it is not allowed to define the disk type (${diskType}) in runtime.disks",
                 loc
@@ -352,42 +354,46 @@ object Runtime {
       defaultMountPoint: Option[String] = None,
       defaultDiskType: Option[String] = None,
       loc: SourceLocation
-  ): Vector[(Long, Option[String], Option[String])] = {
+  ): Vector[DiskRequest] = {
     value match {
       case V_Int(i) =>
         val bytes = Utils.floatToInt(Utils.sizeToFloat(i.toDouble, "GiB", loc))
-        Vector((bytes, defaultMountPoint, defaultDiskType))
+        Vector(DiskRequest(bytes, defaultMountPoint, defaultDiskType))
       case V_Array(a) =>
         a.flatMap(v => parseDisks(v, defaultMountPoint, defaultDiskType, loc))
       case V_String(s) =>
         val t = s.split("\\s").toVector match {
           case Vector(size) =>
             val bytes = Utils.floatToInt(Utils.sizeStringToFloat(size, loc, "GiB"))
-            (bytes, defaultMountPoint, defaultDiskType)
+            DiskRequest(bytes, defaultMountPoint, defaultDiskType)
           case Vector(a, b) =>
             try {
               // "<size> <suffix>"
-              (Utils.floatToInt(Utils.sizeToFloat(a.toDouble, b, loc)),
-               defaultMountPoint,
-               defaultDiskType)
+              DiskRequest(Utils.floatToInt(Utils.sizeToFloat(a.toDouble, b, loc)),
+                          defaultMountPoint,
+                          defaultDiskType)
             } catch {
               case _: Throwable =>
-                (Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")), Some(a), defaultDiskType)
+                DiskRequest(Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")),
+                            Some(a),
+                            defaultDiskType)
             }
           case Vector(a, b, c) =>
             try {
               // "<mount-point> <size> <suffix>"
-              (Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc)),
-               defaultMountPoint,
-               defaultDiskType)
+              DiskRequest(Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc)),
+                          defaultMountPoint,
+                          defaultDiskType)
             } catch {
               case _: Throwable =>
                 // "<mount-point> <size> <disk type>"
-                (Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")), Some(a), Some(c))
+                DiskRequest(Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")),
+                            Some(a),
+                            Some(c))
             }
           case Vector(a, b, c, d) =>
             val bytes = Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc))
-            (bytes, Some(a), Some(d))
+            DiskRequest(bytes, Some(a), Some(d))
         }
         Vector(t)
       case other =>
