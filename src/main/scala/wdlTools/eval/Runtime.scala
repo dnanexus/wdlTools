@@ -18,14 +18,18 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def contains(id: String): Boolean = runtime.contains(id)
 
-  protected def applyKv(id: String, expr: TAT.Expr): V
+  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Option[WdlTypes.T] = None): V
 
-  def get(id: String): Option[V] = {
+  def get(id: String, wdlType: Option[WdlTypes.T] = None): Option[V] = {
     if (!cache.contains(id)) {
       val value = runtime.get(id) match {
-        case Some(expr)                   => Some(applyKv(id, expr))
-        case None if aliases.contains(id) => get(aliases.get(id))
-        case None                         => userDefaultValues.get(id).orElse(defaults.get(id))
+        case Some(expr) =>
+          Some(applyKv(id, expr, wdlType))
+        case None if aliases.contains(id) =>
+          get(aliases.get(id), wdlType)
+        case None =>
+          // TODO: check type
+          userDefaultValues.get(id).orElse(defaults.get(id))
       }
       cache += (id -> value)
     }
@@ -84,10 +88,14 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   // prior to WDL 2, any key was allowed
   override def allows(key: String): Boolean = true
 
-  override protected def applyKv(id: String, expr: TAT.Expr): V = {
-    ctx match {
-      case Some(c) => evaluator.applyExpr(expr, c)
-      case None    => evaluator.applyConst(expr)
+  override protected def applyKv(id: String,
+                                 expr: TAT.Expr,
+                                 wdlType: Option[WdlTypes.T] = None): V = {
+    (ctx, wdlType) match {
+      case (Some(c), None)    => evaluator.applyExpr(expr, c)
+      case (Some(c), Some(t)) => evaluator.applyExprAndCoerce(expr, t, c)
+      case (None, None)       => evaluator.applyConst(expr)
+      case (None, Some(t))    => evaluator.applyConstAndCoerce(expr, t)
     }
   }
 
@@ -175,11 +183,19 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   override val aliases: SymmetricBiMap[String] =
     SymmetricBiMap(Map(Runtime.Keys.Docker -> Runtime.Keys.Container))
 
-  protected def applyKv(id: String, expr: TAT.Expr): V = {
+  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Option[WdlTypes.T] = None): V = {
     def getValue(allowed: Vector[WdlTypes.T]): V = {
-      ctx match {
-        case Some(c) => evaluator.applyExprAndCoerce(expr, allowed, c)
-        case None    => evaluator.applyConstAndCoerce(expr, allowed)
+      (ctx, wdlType) match {
+        case (Some(c), None) =>
+          evaluator.applyExprAndCoerce(expr, allowed, c)
+        case (Some(c), Some(t)) =>
+          assert(allowed.contains(t))
+          evaluator.applyExprAndCoerce(expr, t, c)
+        case (None, None) =>
+          evaluator.applyConstAndCoerce(expr, allowed)
+        case (None, Some(t)) =>
+          assert(allowed.contains(t))
+          evaluator.applyConstAndCoerce(expr, t)
       }
     }
 
