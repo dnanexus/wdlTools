@@ -26,7 +26,8 @@ class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlVa
         V_Object(m.map {
           case (k, v) => k -> applyKv(k, v)
         })
-      case _ => throw new EvalException(s"Unexpected value ${value} for key ${id}", value.loc)
+      case _ =>
+        throw new EvalException(s"Unexpected value ${value} for key ${id}", value.loc)
     }
     if (wdlTypes.isEmpty) {
       wdlValue
@@ -35,12 +36,12 @@ class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlVa
     }
   }
 
-  lazy val values: Map[String, WdlValues.V] = kvs.map {
-    case (id, value) => id -> applyKv(id, value)
-  }
-
-  def getValue(id: String): Option[WdlValues.V] = {
-    values.get(id).orElse(userDefaultValues.get(id)).orElse(defaults.get(id))
+  def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
+    kvs
+      .get(id)
+      .map(value => applyKv(id, value, wdlTypes))
+      .orElse(userDefaultValues.get(id))
+      .orElse(defaults.get(id))
   }
 }
 

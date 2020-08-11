@@ -27,18 +27,19 @@ object ExecException {
 
 class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir) {
   def getCommandFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultCommandScript)
+    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultCommandScript)
   def getReturnCodeFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultReturnCode)
+    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultReturnCode)
   def getContainerCommandFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultContainerRunScript)
+    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerRunScript)
   def getContainerIdFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultContainerId)
+    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerId)
 
   def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
     Map(
         "root" -> getRootDir(),
         "home" -> getHomeDir(),
+        "meta" -> getMetaDir(),
         "tmp" -> getTempDir(),
         "stdout" -> getStdoutFile(),
         "stderr" -> getStderrFile(),
@@ -58,10 +59,6 @@ class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir
 }
 
 object ExecPaths {
-  val DefaultHomeDir = "exec"
-  val DefaultTempDir = "tmp"
-  val DefaultStdout = "stdout"
-  val DefaultStderr = "stderr"
   val DefaultCommandScript = "commandScript"
   val DefaultReturnCode = "returnCode"
   val DefaultContainerRunScript = "containerRunScript"
@@ -81,7 +78,7 @@ object ExecPaths {
 
   def createLocalPathsFromTemp(): ExecPaths = {
     val rootDir = Files.createTempDirectory("wdlTools")
-    val tempDir = rootDir.resolve(DefaultTempDir)
+    val tempDir = rootDir.resolve(EvalPaths.DefaultTempDir)
     ExecPaths(rootDir, tempDir)
   }
 

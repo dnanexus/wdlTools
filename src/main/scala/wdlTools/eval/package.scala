@@ -2,12 +2,22 @@ package wdlTools.eval
 
 import java.nio.file.{Files, Path}
 
-import wdlTools.exec.ExecPaths
 import wdlTools.syntax.SourceLocation
 import wdlTools.util.FileUtils
 
 /**
-  * Configuration for expression evaluation. Some operations perform file IO.
+  * Paths configuration for evaluation of IO-related expressions. The general structure of an
+  * evaluation directory is:
+  *
+  * root
+  * |_home
+  * |_temp
+  * |_meta
+  *   |_stdout
+  *   |_stderr
+  *
+  * where `stdout` and `stderr` are files that store the stdout/stderr of a process. The temp
+  * directory may instead be another location, such as the system tempdir.
   *
   * @param rootDir  the root directory - all other paths (except possibly tmpDir) are under this dir
   * @param tempDir  directory for placing temporary files.
@@ -35,8 +45,14 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
     * The execution directory - used as the base dir for relative paths (e.g. for glob search).
     */
   def getHomeDir(ensureExists: Boolean = false): Path = {
-    getOrCreateDir(ExecPaths.DefaultHomeDir,
-                   getRootDir(ensureExists).resolve(ExecPaths.DefaultHomeDir),
+    getOrCreateDir(EvalPaths.DefaultHomeDir,
+                   getRootDir(ensureExists).resolve(EvalPaths.DefaultHomeDir),
+                   ensureExists)
+  }
+
+  def getMetaDir(ensureExists: Boolean = false): Path = {
+    getOrCreateDir(EvalPaths.DefaultMetaDir,
+                   getRootDir(ensureExists).resolve(EvalPaths.DefaultMetaDir),
                    ensureExists)
   }
 
@@ -44,16 +60,22 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
     * The file that has a copy of standard output.
     */
   def getStdoutFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultStdout)
+    getMetaDir(ensureParentExists).resolve(EvalPaths.DefaultStdout)
 
   /**
     * The file that has a copy of standard error.
     */
   def getStderrFile(ensureParentExists: Boolean = false): Path =
-    getRootDir(ensureParentExists).resolve(ExecPaths.DefaultStderr)
+    getMetaDir(ensureParentExists).resolve(EvalPaths.DefaultStderr)
 }
 
 object EvalPaths {
+  val DefaultHomeDir = "home"
+  val DefaultTempDir = "tmp"
+  val DefaultMetaDir = "meta"
+  val DefaultStdout = "stdout"
+  val DefaultStderr = "stderr"
+
   def apply(rootDir: Path, tempDir: Path): EvalPaths = {
     new EvalPaths(rootDir, tempDir)
   }
@@ -64,7 +86,7 @@ object EvalPaths {
 
   def createFromTemp(): EvalPaths = {
     val rootDir = Files.createTempDirectory("eval")
-    val tempDir = rootDir.resolve("tmp")
+    val tempDir = rootDir.resolve(DefaultTempDir)
     EvalPaths(rootDir, tempDir)
   }
 

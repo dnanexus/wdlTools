@@ -304,13 +304,15 @@ case class Eval(paths: EvalPaths,
       expr match {
         case fl: TAT.ValueFile =>
           fileResovler.resolve(fl.value) match {
-            case f: LocalFileSource => throw new Exception(s"File ${f} is not constant")
-            case _                  => WdlValues.V_File(fl.value)
+            case f: LocalFileSource =>
+              throw new EvalException(s"File ${f} is not constant", expr.loc)
+            case _ => WdlValues.V_File(fl.value)
           }
         case fl: TAT.ValueDirectory =>
           fileResovler.resolveDirectory(fl.value) match {
-            case f: LocalFileSource => throw new Exception(s"Directory ${f} is not constant")
-            case _                  => WdlValues.V_Directory(fl.value)
+            case f: LocalFileSource =>
+              throw new EvalException(s"Directory ${f} is not constant", expr.loc)
+            case _ => WdlValues.V_Directory(fl.value)
           }
         case _ =>
           apply(expr, Context.empty)

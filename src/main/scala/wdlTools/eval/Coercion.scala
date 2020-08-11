@@ -34,7 +34,7 @@ object Coercion {
       case (WdlTypes.T_Int, V_String(s)) =>
         val n =
           try {
-            s.toInt
+            s.toLong
           } catch {
             case _: NumberFormatException =>
               throw new EvalException(s"string ${s} cannot be converted into an Int", loc)

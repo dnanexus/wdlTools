@@ -25,6 +25,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
   // return just one result. Therefore, we ended up with the prototype:
   //       T_File? -> T_Float
   // because with the current type system T_File? is more general than T_File.
+  // TODO: make sure everything here is in sync with
+  //  https://github.com/openwdl/wdl/issues/396
 
   private def unaryNumericPrototypes(funcName: String): Vector[T_Function] = {
     Vector(

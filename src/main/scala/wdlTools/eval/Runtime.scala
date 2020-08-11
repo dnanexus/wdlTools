@@ -14,13 +14,17 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   val aliases: SymmetricBiMap[String] = SymmetricBiMap.empty
 
+  def allows(id: String): Boolean
+
+  def contains(id: String): Boolean = runtime.contains(id)
+
   protected def applyKv(id: String, expr: TAT.Expr): V
 
-  def getValue(id: String): Option[V] = {
+  def get(id: String): Option[V] = {
     if (!cache.contains(id)) {
       val value = runtime.get(id) match {
         case Some(expr)                   => Some(applyKv(id, expr))
-        case None if aliases.contains(id) => getValue(aliases.get(id))
+        case None if aliases.contains(id) => get(aliases.get(id))
         case None                         => userDefaultValues.get(id).orElse(defaults.get(id))
       }
       cache += (id -> value)
@@ -29,7 +33,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   }
 
   def getAll: Map[String, WdlValues.V] = {
-    runtime.keys.map(key => key -> getValue(key).get).toMap
+    runtime.keys.map(key => key -> get(key).get).toMap
   }
 
   def getSourceLocation(id: String): SourceLocation = {
@@ -42,13 +46,15 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def container: Vector[String]
 
+  def cpu: Option[Double]
+
   def memory: Option[Long]
 
   def disks: Vector[(Long, Option[String], Option[String])]
 
   def isValidReturnCode(returnCode: Int): Boolean = {
     val loc = getSourceLocation(Runtime.Keys.ReturnCodes)
-    getValue(Runtime.Keys.ReturnCodes) match {
+    get(Runtime.Keys.ReturnCodes) match {
       case None                => returnCode == 0
       case Some(V_String("*")) => true
       case Some(V_Int(i))      => returnCode == i.toInt
@@ -75,6 +81,9 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map.empty
 
+  // prior to WDL 2, any key was allowed
+  override def allows(key: String): Boolean = true
+
   override protected def applyKv(id: String, expr: TAT.Expr): V = {
     ctx match {
       case Some(c) => evaluator.applyExpr(expr, c)
@@ -83,7 +92,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val container: Vector[String] = {
-    getValue(Runtime.Keys.Docker) match {
+    get(Runtime.Keys.Docker) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
@@ -101,8 +110,20 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
+  override def cpu: Option[Double] = {
+    get(Runtime.Keys.Cpu) match {
+      case None              => None
+      case Some(V_Int(i))    => Some(i.toFloat)
+      case Some(V_Float(f))  => Some(f)
+      case Some(V_String(s)) => Some(s.toFloat)
+      case other =>
+        throw new EvalException(s"Invalid ${Runtime.Keys.Cpu} value ${other}",
+                                getSourceLocation(Runtime.Keys.Cpu))
+    }
+  }
+
   lazy val memory: Option[Long] = {
-    getValue(Runtime.Keys.Memory) match {
+    get(Runtime.Keys.Memory) match {
       case None           => None
       case Some(V_Int(i)) => Some(i)
       case Some(V_String(s)) =>
@@ -115,7 +136,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val disks: Vector[(Long, Option[String], Option[String])] = {
-    getValue(Runtime.Keys.Disks) match {
+    get(Runtime.Keys.Disks) match {
       case None    => Vector.empty
       case Some(v) => Runtime.parseDisks(v, loc = getSourceLocation(Runtime.Keys.Disks))
     }
@@ -137,6 +158,20 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       Runtime.Keys.ReturnCodes -> V_Int(0)
   )
 
+  private val allowedKeys: Set[String] = Set(
+      Runtime.Keys.Container,
+      Runtime.Keys.Cpu,
+      Runtime.Keys.Memory,
+      Runtime.Keys.Disks,
+      Runtime.Keys.Gpu,
+      Runtime.Keys.MaxRetries,
+      Runtime.Keys.ReturnCodes
+  )
+
+  override def allows(key: String): Boolean = {
+    allowedKeys.contains(key)
+  }
+
   override val aliases: SymmetricBiMap[String] =
     SymmetricBiMap(Map(Runtime.Keys.Docker -> Runtime.Keys.Container))
 
@@ -149,7 +184,6 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
 
     id match {
-      // allow 'docker' even in WDL 2.0, for backward-compatibility
       case Runtime.Keys.Container =>
         getValue(Vector(WdlTypes.T_String, WdlTypes.T_Array(WdlTypes.T_String)))
       case Runtime.Keys.Cpu =>
@@ -183,7 +217,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val container: Vector[String] = {
-    getValue(Runtime.Keys.Container) match {
+    get(Runtime.Keys.Container) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
@@ -199,8 +233,15 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
+  override def cpu: Option[Double] = {
+    get(Runtime.Keys.Cpu).map {
+      case V_Float(f) => f
+      case other      => throw new EvalException(s"Invalid cpu value ${other}")
+    }
+  }
+
   lazy val memory: Option[Long] = {
-    getValue(Runtime.Keys.Memory).map {
+    get(Runtime.Keys.Memory).map {
       case V_Int(i) => i
       case other    => throw new EvalException(s"Invalid memory value ${other}")
     }
@@ -208,7 +249,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 
   lazy val disks: Vector[(Long, Option[String], Option[String])] = {
     val loc = getSourceLocation(Runtime.Keys.Disks)
-    getValue(Runtime.Keys.Disks) match {
+    get(Runtime.Keys.Disks) match {
       case None =>
         throw new EvalException(s"No value for 'disks'", loc)
       case Some(v) =>

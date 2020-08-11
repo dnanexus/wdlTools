@@ -15,10 +15,14 @@ import wdlTools.util.Bindings
 case class RuntimeAttributes(runtime: Option[Runtime],
                              hints: Option[Hints],
                              defaultValues: Map[String, WdlValues.V]) {
-  def getValue(id: String): Option[WdlValues.V] = {
-    runtime
-      .flatMap(_.getValue(id))
-      .orElse(hints.flatMap(_.getValue(id)))
+  def get(id: String): Option[WdlValues.V] = {
+    val value = if (runtime.exists(_.allows(id))) {
+      runtime.get.get(id)
+    } else {
+      None
+    }
+    value
+      .orElse(hints.flatMap(_.get(id)))
       .orElse(defaultValues.get(id))
   }
 }
