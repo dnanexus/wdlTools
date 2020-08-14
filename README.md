@@ -4,7 +4,7 @@
 
 ## Abstract Syntax Tree (AST)
 
-The `wdlTools.syntax` package implements an abstract syntax tree (AST) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee. The class definitions reside in `src/main/scala/wdlTools/syntax/AbstractSyntax.scala`.
+The `wdlTools.syntax` package implements an [abstract syntax tree (AST)](src/main/scala/wdlTools/syntax/AbstractSyntax.scala) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee.
 
 Currently, WDL draft-2 and 1.0 are fully supported, and development/2.0 is partially supported.
 
@@ -61,4 +61,4 @@ See the [documentation](doc/Developing.md) for full details.
 
 ## Support
 
-wdlTools is _not_ an official product of DNAnexus. Please do not contact DNAnexus (or any employees thereof) for support. To report a bug or feature request, please open an issue in the issue tracker.
+wdlTools is _not_ an official product of DNAnexus. Please do not contact DNAnexus (or any employees thereof) for support. To report a bug or feature request, please open an issue in the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
