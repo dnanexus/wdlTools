@@ -15,6 +15,10 @@ import wdlTools.util.Bindings
 case class RuntimeAttributes(runtime: Option[Runtime],
                              hints: Option[Hints],
                              defaultValues: Map[String, WdlValues.V]) {
+  def containsRuntime(id: String): Boolean = runtime.exists(_.contains(id))
+
+  def containsHint(id: String): Boolean = hints.exists(_.contains(id))
+
   def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
     val value = if (runtime.exists(_.allows(id))) {
       runtime.get.get(id, wdlTypes)

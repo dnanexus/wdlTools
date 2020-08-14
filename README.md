@@ -33,6 +33,7 @@ The following commands are currently available. They should be considered "alpha
 
 * [check](doc/Commands/Check.md): type-check a WDL file
 * [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
+* [exec](doc/Commands/Exec.md): execute a WDL task (workflow execution is not yet supported)
 * [format](doc/Commands/Format.md): reformat a WDL file
 * [lint](doc/Commands/Lint.md): detect "lint" (i.e. incorrect style or potentially problematic code) in a WDL file
 * [new](doc/Commands/New.md): generate a new WDL project

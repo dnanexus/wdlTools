@@ -4,14 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 
-/**
-  * Classes that translate MetaValues into WdlValues, for ease of inter-operability.
-  * @param kvs mapping of meta key to value
-  * @param userDefaultValues default values supplied by the users - these override any built-in defaults
-  */
-class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlValues.V]) {
-  val defaults: Map[String, WdlValues.V] = Map.empty
-
+class MetaMap(kvs: Map[String, TAT.MetaValue]) {
   protected def applyKv(id: String,
                         value: TAT.MetaValue,
                         wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
@@ -40,6 +33,29 @@ class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlVa
     kvs
       .get(id)
       .map(value => applyKv(id, value, wdlTypes))
+  }
+}
+
+object MetaMap {
+  def apply(kvs: Map[String, TAT.MetaValue]): MetaMap = new MetaMap(kvs)
+
+  lazy val empty: MetaMap = MetaMap(Map.empty)
+}
+
+/**
+  * Classes that translate MetaValues into WdlValues, for ease of inter-operability.
+  * @param kvs mapping of meta key to value
+  * @param userDefaultValues default values supplied by the users - these override any built-in defaults
+  */
+class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Map[String, WdlValues.V])
+    extends MetaMap(kvs) {
+  val defaults: Map[String, WdlValues.V] = Map.empty
+
+  def contains(id: String): Boolean = kvs.contains(id)
+
+  override def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
+    super
+      .get(id, wdlTypes)
       .orElse(userDefaultValues.get(id))
       .orElse(defaults.get(id))
   }
