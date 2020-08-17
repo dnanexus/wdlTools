@@ -18,7 +18,11 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def allows(id: String): Boolean
 
-  def contains(id: String): Boolean = runtime.contains(id)
+  def contains(id: String): Boolean = {
+    cache.contains(id) || runtime.contains(id) || (aliases.contains(id) && contains(
+        aliases.get(id)
+    ))
+  }
 
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[WdlTypes.T] = Vector.empty): V
 
@@ -254,7 +258,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       case Some(V_Array(a)) =>
         a.map {
           case V_String(s) => s
-          case other       => throw new EvalException(s"Invalid docker array item value ${other}")
+          case other       => throw new EvalException(s"Invalid container array item value ${other}")
         }
       case other =>
         throw new EvalException(

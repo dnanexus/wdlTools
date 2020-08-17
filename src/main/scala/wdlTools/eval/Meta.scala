@@ -4,7 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 
-class MetaMap(kvs: Map[String, TAT.MetaValue]) {
+class MetaMap(values: Map[String, TAT.MetaValue]) {
   protected def applyKv(id: String,
                         value: TAT.MetaValue,
                         wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
@@ -30,7 +30,7 @@ class MetaMap(kvs: Map[String, TAT.MetaValue]) {
   }
 
   def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
-    kvs
+    values
       .get(id)
       .map(value => applyKv(id, value, wdlTypes))
   }

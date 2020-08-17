@@ -112,7 +112,9 @@ object Coercion {
     }
   }
 
-  def coerceToFirst(wdlTypes: Vector[WdlTypes.T], value: V, loc: SourceLocation): WdlValues.V = {
+  def coerceToFirst(wdlTypes: Vector[WdlTypes.T],
+                    value: V,
+                    loc: SourceLocation = SourceLocation.empty): WdlValues.V = {
     val coerced: WdlValues.V = wdlTypes
       .collectFirst { t =>
         Try(Coercion.coerceTo(t, value, loc)) match {
@@ -120,7 +122,7 @@ object Coercion {
         }
       }
       .getOrElse(
-          throw new EvalException(s"Value ${value} could not be coerced to one of ${wdlTypes}")
+          throw new EvalException(s"Value ${value} could not be coerced to one of ${wdlTypes}", loc)
       )
     coerced
   }

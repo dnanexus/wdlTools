@@ -32,9 +32,11 @@ case class Logger(quiet: Boolean,
   }
 
   // returns a Logger that has `verbose = true` if `key` is in `keywords`
-  def withTraceIfContainsKey(word: String, newTraceLevel: Int = TraceLevel.Verbose): Logger = {
+  def withTraceIfContainsKey(word: String,
+                             newTraceLevel: Int = TraceLevel.Verbose,
+                             indentInc: Int = 0): Logger = {
     if (containsKey(word) && newTraceLevel > traceLevel) {
-      copy(traceLevel = newTraceLevel)
+      copy(traceLevel = newTraceLevel, traceIndenting = traceIndenting + indentInc)
     } else {
       this
     }

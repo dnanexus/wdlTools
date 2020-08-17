@@ -1,6 +1,6 @@
 package wdlTools.eval
 
-import wdlTools.eval.WdlValues.{V, V_Boolean, V_File, V_Float, V_Int, V_Null, V_Optional, V_String}
+import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 
