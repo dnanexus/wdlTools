@@ -339,8 +339,9 @@ object Runtime {
           throw new RuntimeException("either 'runtime' or 'runtimeLocation' must be nonEmpty")
       )
     evaluator.wdlVersion match {
-      case WdlVersion.V2 => V2Runtime(runtime, evaluator, ctx, defaultValues, loc)
-      case _             => DefaultRuntime(runtime, evaluator, ctx, defaultValues, loc)
+      case None                => throw new RuntimeException("no WdlVersion")
+      case Some(WdlVersion.V2) => V2Runtime(runtime, evaluator, ctx, defaultValues, loc)
+      case _                   => DefaultRuntime(runtime, evaluator, ctx, defaultValues, loc)
     }
   }
 

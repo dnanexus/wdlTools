@@ -66,8 +66,8 @@ case class Exec(conf: WdlToolsConf) extends Command {
     val taskContext = TaskContext.fromJson(
         jsInputs,
         task,
-        Eval(hostPaths, wdlVersion),
-        guestPaths.map(p => Eval(p, wdlVersion)),
+        Eval(hostPaths, Some(wdlVersion)),
+        guestPaths.map(p => Eval(p, Some(wdlVersion))),
         runtimeDefaults
     )
     val taskExecutor = TaskExecutor(taskContext, hostPaths, guestPaths)

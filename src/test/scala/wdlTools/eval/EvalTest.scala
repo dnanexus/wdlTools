@@ -30,7 +30,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
+    val evaluator =
+      Eval(evalPaths, Some(wdlTools.syntax.WdlVersion.V1), evalFileResolver, Logger.Quiet)
     tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
     val decls: Vector[TAT.Declaration] = wf.body.collect {
@@ -220,7 +221,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private def evalCommand(wdlSourceFileName: String): String = {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = Eval(evalPaths, wdlTools.syntax.WdlVersion.V1, evalFileResolver, Logger.Quiet)
+    val evaluator =
+      Eval(evalPaths, Some(wdlTools.syntax.WdlVersion.V1), evalFileResolver, Logger.Quiet)
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
@@ -297,5 +299,61 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle empty stdout/stderr" in {
     val file = srcDir.resolve("empty_stdout.wdl")
     parseAndTypeCheck(file)
+  }
+
+  it should "evalConst" in {
+    val allExpectedResults = Map(
+        "flag" -> Some(WdlValues.V_Boolean(true)),
+        "i" -> Some(WdlValues.V_Int(8)),
+        "x" -> Some(WdlValues.V_Float(2.718)),
+        "s" -> Some(WdlValues.V_String("hello world")),
+        "ar1" -> Some(
+            WdlValues.V_Array(
+                Vector(WdlValues.V_String("A"), WdlValues.V_String("B"), WdlValues.V_String("C"))
+            )
+        ),
+        "m1" -> Some(
+            WdlValues.V_Map(
+                Map(WdlValues.V_String("X") -> WdlValues.V_Int(1),
+                    WdlValues.V_String("Y") -> WdlValues.V_Int(10))
+            )
+        ),
+        "p" -> Some(WdlValues.V_Pair(WdlValues.V_Int(1), WdlValues.V_Int(12))),
+        "j" -> Some(WdlValues.V_Int(8)),
+        "k" -> None,
+        "s2" -> Some(WdlValues.V_String("hello world")),
+        "readme" -> None,
+        "file2" -> None
+    )
+
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("constants.wdl"))
+
+    decls.foreach {
+      case TAT.Declaration(id, wdlType, Some(expr), _) =>
+        val expected: Option[WdlValues.V] = allExpectedResults(id)
+        println(s"${id} ${wdlType} ${expr} ${expected}")
+        expected match {
+          case None =>
+            assertThrows[EvalException] {
+              evaluator.applyConstAndCoerce(expr, wdlType)
+            }
+          case Some(x) =>
+            val retval = evaluator.applyConstAndCoerce(expr, wdlType)
+            retval shouldBe x
+        }
+      case other =>
+        throw new Exception(s"Unexpected declaration ${other}")
+    }
+  }
+
+  it should "not be able to access unsupported file protocols" in {
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("bad_protocol.wdl"))
+    decls match {
+      case Vector(TAT.Declaration(_, wdlType, Some(expr), _)) =>
+        assertThrows[EvalException] {
+          evaluator.applyConstAndCoerce(expr, wdlType)
+        }
+      case other => throw new Exception(s"unexpected decl ${other}")
+    }
   }
 }

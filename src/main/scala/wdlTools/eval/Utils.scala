@@ -59,6 +59,36 @@ object Utils {
     }
   }
 
+  def isOptional(v: V): Boolean = {
+    v match {
+      case _: V_Optional => true
+      case _             => false
+    }
+  }
+
+  /**
+    * Makes a value optional.
+    * @param v the value
+    * @param force if true, then `t` will be made optional even if it is already optional.
+    * @return
+    */
+  def makeOptional(v: V, force: Boolean = false): V_Optional = {
+    v match {
+      case v if force    => V_Optional(v)
+      case v: V_Optional => v
+      case _             => V_Optional(v)
+    }
+  }
+
+  def unwrapOptional(v: V, mustBeOptional: Boolean = false): V = {
+    v match {
+      case V_Optional(wrapped) => wrapped
+      case _ if mustBeOptional =>
+        throw new Exception(s"Value ${v} is not V_Optional")
+      case _ => v
+    }
+  }
+
   // TODO: within string interpolation, V_Null should render as empty string
   @scala.annotation.tailrec
   def primitiveValueToString(wv: V, loc: SourceLocation): String = {
