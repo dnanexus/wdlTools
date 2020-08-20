@@ -8,6 +8,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path, Paths}
 import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
 
 import scala.io.Source
+import scala.reflect.ClassTag
 
 trait FileSource {
   def localPath: Path
@@ -445,6 +446,16 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
       case LocalFileAccessProtocol(searchPath, logger, encoding) =>
         val newSearchPath = if (append) searchPath ++ paths else paths ++ searchPath
         LocalFileAccessProtocol(newSearchPath, logger, encoding)
+      case other => other
+    }
+    FileSourceResolver(newProtos)
+  }
+
+  def replaceProtocol[T <: FileAccessProtocol](
+      newProtocol: T
+  )(implicit tag: ClassTag[T]): FileSourceResolver = {
+    val newProtos = protocols.map {
+      case _: T  => newProtocol
       case other => other
     }
     FileSourceResolver(newProtos)

@@ -29,6 +29,16 @@ case class Parsers(
                                    logger)
   )
 
+  def getWdlVersion(fileSource: FileSource): WdlVersion = {
+    parsers
+      .collectFirst {
+        case (wdlVersion, parser) if parser.canParse(fileSource) => wdlVersion
+      }
+      .getOrElse(
+          throw new Exception(s"No parser is able to parse document ${fileSource}")
+      )
+  }
+
   def getParser(fileSource: FileSource): WdlParser = {
     parsers.values.collectFirst {
       case parser if parser.canParse(fileSource) => parser
