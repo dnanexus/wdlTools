@@ -28,10 +28,17 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     tDoc
   }
 
-  def parseAndTypeCheckAndGetDeclarations(file: Path): (Eval, Vector[TAT.Declaration]) = {
+  def parseAndTypeCheckAndGetDeclarations(
+      file: Path,
+      allowNonstandardCoercions: Boolean = false
+  ): (Eval, Vector[TAT.Declaration]) = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
-      Eval(evalPaths, Some(wdlTools.syntax.WdlVersion.V1), evalFileResolver, Logger.Quiet)
+      Eval(evalPaths,
+           Some(wdlTools.syntax.WdlVersion.V1),
+           evalFileResolver,
+           Logger.Quiet,
+           allowNonstandardCoercions)
     tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
     val decls: Vector[TAT.Declaration] = wf.body.collect {
@@ -202,7 +209,6 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val bindings = evaluator.applyDeclarations(decls, Bindings())
 
     bindings("i1") shouldBe V_Int(13)
-    bindings("i2") shouldBe V_Int(13)
     bindings("i3") shouldBe V_Int(8)
 
     bindings("x1") shouldBe V_Float(3)
@@ -216,6 +222,15 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("s3") shouldBe V_String("4.3")
     bindings("s4") shouldBe V_String("hello")
     bindings("s5") shouldBe V_Optional(V_String("hello"))
+  }
+
+  it should "perform non-standard coercions" in {
+    val file = srcDir.resolve("non_standard_coercions.wdl")
+    val (evaluator, decls) =
+      parseAndTypeCheckAndGetDeclarations(file, allowNonstandardCoercions = true)
+    val bindings = evaluator.applyDeclarations(decls, Bindings())
+
+    bindings("i2") shouldBe V_Int(13)
   }
 
   private def evalCommand(wdlSourceFileName: String): String = {

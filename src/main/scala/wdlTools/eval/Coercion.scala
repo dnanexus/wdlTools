@@ -25,99 +25,162 @@ object Coercion {
     V_Struct(structName, memValues)
   }
 
-  def coerceTo(wdlType: WdlTypes.T, value: V, loc: SourceLocation): V = {
-    (wdlType, value) match {
-      // primitive types
-      case (WdlTypes.T_Boolean, V_Boolean(_)) => value
-      case (WdlTypes.T_Int, V_Int(_))         => value
-      case (WdlTypes.T_Int, V_Float(x))       => V_Int(x.toInt)
-      case (WdlTypes.T_Int, V_String(s)) =>
-        val n =
-          try {
-            s.toLong
-          } catch {
-            case _: NumberFormatException =>
-              throw new EvalException(s"string ${s} cannot be converted into an Int", loc)
+  def coerceTo(wdlType: WdlTypes.T,
+               value: V,
+               loc: SourceLocation = SourceLocation.empty,
+               allowNonstandardCoercions: Boolean = false): V = {
+    def inner(innerType: WdlTypes.T, innerValue: V): V = {
+      (innerType, innerValue) match {
+        // basic coercion of primitive types
+        case (WdlTypes.T_Optional(_), V_Null)    => V_Null
+        case (WdlTypes.T_Boolean, b: V_Boolean)  => b
+        case (WdlTypes.T_Int, i: V_Int)          => i
+        case (WdlTypes.T_Float, f: V_Float)      => f
+        case (WdlTypes.T_Float, V_Int(n))        => V_Float(n.toFloat)
+        case (WdlTypes.T_String, s: V_String)    => s
+        case (WdlTypes.T_File, f: V_File)        => f
+        case (WdlTypes.T_File, V_String(s))      => V_File(s)
+        case (WdlTypes.T_Directory, V_String(s)) => V_Directory(s)
+
+        // primitives to string - I believe this is legal, but it may need to be non-standard
+        case (WdlTypes.T_String, V_Boolean(b)) => V_String(b.toString)
+        case (WdlTypes.T_String, V_Int(n))     => V_String(n.toString)
+        case (WdlTypes.T_String, V_Float(x))   => V_String(x.toString)
+        case (WdlTypes.T_String, V_File(s))    => V_String(s)
+
+        // unwrap optional types/values
+        case (WdlTypes.T_Optional(t), V_Optional(v)) =>
+          V_Optional(inner(t, v))
+        case (WdlTypes.T_Optional(t), v) =>
+          V_Optional(inner(t, v))
+        case (t, V_Optional(v)) =>
+          inner(t, v)
+
+        // compound types - recursively descend into the sub structures and coerce them.
+        case (WdlTypes.T_Array(t, nonEmpty), V_Array(vec)) =>
+          if (nonEmpty && vec.isEmpty)
+            throw new EvalException("array is empty", loc)
+          V_Array(vec.map { x =>
+            inner(t, x)
+          })
+        case (WdlTypes.T_Map(kt, vt), V_Map(m)) =>
+          V_Map(m.map {
+            case (k, v) =>
+              inner(kt, k) -> inner(vt, v)
+          })
+        case (WdlTypes.T_Pair(lt, rt), V_Pair(l, r)) =>
+          V_Pair(inner(lt, l), inner(rt, r))
+        case (WdlTypes.T_Object, obj: V_Object) =>
+          obj
+        case (WdlTypes.T_Struct(name1, members1), V_Struct(name2, members2)) =>
+          if (name1 != name2) {
+            throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}", loc)
           }
-        V_Int(n)
-      case (WdlTypes.T_Float, V_Int(n))   => V_Float(n.toFloat)
-      case (WdlTypes.T_Float, V_Float(_)) => value
-      case (WdlTypes.T_Float, V_String(s)) =>
-        val x =
-          try {
-            s.toDouble
-          } catch {
-            case _: NumberFormatException =>
-              throw new EvalException(s"string ${s} cannot be converted into a Float", loc)
+          // ensure 1) members2 keys are a subset of members1 keys, 2) members2
+          // values are coercible to the corresponding types, and 3) any keys
+          // in members1 that do not appear in members2 are optional
+          val keys1 = members1.keySet
+          val keys2 = members2.keySet
+          val extra = keys2.diff(keys1)
+          if (extra.nonEmpty) {
+            throw new EvalException(
+                s"""struct value has members that do not appear in the struct definition
+                   |  name: ${name1}
+                   |  type members: ${members1}
+                   |  value members: ${members2}
+                   |  extra members: ${extra}""".stripMargin,
+                loc
+            )
           }
-        V_Float(x)
-      case (WdlTypes.T_String, V_Boolean(b)) => V_String(b.toString)
-      case (WdlTypes.T_String, V_Int(n))     => V_String(n.toString)
-      case (WdlTypes.T_String, V_Float(x))   => V_String(x.toString)
-      case (WdlTypes.T_String, V_String(_))  => value
-      case (WdlTypes.T_String, V_File(s))    => V_String(s)
-      case (WdlTypes.T_File, V_String(s))    => V_File(s)
-      case (WdlTypes.T_File, V_File(_))      => value
+          val missingNonOptional = keys1.diff(keys2).map(key => key -> members1(key)).filterNot {
+            case (_, WdlTypes.T_Optional(_)) => false
+            case _                           => true
+          }
+          if (missingNonOptional.nonEmpty) {
+            throw new EvalException(
+                s"""struct value is missing non-optional members
+                   |  name: ${name1}
+                   |  type members: ${members1}
+                   |  value members: ${members2}
+                   |  missing members: ${missingNonOptional}""".stripMargin,
+                loc
+            )
+          }
+          V_Struct(name1, members2.map {
+            case (key, value) => key -> inner(members1(key), value)
+          })
+        case (WdlTypes.T_Struct(name, memberDefs), V_Object(members)) =>
+          coerceToStruct(name, memberDefs, members, loc)
+        case (WdlTypes.T_Struct(name, memberDefs), V_Map(members)) =>
+          // this should probably be considered non-standard
+          // convert into a mapping from string to WdlValue
+          val members2: Map[String, V] = members.map {
+            case (V_String(k), v) => k -> v
+            case (other, _) =>
+              throw new EvalException(
+                  s"Non-string map key ${other} cannot be coerced to struct member",
+                  loc
+              )
+          }
+          coerceToStruct(name, memberDefs, members2, loc)
 
-      // compound types
-      // recursively descend into the sub structures and coerce them.
-      case (WdlTypes.T_Optional(_), V_Null) => V_Null
-      case (WdlTypes.T_Optional(t), V_Optional(v)) =>
-        V_Optional(coerceTo(t, v, loc))
-      case (WdlTypes.T_Optional(t), v) =>
-        V_Optional(coerceTo(t, v, loc))
-      case (t, V_Optional(v)) =>
-        coerceTo(t, v, loc)
+        // non-standard coercions
+        case (WdlTypes.T_String, V_Directory(s)) => V_String(s)
+        case (WdlTypes.T_Boolean, V_String(s)) if allowNonstandardCoercions && s == "true" =>
+          V_Boolean(true)
+        case (WdlTypes.T_Boolean, V_String(s)) if allowNonstandardCoercions && s == "false" =>
+          V_Boolean(false)
+        case (WdlTypes.T_Int, V_String(s)) =>
+          val n =
+            try {
+              s.toLong
+            } catch {
+              case _: NumberFormatException =>
+                throw new EvalException(s"string ${s} cannot be converted into an Int", loc)
+            }
+          V_Int(n)
+        case (WdlTypes.T_Float, V_String(s)) =>
+          val x =
+            try {
+              s.toDouble
+            } catch {
+              case _: NumberFormatException =>
+                throw new EvalException(s"string ${s} cannot be converted into a Float", loc)
+            }
+          V_Float(x)
+        case (WdlTypes.T_Int, V_Float(f)) if allowNonstandardCoercions && f.isWhole =>
+          V_Int(f.toLong)
+        case (WdlTypes.T_Map(k, v), V_Array(array)) if allowNonstandardCoercions =>
+          V_Map(array.map {
+            case V_Pair(l, r) => (inner(k, l), inner(v, r))
+            case _            => throw new EvalException(s"Cannot coerce array ${array} to Map", loc)
+          }.toMap)
+        case (WdlTypes.T_Array(WdlTypes.T_Pair(l, r), _), V_Map(map))
+            if allowNonstandardCoercions =>
+          V_Array(map.map {
+            case (k, v) => V_Pair(inner(l, k), inner(r, v))
+            case _      => throw new EvalException(s"Cannot coerce map ${map} to Array", loc)
+          }.toVector)
+        // TODO: Support Array[String] to Struct coercion as described in
+        //  https://github.com/openwdl/wdl/issues/389
+        case (WdlTypes.T_Any, any) if allowNonstandardCoercions =>
+          // we shouldn't be seeing Any here, but allow it if optional coercions is enabled
+          any
 
-      case (WdlTypes.T_Array(t, nonEmpty), V_Array(vec)) =>
-        if (nonEmpty && vec.isEmpty)
-          throw new EvalException("array is empty", loc)
-        V_Array(vec.map { x =>
-          coerceTo(t, x, loc)
-        })
-
-      case (WdlTypes.T_Map(kt, vt), V_Map(m)) =>
-        V_Map(m.map {
-          case (k, v) =>
-            coerceTo(kt, k, loc) -> coerceTo(vt, v, loc)
-        })
-      case (WdlTypes.T_Pair(lt, rt), V_Pair(l, r)) =>
-        V_Pair(coerceTo(lt, l, loc), coerceTo(rt, r, loc))
-
-      case (WdlTypes.T_Struct(name1, _), V_Struct(name2, _)) =>
-        if (name1 != name2)
-          throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}", loc)
-        value
-
-      // cast of an object to a struct. I think this is legal.
-      case (WdlTypes.T_Struct(name, memberDefs), V_Object(members)) =>
-        coerceToStruct(name, memberDefs, members, loc)
-
-      case (WdlTypes.T_Struct(name, memberDefs), V_Map(members)) =>
-        // convert into a mapping from string to WdlValue
-        val members2: Map[String, V] = members.map {
-          case (V_String(k), v) => k -> v
-          case (other, _) =>
-            throw new EvalException(s"${other} has to be a string for this to be a struct", loc)
-        }
-        coerceToStruct(name, memberDefs, members2, loc)
-
-      // TODO: Support Array[String] to Struct coercion as described in
-      //  https://github.com/openwdl/wdl/issues/389
-
-      case (WdlTypes.T_Object, V_Object(_)) => value
-
-      case (t, other) =>
-        throw new EvalException(s"value ${other} cannot be coerced to type ${t}", loc)
+        case (t, other) =>
+          throw new EvalException(s"value ${other} cannot be coerced to type ${t}", loc)
+      }
     }
+    inner(wdlType, value)
   }
 
   def coerceToFirst(wdlTypes: Vector[WdlTypes.T],
                     value: V,
-                    loc: SourceLocation = SourceLocation.empty): WdlValues.V = {
+                    loc: SourceLocation = SourceLocation.empty,
+                    allowNonstandardCoercions: Boolean = false): WdlValues.V = {
     val coerced: WdlValues.V = wdlTypes
       .collectFirst { t =>
-        Try(Coercion.coerceTo(t, value, loc)) match {
+        Try(Coercion.coerceTo(t, value, loc, allowNonstandardCoercions)) match {
           case Success(v) => v
         }
       }

@@ -17,7 +17,8 @@ object Eval {
 case class Eval(paths: EvalPaths,
                 wdlVersion: Option[WdlVersion],
                 fileResovler: FileSourceResolver = FileSourceResolver.get,
-                logger: Logger = Logger.get) {
+                logger: Logger = Logger.get,
+                allowNonstandardCoercions: Boolean = false) {
   // choose the standard library implementation based on version
   private lazy val standardLibrary = {
     wdlVersion match {
@@ -284,12 +285,12 @@ case class Eval(paths: EvalPaths,
     */
   def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, bindings: Bindings[V]): V = {
     val value = applyExpr(expr, bindings)
-    Coercion.coerceTo(wdlType, value, expr.loc)
+    Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions)
   }
 
   def applyExprAndCoerce(expr: TAT.Expr, wdlTypes: Vector[WdlTypes.T], bindings: Bindings[V]): V = {
     val value = applyExpr(expr, bindings)
-    Coercion.coerceToFirst(wdlTypes, value, expr.loc)
+    Coercion.coerceToFirst(wdlTypes, value, expr.loc, allowNonstandardCoercions)
   }
 
   // Evaluate all the declarations and return a Context
@@ -301,7 +302,7 @@ case class Eval(paths: EvalPaths,
       case (accu, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
         val ctx = Context(accu)
         val value = apply(expr, ctx)
-        val coerced = Coercion.coerceTo(wdlType, value, loc)
+        val coerced = Coercion.coerceTo(wdlType, value, loc, allowNonstandardCoercions)
         accu.add(name, coerced)
       case (_, ast) =>
         throw new Exception(s"Cannot evaluate element ${ast.getClass}")
@@ -368,14 +369,14 @@ case class Eval(paths: EvalPaths,
     */
   def applyConstAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T): V = {
     val value = applyConst(expr)
-    val coerced = Coercion.coerceTo(wdlType, value, expr.loc)
+    val coerced = Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions)
     validateConst(coerced, expr.loc)
     coerced
   }
 
   def applyConstAndCoerce(expr: TAT.Expr, wdlTypes: Vector[WdlTypes.T]): V = {
     val value = applyConst(expr)
-    val coerced = Coercion.coerceToFirst(wdlTypes, value, expr.loc)
+    val coerced = Coercion.coerceToFirst(wdlTypes, value, expr.loc, allowNonstandardCoercions)
     validateConst(coerced, expr.loc)
     coerced
   }

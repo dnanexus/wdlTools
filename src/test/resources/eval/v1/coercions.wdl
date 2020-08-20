@@ -13,7 +13,6 @@ workflow foo {
   Boolean b2 = b1
 
   Int i1 = 13
-  Int i2 = 13.1
   Int i3 = "8"
 
   Float x1 = 3

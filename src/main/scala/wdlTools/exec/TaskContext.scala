@@ -118,9 +118,9 @@ case class TaskContext(task: Task,
                 "sourceLocation" -> JsString(task.loc.locationString)
             )
         ),
-        "inputs" -> JsObject(JsonSerde.serialize(evalBindings)),
+        "inputs" -> JsObject(JsonSerde.serializeBindings(evalBindings)),
         "command" -> JsString(command.getOrElse("")),
-        "runtime" -> JsObject(JsonSerde.serialize(runtime.getAll))
+        "runtime" -> JsObject(JsonSerde.serializeMap(runtime.getAll))
     )
   }
 

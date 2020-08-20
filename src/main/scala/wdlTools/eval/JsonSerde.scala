@@ -19,46 +19,57 @@ final class JsonSerializationException(message: String) extends Exception(messag
   * null 	null
   */
 object JsonSerde {
-  def serialize(wv: V): JsValue = {
-    wv match {
-      case V_Null             => JsNull
-      case V_Boolean(value)   => JsBoolean(value)
-      case V_Int(value)       => JsNumber(value)
-      case V_Float(value)     => JsNumber(value)
-      case V_String(value)    => JsString(value)
-      case V_File(value)      => JsString(value)
-      case V_Directory(value) => JsString(value)
+  def serialize(value: V, handler: Option[V => Option[JsValue]] = None): JsValue = {
+    def inner(innerValue: V): JsValue = {
+      val v = handler.flatMap(_(innerValue))
+      if (v.isDefined) {
+        return v.get
+      }
+      innerValue match {
+        case V_Null             => JsNull
+        case V_Boolean(value)   => JsBoolean(value)
+        case V_Int(value)       => JsNumber(value)
+        case V_Float(value)     => JsNumber(value)
+        case V_String(value)    => JsString(value)
+        case V_File(value)      => JsString(value)
+        case V_Directory(value) => JsString(value)
 
-      // compound values
-      case V_Array(vec) =>
-        JsArray(vec.map(serialize))
-      case V_Map(members) =>
-        JsObject(members.map {
-          case (k, v) =>
-            val key = serialize(k) match {
-              case JsString(value) => value
-              case other =>
-                throw new JsonSerializationException(
-                    s"Cannot serialize non-string map key ${other}"
-                )
-            }
-            key -> serialize(v)
-        })
-      case V_Object(members) =>
-        JsObject(members.map { case (k, v) => k -> serialize(v) })
-      case V_Struct(_, members) =>
-        JsObject(members.map { case (k, v) => k -> serialize(v) })
+        // compound values
+        case V_Array(vec) =>
+          JsArray(vec.map(inner))
+        case V_Pair(l, r) =>
+          JsObject(Map("left" -> inner(l), "right" -> inner(r)))
+        case V_Map(members) =>
+          JsObject(members.map {
+            case (k, v) =>
+              val key = inner(k) match {
+                case JsString(value) => value
+                case other =>
+                  throw new JsonSerializationException(
+                      s"Cannot serialize non-string map key ${other}"
+                  )
+              }
+              key -> inner(v)
+          })
+        case V_Object(members) =>
+          JsObject(members.map { case (k, v) => k -> inner(v) })
+        case V_Struct(_, members) =>
+          JsObject(members.map { case (k, v) => k -> inner(v) })
 
-      case other => throw new JsonSerializationException(s"value ${other} not supported")
+        case other => throw new JsonSerializationException(s"value ${other} not supported")
+      }
     }
+    inner(value)
   }
 
-  def serialize(wv: Map[String, WdlValues.V]): Map[String, JsValue] = {
-    wv.view.mapValues(serialize).toMap
+  def serializeMap(wdlValues: Map[String, WdlValues.V],
+                   handler: Option[V => Option[JsValue]] = None): Map[String, JsValue] = {
+    wdlValues.view.mapValues(v => serialize(v, handler)).toMap
   }
 
-  def serialize(bindings: Bindings[WdlValues.V]): Map[String, JsValue] = {
-    serialize(bindings.all)
+  def serializeBindings(bindings: Bindings[WdlValues.V],
+                        handler: Option[V => Option[JsValue]] = None): Map[String, JsValue] = {
+    serializeMap(bindings.all, handler)
   }
 
   def deserialize(jsValue: JsValue): V = {
