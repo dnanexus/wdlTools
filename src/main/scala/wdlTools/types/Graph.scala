@@ -5,6 +5,8 @@ import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.TypedAbstractSyntax._
+import wdlTools.types.WdlTypes.T_Pair
+import wdlTools.types.WdlTypes.{T, T_Array, T_Map, T_Optional, T_Struct}
 
 case class ElementNode(element: Element)
 
@@ -82,6 +84,42 @@ object ElementGraph {
   }
 }
 
+object TypeGraph {
+
+  /**
+    * Builds a directed dependency graph from struct types. Built-in types are excluded from
+    * the graph. An exception is thrown if there are any missing types. Note that the type
+    * alias (the key in the map) may differ from the struct name - the graph uses the aliases.
+    * @param structs structs to graph
+    * @return a dependency graph
+    */
+  def buildFromStructTypes(structs: Map[String, T_Struct]): Graph[String, DiEdge] = {
+    def extractDependencies(wdlType: T): Vector[String] = {
+      wdlType match {
+        case T_Optional(t) => extractDependencies(t)
+        case T_Array(t, _) => extractDependencies(t)
+        case T_Map(k, v)   => extractDependencies(k) ++ extractDependencies(v)
+        case T_Pair(l, r)  => extractDependencies(l) ++ extractDependencies(r)
+        case T_Struct(name, _) if structs.contains(name) =>
+          Vector(name)
+        case T_Struct(name, _) =>
+          throw new Exception(s"Missing type alias ${name}")
+        case _ => Vector.empty
+      }
+    }
+
+    val graph = structs.foldLeft(Graph.empty[String, DiEdge]) {
+      case (graph, (alias, T_Struct(_, members))) =>
+        graph ++ members.values.flatMap(extractDependencies).map(dep => dep ~> alias)
+    }
+
+    // add in any remaining types, and connect all leafs to the root node
+    val missing = structs.keySet.diff(graph.nodes.map(_.value).toSet)
+    val leaves = graph.nodes.filterNot(_.hasPredecessors).map(_.value)
+    graph ++ (missing ++ leaves).map(GraphUtils.RootNode ~> _)
+  }
+}
+
 object ExprGraph {
   object TaskVarKind extends Enumeration {
     val Input, PreCommand, PostCommand, Output = Value
@@ -106,7 +144,6 @@ object ExprGraph {
     *         names and directed edges, and vars being a mapping of all variable names
     *         to `VarInfo`s.
     * @example
-    * ```wdl
     * task example {
     *   input {
     *     File f
@@ -121,7 +158,7 @@ object ExprGraph {
     *     String sout = s
     *   }
     * }
-    * ```
+    *
     * In this example, `f` is a required input, so the inital graph is
     * `__root__ ~> f`. Next, to successfully evaluate the `command` and
     * `output` sections, we need variables `name` and `s`, so we add nodes
