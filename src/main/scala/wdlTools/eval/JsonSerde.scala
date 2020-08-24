@@ -3,7 +3,6 @@ package wdlTools.eval
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.types.WdlTypes
-import wdlTools.util.Bindings
 
 // an error that occurs during (de)serialization of JSON
 final class JsonSerializationException(message: String) extends Exception(message)
@@ -67,7 +66,7 @@ object JsonSerde {
     wdlValues.view.mapValues(v => serialize(v, handler)).toMap
   }
 
-  def serializeBindings(bindings: Bindings[WdlValues.V],
+  def serializeBindings(bindings: WdlValueBindings,
                         handler: Option[V => Option[JsValue]] = None): Map[String, JsValue] = {
     serializeMap(bindings.toMap, handler)
   }

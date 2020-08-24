@@ -4,7 +4,7 @@ import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, DuplicateBindingException, FileSource, Logger, MapBindings}
+import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileSource, Logger}
 
 /**
   * Type inference context.
@@ -22,16 +22,18 @@ case class Context(
     version: WdlVersion,
     stdlib: Stdlib,
     docSource: FileSource,
-    inputs: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "input"),
-    outputs: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "output"),
-    declarations: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "declaration"),
-    aliases: Bindings[T_Struct] = MapBindings[WdlTypes.T_Struct](elementType = "struct"),
-    callables: Bindings[T_Callable] = MapBindings[WdlTypes.T_Callable](elementType = "callable"),
+    inputs: WdlTypeBindings = WdlTypeBindings(elementType = "input"),
+    outputs: WdlTypeBindings = WdlTypeBindings(elementType = "output"),
+    declarations: WdlTypeBindings = WdlTypeBindings(elementType = "declaration"),
+    aliases: DefaultBindings[T_Struct] =
+      DefaultBindings[T_Struct](Map.empty[String, T_Struct], elementType = "struct"),
+    callables: DefaultBindings[T_Callable] =
+      DefaultBindings[T_Callable](Map.empty[String, T_Callable], elementType = "callable"),
     namespaces: Set[String] = Set.empty
 ) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName: String, bindings: Bindings[WdlType]): Option[WdlType] = {
+  def lookup(varName: String, bindings: WdlTypeBindings): Option[WdlType] = {
     inputs.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -75,7 +77,7 @@ case class Context(
     * Merge current declaration bindings.
     * @return
     */
-  def bindDeclarations(bindings: Bindings[WdlType]): Context = {
+  def bindDeclarations(bindings: WdlTypeBindings): Context = {
     this.copy(declarations = declarations.update(bindings))
   }
 

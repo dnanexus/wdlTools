@@ -3,6 +3,7 @@ package wdlTools.types
 import wdlTools.syntax.Operator
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.util.AbstractBindings
 
 case class DocumentElements(doc: TAT.Document) {
   val (imports, structDefs, tasks) = doc.elements.foldLeft(
@@ -42,6 +43,17 @@ case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
     case ((declarations, calls, scatters, conditionals), cond: TAT.Conditional) =>
       (declarations, calls, scatters, conditionals :+ WorkflowConditional(cond))
   }
+}
+
+case class WdlTypeBindings(bindings: Map[String, T] = Map.empty, elementType: String = "type")
+    extends AbstractBindings[T, WdlTypeBindings](bindings, elementType) {
+  override protected def copyFrom(values: Map[String, T]): WdlTypeBindings = {
+    copy(bindings = values)
+  }
+}
+
+object WdlTypeBindings {
+  lazy val empty: WdlTypeBindings = WdlTypeBindings(Map.empty)
 }
 
 object Utils {

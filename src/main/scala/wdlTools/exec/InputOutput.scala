@@ -3,7 +3,14 @@ package wdlTools.exec
 import java.nio.file.Files
 
 import spray.json._
-import wdlTools.eval.{Eval, EvalException, JsonSerde, JsonSerializationException, WdlValues}
+import wdlTools.eval.{
+  Eval,
+  EvalException,
+  JsonSerde,
+  JsonSerializationException,
+  WdlValueBindings,
+  WdlValues
+}
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax.{
   InputDefinition,
@@ -13,7 +20,7 @@ import wdlTools.types.TypedAbstractSyntax.{
   RequiredInputDefinition
 }
 import wdlTools.types.WdlTypes
-import wdlTools.util.{MapBindings, FileSourceResolver, Logger}
+import wdlTools.util.{FileSourceResolver, Logger}
 
 /**
   * Implemention of the JSON Input Format in the WDL specification
@@ -27,7 +34,7 @@ object InputOutput {
                         taskInputDefinitions: Vector[InputDefinition],
                         evaluator: Eval,
                         logger: Logger = Logger.Quiet,
-                        strict: Boolean = false): MapBindings[WdlValue] = {
+                        strict: Boolean = false): WdlValueBindings = {
     val taskInputs = taskInputDefinitions.map(inp => inp.name -> inp).toMap
     val typesAndValues: Map[String, (WdlTypes.T, Option[WdlValues.V])] = taskInputs.map {
       case (declName, inp) =>
@@ -47,7 +54,7 @@ object InputOutput {
         declName -> (wdlType, wdlValue)
     }
     val (defined, undefined) = typesAndValues.partition(_._2._2.isDefined)
-    val definedContext = MapBindings(defined.map {
+    val definedContext = WdlValueBindings(defined.map {
       case (declName, (_, Some(wdlValue))) => declName -> wdlValue
     })
     if (undefined.isEmpty) {

@@ -3,6 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
+import wdlTools.util.AbstractBindings
 
 object Utils {
   // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
@@ -104,4 +105,25 @@ object Utils {
         throw new EvalException(s"${other} is not a primitive value", loc)
     }
   }
+}
+
+case class WdlValueBindings(bindings: Map[String, V] = Map.empty,
+                            allowNonstandardCoercions: Boolean = false)
+    extends AbstractBindings[V, WdlValueBindings](bindings, "value") {
+
+  override protected def copyFrom(values: Map[String, V]): WdlValueBindings = {
+    copy(bindings = values)
+  }
+
+  def get(id: String,
+          wdlTypes: Vector[WdlTypes.T] = Vector.empty,
+          sourceLocation: SourceLocation = SourceLocation.empty): Option[WdlValues.V] = {
+    get(id).map(value =>
+      Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions)
+    )
+  }
+}
+
+object WdlValueBindings {
+  lazy val empty: WdlValueBindings = WdlValueBindings()
 }

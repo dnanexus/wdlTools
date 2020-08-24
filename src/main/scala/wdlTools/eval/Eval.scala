@@ -4,20 +4,13 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{
-  Bindings,
-  FileSource,
-  FileSourceResolver,
-  LocalFileSource,
-  Logger,
-  MapBindings
-}
+import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger}
 
 object Eval {
   lazy val empty: Eval = Eval(EvalPaths.empty, None, FileSourceResolver.get, Logger.get)
 
-  def createBindingsFromEnv(env: Map[String, (WdlTypes.T, V)]): Bindings[V] = {
-    MapBindings(env.map { case (name, (_, v)) => name -> v })
+  def createBindingsFromEnv(env: Map[String, (WdlTypes.T, V)]): WdlValueBindings = {
+    WdlValueBindings(env.map { case (name, (_, v)) => name -> v })
   }
 }
 
@@ -37,7 +30,7 @@ case class Eval(paths: EvalPaths,
     }
   }
 
-  private case class Context(bindings: Bindings[V] = Bindings.empty[V],
+  private case class Context(bindings: WdlValueBindings = WdlValueBindings.empty,
                              exprState: ExprState = ExprState.Start) {
 
     def apply(name: String): V = {
@@ -276,7 +269,7 @@ case class Eval(paths: EvalPaths,
 
   // public entry points
   //
-  def applyExpr(expr: TAT.Expr, bindings: Bindings[V] = Bindings.empty[V]): V = {
+  def applyExpr(expr: TAT.Expr, bindings: WdlValueBindings = WdlValueBindings.empty): V = {
     apply(expr, Context(bindings))
   }
 
@@ -290,12 +283,14 @@ case class Eval(paths: EvalPaths,
     * @param bindings context
     * @return
     */
-  def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, bindings: Bindings[V]): V = {
+  def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, bindings: WdlValueBindings): V = {
     val value = applyExpr(expr, bindings)
     Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions)
   }
 
-  def applyExprAndCoerce(expr: TAT.Expr, wdlTypes: Vector[WdlTypes.T], bindings: Bindings[V]): V = {
+  def applyExprAndCoerce(expr: TAT.Expr,
+                         wdlTypes: Vector[WdlTypes.T],
+                         bindings: WdlValueBindings): V = {
     val value = applyExpr(expr, bindings)
     Coercion.coerceToFirst(wdlTypes, value, expr.loc, allowNonstandardCoercions)
   }
@@ -303,10 +298,10 @@ case class Eval(paths: EvalPaths,
   // Evaluate all the declarations and return a Context
   def applyDeclarations(
       decls: Vector[TAT.Declaration],
-      bindings: Bindings[V] = Bindings.empty[V]
-  ): Bindings[V] = {
+      bindings: WdlValueBindings = WdlValueBindings.empty
+  ): WdlValueBindings = {
     decls.foldLeft(bindings) {
-      case (accu, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
+      case (accu: WdlValueBindings, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
         val ctx = Context(accu)
         val value = apply(expr, ctx)
         val coerced = Coercion.coerceTo(wdlType, value, loc, allowNonstandardCoercions)
@@ -479,7 +474,7 @@ case class Eval(paths: EvalPaths,
   // evaluate all the parts of a command section.
   //
   def applyCommand(command: TAT.CommandSection,
-                   bindings: Bindings[V] = Bindings.empty[V]): String = {
+                   bindings: WdlValueBindings = WdlValueBindings.empty): String = {
     val ctx = Context(bindings, ExprState.InString)
     val commandStr = command.parts
       .map { expr =>

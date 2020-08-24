@@ -4,9 +4,9 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, JsonSerde, Runtime, WdlValues}
+import wdlTools.eval.{Eval, JsonSerde, Runtime, WdlValueBindings, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger, MapBindings}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 trait FileSourceLocalizer {
   def localizeFile(uri: String): Path
@@ -60,10 +60,10 @@ case class SafeFileSourceLocalizer(root: Path, subdirPrefix: String = "input")
 }
 
 case class TaskContext(task: Task,
-                       inputBindings: Bindings[V],
+                       inputBindings: WdlValueBindings,
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
-                       defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
+                       defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
                        fileResolver: FileSourceResolver = FileSourceResolver.get,
                        logger: Logger = Logger.get) {
   private lazy val dockerUtils = DockerUtils(fileResolver, logger)
@@ -73,7 +73,7 @@ case class TaskContext(task: Task,
   }
   // The inputs and runtime section are evaluated using the host paths
   // (which will be the same as the guest paths, unless we're running in a container)
-  private lazy val evalBindings: Bindings[V] = {
+  private lazy val evalBindings: WdlValueBindings = {
     val bindings = hostEvaluator.applyDeclarations(task.declarations, inputBindings)
     // If there is a command to evaluate, pre-localize all the files/dirs, otherwise
     // just allow them to be localized on demand (for example, if they're required to
@@ -81,7 +81,7 @@ case class TaskContext(task: Task,
     if (hasCommand) {
       val localizer =
         SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true))
-      MapBindings(bindings.toMap.map {
+      WdlValueBindings(bindings.toMap.map {
         case (name, V_File(uri)) =>
           val localizedPath = localizer.localizeFile(uri)
           name -> V_File(localizedPath.toString)
@@ -133,7 +133,7 @@ case class TaskContext(task: Task,
     }
   }
 
-  lazy val outputBindings: Bindings[V] = {
+  lazy val outputBindings: WdlValueBindings = {
     task.outputs.foldLeft(evalBindings) {
       case (accu, output) =>
         val outputValue = hostEvaluator.applyExpr(output.expr, accu)
@@ -182,7 +182,7 @@ object TaskContext {
                task: Task,
                hostEvaluator: Eval,
                guestEvaluator: Option[Eval] = None,
-               defaultRuntimeValues: Map[String, WdlValues.V] = Map.empty,
+               defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
                logger: Logger = Logger.Quiet,
                strict: Boolean = false): TaskContext = {
     val inputs =

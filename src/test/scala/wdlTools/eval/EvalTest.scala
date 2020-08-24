@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{MapBindings, FileSourceResolver, Logger, FileUtils => UUtil}
+import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
@@ -20,7 +20,6 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val linesep = System.lineSeparator()
   private val evalPaths: EvalPaths = EvalPaths.createFromTemp()
   private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
-  private type WdlValue = WdlValues.V
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parsers.parseDocument(fileResolver.fromPath(UUtil.absolutePath(file)))
@@ -50,7 +49,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyDeclarations(decls, MapBindings())
+    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
     bindings("k0") shouldBe V_Int(-1)
     bindings("k1") shouldBe V_Int(1)
 
@@ -90,7 +89,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "call stdlib" in {
     val file = srcDir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val ctx = MapBindings[WdlValue]().add("empty_string", V_Null)
+    val ctx = WdlValueBindings(Map("empty_string" -> V_Null))
     val bindings = evaluator.applyDeclarations(decls, ctx)
 
     bindings("x") shouldBe V_Float(1.4)
@@ -206,7 +205,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "perform coercions" in {
     val file = srcDir.resolve("coercions.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyDeclarations(decls, MapBindings())
+    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
 
     bindings("i1") shouldBe V_Int(13)
     bindings("i3") shouldBe V_Int(8)
@@ -228,7 +227,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("non_standard_coercions.wdl")
     val (evaluator, decls) =
       parseAndTypeCheckAndGetDeclarations(file, allowNonstandardCoercions = true)
-    val bindings = evaluator.applyDeclarations(decls, MapBindings())
+    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
 
     bindings("i2") shouldBe V_Int(13)
   }
@@ -241,7 +240,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyDeclarations(task.declarations, MapBindings())
+    val ctx = evaluator.applyDeclarations(task.declarations, WdlValueBindings.empty)
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -294,21 +293,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("bad_coercion.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     assertThrows[EvalException] {
-      val _ = evaluator.applyDeclarations(decls, MapBindings())
+      val _ = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
     }
   }
 
   it should "handle null and optionals" taggedAs Edge in {
     val file = srcDir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bd = evaluator.applyDeclarations(decls, MapBindings(Map("i2" -> V_Null)))
+    val bd = evaluator.applyDeclarations(decls, WdlValueBindings(Map("i2" -> V_Null)))
     bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 
   it should "handle accessing pair values" in {
     val file = srcDir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    evaluator.applyDeclarations(decls, MapBindings(Map("i2" -> V_Null)))
+    evaluator.applyDeclarations(decls, WdlValueBindings(Map("i2" -> V_Null)))
   }
 
   it should "handle empty stdout/stderr" in {

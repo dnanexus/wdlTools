@@ -1,10 +1,8 @@
 package wdlTools.eval
 
-import wdlTools.eval.WdlValues.V
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax.{MetaSection, RuntimeSection}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.Bindings
 
 /**
   * Unification of runtime and hints sections, to enable accessing runtime attributes in
@@ -14,7 +12,7 @@ import wdlTools.util.Bindings
   */
 case class RuntimeAttributes(runtime: Option[Runtime],
                              hints: Option[Hints],
-                             defaultValues: Bindings[WdlValues.V]) {
+                             defaultValues: WdlValueBindings) {
   def contains(id: String): Boolean = {
     runtime.exists(_.contains(id)) || hints.exists(_.contains(id)) || defaultValues.contains(id)
   }
@@ -27,7 +25,7 @@ case class RuntimeAttributes(runtime: Option[Runtime],
     }
     value
       .orElse(hints.flatMap(_.get(id, wdlTypes)))
-      .orElse(defaultValues.get(id)) // TODO: type check
+      .orElse(defaultValues.get(id, wdlTypes))
   }
 }
 
@@ -35,8 +33,8 @@ object RuntimeAttributes {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[Bindings[V]] = None,
-      defaultValues: Bindings[WdlValues.V] = Bindings.empty[WdlValues.V]
+      ctx: Option[WdlValueBindings] = None,
+      defaultValues: WdlValueBindings = WdlValueBindings.empty
   ): RuntimeAttributes = {
     create(task.runtime, task.hints, evaluator, ctx, defaultValues, Some(task.loc))
   }
@@ -45,8 +43,8 @@ object RuntimeAttributes {
       runtimeSection: Option[RuntimeSection],
       hintsSection: Option[MetaSection],
       evaluator: Eval,
-      ctx: Option[Bindings[V]] = None,
-      defaultValues: Bindings[WdlValues.V] = Bindings.empty[WdlValues.V],
+      ctx: Option[WdlValueBindings] = None,
+      defaultValues: WdlValueBindings = WdlValueBindings.empty,
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
     val runtime = runtimeSection.map(r =>

@@ -4,11 +4,11 @@ import java.nio.file.{Path, Paths}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.eval.{Eval, EvalPaths, WdlValues}
+import wdlTools.eval.{Eval, EvalPaths, WdlValueBindings}
 import wdlTools.generators.code.WdlV1Generator
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, FileSource, FileSourceResolver, LinesFileSource}
+import wdlTools.util.{FileSource, FileSourceResolver, LinesFileSource}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {
@@ -24,7 +24,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     tDoc.elements.size should not be 0
     tDoc.elements.collect {
       case task: TAT.Task =>
-        val ctx = evaluator.applyDeclarations(task.declarations, Bindings.empty[WdlValues.V])
+        val ctx = evaluator.applyDeclarations(task.declarations, WdlValueBindings.empty)
         evaluator.applyCommand(task.command, ctx)
     }
   }

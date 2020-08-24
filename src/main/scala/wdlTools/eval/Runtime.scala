@@ -3,12 +3,12 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, SymmetricBiMap}
+import wdlTools.util.SymmetricBiMap
 
 case class DiskRequest(size: Long, mountPoint: Option[String], diskType: Option[String])
 
 abstract class Runtime(runtime: Map[String, TAT.Expr],
-                       userDefaultValues: Map[String, V],
+                       userDefaultValues: WdlValueBindings,
                        runtimeLocation: SourceLocation) {
   private var cache: Map[String, Option[V]] = Map.empty
 
@@ -85,8 +85,8 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
-                          ctx: Option[Bindings[V]] = None,
-                          userDefaultValues: Map[String, V] = Map.empty,
+                          ctx: Option[WdlValueBindings] = None,
+                          userDefaultValues: WdlValueBindings = WdlValueBindings.empty,
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map.empty
@@ -159,8 +159,8 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
-                     ctx: Option[Bindings[V]] = None,
-                     userDefaultValues: Map[String, V] = Map.empty,
+                     ctx: Option[WdlValueBindings] = None,
+                     userDefaultValues: WdlValueBindings = WdlValueBindings.empty,
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map(
@@ -315,8 +315,8 @@ object Runtime {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[Bindings[V]] = None,
-      defaultValues: Map[String, V] = Map.empty
+      ctx: Option[WdlValueBindings] = None,
+      defaultValues: WdlValueBindings = WdlValueBindings.empty
   ): Runtime = {
     create(task.runtime,
            evaluator,
@@ -328,8 +328,8 @@ object Runtime {
   def create(
       runtime: Option[TAT.RuntimeSection],
       evaluator: Eval,
-      ctx: Option[Bindings[V]] = None,
-      defaultValues: Map[String, V] = Map.empty,
+      ctx: Option[WdlValueBindings] = None,
+      defaultValues: WdlValueBindings = WdlValueBindings.empty,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {
     val loc = runtime
