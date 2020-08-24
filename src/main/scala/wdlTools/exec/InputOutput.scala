@@ -13,7 +13,7 @@ import wdlTools.types.TypedAbstractSyntax.{
   RequiredInputDefinition
 }
 import wdlTools.types.WdlTypes
-import wdlTools.util.{Bindings, FileSourceResolver, Logger}
+import wdlTools.util.{MapBindings, FileSourceResolver, Logger}
 
 /**
   * Implemention of the JSON Input Format in the WDL specification
@@ -27,7 +27,7 @@ object InputOutput {
                         taskInputDefinitions: Vector[InputDefinition],
                         evaluator: Eval,
                         logger: Logger = Logger.Quiet,
-                        strict: Boolean = false): Bindings[WdlValue] = {
+                        strict: Boolean = false): MapBindings[WdlValue] = {
     val taskInputs = taskInputDefinitions.map(inp => inp.name -> inp).toMap
     val typesAndValues: Map[String, (WdlTypes.T, Option[WdlValues.V])] = taskInputs.map {
       case (declName, inp) =>
@@ -47,7 +47,7 @@ object InputOutput {
         declName -> (wdlType, wdlValue)
     }
     val (defined, undefined) = typesAndValues.partition(_._2._2.isDefined)
-    val definedContext = Bindings(defined.map {
+    val definedContext = MapBindings(defined.map {
       case (declName, (_, Some(wdlValue))) => declName -> wdlValue
     })
     if (undefined.isEmpty) {

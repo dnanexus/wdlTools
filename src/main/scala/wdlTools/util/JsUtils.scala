@@ -57,6 +57,15 @@ object JsUtils {
     }
   }
 
+  def getBoolean(js: JsValue, fieldName: Option[String] = None): Boolean = {
+    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js) match {
+      case JsBoolean(value)  => value
+      case JsString("true")  => true
+      case JsString("false") => false
+      case other             => throw new Exception(s"Expected a boolean, got ${other}")
+    }
+  }
+
   // Make a JSON value deterministically sorted.  This is used to
   // ensure that the checksum does not change when maps
   // are ordered in different ways.

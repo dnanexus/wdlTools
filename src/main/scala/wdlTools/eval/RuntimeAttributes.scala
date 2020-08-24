@@ -14,7 +14,7 @@ import wdlTools.util.Bindings
   */
 case class RuntimeAttributes(runtime: Option[Runtime],
                              hints: Option[Hints],
-                             defaultValues: Map[String, WdlValues.V]) {
+                             defaultValues: Bindings[WdlValues.V]) {
   def contains(id: String): Boolean = {
     runtime.exists(_.contains(id)) || hints.exists(_.contains(id)) || defaultValues.contains(id)
   }
@@ -36,7 +36,7 @@ object RuntimeAttributes {
       task: TAT.Task,
       evaluator: Eval,
       ctx: Option[Bindings[V]] = None,
-      defaultValues: Map[String, WdlValues.V] = Map.empty
+      defaultValues: Bindings[WdlValues.V] = Bindings.empty[WdlValues.V]
   ): RuntimeAttributes = {
     create(task.runtime, task.hints, evaluator, ctx, defaultValues, Some(task.loc))
   }
@@ -46,7 +46,7 @@ object RuntimeAttributes {
       hintsSection: Option[MetaSection],
       evaluator: Eval,
       ctx: Option[Bindings[V]] = None,
-      defaultValues: Map[String, WdlValues.V] = Map.empty,
+      defaultValues: Bindings[WdlValues.V] = Bindings.empty[WdlValues.V],
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
     val runtime = runtimeSection.map(r =>

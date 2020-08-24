@@ -4,7 +4,7 @@ import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, DuplicateBindingException, FileSource, Logger}
+import wdlTools.util.{Bindings, DuplicateBindingException, FileSource, Logger, MapBindings}
 
 /**
   * Type inference context.
@@ -22,11 +22,11 @@ case class Context(
     version: WdlVersion,
     stdlib: Stdlib,
     docSource: FileSource,
-    inputs: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "input"),
-    outputs: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "output"),
-    declarations: Bindings[WdlTypes.T] = Bindings[WdlTypes.T](elementType = "declaration"),
-    aliases: Bindings[T_Struct] = Bindings[WdlTypes.T_Struct](elementType = "struct"),
-    callables: Bindings[T_Callable] = Bindings[WdlTypes.T_Callable](elementType = "callable"),
+    inputs: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "input"),
+    outputs: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "output"),
+    declarations: Bindings[WdlTypes.T] = MapBindings[WdlTypes.T](elementType = "declaration"),
+    aliases: Bindings[T_Struct] = MapBindings[WdlTypes.T_Struct](elementType = "struct"),
+    callables: Bindings[T_Callable] = MapBindings[WdlTypes.T_Callable](elementType = "callable"),
     namespaces: Set[String] = Set.empty
 ) {
   type WdlType = WdlTypes.T
@@ -114,7 +114,7 @@ case class Context(
     }
 
     // There cannot be any collisions because this is a new namespace
-    val importCallables = importContext.callables.all.map {
+    val importCallables = importContext.callables.toMap.map {
       case (name, taskSig: T_Task) =>
         val fqn = namespace + "." + name
         fqn -> taskSig.copy(name = fqn)
@@ -135,7 +135,7 @@ case class Context(
     val aliasMapping: Map[String, String] = typeAliases.map {
       case AST.ImportAlias(src, dest, _) => src -> dest
     }.toMap
-    val importAliases: Map[String, T_Struct] = importContext.aliases.all.map {
+    val importAliases: Map[String, T_Struct] = importContext.aliases.toMap.map {
       case (name, importedStruct: T_Struct) =>
         aliasMapping.get(name) match {
           case None          => name -> importedStruct

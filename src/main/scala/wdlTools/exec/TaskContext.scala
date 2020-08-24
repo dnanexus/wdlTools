@@ -4,9 +4,9 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, Runtime, JsonSerde, WdlValues}
+import wdlTools.eval.{Eval, JsonSerde, Runtime, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger, MapBindings}
 
 trait FileSourceLocalizer {
   def localizeFile(uri: String): Path
@@ -81,7 +81,7 @@ case class TaskContext(task: Task,
     if (hasCommand) {
       val localizer =
         SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true))
-      Bindings(bindings.all.map {
+      MapBindings(bindings.toMap.map {
         case (name, V_File(uri)) =>
           val localizedPath = localizer.localizeFile(uri)
           name -> V_File(localizedPath.toString)

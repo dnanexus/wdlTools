@@ -11,6 +11,7 @@ import wdlTools.util.{
   DuplicateBindingException,
   FileSourceResolver,
   Logger,
+  MapBindings,
   TraceLevel,
   FileUtils => UUtil
 }
@@ -445,7 +446,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // translate each declaration
     val (tDecls, _, _) =
       inputSection.declarations
-        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings[WdlType]())) {
+        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings.empty[WdlType])) {
           case ((tDecls, names, bindings), decl) =>
             if (names.contains(decl.name)) {
               handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
@@ -482,12 +483,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // output variables can shadow input definitions, but not intermediate
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
-    val both = outputSection.declarations.map(_.name).toSet intersect ctx.declarations.getNames
+    val both = outputSection.declarations.map(_.name).toSet intersect ctx.declarations.keySet
 
     // translate the declarations
     val (tDecls, _, _) =
       outputSection.declarations
-        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings[WdlType]())) {
+        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], Bindings.empty[WdlType])) {
           case ((tDecls, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
             if (names.contains(decl.name)) {
@@ -633,7 +634,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
     // add types to the declarations, and accumulate context
     val (tDeclarations, _) =
-      task.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings[WdlType]())) {
+      task.declarations.foldLeft((Vector.empty[TAT.Declaration], Bindings.empty[WdlType])) {
         case ((tDecls, bindings), decl) =>
           val (tDecl, afterBindings) = applyDecl(decl, inputCtx, bindings)
           (tDecls :+ tDecl, afterBindings)
@@ -822,7 +823,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
-  private def applyScatter(scatter: AST.Scatter, ctx: Context): (TAT.Scatter, Bindings[WdlType]) = {
+  private def applyScatter(scatter: AST.Scatter,
+                           ctx: Context): (TAT.Scatter, MapBindings[WdlType]) = {
     val eCollection = applyExpr(scatter.expr, ctx)
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
@@ -847,7 +849,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
     // Add an array type to all variables defined in the scatter body
     val gatherBindings =
-      bindings.all.map {
+      bindings.toMap.map {
         case (callName, callType: T_Call) =>
           val callOutput = callType.output.map {
             case (name, t) => name -> T_Array(t)
@@ -858,7 +860,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       }
 
     val tScatter = TAT.Scatter(scatter.identifier, eCollection, tBody, scatter.loc)
-    (tScatter, Bindings(gatherBindings))
+    (tScatter, MapBindings(gatherBindings))
   }
 
   // The body of a conditional is accessible to the statements that come after it.
@@ -866,7 +868,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   // Add an optional modifier to all the types inside the body.
   private def applyConditional(cond: AST.Conditional,
-                               ctx: Context): (TAT.Conditional, Bindings[WdlType]) = {
+                               ctx: Context): (TAT.Conditional, MapBindings[WdlType]) = {
     val condExpr = applyExpr(cond.expr, ctx) match {
       case e if e.wdlType == T_Boolean => e
       case e =>
@@ -880,7 +882,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val (wfElements, bindings) = applyWorkflowElements(cond.body, ctx)
 
     val optionalBindings =
-      bindings.all.map {
+      bindings.toMap.map {
         case (callName, callType: T_Call) =>
           val callOutput = callType.output.map {
             case (name, t) => name -> Utils.makeOptional(t)
@@ -890,7 +892,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           varName -> Utils.makeOptional(typ)
       }
 
-    (TAT.Conditional(condExpr, wfElements, cond.loc), Bindings(optionalBindings))
+    (TAT.Conditional(condExpr, wfElements, cond.loc), MapBindings(optionalBindings))
   }
 
   // Add types to a block of workflow-elements:
@@ -907,7 +909,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       body: Vector[AST.WorkflowElement],
       ctx: Context
   ): (Vector[TAT.WorkflowElement], Bindings[WdlType]) = {
-    body.foldLeft((Vector.empty[TAT.WorkflowElement], Bindings[WdlType]())) {
+    body.foldLeft((Vector.empty[TAT.WorkflowElement], Bindings.empty[WdlType])) {
       case ((tElements, bindings), decl: AST.Declaration) =>
         val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings)
         (tElements :+ tDecl, afterBindings)
