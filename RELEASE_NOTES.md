@@ -1,6 +1,8 @@
 # v0.5.0 (dev)
 
+* Added `wdlTools.types.Graph` for building DAGs from the TST.
 * Breaking change: the operator case classes have been removed from AST and TST. Operators are now represented by `ExprApply` with special names. The names can be looked up in `wdlTools.syntax.Operator`.
+* Many other internal breaking changes - mostly reorganization/renaming.
 
 # v0.4.0 (2020-07-16)
 
