@@ -9,15 +9,21 @@ trait Bindings[T, +Self <: Bindings[T, Self]] {
 
   def toMap: Map[String, T]
 
-  protected def throwDuplicateError(names: Vector[String]): Unit
+  protected val elementType: String
 
   protected def copyFrom(values: Map[String, T]): Self
 
   def update(bindings: Map[String, T]): Self = {
     (keySet & bindings.keySet).toVector match {
-      case Vector(name)    => throwDuplicateError(Vector(name))
-      case v if v.size > 1 => throwDuplicateError(v)
-      case _               => ()
+      case Vector(name) =>
+        throw new DuplicateBindingException(
+            s"${elementType} ${name} shadows an existing variable"
+        )
+      case v if v.size > 1 =>
+        throw new DuplicateBindingException(
+            s"${elementType}s ${v.mkString(",")} shadow existing variables"
+        )
+      case _ => ()
     }
     copyFrom(toMap ++ bindings)
   }
@@ -40,8 +46,7 @@ trait Bindings[T, +Self <: Bindings[T, Self]] {
 }
 
 abstract class AbstractBindings[T, +Self <: Bindings[T, Self]](
-    all: Map[String, T] = Map.empty[String, T],
-    elementType: String = "binding"
+    all: Map[String, T] = Map.empty[String, T]
 ) extends Bindings[T, Self] {
   def contains(name: String): Boolean = all.contains(name)
 
@@ -52,23 +57,11 @@ abstract class AbstractBindings[T, +Self <: Bindings[T, Self]](
   def apply(name: String): T = all(name)
 
   def get(name: String): Option[T] = all.get(name)
-
-  override protected def throwDuplicateError(names: Vector[String]): Unit = {
-    names match {
-      case Vector(name) =>
-        throw new DuplicateBindingException(
-            s"${elementType} ${name} shadows an existing variable"
-        )
-      case v =>
-        throw new DuplicateBindingException(
-            s"${elementType}s ${v.mkString(",")} shadow existing variables"
-        )
-    }
-  }
 }
 
-case class DefaultBindings[T](bindings: Map[String, T] = Map.empty, elementType: String = "binding")
-    extends AbstractBindings[T, DefaultBindings[T]](bindings, elementType) {
+case class DefaultBindings[T](bindings: Map[String, T] = Map.empty,
+                              override val elementType: String = "binding")
+    extends AbstractBindings[T, DefaultBindings[T]](bindings) {
   override protected def copyFrom(values: Map[String, T]): DefaultBindings[T] = {
     copy(bindings = values)
   }

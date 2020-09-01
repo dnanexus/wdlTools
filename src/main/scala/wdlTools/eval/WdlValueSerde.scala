@@ -17,7 +17,7 @@ final class JsonSerializationException(message: String) extends Exception(messag
   * boolean 	Boolean
   * null 	null
   */
-object JsonSerde {
+object WdlValueSerde {
   def serialize(value: V, handler: Option[V => Option[JsValue]] = None): JsValue = {
     def inner(innerValue: V): JsValue = {
       val v = handler.flatMap(_(innerValue))

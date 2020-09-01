@@ -23,6 +23,10 @@ object JsUtils {
     FileUtils.writeFileContent(path, js.prettyPrint)
   }
 
+  def get(js: JsValue, fieldName: Option[String] = None): JsValue = {
+    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js)
+  }
+
   def getFields(js: JsValue, fieldName: Option[String] = None): Map[String, JsValue] = {
     val obj = js match {
       case obj: JsObject => obj
@@ -35,14 +39,14 @@ object JsUtils {
   }
 
   def getValues(js: JsValue, fieldName: Option[String] = None): Vector[JsValue] = {
-    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js) match {
+    get(js, fieldName) match {
       case JsArray(values) => values
       case other           => throw new Exception(s"Expected JsArray, got ${other}")
     }
   }
 
   def getString(js: JsValue, fieldName: Option[String] = None): String = {
-    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js) match {
+    get(js, fieldName) match {
       case JsString(value) => value
       case JsNumber(value) => value.toString()
       case other           => throw new Exception(s"Expected a string, got ${other}")
@@ -50,7 +54,7 @@ object JsUtils {
   }
 
   def getInt(js: JsValue, fieldName: Option[String] = None): Int = {
-    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js) match {
+    get(js, fieldName) match {
       case JsNumber(value) => value.toInt
       case JsString(value) => value.toInt
       case other           => throw new Exception(s"Expected a number, got ${other}")
@@ -58,7 +62,7 @@ object JsUtils {
   }
 
   def getBoolean(js: JsValue, fieldName: Option[String] = None): Boolean = {
-    fieldName.map(x => js.asJsObject.fields(x)).getOrElse(js) match {
+    get(js, fieldName) match {
       case JsBoolean(value)  => value
       case JsString("true")  => true
       case JsString("false") => false

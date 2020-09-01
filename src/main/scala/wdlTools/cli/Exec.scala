@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.nio.file.Paths
 
 import spray.json.JsValue
-import wdlTools.eval.{Eval, JsonSerde, WdlValueBindings}
+import wdlTools.eval.{Eval, WdlValueSerde, WdlValueBindings}
 import wdlTools.exec.{
   ExecPaths,
   TaskContext,
@@ -54,7 +54,11 @@ case class Exec(conf: WdlToolsConf) extends Command {
       case None => WdlValueBindings.empty
       case Some(path) =>
         WdlValueBindings(
-            JsUtils.getFields(JsUtils.jsFromFile(path)).view.mapValues(JsonSerde.deserialize).toMap
+            JsUtils
+              .getFields(JsUtils.jsFromFile(path))
+              .view
+              .mapValues(WdlValueSerde.deserialize)
+              .toMap
         )
     }
     val wdlVersion = doc.version.value

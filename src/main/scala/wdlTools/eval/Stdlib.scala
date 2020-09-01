@@ -721,7 +721,7 @@ case class Stdlib(paths: EvalPaths,
     val file = getWdlFile(ctx.getOneArg, ctx.loc)
     val content = ioSupport.readFile(file.value, ctx.loc)
     try {
-      JsonSerde.deserialize(content.parseJson)
+      WdlValueSerde.deserialize(content.parseJson)
     } catch {
       case e: JsonSerializationException =>
         throw new EvalException(e.getMessage, ctx.loc)
@@ -922,7 +922,7 @@ case class Stdlib(paths: EvalPaths,
   private def write_json(ctx: FunctionContext): V_File = {
     val jsv =
       try {
-        JsonSerde.serialize(ctx.getOneArg)
+        WdlValueSerde.serialize(ctx.getOneArg)
       } catch {
         case e: JsonSerializationException =>
           throw new EvalException(e.getMessage, ctx.loc)

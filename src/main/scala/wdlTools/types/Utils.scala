@@ -45,8 +45,9 @@ case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
   }
 }
 
-case class WdlTypeBindings(bindings: Map[String, T] = Map.empty, elementType: String = "type")
-    extends AbstractBindings[T, WdlTypeBindings](bindings, elementType) {
+case class WdlTypeBindings(bindings: Map[String, T] = Map.empty,
+                           override val elementType: String = "type")
+    extends AbstractBindings[T, WdlTypeBindings](bindings) {
   override protected def copyFrom(values: Map[String, T]): WdlTypeBindings = {
     copy(bindings = values)
   }
@@ -57,6 +58,7 @@ object WdlTypeBindings {
 }
 
 object Utils {
+  // TODO: what about T_Any?
   val PrimitiveTypes: Set[T] = Set(T_String, T_File, T_Directory, T_Boolean, T_Int, T_Float)
 
   /**

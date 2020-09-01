@@ -11,7 +11,7 @@ import wdlTools.syntax.{
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import wdlTools.util.{FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger, StringFileSource}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
@@ -291,7 +291,11 @@ case class ParseAll(followImports: Boolean = false,
       val elems: Vector[AST.DocumentElement] = doc.elements.map {
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (followImports) {
-            followImport(importDoc.addr.value)
+            val parent = doc.source match {
+              case fs: LocalFileSource => Some(fs.localPath.getParent)
+              case _                   => None
+            }
+            followImport(importDoc.addr.value, parent)
           } else {
             None
           }

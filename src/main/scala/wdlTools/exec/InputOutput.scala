@@ -6,7 +6,7 @@ import spray.json._
 import wdlTools.eval.{
   Eval,
   EvalException,
-  JsonSerde,
+  WdlValueSerde,
   JsonSerializationException,
   WdlValueBindings,
   WdlValues
@@ -45,7 +45,7 @@ object InputOutput {
             .get(fqn)
             .map(jsValue =>
               try {
-                JsonSerde.deserialize(jsValue, wdlType, fqn)
+                WdlValueSerde.deserialize(jsValue, wdlType, fqn)
               } catch {
                 case jse: JsonSerializationException =>
                   throw new ExecException(jse.getMessage, inp.loc)
@@ -257,7 +257,7 @@ object InputOutput {
       val value = {
         val wdlValue = outputs(declName)
         try {
-          JsonSerde.serialize(wdlValue)
+          WdlValueSerde.serialize(wdlValue)
         } catch {
           case e: JsonSerializationException =>
             throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",

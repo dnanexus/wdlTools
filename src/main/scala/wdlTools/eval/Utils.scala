@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
-import wdlTools.util.AbstractBindings
+import wdlTools.util.{AbstractBindings, Bindings}
 
 object Utils {
   // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
@@ -107,13 +107,8 @@ object Utils {
   }
 }
 
-case class WdlValueBindings(bindings: Map[String, V] = Map.empty,
-                            allowNonstandardCoercions: Boolean = false)
-    extends AbstractBindings[V, WdlValueBindings](bindings, "value") {
-
-  override protected def copyFrom(values: Map[String, V]): WdlValueBindings = {
-    copy(bindings = values)
-  }
+trait VBindings[+Self <: VBindings[Self]] extends Bindings[V, Self] {
+  val allowNonstandardCoercions: Boolean
 
   def get(id: String,
           wdlTypes: Vector[WdlTypes.T] = Vector.empty,
@@ -121,6 +116,16 @@ case class WdlValueBindings(bindings: Map[String, V] = Map.empty,
     get(id).map(value =>
       Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions)
     )
+  }
+}
+
+case class WdlValueBindings(bindings: Map[String, V] = Map.empty,
+                            allowNonstandardCoercions: Boolean = false,
+                            override val elementType: String = "value")
+    extends AbstractBindings[V, WdlValueBindings](bindings)
+    with VBindings[WdlValueBindings] {
+  override protected def copyFrom(values: Map[String, V]): WdlValueBindings = {
+    copy(bindings = values)
   }
 }
 

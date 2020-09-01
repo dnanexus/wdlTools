@@ -15,7 +15,7 @@ import wdlTools.syntax.{Antlr4Util, WdlVersion}
 import wdlTools.types.TypeCheckingRegime
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
-import wdlTools.util.{FileSourceResolver, Logger, TraceLevel}
+import wdlTools.util.{FileSourceResolver, Logger}
 
 import scala.util.Try
 
@@ -71,7 +71,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
               |Options:
               |""".stripMargin)
 
-    val verbose: ScallopOption[Boolean] = opt(descr = "use more verbose output")
+    val verbose: ScallopOption[Int] = tally(descr = "use more verbose output")
     val quiet: ScallopOption[Boolean] = opt(descr = "use less verbose output")
 
     /**
@@ -80,8 +80,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       */
     def init(): Unit = {
       val quiet = this.quiet.getOrElse(default = false)
-      val verbose = this.verbose.getOrElse(default = false)
-      Logger.set(quiet, if (verbose) TraceLevel.Verbose else TraceLevel.None)
+      val traceLevel = this.verbose.getOrElse(default = 0)
+      Logger.set(quiet, traceLevel)
     }
   }
 

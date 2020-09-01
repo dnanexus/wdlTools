@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
-import wdlTools.util.{FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger, StringFileSource}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
@@ -328,7 +328,11 @@ case class ParseAll(followImports: Boolean = false,
         case struct: ConcreteSyntax.TypeStruct => translateStruct(struct)
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (followImports) {
-            followImport(importDoc.addr.value)
+            val parent = doc.source match {
+              case fs: LocalFileSource => Some(fs.localPath.getParent)
+              case _                   => None
+            }
+            followImport(importDoc.addr.value, parent)
           } else {
             None
           }

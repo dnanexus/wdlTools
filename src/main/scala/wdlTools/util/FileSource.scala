@@ -255,14 +255,6 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     }
   }
 
-  def resolve(uri: String): LocalFileSource = {
-    resolvePath(uriToPath(uri), Some(uri))
-  }
-
-  override def resolveDirectory(uri: String): FileSource = {
-    resolvePath(uriToPath(uri), Some(uri), isDirectory = true)
-  }
-
   // search for a relative path in the directories of `searchPath`
   private def findInPath(relPath: String): Option[Path] = {
     searchPath
@@ -286,6 +278,14 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
       )
     }
     LocalFileSource(value.getOrElse(path.toString), path, resolved, logger, encoding, isDirectory)
+  }
+
+  def resolve(uri: String): LocalFileSource = {
+    resolvePath(uriToPath(uri), Some(uri))
+  }
+
+  override def resolveDirectory(uri: String): FileSource = {
+    resolvePath(uriToPath(uri), Some(uri), isDirectory = true)
   }
 }
 

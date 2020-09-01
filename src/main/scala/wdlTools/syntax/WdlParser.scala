@@ -1,5 +1,7 @@
 package wdlTools.syntax
 
+import java.nio.file.Path
+
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 import wdlTools.util.{FileSource, FileSourceResolver, Logger, TraceLevel}
 
@@ -13,11 +15,18 @@ abstract class WdlParser(followImports: Boolean = false,
   // cache of documents that have already been fetched and parsed.
   private var docCache: Map[String, Option[AbstractSyntax.Document]] = Map.empty
 
-  protected def followImport(uri: String): Option[AbstractSyntax.Document] = {
+  protected def followImport(uri: String,
+                             parent: Option[Path] = None): Option[AbstractSyntax.Document] = {
     docCache.get(uri) match {
       case None =>
         logger.trace(s"parsing import ${uri}", minLevel = TraceLevel.VVerbose)
-        val aDoc = Some(parseDocument(fileResolver.resolve(uri)))
+        val fileResolverWithParent = parent match {
+          // Prepend the parent of the current directory to the search path
+          // in case we need to resolve relative imports.
+          case Some(path) => fileResolver.addToLocalSearchPath(Vector(path), append = false)
+          case None       => fileResolver
+        }
+        val aDoc = Some(parseDocument(fileResolverWithParent.resolve(uri)))
         docCache += (uri -> aDoc)
         aDoc
       case Some(aDoc) => aDoc
