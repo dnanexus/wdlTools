@@ -4,6 +4,7 @@ workflow foo {
   # convert an optional file-array to a file-array
   Array[File] files = ["a", "b"]
   Array[File]? files2 = files
+  File? file2 = "/tmp/xxx.txt"
 
   # Convert an optional int to an int
   # This will fail at runtime if a is null
@@ -33,8 +34,9 @@ workflow foo {
 
   # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/JointGenotypingWf.wdl#L570
   #
-  # Adding a String and String?
+  # T to T? are not allowed in strict type checking
   String? here = "here"
+  # Adding a String and String?
   String? buf = "not " + "invented " + here
 
   # https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1207

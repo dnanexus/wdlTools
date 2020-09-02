@@ -90,9 +90,10 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     (left, right) match {
       // List of special cases goes here
 
-      // a type T can be coerced to a T?
-      // I don't think this is such a great idea.
-      case (T_Optional(l), r) if l == r => true
+      // a type T can be coerced to a T? - this isn't great, but it's necessary
+      // since there is no function for doing the coercion explicitly
+      case (T_Optional(l), r) if regime <= Moderate && isCoercibleTo2(l, r) =>
+        true
 
       // normal cases
       case (_, _) =>
