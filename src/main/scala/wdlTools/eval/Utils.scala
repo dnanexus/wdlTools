@@ -73,7 +73,7 @@ object Utils {
     * @param force if true, then `t` will be made optional even if it is already optional.
     * @return
     */
-  def makeOptional(v: V, force: Boolean = false): V_Optional = {
+  def ensureOptional(v: V, force: Boolean = false): V_Optional = {
     v match {
       case v if force    => V_Optional(v)
       case v: V_Optional => v
@@ -104,6 +104,30 @@ object Utils {
       case other =>
         throw new EvalException(s"${other} is not a primitive value", loc)
     }
+  }
+
+  def transform(value: V, transformer: V => Option[V]): V = {
+    def inner(innerValue: V): V = {
+      val v = transformer(innerValue)
+      if (v.isDefined) {
+        return v.get
+      }
+      innerValue match {
+        case V_Optional(v) => V_Optional(inner(v))
+        case V_Array(vec)  => V_Array(vec.map(inner))
+        case V_Pair(l, r)  => V_Pair(inner(l), inner(r))
+        case V_Map(members) =>
+          V_Map(members.map {
+            case (k, v) => inner(k) -> inner(v)
+          })
+        case V_Object(members) =>
+          V_Object(members.map { case (k, v) => k -> inner(v) })
+        case V_Struct(_, members) =>
+          V_Object(members.map { case (k, v) => k -> inner(v) })
+        case other => other
+      }
+    }
+    inner(value)
   }
 }
 

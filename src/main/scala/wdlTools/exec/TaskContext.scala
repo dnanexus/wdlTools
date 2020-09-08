@@ -4,58 +4,91 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, WdlValueSerde, Runtime, WdlValueBindings, WdlValues}
+import wdlTools.eval.{Eval, Runtime, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
-trait FileSourceLocalizer {
-  def localizeFile(uri: String): Path
-
-  def localizeDirectory(uri: String): Path
+trait LocalizationDisambiguator {
+  def getLocalPath(fileSource: FileSource): Path
 }
 
-// Localize a file according to the rules in the spec:
-// https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#task-input-localization.
-// * two input files with the same name must be located separately, to avoid name collision
-// * two input files that originated in the same storage directory must also be localized into
-//   the same directory for task execution
-// We use the general strategy of creating randomly named directories under root. We use a single
-// directory if possible, but create additional directories to avoid name collision.
-case class SafeFileSourceLocalizer(root: Path, subdirPrefix: String = "input")
-    extends FileSourceLocalizer {
-  private var sourceTargetMap: Map[Path, Path] = Map.empty
+/**
+  * Localizes a file according to the rules in the spec:
+  * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#task-input-localization.
+  * * two input files with the same name must be located separately, to avoid name collision
+  * * two input files that originated in the same storage directory must also be localized into
+  *   the same directory for task execution
+  * We use the general strategy of creating randomly named directories under root. We use a single
+  * directory if possible, but create additional directories to avoid name collision.
+  * @param root the root dir - files are localize to subdirectories under this directory
+  * @param existingPaths optional Set of paths that should be assumed to already exist locally
+  * @param subdirPrefix prefix to add to localization dirs
+  * @param disambiguationDirLimit max number of disambiguation subdirs that can be created
+  */
+case class SafeLocalizationDisambiguator(root: Path,
+                                         existingPaths: Set[Path] = Set.empty,
+                                         subdirPrefix: String = "input",
+                                         disambiguationDirLimit: Int = 200)
+    extends LocalizationDisambiguator {
   private lazy val primaryDir = Files.createTempDirectory(root, subdirPrefix)
+  // mapping from source file parent directories to local directories - this
+  // ensures that files that were originally from the same directory are
+  // localized to the same target directory
+  private var sourceTargetMap: Map[Path, Path] = Map.empty
+  // keep track of which disambiguation dirs we've created
+  private var disambiguationDirs: Set[Path] = Set(primaryDir)
+  // keep track of which Paths we've returned so we can detect collisions
+  private var localizedPaths: Set[Path] = existingPaths
 
-  private def localize(source: FileSource): Path = {
+  def getLocalizedPaths: Set[Path] = localizedPaths
+
+  private def exists(path: Path): Boolean = {
+    if (localizedPaths.contains(path)) {
+      true
+    } else if (Files.exists(path)) {
+      localizedPaths += path
+      true
+    } else {
+      false
+    }
+  }
+
+  override def getLocalPath(source: FileSource): Path = {
     val sourceParent = source.localPath.getParent
     sourceTargetMap.get(sourceParent) match {
       // if we already saw another file from the same parent directory as `source`, try to
       // put `source` in that same directory
-      case Some(parent) if Files.exists(parent.resolve(source.fileName)) =>
+      case Some(parent) if exists(parent.resolve(source.fileName)) =>
         throw new FileAlreadyExistsException(
             s"Trying to localize ${source} to ${parent} but the file already exists in that directory"
         )
       case Some(parent) =>
-        source.localizeToDir(parent)
-      case None if Files.exists(primaryDir.resolve(source.fileName)) =>
-        // there is a name collision in primaryDir, so create a new dir
-        val newDir = Files.createTempDirectory(root, "input")
-        sourceTargetMap += (sourceParent -> newDir)
-        source.localizeToDir(newDir)
-      case _ =>
-        sourceTargetMap += (sourceParent -> primaryDir)
-        source.localizeToDir(primaryDir)
+        parent.resolve(source.fileName)
+      case None =>
+        val primaryPath = primaryDir.resolve(source.fileName)
+        if (!exists(primaryPath)) {
+          sourceTargetMap += (sourceParent -> primaryDir)
+          primaryPath
+        } else if (disambiguationDirs.size >= disambiguationDirLimit) {
+          throw new Exception(
+              s"""|Tried to localize ${source} to local filesystem at ${root}/*/${source.fileName}, 
+                  |but there was a name collision and there are already the maximum number of 
+                  |disambiguation directories (${disambiguationDirLimit}).""".stripMargin
+                .replaceAll("\n", " ")
+          )
+        } else {
+          // there is a name collision in primaryDir - create a new dir
+          val newDir = Files.createTempDirectory(root, "input")
+          // we should never get a collision according to the guarantees of
+          // Files.createTempDirectory, but we check anyway
+          if (Files.exists(newDir) || disambiguationDirs.contains(newDir)) {
+            throw new Exception(s"collision with existing dir ${newDir}")
+          }
+          disambiguationDirs += newDir
+          sourceTargetMap += (sourceParent -> newDir)
+          newDir.resolve(source.fileName)
+        }
     }
-  }
-
-  override def localizeFile(uri: String): Path = {
-    val fileSource = FileSourceResolver.get.resolve(uri)
-    localize(fileSource)
-  }
-
-  override def localizeDirectory(uri: String): Path = {
-    val fileSource = FileSourceResolver.get.resolveDirectory(uri)
-    localize(fileSource)
   }
 }
 
@@ -64,6 +97,7 @@ case class TaskContext(task: Task,
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
                        defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
+                       taskIO: TaskInputOutput,
                        fileResolver: FileSourceResolver = FileSourceResolver.get,
                        logger: Logger = Logger.get) {
   private lazy val dockerUtils = DockerUtils(fileResolver, logger)
@@ -79,14 +113,18 @@ case class TaskContext(task: Task,
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
     if (hasCommand) {
-      val localizer =
-        SafeFileSourceLocalizer(hostEvaluator.paths.getRootDir(true))
+      val disambiguator = SafeLocalizationDisambiguator(hostEvaluator.paths.getRootDir(true))
+      // TODO: put localization behind a trait so we can swap in e.g. a parallelized implementation
       WdlValueBindings(bindings.toMap.map {
         case (name, V_File(uri)) =>
-          val localizedPath = localizer.localizeFile(uri)
+          val fileSource = fileResolver.resolve(uri)
+          val localizedPath = disambiguator.getLocalPath(fileSource)
+          fileSource.localize(localizedPath)
           name -> V_File(localizedPath.toString)
         case (name, V_Directory(uri)) =>
-          val localizedPath = localizer.localizeDirectory(uri)
+          val fileSource = fileResolver.resolveDirectory(uri)
+          val localizedPath = disambiguator.getLocalPath(fileSource)
+          fileSource.localize(localizedPath)
           name -> V_Directory(localizedPath.toString)
         case other => other
       })
@@ -147,17 +185,17 @@ case class TaskContext(task: Task,
     task.outputs.map { output =>
       val value = outputBindings.get(output.name)
       val resolved: WdlValues.V =
-        InputOutput.resolveWdlValue(output.name,
-                                    output.wdlType,
-                                    value,
-                                    outputFileResolver,
-                                    output.loc)
+        TaskInputOutput.resolveWdlValue(output.name,
+                                        output.wdlType,
+                                        value,
+                                        outputFileResolver,
+                                        output.loc)
       output.name -> resolved
     }.toMap
   }
 
   def jsonOutputs: JsObject = {
-    InputOutput.taskOutputToJson(outputs, task.name, task.outputs)
+    taskIO.outputValuesToJson(outputs)
   }
 }
 
@@ -171,8 +209,6 @@ object TaskContext {
     * @param task the task
     * @param hostEvaluator expression evaluator for the guest (i.e. container) system
     * @param guestEvaluator expression evaluator for the guest (i.e. container) system - defaults to `hostEvaluator`
-    * @param strict whether to throw an exception if a default cannot be evaluated; if false, then any
-    *               optional parameters with unspecified values and un-evaluable defaults is set to V_Null.
     * @return TaskInputs
     * throws EvalException if
     * - evaluation fails for a default expression, unless `strict = false`
@@ -183,10 +219,9 @@ object TaskContext {
                hostEvaluator: Eval,
                guestEvaluator: Option[Eval] = None,
                defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
-               logger: Logger = Logger.Quiet,
+               taskIO: TaskInputOutput,
                strict: Boolean = false): TaskContext = {
-    val inputs =
-      InputOutput.taskInputFromJson(jsInputs, task.name, task.inputs, hostEvaluator, logger, strict)
-    TaskContext(task, inputs, hostEvaluator, guestEvaluator, defaultRuntimeValues)
+    val inputs = taskIO.inputsFromJson(jsInputs, hostEvaluator, strict)
+    TaskContext(task, inputs, hostEvaluator, guestEvaluator, defaultRuntimeValues, taskIO)
   }
 }

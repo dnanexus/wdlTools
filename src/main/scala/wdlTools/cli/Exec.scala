@@ -3,14 +3,15 @@ package wdlTools.cli
 import java.nio.file.Paths
 
 import spray.json.JsValue
-import wdlTools.eval.{Eval, WdlValueSerde, WdlValueBindings}
+import wdlTools.eval.{Eval, WdlValueBindings, WdlValueSerde}
 import wdlTools.exec.{
   ExecPaths,
   TaskContext,
   TaskExecutor,
   TaskExecutorCommandFailure,
   TaskExecutorInternalError,
-  TaskExecutorSuccess
+  TaskExecutorSuccess,
+  TaskInputOutput
 }
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
@@ -69,12 +70,15 @@ case class Exec(conf: WdlToolsConf) extends Command {
     } else {
       (ExecPaths.createLocalPathsFromTemp(), None)
     }
+    val hostEvaluator = Eval(hostPaths, Some(wdlVersion))
+    val taskIO = TaskInputOutput(task)
     val taskContext = TaskContext.fromJson(
         jsInputs,
         task,
-        Eval(hostPaths, Some(wdlVersion)),
+        hostEvaluator,
         guestPaths.map(p => Eval(p, Some(wdlVersion))),
-        runtimeDefaults
+        runtimeDefaults,
+        taskIO
     )
     val taskExecutor = TaskExecutor(taskContext, hostPaths, guestPaths)
     Logger.get.info(s"""Executing task ${task.name} in ${hostPaths.getRootDir()}""")

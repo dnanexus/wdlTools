@@ -4,6 +4,7 @@ import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import wdlTools.syntax.WdlVersion
+import wdlTools.types.ExprGraph.VarInfo
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.T_Pair
 import wdlTools.types.WdlTypes.{T, T_Array, T_Map, T_Optional, T_Struct}
@@ -120,17 +121,174 @@ object TypeGraph {
   }
 }
 
-object ExprGraph {
-  object TaskVarKind extends Enumeration {
-    val Input, PreCommand, PostCommand, Output = Value
+case class ExprGraph(graph: Graph[String, DiEdge], varInfo: Map[String, VarInfo]) {
+  lazy val dependencyOrder: Vector[String] = GraphUtils.toOrderedVector(graph)
+
+  def inputOrder: Vector[String] = {
+    dependencyOrder.collect {
+      case dep if varInfo(dep).kind.contains(ExprGraph.VarKind.Input) => dep
+    }
   }
 
-  case class TaskVarInfo(v: Variable,
-                         referenced: Boolean,
-                         expr: Option[Expr] = None,
-                         kind: Option[TaskVarKind.Value] = None)
+  def outputOrder: Vector[String] = {
+    dependencyOrder.collect {
+      case dep if varInfo(dep).kind.contains(ExprGraph.VarKind.Output) => dep
+    }
+  }
+}
+
+object ExprGraph {
 
   /**
+    * Different kinds of variables:
+    * - Input = a variable in the input {} section
+    * - Output = a variable in the output {} section
+    * - Private = a variable not in input or output
+    * - PostCommand = a Private task variable that depends on the command block being evaluated
+    */
+  object VarKind extends Enumeration {
+    val Input, Private, PostCommand, Output = Value
+  }
+
+  trait VarInfo {
+    def element: Element
+    def referenced: Boolean
+    def kind: Option[VarKind.Value]
+  }
+
+  case class DeclInfo(element: Variable,
+                      referenced: Boolean,
+                      expr: Option[Expr] = None,
+                      kind: Option[VarKind.Value] = None)
+      extends VarInfo
+
+  private def createInputInfos(inputs: Vector[InputDefinition]): Map[String, DeclInfo] = {
+    inputs.map {
+      case req: RequiredInputDefinition =>
+        req.name -> DeclInfo(req, referenced = true, kind = Some(VarKind.Input))
+      case opt: OptionalInputDefinition =>
+        opt.name -> DeclInfo(opt, referenced = false, kind = Some(VarKind.Input))
+      case optWithDefault: OverridableInputDefinitionWithDefault =>
+        optWithDefault.name -> DeclInfo(optWithDefault,
+                                        referenced = false,
+                                        expr = Some(optWithDefault.defaultExpr),
+                                        kind = Some(VarKind.Input))
+    }.toMap
+  }
+
+  private def createOutputInfos(outputs: Vector[OutputDefinition]): Map[String, DeclInfo] = {
+    outputs.map { out =>
+      out.name -> DeclInfo(out,
+                           referenced = true,
+                           expr = Some(out.expr),
+                           kind = Some(VarKind.Output))
+    }.toMap
+  }
+
+  def buildFromTaskVariables(
+      inputDefs: Vector[InputDefinition] = Vector.empty,
+      outputDefs: Vector[OutputDefinition] = Vector.empty,
+      declarations: Vector[Declaration] = Vector.empty,
+      commandParts: Vector[Expr] = Vector.empty,
+      runtime: Map[String, Expr] = Map.empty
+  ): ExprGraph = {
+    // collect all variables from task
+    val inputs: Map[String, DeclInfo] = createInputInfos(inputDefs)
+    val outputs: Map[String, DeclInfo] = createOutputInfos(outputDefs)
+    val decls: Map[String, DeclInfo] = declarations.map { decl =>
+      decl.name -> DeclInfo(decl, referenced = false, expr = decl.expr)
+    }.toMap
+    val allVars: Map[String, DeclInfo] = inputs ++ outputs ++ decls
+
+    // Since a task is self-contained, it is an error to reference an identifier
+    // that is not in the set of task variables.
+    def checkDependency(varName: String, depName: String, expr: Option[Expr]): Unit = {
+      if (!allVars.contains(depName)) {
+        val exprStr = expr.map(e => s" expression ${Utils.prettyFormatExpr(e)}").getOrElse("")
+        throw new Exception(
+            s"${varName}${exprStr} references non-task variable ${depName}"
+        )
+      }
+    }
+
+    // Add all missing dependencies to the graph. Any node with no dependencies
+    // is linked to root.
+    def addDependencies(names: Iterable[String],
+                        graph: Graph[String, DiEdge]): Graph[String, DiEdge] = {
+      names.foldLeft(graph) {
+        case (g, name) =>
+          allVars(name) match {
+            case DeclInfo(_, _, Some(expr), _) =>
+              val deps = Utils.exprDependencies(expr).keySet.map { dep =>
+                checkDependency(name, dep, Some(expr))
+                (dep, name)
+              }
+              if (deps.isEmpty) {
+                // the node has no dependencies, so link it to root
+                g ++ Set(GraphUtils.RootNode ~> name)
+              } else {
+                // process the dependencies first, then add the edges for this node
+                val missing = deps.map(_._1) -- g.nodes.toOuter
+                val gNew = if (missing.nonEmpty) {
+                  addDependencies(missing, g)
+                } else {
+                  g
+                }
+                gNew ++ deps.map(d => d._1 ~> d._2)
+              }
+            case _ =>
+              // the node has no dependencies, so link it to root
+              g ++ Set(GraphUtils.RootNode ~> name)
+          }
+      }
+    }
+
+    // Collect required nodes from input, command, runtime, and output blocks
+    val commandDeps: Set[String] =
+      commandParts.flatMap { expr =>
+        Utils.exprDependencies(expr).keySet.map { dep =>
+          checkDependency("command", dep, Some(expr))
+          dep
+        }
+      }.toSet
+    val runtimeDeps: Set[String] = runtime.values.flatMap { expr =>
+      Utils.exprDependencies(expr).keySet.map { dep =>
+        checkDependency("runtime", dep, Some(expr))
+        dep
+      }
+    }.toSet
+    val requiredNodes =
+      inputs.filter(_._2.referenced).keySet | commandDeps | runtimeDeps | outputs.keySet
+
+    // create the graph by iteratively adding missing nodes
+    val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
+
+    // Update referenced = true for all vars in the graph.
+    // Also update VarKind for decls based on whether they are depended on by any non-output
+    // expressions.
+    val updatedVars = allVars.map {
+      case (name, DeclInfo(v, _, expr, None)) if graph.contains(name) =>
+        val dependentNodes = graph.get(name).outgoing.map(_.to.value)
+        val newKind = {
+          if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
+            Some(VarKind.Private)
+          } else {
+            Some(VarKind.PostCommand)
+          }
+        }
+        name -> DeclInfo(v, referenced = true, expr = expr, kind = newKind)
+      case (name, info) if graph.contains(name) =>
+        name -> info.copy(referenced = true)
+      case (name, varInfo) if varInfo.referenced =>
+        name -> varInfo.copy(referenced = false)
+      case other => other
+    }
+
+    ExprGraph(graph, updatedVars)
+  }
+
+  /**
+    *
     * Builds a directed dependency graph of variables used within the scope of a task.
     *
     * The graph is rooted by a special root node (`GraphUtils.RootNode`), which is a
@@ -169,151 +327,51 @@ object ExprGraph {
     */
   def buildFromTask(
       task: Task
-  ): (Graph[String, DiEdge], Map[String, TaskVarInfo]) = {
-    // collect all variables from task
-    val inputs: Map[String, TaskVarInfo] = task.inputs.map {
-      case req: RequiredInputDefinition =>
-        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
-      case opt: OptionalInputDefinition =>
-        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
-      case optWithDefault: OverridableInputDefinitionWithDefault =>
-        optWithDefault.name -> TaskVarInfo(optWithDefault,
-                                           referenced = false,
-                                           expr = Some(optWithDefault.defaultExpr),
-                                           kind = Some(TaskVarKind.Input))
-    }.toMap
-    val outputs: Map[String, TaskVarInfo] = task.outputs.map { out =>
-      out.name -> TaskVarInfo(out,
-                              referenced = true,
-                              expr = Some(out.expr),
-                              kind = Some(TaskVarKind.Output))
-    }.toMap
-    val decls: Map[String, TaskVarInfo] = task.declarations.map { decl =>
-      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
-    }.toMap
-    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
-
-    // Since a task is self-contained, it is an error to reference an identifier
-    // that is not in the set of task variables.
-    def checkDependency(varName: String, depName: String, expr: Option[Expr]): Unit = {
-      if (!allVars.contains(depName)) {
-        val exprStr = expr.map(e => s" expression ${e}").getOrElse("")
-        throw new Exception(
-            s"${varName}${exprStr} references non-task variable ${depName}"
-        )
-      }
-    }
-
-    // Add all missing dependencies to the graph. Any node with no dependencies
-    // is linked to root.
-    def addDependencies(names: Iterable[String],
-                        graph: Graph[String, DiEdge]): Graph[String, DiEdge] = {
-      names.foldLeft(graph) {
-        case (g, name) =>
-          allVars(name) match {
-            case TaskVarInfo(_, _, Some(expr), _) =>
-              val deps = Utils.exprDependencies(expr).keySet.map { dep =>
-                checkDependency(name, dep, Some(expr))
-                (dep, name)
-              }
-              if (deps.isEmpty) {
-                // the node has no dependencies, so link it to root
-                g ++ Set(GraphUtils.RootNode ~> name)
-              } else {
-                // process the dependencies first, then add the edges for this node
-                val missing = deps.map(_._1) -- g.nodes.toOuter
-                val gNew = if (missing.nonEmpty) {
-                  addDependencies(missing, g)
-                } else {
-                  g
-                }
-                gNew ++ deps.map(d => d._1 ~> d._2)
-              }
-            case _ =>
-              // the node has no dependencies, so link it to root
-              g ++ Set(GraphUtils.RootNode ~> name)
-          }
-      }
-    }
-
-    // Collect required nodes from input, command, runtime, and output blocks
-    val commandDeps: Set[String] =
-      task.command.parts.flatMap { expr =>
-        Utils.exprDependencies(expr).keySet.map { dep =>
-          checkDependency("command", dep, Some(expr))
-          dep
-        }
-      }.toSet
-    val runtimeDeps: Set[String] = task.runtime
-      .map(_.kvs.values.flatMap { expr =>
-        Utils.exprDependencies(expr).keySet.map { dep =>
-          checkDependency("runtime", dep, Some(expr))
-          dep
-        }
-      }.toSet)
-      .getOrElse(Set.empty)
-    val requiredNodes =
-      inputs.filter(_._2.referenced).keySet | commandDeps | runtimeDeps | outputs.keySet
-
-    // create the graph by iteratively adding missing nodes
-    val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
-
-    // Update referenced = true for all vars in the graph.
-    // Also update VarKind for decls based on whether they are depended on by any non-output
-    // expressions.
-    val updatedVars = allVars.map {
-      case (name, TaskVarInfo(v, _, expr, None)) if graph.contains(name) =>
-        val dependentNodes = graph.get(name).outgoing.map(_.to.value)
-        val newKind = {
-          if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
-            Some(TaskVarKind.PreCommand)
-          } else {
-            Some(TaskVarKind.PostCommand)
-          }
-        }
-        name -> TaskVarInfo(v, referenced = true, expr = expr, kind = newKind)
-      case (name, info) if graph.contains(name) =>
-        name -> info.copy(referenced = true)
-      case (name, varInfo) if varInfo.referenced =>
-        name -> varInfo.copy(referenced = false)
-      case other => other
-    }
-
-    (graph, updatedVars)
+  ): ExprGraph = {
+    buildFromTaskVariables(
+        task.inputs,
+        task.outputs,
+        task.declarations,
+        task.command.parts,
+        task.runtime.map(_.kvs).getOrElse(Map.empty)
+    )
   }
-//
-//  object WorkflowVarKind extends Enumeration {
-//    val Input, Output = Value
-//  }
-//
-//  case class WorkflowVarInfo(v: Variable,
-//                             referenced: Boolean,
-//                             expr: Option[Expr] = None,
-//                             kind: Option[WorkflowVarKind.Value] = None)
-//
-//  def buildFromWorkflow(wf: Workflow): (Graph[String, DiEdge], Map[String, WorkflowVarInfo]) = {
+
+  case class CallInfo(element: Call,
+                      referenced: Boolean = false,
+                      kind: Option[VarKind.Value] = Some(VarKind.Private))
+      extends VarInfo
+
+//  def buildFromWorkflow(wf: Workflow): (Graph[String, DiEdge], Map[String, VarInfo]) = {
+//    val inputs: Map[String, DeclInfo] = createInputInfos(wf.inputs)
+//    val outputs: Map[String, DeclInfo] = createOutputInfos(wf.outputs)
 //    val wfBody = WorkflowBodyElements(wf.body)
-//    val inputs: Map[String, TaskVarInfo] = wf.inputs.map {
-//      case req: RequiredInputDefinition =>
-//        req.name -> TaskVarInfo(req, referenced = true, kind = Some(TaskVarKind.Input))
-//      case opt: OptionalInputDefinition =>
-//        opt.name -> TaskVarInfo(opt, referenced = false, kind = Some(TaskVarKind.Input))
-//      case optWithDefault: OverridableInputDefinitionWithDefault =>
-//        optWithDefault.name -> TaskVarInfo(optWithDefault,
-//                                           referenced = false,
-//                                           expr = Some(optWithDefault.defaultExpr),
-//                                           kind = Some(TaskVarKind.Input))
+//    val decls: Map[String, DeclInfo] = wfBody.declarations.map { decl =>
+//      decl.name -> DeclInfo(decl,
+//                            referenced = false,
+//                            expr = decl.expr,
+//                            kind = Some(VarKind.Private))
 //    }.toMap
-//    val outputs: Map[String, TaskVarInfo] = wf.outputs.map { out =>
-//      out.name -> TaskVarInfo(out,
-//                              referenced = true,
-//                              expr = Some(out.expr),
-//                              kind = Some(TaskVarKind.Output))
-//    }.toMap
-//    val decls: Map[String, TaskVarInfo] = wfBody.declarations.map { decl =>
-//      decl.name -> TaskVarInfo(decl, referenced = false, expr = decl.expr)
-//    }.toMap
-//    val allVars: Map[String, TaskVarInfo] = inputs ++ outputs ++ decls
+//
+//    // add calls
+//    val calls = wfBody.calls.map { call =>
+//      call.actualName -> CallInfo(call)
+//    }
+//    // build sub-graphs from nested blocks
+//    wfBody.scatters
+//
+//    val allVars: Map[String, VarInfo] = inputs ++ outputs ++ decls ++ calls
+//
+//    // Since a task is self-contained, it is an error to reference an identifier
+//    // that is not in the set of task variables.
+//    def checkDependency(varName: String, depName: String, expr: Option[Expr]): Unit = {
+//      if (!allVars.contains(depName)) {
+//        val exprStr = expr.map(e => s" expression ${Utils.prettyFormatExpr(e)}").getOrElse("")
+//        throw new Exception(
+//            s"${varName}${exprStr} references non-task variable ${depName}"
+//        )
+//      }
+//    }
 //  }
 }
 

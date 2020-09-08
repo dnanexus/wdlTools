@@ -366,6 +366,22 @@ object Utils {
     inner(expr, noQuoting)
   }
 
+  def prettyFormatInputs(inputs: Vector[TAT.InputDefinition]): String = {
+    inputs
+      .map {
+        case TAT.RequiredInputDefinition(iName, wdlType, _) =>
+          s"${prettyFormatType(wdlType)} ${iName}"
+
+        case TAT.OverridableInputDefinitionWithDefault(iName, wdlType, defaultExpr, _) =>
+          s"${prettyFormatType(wdlType)} ${iName} = ${prettyFormatExpr(defaultExpr)}"
+
+        case TAT.OptionalInputDefinition(iName, wdlType, _) =>
+          s"${prettyFormatType(wdlType)} ${iName}"
+
+      }
+      .mkString("\n")
+  }
+
   /**
     * Extract all identifiers in an expression.
     * TODO: factor out an ExpressionWalker class.

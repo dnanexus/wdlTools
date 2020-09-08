@@ -38,7 +38,7 @@ case class TaskExecutorInternalError(message: String, error: Option[Throwable] =
   }
 }
 
-case class TaskCommandFileGenerator(logger: Logger) {
+case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
   private val renderer = Renderer()
 
   // Write the core bash script into a file.
@@ -91,6 +91,18 @@ case class TaskCommandFileGenerator(logger: Logger) {
     FileUtils.writeFileContent(commandFile, dockerRunScript, makeExecutable = true)
     commandFile
   }
+
+  def apply(command: Option[String],
+            hostPaths: ExecPaths,
+            container: Option[(String, ExecPaths)] = None): Path = {
+    if (container.isDefined) {
+      val (containerImage, guestPaths) = container.get
+      writeCommandScript(command, hostPaths, Some(guestPaths))
+      writeDockerRunScript(containerImage, hostPaths, guestPaths)
+    } else {
+      writeCommandScript(command, hostPaths)
+    }
+  }
 }
 
 object TaskCommandFileGenerator {
@@ -113,14 +125,11 @@ case class TaskExecutor(taskContext: TaskContext,
     val commandFile =
       try {
         if (useContainer) {
-          scriptGenerator.writeCommandScript(taskContext.command, hostPaths, guestPaths)
-          scriptGenerator.writeDockerRunScript(
-              taskContext.containerImage.get,
-              hostPaths,
-              guestPaths.get
-          )
+          scriptGenerator.apply(taskContext.command,
+                                hostPaths,
+                                Some(taskContext.containerImage.get, guestPaths.get))
         } else {
-          scriptGenerator.writeCommandScript(taskContext.command, hostPaths)
+          scriptGenerator.apply(taskContext.command, hostPaths)
         }
       } catch {
         case t: Throwable =>

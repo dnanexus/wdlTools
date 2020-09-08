@@ -1,3 +1,11 @@
+/**
+  * TODO:
+  * - rewrite code generators using ideas from
+  *   - http://journal.stuffwithstuff.com/2015/09/08/the-hardest-program-ive-ever-written/
+  *   - https://github.com/prettier/prettier-printer
+  *   - https://jyp.github.io/posts/towards-the-prettiest-printer.html
+  *   - https://github.com/dprint/dprint/blob/master/README.md
+  */
 package wdlTools.generators.code
 
 import wdlTools.syntax.BuiltinSymbols

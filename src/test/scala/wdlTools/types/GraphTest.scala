@@ -8,7 +8,7 @@ import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import scalax.collection.GraphEdge.DiEdge
 import wdlTools.syntax.Parsers
-import wdlTools.types.ExprGraph.TaskVarKind
+import wdlTools.types.ExprGraph.VarKind
 import wdlTools.types.TypedAbstractSyntax.Task
 import wdlTools.types.WdlTypes._
 import wdlTools.util.{FileSourceResolver, Logger}
@@ -45,8 +45,8 @@ class GraphTest extends AnyFlatSpec with Matchers {
       case t: Task => t
     }
     tasks.size shouldBe 1
-    val (graph, variables) = ExprGraph.buildFromTask(tasks.head)
-    val ordered = GraphUtils.toOrderedVector(graph)
+    val exprGraph = ExprGraph.buildFromTask(tasks.head)
+    val ordered = exprGraph.dependencyOrder
     ordered.size shouldBe 9
     // there are mutliple equally valid sortings - we just need to make sure
     // the contents of each 'block' are the same and the blocks are ordered
@@ -56,25 +56,25 @@ class GraphTest extends AnyFlatSpec with Matchers {
         Set("dout2", "sout")
     )
     compareOrdered(expected, ordered)
-    variables.foreach {
+    exprGraph.varInfo.foreach {
       case ("b", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe Some(TaskVarKind.Input)
+        info.kind shouldBe Some(VarKind.Input)
       case ("y", info) =>
         info.referenced shouldBe false
         info.kind shouldBe None
       case ("f" | "s" | "i" | "d" | "name", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(TaskVarKind.Input)
+        info.kind shouldBe Some(VarKind.Input)
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(TaskVarKind.PreCommand)
+        info.kind shouldBe Some(VarKind.Private)
       case ("dout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(TaskVarKind.PostCommand)
+        info.kind shouldBe Some(VarKind.PostCommand)
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(TaskVarKind.Output)
+        info.kind shouldBe Some(VarKind.Output)
       case other =>
         throw new Exception(s"invalid var ${other}")
     }

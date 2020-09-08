@@ -21,7 +21,7 @@ case class Logger(quiet: Boolean,
                   traceLevel: Int,
                   keywords: Set[String] = Set.empty,
                   traceIndenting: Int = 0) {
-  private val DEFAULT_MESSAGE_LIMIT = 1000
+  private val DefaultMessageLimit = 1000
   private lazy val keywordsLower: Set[String] = keywords.map(_.toLowerCase)
 
   lazy val isVerbose: Boolean = traceLevel >= TraceLevel.Verbose
@@ -101,7 +101,7 @@ case class Logger(quiet: Boolean,
   // Logging output for applets at runtime. Shortcut for `trace()` with a message `maxLength`
   // (defaults to `APPLET_LOG_MSG_LIMIT`)
   def traceLimited(msg: String,
-                   limit: Int = DEFAULT_MESSAGE_LIMIT,
+                   limit: Int = DefaultMessageLimit,
                    minLevel: Int = TraceLevel.Verbose,
                    requiredKey: Option[String] = None,
                    exception: Option[Throwable] = None): Unit = {

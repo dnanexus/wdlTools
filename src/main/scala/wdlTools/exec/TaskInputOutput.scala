@@ -6,89 +6,146 @@ import spray.json._
 import wdlTools.eval.{
   Eval,
   EvalException,
-  WdlValueSerde,
   JsonSerializationException,
   WdlValueBindings,
-  WdlValues
+  WdlValueSerde,
+  WdlValues,
+  Utils => WdlValueUtils
 }
 import wdlTools.syntax.SourceLocation
-import wdlTools.types.TypedAbstractSyntax.{
-  InputDefinition,
-  OptionalInputDefinition,
-  OutputDefinition,
-  OverridableInputDefinitionWithDefault,
-  RequiredInputDefinition
-}
-import wdlTools.types.WdlTypes
+import wdlTools.types.TypedAbstractSyntax._
+import wdlTools.types.{ExprGraph, WdlTypes}
 import wdlTools.util.{FileSourceResolver, Logger}
 
 /**
   * Implemention of the JSON Input Format in the WDL specification
   * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
   */
-object InputOutput {
-  type WdlValue = WdlValues.V
+case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
+  private lazy val depOrder = ExprGraph.buildFromTask(task)
+  private lazy val taskInputs = task.inputs.map(inp => inp.name -> inp).toMap
+  private lazy val taskOutputs = task.outputs.map(out => out.name -> out).toMap
 
-  def taskInputFromJson(jsInputs: Map[String, JsValue],
-                        taskName: String,
-                        taskInputDefinitions: Vector[InputDefinition],
-                        evaluator: Eval,
-                        logger: Logger = Logger.Quiet,
-                        strict: Boolean = false): WdlValueBindings = {
-    val taskInputs = taskInputDefinitions.map(inp => inp.name -> inp).toMap
-    val typesAndValues: Map[String, (WdlTypes.T, Option[WdlValues.V])] = taskInputs.map {
-      case (declName, inp) =>
-        val fqn = s"${taskName}.${declName}"
-        val wdlType = inp.wdlType
-        val wdlValue: Option[WdlValues.V] =
-          jsInputs
-            .get(fqn)
-            .map(jsValue =>
-              try {
-                WdlValueSerde.deserialize(jsValue, wdlType, fqn)
-              } catch {
-                case jse: JsonSerializationException =>
-                  throw new ExecException(jse.getMessage, inp.loc)
-              }
-            )
-        declName -> (wdlType, wdlValue)
+  def inputsFromValues(inputValues: Map[String, WdlValues.V],
+                       evaluator: Eval,
+                       strict: Boolean = false): WdlValueBindings = {
+    // resolve default values for any missing inputs
+    depOrder.inputOrder.foldLeft(WdlValueBindings.empty) {
+      case (ctx, declName) =>
+        val value = taskInputs(declName) match {
+          case _: RequiredInputDefinition if inputValues.contains(declName) =>
+            // ensure the required value is not T_Optional
+            WdlValueUtils.unwrapOptional(inputValues(declName))
+          case inp: RequiredInputDefinition =>
+            throw new ExecException(s"Missing required input ${declName} to task ${task.name}",
+                                    inp.loc)
+          case _ if inputValues.contains(declName) =>
+            // ensure the optional value is T_Optional
+            WdlValueUtils.ensureOptional(inputValues(declName))
+          case _: OptionalInputDefinition =>
+            WdlValues.V_Null
+          case OverridableInputDefinitionWithDefault(_, wdlType, defaultExpr, loc) =>
+            // An input definition that has a default value supplied.
+            // Typical WDL example would be a declaration like: "Int x = 5"
+            try {
+              evaluator.applyExprAndCoerce(defaultExpr, wdlType, ctx)
+            } catch {
+              case e: EvalException if !strict =>
+                logger.trace(
+                    s"Could not evaluate default value expression for input parameter ${declName}",
+                    exception = Some(e)
+                )
+                WdlValues.V_Null
+              case t: Throwable =>
+                throw new ExecException(
+                    s"Could not evaluate default value expression for input parameter ${declName}",
+                    t,
+                    loc
+                )
+            }
+        }
+        ctx.add(declName, value)
     }
-    val (defined, undefined) = typesAndValues.partition(_._2._2.isDefined)
-    val definedContext = WdlValueBindings(defined.map {
-      case (declName, (_, Some(wdlValue))) => declName -> wdlValue
-    })
-    if (undefined.isEmpty) {
-      definedContext
-    } else {
-      // Evaluate defaults for missing values
-      // TODO: this could be done better by ordering the expressions based on their dependencies
-      undefined.keys.foldLeft(definedContext) {
-        case (ctx, declName) =>
-          val wdlValue: WdlValues.V = taskInputs(declName) match {
-            case inp: RequiredInputDefinition =>
-              throw new ExecException(s"Missing required input ${declName} to task ${taskName}",
-                                      inp.loc)
-            case _: OptionalInputDefinition => WdlValues.V_Null
-            case OverridableInputDefinitionWithDefault(_, _, defaultExpr, loc) =>
-              try {
-                evaluator.applyExpr(defaultExpr, ctx)
-              } catch {
-                case e: EvalException if !strict =>
-                  logger.trace(
-                      s"Could not evaluate default value expression for input parameter ${declName}",
-                      exception = Some(e)
-                  )
-                  WdlValues.V_Null
-                case t: Throwable =>
-                  throw new ExecException(
-                      s"Could not evaluate default value expression for input parameter ${declName}",
-                      t,
-                      loc
-                  )
-              }
+  }
+
+  def inputsFromJson(jsInputs: Map[String, JsValue],
+                     evaluator: Eval,
+                     strict: Boolean = false): WdlValueBindings = {
+    val values = taskInputs.flatMap {
+      case (declName, inp) =>
+        // lookup by fully-qualified name first, then plain name
+        val fqn = s"${task.name}.${declName}"
+        val value = if (jsInputs.contains(fqn)) {
+          TaskInputOutput.deserialize(jsInputs(fqn), inp, fqn)
+        } else if (jsInputs.contains(declName)) {
+          TaskInputOutput.deserialize(jsInputs(declName), inp, declName)
+        } else {
+          None
+        }
+        value.map(declName -> _)
+    }
+    inputsFromValues(values, evaluator, strict)
+  }
+
+  def outputValuesToJson(outputs: Map[String, WdlValues.V],
+                         prefixTaskName: Boolean = true): JsObject = {
+    val fields: Map[String, JsValue] = taskOutputs.map {
+      case (declName, out) =>
+        val key = if (prefixTaskName) {
+          s"${task.name}.${declName}"
+        } else {
+          declName
+        }
+        val value = {
+          val wdlValue = outputs(declName)
+          try {
+            WdlValueSerde.serialize(wdlValue)
+          } catch {
+            case e: JsonSerializationException =>
+              throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",
+                                      e,
+                                      out.loc)
           }
-          ctx.add(declName, wdlValue)
-      }
+        }
+        key -> value
+    }
+    JsObject(fields)
+  }
+
+  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): WdlValueBindings = {
+    depOrder.outputOrder.foldLeft(WdlValueBindings.empty) {
+      case (outCtx, declName) =>
+        val out = taskOutputs(declName)
+        outCtx.add(declName,
+                   evaluator.applyExprAndCoerce(out.expr, out.wdlType, ctx.update(outCtx)))
+    }
+  }
+
+  def outputsToJson(evaluator: Eval,
+                    ctx: WdlValueBindings,
+                    prefixTaskName: Boolean = true): JsObject = {
+    val outputValues: WdlValueBindings = evaluateOutputs(evaluator, ctx)
+    outputValuesToJson(outputValues.toMap, prefixTaskName)
+  }
+}
+
+object TaskInputOutput {
+  def deserialize(jsValue: JsValue,
+                  inputDef: InputDefinition,
+                  name: String): Option[WdlValues.V] = {
+    jsValue match {
+      case null | JsNull =>
+        // treat a value of null as undefined - this will get replaced with
+        // a default value (or an exception will be thrown if this is a
+        // required parameter)
+        None
+      case _ =>
+        try {
+          Some(WdlValueSerde.deserialize(jsValue, inputDef.wdlType, name))
+        } catch {
+          case jse: JsonSerializationException =>
+            throw new ExecException(jse.getMessage, inputDef.loc)
+        }
     }
   }
 
@@ -246,27 +303,5 @@ object InputOutput {
             loc
         )
     }
-  }
-
-  def taskOutputToJson(outputs: Map[String, WdlValues.V],
-                       taskName: String,
-                       taskOutputDefinitions: Vector[OutputDefinition]): JsObject = {
-    val fields: Map[String, JsValue] = taskOutputDefinitions.map { out =>
-      val declName = out.name
-      val key = s"${taskName}.${declName}"
-      val value = {
-        val wdlValue = outputs(declName)
-        try {
-          WdlValueSerde.serialize(wdlValue)
-        } catch {
-          case e: JsonSerializationException =>
-            throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",
-                                    e,
-                                    out.loc)
-        }
-      }
-      key -> value
-    }.toMap
-    JsObject(fields)
   }
 }
