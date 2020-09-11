@@ -78,7 +78,7 @@ object Utils {
     *   String s = "Ford model T"
     *   String s2 = 5
     */
-  def isPrimitive(t: T): Boolean = PrimitiveTypes.contains(t)
+  def isPrimitive(t: T): Boolean = PrimitiveTypes.contains(unwrapOptional(t))
 
   def isPrimitiveValue(expr: TAT.Expr): Boolean = {
     expr match {
@@ -107,7 +107,7 @@ object Utils {
     * @param force if true, then `t` will be made optional even if it is already optional.
     * @return
     */
-  def makeOptional(t: T, force: Boolean = false): T_Optional = {
+  def ensureOptional(t: T, force: Boolean = false): T_Optional = {
     t match {
       case t if force    => T_Optional(t)
       case t: T_Optional => t
@@ -366,20 +366,19 @@ object Utils {
     inner(expr, noQuoting)
   }
 
-  def prettyFormatInputs(inputs: Vector[TAT.InputDefinition]): String = {
-    inputs
-      .map {
-        case TAT.RequiredInputDefinition(iName, wdlType, _) =>
-          s"${prettyFormatType(wdlType)} ${iName}"
+  def prettyFormatInput(input: TAT.InputDefinition): String = {
+    input match {
+      case TAT.RequiredInputDefinition(name, wdlType, _) =>
+        s"${prettyFormatType(wdlType)} ${name}"
+      case TAT.OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+        s"${prettyFormatType(wdlType)} ${name} = ${prettyFormatExpr(defaultExpr)}"
+      case TAT.OptionalInputDefinition(name, wdlType, _) =>
+        s"${prettyFormatType(wdlType)} ${name}"
+    }
+  }
 
-        case TAT.OverridableInputDefinitionWithDefault(iName, wdlType, defaultExpr, _) =>
-          s"${prettyFormatType(wdlType)} ${iName} = ${prettyFormatExpr(defaultExpr)}"
-
-        case TAT.OptionalInputDefinition(iName, wdlType, _) =>
-          s"${prettyFormatType(wdlType)} ${iName}"
-
-      }
-      .mkString("\n")
+  def prettyFormatOutput(output: TAT.OutputDefinition): String = {
+    s"${prettyFormatType(output.wdlType)} ${output.name} = ${prettyFormatExpr(output.expr)}"
   }
 
   /**

@@ -882,11 +882,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       bindings.toMap.map {
         case (callName, callType: T_Call) =>
           val callOutput = callType.output.map {
-            case (name, t) => name -> Utils.makeOptional(t)
+            case (name, t) => name -> Utils.ensureOptional(t)
           }
           callName -> T_Call(callType.name, callOutput)
         case (varName, typ: WdlType) =>
-          varName -> Utils.makeOptional(typ)
+          varName -> Utils.ensureOptional(typ)
       }
 
     (TAT.Conditional(condExpr, wfElements, cond.loc), WdlTypeBindings(optionalBindings))

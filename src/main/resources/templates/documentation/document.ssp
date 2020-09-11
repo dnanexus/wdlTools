@@ -1,48 +1,10 @@
-<%@ import val doc: wdlTools.generators.DocumentationGenerator.WdlDocumentation %>
+<%@ import val doc: wdlTools.generators.project.DocumentationGenerator.WdlDocumentation %>
 <%
-import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.Utils._
-import wdlTools.generators.DocumentationGenerator._
-import java.nio.file.Paths
-def typeToString(wdlType: Type): String = {
-  wdlType match {
-    case TypeOptional(t, _)        => s"${typeToString(t)}?"
-    case TypeArray(t, nonEmpty, _) => s"Array[${typeToString(t)}]${if (nonEmpty) "+" else ""}"
-    case TypeMap(k, v, _)          => s"Map[${typeToString(k)}, ${typeToString(v)}]"
-    case TypePair(l, r, _)         => s"Pair[${typeToString(l)}, ${typeToString(r)}]"
-    case TypeString(_)             => "String"
-    case TypeFile(_)               => "File"
-    case TypeDirectory(_)          => "Directory"
-    case TypeBoolean(_)            => "Boolean"
-    case TypeInt(_)                => "Int"
-    case TypeFloat(_)              => "Float"
-    case TypeIdentifier(id, _)     => s"[${id}](#${id})"
-    case TypeObject(_)             => "Object"
-    case TypeStruct(name, _, _)    => s"[${name}](#${name})"
-  }
-}
-def formatMetaValue(metaValue: ValueDocumentation, indent: String = ""): String = {
-  metaValue match {
-    case SimpleValueDocumentation(value, comment) =>
-      val s: String = value match {
-        case e: Expr => exprToString(e)
-        case v: MetaValue => metaValueToString(v)
-        case other => other.toString
-      }
-      if (comment.isDefined) {
-        s"${s} (${comment.get})"
-      } else {
-        s
-      }
-      case ListValueDocumentation(value, comment) => s"${value.map(x => formatMetaValue(x, indent + "    ")).mkString(", ")}"
-      case MapValueDocumentation(value, comment) =>
-        val indent2 = s"${indent}    "
-        val items = value.map(x => s"${indent2}* ${x._1}: ${formatMetaValue(x._2, indent2 + "    ")}")
-        s"\n${items.mkString("\n")}"
-  }
+def indent(value: Any, indent: "    "): String = {
+  value.toString.linesIterator.map(line => s"${indent}${line}").mkString("\n")
 }
 %>
-# [${Paths.get(doc.sourceUrl.getPath).getFileName}](${doc.sourceUrl})
+# [${doc.source.fileName}](${doc.source.toString})
 
 <% if (doc.comment.isDefined) {%>
 ${doc.comment.get}
@@ -93,7 +55,7 @@ ${doc.workflow.get.comment.get}
 ### Metadata
 
 <% for (kv <- doc.workflow.get.meta) { %>
-* ${kv.key}: ${formatMetaValue(kv.value)}
+* ${kv.key}: ${kv.value}
 <% } %>
 <% } %>
 <% if (doc.workflow.get.inputs.nonEmpty) { %>
@@ -101,14 +63,14 @@ ${doc.workflow.get.comment.get}
 ### Inputs
 
 <% for (inp <- doc.workflow.get.inputs) { %>
-* ${typeToString(inp.wdlType)} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
+* ${inp.wdlType} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
 <% if (inp.defaultValue.isDefined) { %>
 
-  * Default value: ${inp.defaultValue.get}
+    * Default value: ${inp.defaultValue.get}
 <% } %>
 <% if (inp.meta.isDefined) { %>
 
-    * Metadata: ${formatMetaValue(inp.meta.get, "    ")}
+    * Metadata: ${indent(inp.meta.get, "    ")}
 <% } %>
 <% } %>
 
@@ -118,10 +80,10 @@ ${doc.workflow.get.comment.get}
 ### Outputs
 
 <% for (out <- doc.workflow.get.outputs) { %>
-* ${typeToString(out.wdlType)} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
+* ${out.wdlType} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
 <% if (out.meta.isDefined) { %>
 
-    * Metadata: ${formatMetaValue(out.meta.get, "    ")}
+    * Metadata: ${indent(out.meta.get, "    ")}
 <% } %>
 <% } %>
 
@@ -151,7 +113,7 @@ ${task.comment.get}
 #### Metadata
 
 <% for (kv <- task.meta) { %>
-* ${kv.key}: ${formatMetaValue(kv.value)}
+* ${kv.key}: ${kv.value}
 <% } %>
 <% } %>
 <% if (task.inputs.nonEmpty) { %>
@@ -159,13 +121,13 @@ ${task.comment.get}
 #### Inputs
 
 <% for (inp <- task.inputs) { %>
-* ${typeToString(inp.wdlType)} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
+* ${inp.wdlType} ${inp.name}<% if (inp.comment.isDefined) { %>: ${inp.comment.get}<% } %>
 <% if (inp.defaultValue.isDefined) { %>
 
     * Default value: ${inp.defaultValue.get}
 <% } %>
 <% if (inp.meta.isDefined) { %>
-    * Metadata: ${formatMetaValue(inp.meta.get, "    ")}
+    * Metadata: ${indent(inp.meta.get, "    ")}
 <% } %>
 <% } %>
 
@@ -175,13 +137,13 @@ ${task.comment.get}
 #### Outputs
 
 <% for (out <- task.outputs) { %>
-* ${typeToString(out.wdlType)} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
+* ${out.wdlType} ${out.name}<% if (out.comment.isDefined) { %>: ${out.comment.get}<% } %>
 <% if (out.defaultValue.isDefined) { %>
 
     * Default value: ${out.defaultValue.get}
 <% } %>
 <% if (out.meta.isDefined) { %>
-    * Metadata: ${formatMetaValue(out.meta.get, "    ")}
+    * Metadata: ${indent(out.meta.get, "    ")}
 <% } %>
 <% } %>
 
@@ -191,7 +153,7 @@ ${task.comment.get}
 #### Runtime
 
 <% for (kv <- task.runtime) { %>
-* ${kv.key}: ${formatMetaValue(kv.value)}
+* ${kv.key}: ${kv.value}
 <% } %>
 <% } %>
 <% if (task.hints.nonEmpty) { %>
@@ -199,7 +161,7 @@ ${task.comment.get}
 #### Hints
 
 <% for (kv <- task.hints) { %>
-* ${kv.key}: ${formatMetaValue(kv.value)}
+* ${kv.key}: ${kv.value}
 <% } %>
 <% } %>
 <% } %>

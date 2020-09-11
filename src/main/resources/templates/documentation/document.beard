@@ -1,0 +1,154 @@
+# [{{ doc.source.fileName }}]({{ doc.source.toString }})
+
+{{ if doc.comment.isDefined }}
+{{ doc.comment.get }}
+
+{{ /if }}
+{{ if doc.imports.nonEmpty }}
+* [Imports](#imports)
+{{ /if }}
+{{ if doc.workflow.isDefined }}
+* [Workflow {{ doc.workflow.get.name }}](#workflow)
+{{ /if }}
+{{ if doc.tasks.nonEmpty }}
+* [Tasks](#tasks)
+{{ for task in doc.tasks }}
+* [{{ task.name }}](#{{ task.name }})
+{{ /for }}
+{{ /if }}
+{{ if doc.imports.nonEmpty }}
+
+## Imports
+
+{{ for imp in doc.imports }}
+* [{{ imp.name }}]({{ imp.addr }}){{ if imp.comment.isDefined }}: {{ imp.comment.get }}{{ /if }}
+
+{{ for name, alias in imp.aliases }}
+* {{ name }} as {{ alias }}
+{{ /for }}
+{{ /for }}
+{{ /if }}
+{{ if doc.workflow.isDefined }}
+
+<a name="workflow"></a>
+## Workflow {{ doc.workflow.get.name }}
+{{ if doc.workflow.get.comment.isDefined }}
+
+{{ doc.workflow.get.comment.get }}
+{{ /if }}
+{{ if doc.workflow.get.meta.nonEmpty }}
+
+### Metadata
+
+{{ for kv in doc.workflow.get.meta }}
+* {{ kv.key }}: {{ kv.value }}
+{{ /for }}
+{{ /if }}
+{{ if doc.workflow.get.inputs.nonEmpty }}
+
+### Inputs
+
+{{ for inp in doc.workflow.get.inputs }}
+* {{ inp.wdlType }} {{ inp.name }}{{ if inp.comment.isDefined }}: {{ inp.comment.get }}{{ /if }}
+{{ if inp.defaultValue.isDefined }}
+
+* Default value: {{ inp.defaultValue.get }}
+{{ /if }}
+{{ if inp.meta.isDefined }}
+
+* Metadata: {{ inp.meta.get | indent length=4) }}
+{{ /if }}
+{{ /for }}
+
+{{ /if }}
+{{ if doc.workflow.get.outputs.nonEmpty }}
+
+### Outputs
+
+{{ for out in doc.workflow.get.outputs }}
+* {{ out.wdlType }} {{ out.name }}{{ if out.comment.isDefined }}: {{ out.comment.get }}{{ /if }}
+{{ if out.meta.isDefined }}
+
+* Metadata: {{ out.meta.get | indent length=4 }}
+{{ /if }}
+{{ /for }}
+
+{{ /if }}
+{{ if doc.workflow.get.calls.nonEmpty }}
+
+### Calls
+
+{{ for call in doc.workflow.get.calls }}
+* [{{ call.name }}](#{{ call.name }}){{ if call.comment.isDefined }}: {{ call.comment.get }}{{ /if }}
+{{ /for }}
+{{ /if }}
+
+{{ /if }}
+{{ if doc.tasks.nonEmpty }}
+
+## Tasks
+{{ for task in doc.tasks }}
+
+### {{ task.name }}
+{{ if task.comment.isDefined }}
+
+{{ task.comment.get }}
+{{ /if }}
+{{ if task.meta.nonEmpty }}
+
+#### Metadata
+
+{{ for kv in task.meta }}
+* {{ kv.key }}: {{ kv.value }}
+{{ /for }}
+{{ /if }}
+{{ if task.inputs.nonEmpty }}
+
+#### Inputs
+
+{{ for inp in task.inputs }}
+* {{ inp.wdlType }} {{ inp.name }}{{ if inp.comment.isDefined }}: {{inp.comment.get }}{{ /if }}
+{{ if inp.defaultValue.isDefined }}
+
+* Default value: {{ inp.defaultValue.get }}
+{{ /if }}
+{{ if inp.meta.isDefined }}
+* Metadata: {{ inp.meta.get | indent length=4 }}
+{{ /if }}
+{{ /for }}
+
+{{ /if }}
+{{ if task.outputs.nonEmpty }}
+
+#### Outputs
+
+{{ for out in task.outputs }}
+* {{ out.wdlType }} {{ out.name }}{{ if out.comment.isDefined }}: {{ out.comment.get }}{{ /if }}
+{{ if out.defaultValue.isDefined }}
+
+* Default value: {{ out.defaultValue.get }}
+{{ /if }}
+{{ if out.meta.isDefined }}
+* Metadata: {{ out.meta.get | indent length=4 }}
+{{ /if }}
+{{ /for }}
+
+{{ /if }}
+{{ if task.runtime.nonEmpty }}
+
+#### Runtime
+
+{{ for kv in task.runtime }}
+* {{ kv.key }}: {{ kv.value }}
+{{ /for }}
+{{ /if }}
+{{ if task.hints.nonEmpty }}
+
+#### Hints
+
+{{ for kv in task.hints }}
+* {{ kv.key }}: {{ kv.value }}
+{{ /for }}
+{{ /if }}
+{{ /for }}
+{{ /if }}

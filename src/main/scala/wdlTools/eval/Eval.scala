@@ -100,7 +100,7 @@ case class Eval(paths: EvalPaths,
       // within an interpolation, null/None renders as empty string
       case V_Null | V_Optional(V_Null) => ""
       case other =>
-        Utils.primitiveValueToString(other, loc)
+        Utils.formatPrimitive(other, loc)
     }
   }
 
@@ -480,7 +480,7 @@ case class Eval(paths: EvalPaths,
       .map { expr =>
         apply(expr, ctx) match {
           case V_Null => ""
-          case value  => Utils.primitiveValueToString(value, expr.loc)
+          case value  => Utils.formatPrimitive(value, expr.loc)
         }
       }
       .mkString("")

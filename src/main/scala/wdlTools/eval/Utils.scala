@@ -5,6 +5,8 @@ import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 import wdlTools.util.{AbstractBindings, Bindings}
 
+import scala.annotation.tailrec
+
 object Utils {
   // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
   def sizeUnit(sUnit: String, loc: SourceLocation): Double = {
@@ -90,17 +92,33 @@ object Utils {
     }
   }
 
+  @tailrec
+  def isPrimitive(value: V): Boolean = {
+    value match {
+      case V_Null         => true
+      case V_Boolean(_)   => true
+      case V_Int(_)       => true
+      case V_Float(_)     => true
+      case V_String(_)    => true
+      case V_File(_)      => true
+      case V_Directory(_) => true
+      case V_Optional(v)  => isPrimitive(v)
+      case _              => false
+    }
+  }
+
   // TODO: within string interpolation, V_Null should render as empty string
-  @scala.annotation.tailrec
-  def primitiveValueToString(wv: V, loc: SourceLocation): String = {
+  @tailrec
+  def formatPrimitive(wv: V, loc: SourceLocation = SourceLocation.empty): String = {
     wv match {
-      case V_Null           => "null"
-      case V_Boolean(value) => value.toString
-      case V_Int(value)     => value.toString
-      case V_Float(value)   => value.toString
-      case V_String(value)  => value
-      case V_File(value)    => value
-      case V_Optional(x)    => primitiveValueToString(x, loc)
+      case V_Null             => "null"
+      case V_Boolean(value)   => value.toString
+      case V_Int(value)       => value.toString
+      case V_Float(value)     => value.toString
+      case V_String(value)    => value
+      case V_File(value)      => value
+      case V_Directory(value) => value
+      case V_Optional(x)      => formatPrimitive(x, loc)
       case other =>
         throw new EvalException(s"${other} is not a primitive value", loc)
     }

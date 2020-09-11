@@ -17,27 +17,28 @@ import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
 import wdlTools.util.{FileSourceResolver, Logger}
 
-/**
-  * Implemention of the JSON Input Format in the WDL specification
-  * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
-  */
-case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
-  private lazy val depOrder = ExprGraph.buildFromTask(task)
-  private lazy val taskInputs = task.inputs.map(inp => inp.name -> inp).toMap
-  private lazy val taskOutputs = task.outputs.map(out => out.name -> out).toMap
+abstract class InputOutput(callable: Callable, logger: Logger) {
+  protected lazy val callableInputs: Map[String, InputDefinition] =
+    callable.inputs.map(inp => inp.name -> inp).toMap
+  protected lazy val callableOutputs: Map[String, OutputDefinition] =
+    callable.outputs.map(out => out.name -> out).toMap
+
+  protected def inputOrder: Vector[String]
+
+  protected def outputOrder: Vector[String]
 
   def inputsFromValues(inputValues: Map[String, WdlValues.V],
                        evaluator: Eval,
                        strict: Boolean = false): WdlValueBindings = {
     // resolve default values for any missing inputs
-    depOrder.inputOrder.foldLeft(WdlValueBindings.empty) {
+    inputOrder.foldLeft(WdlValueBindings.empty) {
       case (ctx, declName) =>
-        val value = taskInputs(declName) match {
+        val value = callableInputs(declName) match {
           case _: RequiredInputDefinition if inputValues.contains(declName) =>
             // ensure the required value is not T_Optional
             WdlValueUtils.unwrapOptional(inputValues(declName))
           case inp: RequiredInputDefinition =>
-            throw new ExecException(s"Missing required input ${declName} to task ${task.name}",
+            throw new ExecException(s"Missing required input ${declName} to task ${callable.name}",
                                     inp.loc)
           case _ if inputValues.contains(declName) =>
             // ensure the optional value is T_Optional
@@ -68,10 +69,32 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
     }
   }
 
+  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): WdlValueBindings = {
+    outputOrder.foldLeft(WdlValueBindings.empty) {
+      case (outCtx, declName) =>
+        val out = callableOutputs(declName)
+        outCtx.add(declName,
+                   evaluator.applyExprAndCoerce(out.expr, out.wdlType, ctx.update(outCtx)))
+    }
+  }
+}
+
+/**
+  * Implemention of the JSON Input Format in the WDL specification
+  * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
+  */
+case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
+    extends InputOutput(task, logger) {
+  private lazy val depOrder = ExprGraph.buildFromTask(task)
+
+  override protected def inputOrder: Vector[String] = depOrder.inputOrder
+
+  override protected def outputOrder: Vector[String] = depOrder.outputOrder
+
   def inputsFromJson(jsInputs: Map[String, JsValue],
                      evaluator: Eval,
                      strict: Boolean = false): WdlValueBindings = {
-    val values = taskInputs.flatMap {
+    val values = callableInputs.flatMap {
       case (declName, inp) =>
         // lookup by fully-qualified name first, then plain name
         val fqn = s"${task.name}.${declName}"
@@ -89,7 +112,7 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
 
   def outputValuesToJson(outputs: Map[String, WdlValues.V],
                          prefixTaskName: Boolean = true): JsObject = {
-    val fields: Map[String, JsValue] = taskOutputs.map {
+    val fields: Map[String, JsValue] = callableOutputs.map {
       case (declName, out) =>
         val key = if (prefixTaskName) {
           s"${task.name}.${declName}"
@@ -110,15 +133,6 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
         key -> value
     }
     JsObject(fields)
-  }
-
-  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): WdlValueBindings = {
-    depOrder.outputOrder.foldLeft(WdlValueBindings.empty) {
-      case (outCtx, declName) =>
-        val out = taskOutputs(declName)
-        outCtx.add(declName,
-                   evaluator.applyExprAndCoerce(out.expr, out.wdlType, ctx.update(outCtx)))
-    }
   }
 
   def outputsToJson(evaluator: Eval,

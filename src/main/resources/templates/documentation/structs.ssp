@@ -1,24 +1,4 @@
 <%@ import val structs: Vector[wdlTools.generators.project.DocumentationGenerator.StructDocumentation] %>
-<%
-import wdlTools.syntax.AbstractSyntax._
-def typeToString(wdlType: Type): String = {
-  wdlType match {
-  case TypeOptional(t, _)        => s"${typeToString(t)}?"
-  case TypeArray(t, nonEmpty, _) => s"Array[${typeToString(t)}]${if (nonEmpty) "+" else ""}"
-  case TypeMap(k, v, _)          => s"Map[${typeToString(k)}, ${typeToString(v)}]"
-  case TypePair(l, r, _)         => s"Pair[${typeToString(l)}, ${typeToString(r)}]"
-  case TypeString(_)             => "String"
-  case TypeFile(_)               => "File"
-  case TypeDirectory(_)          => "Directory"
-  case TypeBoolean(_)            => "Boolean"
-  case TypeInt(_)                => "Int"
-  case TypeFloat(_)              => "Float"
-  case TypeIdentifier(id, _)     => s"[${id}](#${id})"
-  case TypeObject(_)             => "Object"
-  case TypeStruct(name, _, _)    => s"[${name}](#${name})"
-  }
-}
-%>
 # Structs
 
 <% for (struct <- structs) { %>
@@ -32,7 +12,7 @@ ${struct.comment.get}
 ### Members
 
 <% for (member <- struct.members) { %>
-* ${typeToString(member.wdlType)} ${member.name}<% if (member.comment.isDefined) { %>: ${member.comment.get}<% } %>
+* ${member.wdlType} ${member.name}<% if (member.comment.isDefined) { %>: ${member.comment.get}<% } %>
 
 <% }%>
 <% }%>

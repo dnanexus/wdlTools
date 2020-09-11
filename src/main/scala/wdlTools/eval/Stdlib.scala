@@ -1150,7 +1150,7 @@ case class Stdlib(paths: EvalPaths,
   }
 
   private def getStringVector(arg: V, loc: SourceLocation): Vector[String] = {
-    getWdlVector(arg, loc).map(vw => Utils.primitiveValueToString(vw, loc))
+    getWdlVector(arg, loc).map(vw => Utils.formatPrimitive(vw, loc))
   }
 
   // X select_first(Array[X?])

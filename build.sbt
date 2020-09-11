@@ -77,6 +77,10 @@ assemblyJarName in assembly := "wdlTools.jar"
 logLevel in assembly := Level.Info
 //assemblyOutputPath in assembly := file("applet_resources/resources/dxWDL.jar")
 
+resolvers ++= Seq(
+    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
+)
+
 val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
@@ -85,6 +89,7 @@ val sprayVersion = "1.3.5"
 val katanVersion = "0.6.1"
 val graphVersion = "1.13.2"
 val scalatestVersion = "3.1.1"
+//val beardVersion = "0.3.1"
 
 libraryDependencies ++= Seq(
     // antlr4 lexer + parser
@@ -93,6 +98,7 @@ libraryDependencies ++= Seq(
     "org.rogach" %% "scallop" % scallopVersion,
     // template engine
     "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
+//    "de.zalando" %% "beard" % beardVersion,
     "com.typesafe" % "config" % typesafeVersion,
     "io.spray" %% "spray-json" % sprayVersion,
     "com.nrinaudo" %% "kantan.csv" % katanVersion,

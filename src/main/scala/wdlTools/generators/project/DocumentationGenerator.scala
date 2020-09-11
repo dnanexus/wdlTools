@@ -3,13 +3,14 @@ package wdlTools.generators.project
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Utils.prettyFormatExpr
-import wdlTools.syntax.{Comment, Parsers}
+import wdlTools.syntax.{Comment, Parsers, Utils}
 import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
 
 object DocumentationGenerator {
-  private val DOCUMENT_TEMPLATE = "/templates/documentation/document.ssp"
-  private val STRUCTS_TEMPLATE = "/templates/documentation/structs.ssp"
-  private val INDEX_TEMPLATE = "/templates/documentation/index.ssp"
+  //private val TemplatePrefix = "/templates/documentation/"
+  private val DocumentTemplate = "/templates/documentation/document.ssp"
+  private val StructsTemplate = "/templates/documentation/structs.ssp"
+  private val IndexTemplate = "/templates/documentation/index.ssp"
 
   case class DocumentationComment(comments: Vector[Comment]) {
     private val commentRegex = "#+\\s*(.*)".r
@@ -23,6 +24,29 @@ object DocumentationGenerator {
     }
   }
 
+  private def formatMetaValue(metaValue: ValueDocumentation, indent: String = ""): String = {
+    metaValue match {
+      case SimpleValueDocumentation(value, comment) =>
+        val s: String = value match {
+          case e: Expr      => Utils.prettyFormatExpr(e)
+          case v: MetaValue => Utils.prettyFormatMetaValue(v)
+          case other        => other.toString
+        }
+        if (comment.isDefined) {
+          s"${s} (${comment.get})"
+        } else {
+          s
+        }
+      case ListValueDocumentation(value, _) =>
+        s"${value.map(x => formatMetaValue(x, indent + "    ")).mkString(", ")}"
+      case MapValueDocumentation(value, _) =>
+        val indent2 = s"${indent}    "
+        val items =
+          value.map(x => s"${indent2}* ${x._1}: ${formatMetaValue(x._2, indent2 + "    ")}")
+        s"\n${items.mkString("\n")}"
+    }
+  }
+
   case class ImportDocumentation(addr: String,
                                  name: String,
                                  aliases: Map[String, String],
@@ -30,6 +54,8 @@ object DocumentationGenerator {
 
   trait ValueDocumentation {
     val comment: Option[DocumentationComment]
+
+    override def toString: String = formatMetaValue(this)
   }
 
   case class SimpleValueDocumentation(value: Element, comment: Option[DocumentationComment])
@@ -48,7 +74,7 @@ object DocumentationGenerator {
                                    comment: Option[DocumentationComment])
 
   case class DeclarationDocumentation(name: String,
-                                      wdlType: Type,
+                                      wdlType: String,
                                       defaultValue: Option[String] = None,
                                       meta: Option[ValueDocumentation] = None,
                                       comment: Option[DocumentationComment])
@@ -164,6 +190,25 @@ object DocumentationGenerator {
         }
       }
 
+      def wdlTypeToString(wdlType: Type): String = {
+        wdlType match {
+          case TypeOptional(t, _) => s"${wdlTypeToString(t)}?"
+          case TypeArray(t, nonEmpty, _) =>
+            s"Array[${wdlTypeToString(t)}]${if (nonEmpty) "+" else ""}"
+          case TypeMap(k, v, _)       => s"Map[${wdlTypeToString(k)}, ${wdlTypeToString(v)}]"
+          case TypePair(l, r, _)      => s"Pair[${wdlTypeToString(l)}, ${wdlTypeToString(r)}]"
+          case TypeString(_)          => "String"
+          case TypeFile(_)            => "File"
+          case TypeDirectory(_)       => "Directory"
+          case TypeBoolean(_)         => "Boolean"
+          case TypeInt(_)             => "Int"
+          case TypeFloat(_)           => "Float"
+          case TypeIdentifier(id, _)  => s"[${id}](#${id})"
+          case TypeObject(_)          => "Object"
+          case TypeStruct(name, _, _) => s"[${name}](#${name})"
+        }
+      }
+
       def getDeclarationDocumentation(
           decls: Vector[Declaration],
           meta: Option[ParameterMetaSection],
@@ -180,7 +225,7 @@ object DocumentationGenerator {
           }
           DeclarationDocumentation(
               d.name,
-              d.wdlType,
+              wdlTypeToString(d.wdlType),
               default,
               paramMeta.map(v => getMetaValueDocumentation(v, meta.get.loc.line)),
               getDocumentationComment(d)
@@ -212,9 +257,15 @@ object DocumentationGenerator {
       }
       val structs = sortedElements.collect {
         case struct: TypeStruct =>
-          StructDocumentation(struct.name, struct.members.map(m => {
-            DeclarationDocumentation(m.name, m.wdlType, comment = getDocumentationComment(m))
-          }), getDocumentationComment(struct))
+          StructDocumentation(
+              struct.name,
+              struct.members.map(m => {
+                DeclarationDocumentation(m.name,
+                                         wdlTypeToString(m.wdlType),
+                                         comment = getDocumentationComment(m))
+              }),
+              getDocumentationComment(struct)
+          )
       }
       val workflow = sortedElements.collect {
         case wf: Workflow =>
@@ -308,19 +359,19 @@ object DocumentationGenerator {
         }
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
-    val renderer: Renderer = Renderer()
+    val renderer = Renderer()
     val pages: Vector[FileSource] = docs.map {
       case (source, doc) =>
         val destFile = FileUtils.changeFileExt(source.fileName, ".wdl", ".md")
         StringFileSource(
-            renderer.render(DOCUMENT_TEMPLATE, Map("doc" -> doc)),
+            renderer.render(DocumentTemplate, Map("doc" -> doc)),
             Some(FileUtils.getPath(destFile))
         )
     }.toVector ++ (
         if (structs.nonEmpty) {
           Vector(
               StringFileSource(
-                  renderer.render(STRUCTS_TEMPLATE, Map("structs" -> structs)),
+                  renderer.render(StructsTemplate, Map("structs" -> structs)),
                   Some(FileUtils.getPath("structs.md"))
               )
           )
@@ -329,7 +380,7 @@ object DocumentationGenerator {
         }
     )
     pages :+ StringFileSource(
-        renderer.render(INDEX_TEMPLATE, Map("title" -> title, "pages" -> pages.map(_.fileName))),
+        renderer.render(IndexTemplate, Map("title" -> title, "pages" -> pages.map(_.fileName))),
         Some(FileUtils.getPath("index.md"))
     )
   }
