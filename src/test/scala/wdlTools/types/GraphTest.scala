@@ -68,7 +68,7 @@ class GraphTest extends AnyFlatSpec with Matchers {
         info.kind shouldBe Some(VarKind.Input)
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Private)
+        info.kind shouldBe Some(VarKind.Intermediate)
       case ("dout", info) =>
         info.referenced shouldBe true
         info.kind shouldBe Some(VarKind.PostCommand)

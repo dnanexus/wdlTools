@@ -20,10 +20,13 @@ case class DocumentElements(doc: TAT.Document) {
 }
 
 case class WorkflowScatter(scatter: TAT.Scatter) {
+  val identifier: String = scatter.identifier
+  val expr = scatter.expr
   val bodyElements: WorkflowBodyElements = WorkflowBodyElements(scatter.body)
 }
 
 case class WorkflowConditional(conditional: TAT.Conditional) {
+  val expr = conditional.expr
   val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body)
 }
 
