@@ -45,7 +45,7 @@ class GraphTest extends AnyFlatSpec with Matchers {
       case t: Task => t
     }
     tasks.size shouldBe 1
-    val exprGraph = ExprGraph.buildFromTask(tasks.head)
+    val exprGraph = ExprGraph.buildFrom(tasks.head)
     val ordered = exprGraph.dependencyOrder
     ordered.size shouldBe 9
     // there are mutliple equally valid sortings - we just need to make sure
@@ -59,22 +59,22 @@ class GraphTest extends AnyFlatSpec with Matchers {
     exprGraph.varInfo.foreach {
       case ("b", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe Some(VarKind.Input)
+        info.kind shouldBe VarKind.Input
       case ("y", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe None
+        info.kind shouldBe VarKind.Intermediate
       case ("f" | "s" | "i" | "d" | "name", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Input)
+        info.kind shouldBe VarKind.Input
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Intermediate)
+        info.kind shouldBe VarKind.Intermediate
       case ("dout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.PostCommand)
+        info.kind shouldBe VarKind.PostCommand
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe Some(VarKind.Output)
+        info.kind shouldBe VarKind.Output
       case other =>
         throw new Exception(s"invalid var ${other}")
     }
@@ -156,5 +156,18 @@ class GraphTest extends AnyFlatSpec with Matchers {
         Set("Boom")
     )
     compareOrdered(expectedWithAliases, orderedWithAliases)
+  }
+
+  it should "build an expression graph from WDL file" in {
+    val fileSource = fileResolver.resolve("many_structs.wdl")
+    val doc = parsers.parseDocument(fileSource)
+    val (_, ctx) = typeInfer.apply(doc)
+    val graph = TypeGraph.buildFromStructTypes(ctx.aliases.bindings)
+    val ordered = GraphUtils.toOrderedVector(graph)
+    val expected = Vector(
+        Set("Coord", "Bunk", "Foo", "SampleReports"),
+        Set("SampleReportsArray")
+    )
+    compareOrdered(expected, ordered)
   }
 }

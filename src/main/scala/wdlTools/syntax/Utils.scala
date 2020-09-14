@@ -45,7 +45,7 @@ object Utils {
             .mkString(", ")
           s"object($m)"
         // ~{true="--yes" false="--no" boolean_value}
-        case ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, _) =>
+        case ExprPlaceholderCondition(t: Expr, f: Expr, value: Expr, _) =>
           s"{true=${inner(t)} false=${inner(f)} ${inner(value)}"
 
         // ~{default="foo" optional_value}

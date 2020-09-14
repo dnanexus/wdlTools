@@ -345,7 +345,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     decls.foreach {
       case TAT.Declaration(id, wdlType, Some(expr), _) =>
         val expected: Option[WdlValues.V] = allExpectedResults(id)
-        println(s"${id} ${wdlType} ${expr} ${expected}")
+        //println(s"${id} ${wdlType} ${expr} ${expected}")
         expected match {
           case None =>
             assertThrows[EvalException] {

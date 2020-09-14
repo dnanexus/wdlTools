@@ -168,7 +168,7 @@ case class Eval(paths: EvalPaths,
             interpolationValueToString(v, expr.loc)
           }
           V_String(strArray.mkString(""))
-        case TAT.ExprPlaceholderEqual(t, f, boolExpr, _, _) =>
+        case TAT.ExprPlaceholderCondition(t, f, boolExpr, _, _) =>
           // ~{true="--yes" false="--no" boolean_value}
           inner(boolExpr, nestedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
             case V_Boolean(true) =>

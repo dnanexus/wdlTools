@@ -50,11 +50,11 @@ object TypedAbstractSyntax {
   sealed trait ExprPlaceholder extends Expr {
     val value: Expr
   }
-  case class ExprPlaceholderEqual(t: Expr,
-                                  f: Expr,
-                                  value: Expr,
-                                  wdlType: WdlType,
-                                  loc: SourceLocation)
+  case class ExprPlaceholderCondition(t: Expr,
+                                      f: Expr,
+                                      value: Expr,
+                                      wdlType: WdlType,
+                                      loc: SourceLocation)
       extends ExprPlaceholder
   case class ExprPlaceholderDefault(default: Expr,
                                     value: Expr,

@@ -326,7 +326,7 @@ object Utils {
           s"object {$m2}"
 
         // ~{true="--yes" false="--no" boolean_value}
-        case TAT.ExprPlaceholderEqual(t, f, value, _, _) =>
+        case TAT.ExprPlaceholderCondition(t, f, value, _, _) =>
           s"{true=${inner(t, disableQuoting)} false=${inner(f, disableQuoting)} ${inner(value, disableQuoting)}"
 
         // ~{default="foo" optional_value}
@@ -417,7 +417,7 @@ object Utils {
         valMap.flatMap { case (k, v) => exprDependencies(k) ++ exprDependencies(v) }
       case TAT.ExprObject(fields, _, _) =>
         fields.flatMap { case (_, v) => exprDependencies(v) }
-      case TAT.ExprPlaceholderEqual(t: TAT.Expr, f: TAT.Expr, value: TAT.Expr, _, _) =>
+      case TAT.ExprPlaceholderCondition(t: TAT.Expr, f: TAT.Expr, value: TAT.Expr, _, _) =>
         exprDependencies(t) ++ exprDependencies(f) ++ exprDependencies(value)
       case TAT.ExprPlaceholderDefault(default: TAT.Expr, value: TAT.Expr, _, _) =>
         exprDependencies(default) ++ exprDependencies(value)

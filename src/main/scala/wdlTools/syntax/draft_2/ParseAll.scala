@@ -69,10 +69,10 @@ case class ParseAll(followImports: Boolean = false,
 
         // string place holders
         case CST.ExprPlaceholderEqual(t, f, value, srcText) =>
-          AST.ExprPlaceholderEqual(translateExpr(t),
-                                   translateExpr(f),
-                                   translateExpr(value),
-                                   srcText)
+          AST.ExprPlaceholderCondition(translateExpr(t),
+                                       translateExpr(f),
+                                       translateExpr(value),
+                                       srcText)
         case CST.ExprPlaceholderDefault(default, value, srcText) =>
           AST.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
         case CST.ExprPlaceholderSep(sep, value, srcText) =>

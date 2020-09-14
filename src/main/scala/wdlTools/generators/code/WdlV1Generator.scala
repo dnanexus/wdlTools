@@ -350,7 +350,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             Wrapping.Always
         )
       // placeholders
-      case ExprPlaceholderEqual(t, f, value, _, _) =>
+      case ExprPlaceholderCondition(t, f, value, _, _) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,

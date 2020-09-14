@@ -523,7 +523,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
             Wrapping.Always
         )
       // placeholders
-      case ExprPlaceholderEqual(t, f, value, text) =>
+      case ExprPlaceholderCondition(t, f, value, text) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,

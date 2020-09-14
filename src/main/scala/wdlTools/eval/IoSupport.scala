@@ -77,9 +77,7 @@ case class IoSupport(paths: EvalPaths,
     * @return the list of globbed paths
     */
   def glob(pattern: String): Vector[String] = {
-    if (logger.isVerbose) {
-      System.out.println(s"glob(${pattern})")
-    }
+    logger.trace(s"glob(${pattern})")
     val baseDir = paths.getHomeDir(true)
     val matcher: PathMatcher = FileSystems.getDefault
       .getPathMatcher(s"glob:${baseDir.toString}/${pattern}")
@@ -97,9 +95,7 @@ case class IoSupport(paths: EvalPaths,
           .toVector
         files.sorted
       }
-    if (logger.isVerbose) {
-      System.out.println(s"""glob results=${retval.mkString("\n")}""")
-    }
+    logger.trace(s"""glob results=${retval.mkString("\n")}""")
     retval
   }
 

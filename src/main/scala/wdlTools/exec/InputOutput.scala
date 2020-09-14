@@ -85,7 +85,7 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
   */
 case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
     extends InputOutput(task, logger) {
-  private lazy val depOrder = ExprGraph.buildFromTask(task)
+  private lazy val depOrder = ExprGraph.buildFrom(task)
 
   override protected def inputOrder: Vector[String] = depOrder.inputOrder
 
