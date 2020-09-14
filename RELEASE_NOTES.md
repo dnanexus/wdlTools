@@ -1,4 +1,4 @@
-# v0.5.1 (2020-09-14)
+# v0.6.0 (2020-09-14)
 
 * Fixed autodoc templates
 * Allow T -> T? coercion under `Moderate` type-checking strictness
