@@ -141,8 +141,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                          initialType: WdlTypes.T = T_String): (TAT.Expr, WdlTypes.T) = {
       val e2 = nested(expr, state)
       // check that the expression is coercible to an *optional* string - we use
-      // optional here because a null value auto-coerces to the empty string within
-      // a placeholder
+      // optional here because a null/None/undefined value auto-coerces to the
+      // empty string within a placeholder
       val t2: T = if (unify.isCoercibleTo(T_Optional(T_String), e2.wdlType)) {
         exprType
       } else {

@@ -1,4 +1,11 @@
-# v0.5.0 (dev)
+# v0.5.1 (2020-09-14)
+
+* Fixed autodoc templates
+* Allow T -> T? coercion under `Moderate` type-checking strictness
+* Handle nested placeholders during string interpolation - these were previously disallowed
+* Add expression graph builder for workflows
+
+# v0.5.0 (2020-09-01)
 
 * Added `wdlTools.types.Graph` for building DAGs from the TST.
 * Breaking change: the operator case classes have been removed from AST and TST. Operators are now represented by `ExprApply` with special names. The names can be looked up in `wdlTools.syntax.Operator`.
