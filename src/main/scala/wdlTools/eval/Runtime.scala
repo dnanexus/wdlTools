@@ -58,6 +58,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def cpu: Option[Double]
 
+  // allow fractional values - round up to nearest int
   def memory: Option[Long]
 
   def disks: Vector[DiskRequest]
@@ -125,11 +126,10 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   override def cpu: Option[Double] = {
-    get(Runtime.Keys.Cpu) match {
-      case None              => None
-      case Some(V_Int(i))    => Some(i.toFloat)
-      case Some(V_Float(f))  => Some(f)
-      case Some(V_String(s)) => Some(s.toFloat)
+    get(Runtime.Keys.Cpu).map {
+      case V_Int(i)    => i.toDouble
+      case V_Float(f)  => f
+      case V_String(s) => s.toDouble
       case other =>
         throw new EvalException(s"Invalid ${Runtime.Keys.Cpu} value ${other}",
                                 getSourceLocation(Runtime.Keys.Cpu))
@@ -137,12 +137,12 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val memory: Option[Long] = {
-    get(Runtime.Keys.Memory) match {
-      case None           => None
-      case Some(V_Int(i)) => Some(i)
-      case Some(V_String(s)) =>
+    get(Runtime.Keys.Memory).map {
+      case V_Int(i)   => i
+      case V_Float(d) => Utils.floatToInt(d)
+      case V_String(s) =>
         val d = Utils.sizeStringToFloat(s, getSourceLocation(Runtime.Keys.Memory))
-        Some(Utils.floatToInt(d))
+        Utils.floatToInt(d)
       case other =>
         throw new EvalException(s"Invalid ${Runtime.Keys.Memory} value ${other}",
                                 getSourceLocation(Runtime.Keys.Memory))
@@ -227,7 +227,8 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       case Runtime.Keys.Memory =>
         // always return memory in bytes (round up to nearest byte)
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_String)) match {
-          case i: V_Int => i
+          case i: V_Int   => i
+          case V_Float(d) => V_Int(Utils.floatToInt(d))
           case V_String(s) =>
             val d = Utils.sizeStringToFloat(s, expr.loc)
             V_Int(Utils.floatToInt(d))
@@ -237,8 +238,9 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
         }
       case Runtime.Keys.Disks =>
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_Array(WdlTypes.T_String), WdlTypes.T_String)) match {
-          case i: V_Int => V_String(s"${i} GiB")
-          case v        => v
+          case i: V_Int   => V_String(s"${i} GiB")
+          case V_Float(d) => V_String(s"${d} GiB")
+          case v          => v
         }
       case Runtime.Keys.Gpu =>
         getValue(Vector(WdlTypes.T_Boolean))
@@ -363,6 +365,9 @@ object Runtime {
     value match {
       case V_Int(i) =>
         val bytes = Utils.floatToInt(Utils.sizeToFloat(i.toDouble, "GiB", loc))
+        Vector(DiskRequest(bytes, defaultMountPoint, defaultDiskType))
+      case V_Float(d) =>
+        val bytes = Utils.floatToInt(Utils.sizeToFloat(d, "GiB", loc))
         Vector(DiskRequest(bytes, defaultMountPoint, defaultDiskType))
       case V_Array(a) =>
         a.flatMap(v => parseDisks(v, defaultMountPoint, defaultDiskType, loc))
