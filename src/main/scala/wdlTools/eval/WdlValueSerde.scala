@@ -98,19 +98,14 @@ object WdlValueSerde {
   def deserialize(
       jsValue: JsValue,
       wdlType: WdlTypes.T,
-      name: String = "",
-      handler: Option[(JsValue, WdlTypes.T, String) => Option[WdlValues.V]] = None
+      name: String = ""
   ): WdlValues.V = {
     def inner(innerValue: JsValue, innerType: WdlTypes.T, innerName: String): WdlValues.V = {
-      val v = handler.flatMap(_(innerValue, innerType, innerName))
-      if (v.isDefined) {
-        return v.get
-      }
       (innerType, innerValue) match {
         // primitive types
         case (WdlTypes.T_Boolean, JsBoolean(b))  => WdlValues.V_Boolean(b.booleanValue)
-        case (WdlTypes.T_Int, JsNumber(bd))      => WdlValues.V_Int(bd.longValue)
-        case (WdlTypes.T_Float, JsNumber(bd))    => WdlValues.V_Float(bd.doubleValue)
+        case (WdlTypes.T_Int, JsNumber(i))       => WdlValues.V_Int(i.longValue)
+        case (WdlTypes.T_Float, JsNumber(f))     => WdlValues.V_Float(f.doubleValue)
         case (WdlTypes.T_String, JsString(s))    => WdlValues.V_String(s)
         case (WdlTypes.T_File, JsString(s))      => WdlValues.V_File(s)
         case (WdlTypes.T_Directory, JsString(s)) => WdlValues.V_Directory(s)

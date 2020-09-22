@@ -109,8 +109,8 @@ object Utils {
 
   // TODO: within string interpolation, V_Null should render as empty string
   @tailrec
-  def formatPrimitive(wv: V, loc: SourceLocation = SourceLocation.empty): String = {
-    wv match {
+  def formatPrimitive(value: V, loc: SourceLocation = SourceLocation.empty): String = {
+    value match {
       case V_Null             => "null"
       case V_Boolean(value)   => value.toString
       case V_Int(value)       => value.toString
@@ -121,6 +121,45 @@ object Utils {
       case V_Optional(x)      => formatPrimitive(x, loc)
       case other =>
         throw new EvalException(s"${other} is not a primitive value", loc)
+    }
+  }
+
+  def prettyFormat(value: V): String = {
+    value match {
+      case _ if isPrimitive(value) =>
+        s"${formatPrimitive(value)}"
+      case V_Pair(l, r) =>
+        s"(${prettyFormat(l)}, ${prettyFormat(r)})"
+      case V_Array(array) =>
+        s"[${array.map(prettyFormat).mkString(", ")}]"
+      case V_Map(members) =>
+        val memberStr = members
+          .map {
+            case (k, v) => s"${prettyFormat(k)}: ${prettyFormat(v)}"
+          }
+          .mkString(", ")
+        s"{${memberStr}}"
+      case V_Object(members) =>
+        val memberStr = members
+          .map {
+            case (k, v) => s"${k}: ${prettyFormat(v)}"
+          }
+          .mkString(", ")
+        s"{${memberStr}}"
+      case V_Struct(name, members) =>
+        val memberStr = members
+          .map {
+            case (k, v) => s"${k}: ${prettyFormat(v)}"
+          }
+          .mkString(", ")
+        s"${name} {${memberStr}}"
+      case V_Call(name, members) =>
+        val memberStr = members
+          .map {
+            case (k, v) => s"${k}: ${prettyFormat(v)}"
+          }
+          .mkString(", ")
+        s"${name} { input: ${memberStr} }"
     }
   }
 

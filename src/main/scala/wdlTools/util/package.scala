@@ -7,14 +7,15 @@ package object util {
     sw.toString
   }
 
-  def errorMessage(message: String, exception: Option[Throwable]): String = {
-    val exStr = exception.map(exceptionToString)
-    (message, exStr) match {
-      case (s, Some(e)) if s.nonEmpty =>
-        s"""${message}
-           |${e}""".stripMargin
-      case ("", Some(e)) => e
-      case (s, None)     => s
+  def errorMessage(message: String,
+                   exception: Option[Throwable],
+                   stackTrace: Boolean = true): String = {
+    (message, exception) match {
+      case (s, Some(e)) if s.nonEmpty && stackTrace => s"${s}\n${exceptionToString(e)}"
+      case (s, Some(e)) if s.nonEmpty               => s"${s}: ${e.getMessage}"
+      case ("", Some(e)) if stackTrace              => exceptionToString(e)
+      case ("", Some(e))                            => e.getMessage
+      case (s, None)                                => s
     }
   }
 

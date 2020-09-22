@@ -232,14 +232,19 @@ object TypedAbstractSyntax {
                   loc: SourceLocation)
       extends WorkflowElement
 
+  sealed trait BlockElement extends WorkflowElement {
+    val expr: Expr
+    val body: Vector[WorkflowElement]
+  }
+
   case class Scatter(identifier: String,
                      expr: Expr,
                      body: Vector[WorkflowElement],
                      loc: SourceLocation)
-      extends WorkflowElement
+      extends BlockElement
 
   case class Conditional(expr: Expr, body: Vector[WorkflowElement], loc: SourceLocation)
-      extends WorkflowElement
+      extends BlockElement
 
   // A workflow
 

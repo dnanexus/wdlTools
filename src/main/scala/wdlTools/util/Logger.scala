@@ -1,5 +1,7 @@
 package wdlTools.util
 
+import java.io.PrintStream
+
 object TraceLevel {
   // show no trace messages
   val None: Int = 0
@@ -20,7 +22,8 @@ object TraceLevel {
 case class Logger(quiet: Boolean,
                   traceLevel: Int,
                   keywords: Set[String] = Set.empty,
-                  traceIndenting: Int = 0) {
+                  traceIndenting: Int = 0,
+                  stream: PrintStream = System.err) {
   private val DefaultMessageLimit = 1000
   private lazy val keywordsLower: Set[String] = keywords.map(_.toLowerCase)
 
@@ -50,20 +53,20 @@ case class Logger(quiet: Boolean,
   // print a message with no color - ignored if `quiet` is false
   def info(msg: String): Unit = {
     if (!quiet) {
-      System.err.println(msg)
+      stream.println(msg)
     }
   }
 
   // print a warning message in yellow - ignored if `quiet` is true and `force` is false
   def warning(msg: String, force: Boolean = false, exception: Option[Throwable] = None): Unit = {
     if (force || !quiet) {
-      Logger.warning(msg, exception)
+      Logger.warning(msg, exception, stackTrace = isVerbose, stream = stream)
     }
   }
 
   // print an error message in red
   def error(msg: String, exception: Option[Throwable] = None): Unit = {
-    Logger.error(msg, exception)
+    Logger.error(msg, exception, stream = stream)
   }
 
   private def traceEnabledFor(minLevel: Int, requiredKey: Option[String]): Boolean = {
@@ -71,7 +74,7 @@ case class Logger(quiet: Boolean,
   }
 
   private def printTrace(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(errorMessage(s"${" " * traceIndenting * 2}${msg}", exception))
+    stream.println(errorMessage(s"${" " * traceIndenting * 2}${msg}", exception))
   }
 
   private def truncateMessage(msg: String, maxLength: Int) = {
@@ -146,14 +149,22 @@ object Logger {
   }
 
   // print a warning message in yellow
-  def warning(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(
-        errorMessage(s"${Console.YELLOW}[warning] ${msg}${Console.RESET}", exception)
+  def warning(msg: String,
+              exception: Option[Throwable] = None,
+              stackTrace: Boolean = false,
+              stream: PrintStream = System.err): Unit = {
+    stream.println(
+        errorMessage(s"${Console.YELLOW}[warning] ${msg}${Console.RESET}", exception, stackTrace)
     )
   }
 
   // print an error message in red
-  def error(msg: String, exception: Option[Throwable] = None): Unit = {
-    System.err.println(errorMessage(s"${Console.RED}[error] ${msg}${Console.RESET}", exception))
+  def error(msg: String,
+            exception: Option[Throwable] = None,
+            stackTrace: Boolean = true,
+            stream: PrintStream = System.err): Unit = {
+    stream.println(
+        errorMessage(s"${Console.RED}[error] ${msg}${Console.RESET}", exception, stackTrace)
+    )
   }
 }

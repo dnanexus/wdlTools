@@ -369,19 +369,19 @@ object Utils {
     inner(expr, noQuoting)
   }
 
-  def prettyFormatInput(input: TAT.InputDefinition): String = {
+  def prettyFormatInput(input: TAT.InputDefinition, indent: String = ""): String = {
     input match {
       case TAT.RequiredInputDefinition(name, wdlType, _) =>
-        s"${prettyFormatType(wdlType)} ${name}"
+        s"${indent}${prettyFormatType(wdlType)} ${name}"
       case TAT.OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
-        s"${prettyFormatType(wdlType)} ${name} = ${prettyFormatExpr(defaultExpr)}"
+        s"${indent}${prettyFormatType(wdlType)} ${name} = ${prettyFormatExpr(defaultExpr)}"
       case TAT.OptionalInputDefinition(name, wdlType, _) =>
-        s"${prettyFormatType(wdlType)} ${name}"
+        s"${indent}${prettyFormatType(wdlType)} ${name}"
     }
   }
 
-  def prettyFormatOutput(output: TAT.OutputDefinition): String = {
-    s"${prettyFormatType(output.wdlType)} ${output.name} = ${prettyFormatExpr(output.expr)}"
+  def prettyFormatOutput(output: TAT.OutputDefinition, indent: String = ""): String = {
+    s"${indent}${prettyFormatType(output.wdlType)} ${output.name} = ${prettyFormatExpr(output.expr)}"
   }
 
   /**
