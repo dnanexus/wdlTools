@@ -1,6 +1,7 @@
 package wdlTools.util
 
 import java.io.PrintStream
+import java.nio.file.Path
 
 object TraceLevel {
   // show no trace messages
@@ -23,7 +24,18 @@ case class Logger(quiet: Boolean,
                   traceLevel: Int,
                   keywords: Set[String] = Set.empty,
                   traceIndenting: Int = 0,
-                  stream: PrintStream = System.err) {
+                  logFile: Option[Path] = None) {
+  private val stream: PrintStream = logFile match {
+    case Some(path) =>
+      val fileStream = new PrintStream(path.toFile)
+      sys.addShutdownHook({
+        fileStream.flush()
+        fileStream.close()
+      })
+      fileStream
+    case None =>
+      System.err
+  }
   private val DefaultMessageLimit = 1000
   private lazy val keywordsLower: Set[String] = keywords.map(_.toLowerCase)
 
