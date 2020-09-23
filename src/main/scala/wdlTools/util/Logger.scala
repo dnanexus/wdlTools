@@ -126,7 +126,7 @@ case class Logger(quiet: Boolean,
   // Ignore a value and print a trace message. This is useful for avoiding warnings/errors
   // on unused variables.
   def ignore[A](value: A,
-                minLevel: Int = TraceLevel.Verbose,
+                minLevel: Int = TraceLevel.VVerbose,
                 requiredKey: Option[String] = None): Unit = {
     if (traceEnabledFor(minLevel, requiredKey)) {
       printTrace(s"ignoring ${value}")
