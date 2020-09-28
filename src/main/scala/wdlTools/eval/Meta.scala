@@ -96,19 +96,19 @@ case class Hints(hints: Option[TAT.MetaSection],
                  userDefaultValues: Map[String, WdlValues.V] = Map.empty)
     extends Meta(hints.map(_.kvs).getOrElse(Map.empty), userDefaultValues) {
   override val defaults: Map[String, WdlValues.V] = Map(
-      Hints.Keys.ShortTask -> V_Boolean(false),
-      Hints.Keys.LocalizationOptional -> V_Boolean(false),
-      Hints.Keys.Inputs -> V_Object(Map.empty),
-      Hints.Keys.Outputs -> V_Object(Map.empty)
+      Hints.ShortTaskKey -> V_Boolean(false),
+      Hints.LocalizationOptionalKey -> V_Boolean(false),
+      Hints.InputsKey -> V_Object(Map.empty),
+      Hints.OutputsKey -> V_Object(Map.empty)
   )
 
   override protected def applyKv(id: String,
                                  value: TAT.MetaValue,
                                  wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
     id match {
-      case Hints.Keys.MaxCpu =>
+      case Hints.MaxCpuKey =>
         super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Float)))
-      case Hints.Keys.MaxMemory =>
+      case Hints.MaxMemoryKey =>
         super.applyKv(
             id,
             value,
@@ -120,14 +120,14 @@ case class Hints(hints: Option[TAT.MetaSection],
             V_Int(Utils.floatToInt(d))
           case other =>
             throw new EvalException(
-                s"Invalid ${Hints.Keys.MaxMemory} value ${other}"
+                s"Invalid ${Hints.MaxMemoryKey} value ${other}"
             )
         }
-      case Hints.Keys.ShortTask =>
+      case Hints.ShortTaskKey =>
         super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
-      case Hints.Keys.LocalizationOptional =>
+      case Hints.LocalizationOptionalKey =>
         super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
-      case Hints.Keys.Inputs | Hints.Keys.Outputs =>
+      case Hints.InputsKey | Hints.OutputsKey =>
         super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Object)))
       case _ =>
         super.applyKv(id, value, wdlTypes)
@@ -136,14 +136,12 @@ case class Hints(hints: Option[TAT.MetaSection],
 }
 
 object Hints {
-  object Keys {
-    val MaxCpu = "maxCpu"
-    val MaxMemory = "maxMemory"
-    val ShortTask = "shortTask"
-    val LocalizationOptional = "localizationOptional"
-    val Inputs = "inputs"
-    val Outputs = "outputs"
-  }
+  val MaxCpuKey = "maxCpu"
+  val MaxMemoryKey = "maxMemory"
+  val ShortTaskKey = "shortTask"
+  val LocalizationOptionalKey = "localizationOptional"
+  val InputsKey = "inputs"
+  val OutputsKey = "outputs"
 
   def create(hints: Option[TAT.MetaSection],
              userDefaultValues: Map[String, WdlValues.V] = Map.empty): Hints =

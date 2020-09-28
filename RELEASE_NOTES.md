@@ -1,3 +1,21 @@
+# v0.7.0 (2020-09-28)
+
+* Refactoring of `types.Unification`, including additionl UnificationContext, which allows for context-specific type checking
+* Renamed some members of typed AST:
+    * `Declaration` -> `PrivateVariable`
+    * `*InputDefinition` -> `*InputParameter`
+    * `OutputDefinition` -> `OutputParameter`
+    * `Task.declarations` -> `Task.privateVariables`
+* Renamed `types.Context` -> `Types.TypeContext`    
+* Add default values for all reserved runtime keys (as per the [PR](https://github.com/openwdl/wdl/pull/315))
+* Override `LocalFileSource.equals` to compare based on `localPath`    
+ 
+# v0.6.1 (2020-09-24)
+
+* Support floating-point values for cpu, memory, and disk size runtime requirements
+* Add `BlockElement` as the parent type of `Conditional` and `Scatter` in typed AST
+* Logger enhancements
+ 
 # v0.6.0 (2020-09-14)
 
 * Fixed autodoc templates
