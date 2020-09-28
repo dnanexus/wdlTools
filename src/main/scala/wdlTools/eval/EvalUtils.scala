@@ -8,34 +8,41 @@ import wdlTools.util.{AbstractBindings, Bindings}
 import scala.annotation.tailrec
 
 object Utils {
-  // sUnit is a units parameter (KB, KiB, MB, GiB, ...)
-  def sizeUnit(sUnit: String, loc: SourceLocation): Double = {
-    sUnit.toLowerCase match {
-      case "b"   => 1
-      case "kb"  => 1000d
-      case "mb"  => 1000d * 1000d
-      case "gb"  => 1000d * 1000d * 1000d
-      case "tb"  => 1000d * 1000d * 1000d * 1000d
-      case "kib" => 1024d
-      case "mib" => 1024d * 1024d
-      case "gib" => 1024d * 1024d * 1024d
-      case "tib" => 1024d * 1024d * 1024d * 1024d
-      case _     => throw new EvalException(s"Unknown unit ${sUnit}", loc)
-    }
+  lazy val SizeUnits: Map[String, Double] = Map(
+      "b" -> 1d,
+      "kb" -> 1000d,
+      "mb" -> 1000d * 1000d,
+      "gb" -> 1000d * 1000d * 1000d,
+      "tb" -> 1000d * 1000d * 1000d * 1000d,
+      "kib" -> 1024d,
+      "mib" -> 1024d * 1024d,
+      "gib" -> 1024d * 1024d * 1024d,
+      "tib" -> 1024d * 1024d * 1024d * 1024d
+  )
+
+  /**
+    * Returns the multiplier for the given size unit.
+    * @param sizeUnit units parameter (KB, KiB, MB, GiB, ...)
+    * @param loc SourceLocation
+    * @return
+    */
+  def getSizeMultiplier(sizeUnit: String, loc: SourceLocation): Double = {
+    SizeUnits.getOrElse(sizeUnit.toLowerCase,
+                        throw new EvalException(s"Unknown unit ${sizeUnit}", loc))
   }
 
   private val stringSizeRegexp = "([\\d.]+)(?:\\s*(.+))?".r
 
   def sizeToFloat(size: Double, suffix: String, loc: SourceLocation): Double = {
-    size * sizeUnit(suffix, loc)
+    size * getSizeMultiplier(suffix, loc)
   }
 
   def sizeStringToFloat(sizeString: String,
                         loc: SourceLocation,
                         defaultSuffix: String = "b"): Double = {
     sizeString match {
-      case stringSizeRegexp(d, u) if u == null => d.toDouble * sizeUnit(defaultSuffix, loc)
-      case stringSizeRegexp(d, u)              => d.toDouble * sizeUnit(u, loc)
+      case stringSizeRegexp(d, u) if u == null => d.toDouble * getSizeMultiplier(defaultSuffix, loc)
+      case stringSizeRegexp(d, u)              => d.toDouble * getSizeMultiplier(u, loc)
       case other                               => throw new EvalException(s"Invalid size string ${other}", loc)
     }
   }

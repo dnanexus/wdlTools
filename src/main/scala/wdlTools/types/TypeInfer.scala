@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, Utils => SUtil}
+import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, SyntaxUtils => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.Utils.{isPrimitive, prettyFormatExpr, prettyFormatType}

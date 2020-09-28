@@ -2,8 +2,8 @@ package wdlTools.generators.project
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.Utils.prettyFormatExpr
-import wdlTools.syntax.{Comment, Parsers, Utils}
+import wdlTools.syntax.SyntaxUtils.prettyFormatExpr
+import wdlTools.syntax.{Comment, Parsers, SyntaxUtils}
 import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
 
 object DocumentationGenerator {
@@ -28,8 +28,8 @@ object DocumentationGenerator {
     metaValue match {
       case SimpleValueDocumentation(value, comment) =>
         val s: String = value match {
-          case e: Expr      => Utils.prettyFormatExpr(e)
-          case v: MetaValue => Utils.prettyFormatMetaValue(v)
+          case e: Expr      => SyntaxUtils.prettyFormatExpr(e)
+          case v: MetaValue => SyntaxUtils.prettyFormatMetaValue(v)
           case other        => other.toString
         }
         if (comment.isDefined) {

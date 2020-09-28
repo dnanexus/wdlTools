@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import AbstractSyntax._
 
-object Utils {
+object SyntaxUtils {
 
   /**
     * Utility function for writing an expression in a human readable form

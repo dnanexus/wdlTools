@@ -9,7 +9,11 @@
 * Renamed `types.Context` -> `Types.TypeContext`    
 * Add default values for all reserved runtime keys (as per the [PR](https://github.com/openwdl/wdl/pull/315))
 * Override `LocalFileSource.equals` to compare based on `localPath`    
- 
+* Renamed Utils classes
+    * `eval.Utils` -> `eval.EvalUtils`
+    * `syntax.Utils` -> `syntax.SyntaxUtils`
+    * `types.Utils` -> `types.TypeUtils`
+
 # v0.6.1 (2020-09-24)
 
 * Support floating-point values for cpu, memory, and disk size runtime requirements

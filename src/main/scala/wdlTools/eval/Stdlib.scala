@@ -972,7 +972,7 @@ case class Stdlib(paths: EvalPaths,
         V_Float(sizeCore(ctx.args.head, ctx.loc))
       case 2 =>
         val sUnit = getWdlString(ctx.args(1), ctx.loc)
-        val nBytesInUnit = Utils.sizeUnit(sUnit, ctx.loc)
+        val nBytesInUnit = Utils.getSizeMultiplier(sUnit, ctx.loc)
         val nBytes = sizeCore(ctx.args.head, ctx.loc)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
