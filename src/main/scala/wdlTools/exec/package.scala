@@ -26,14 +26,21 @@ object ExecException {
 }
 
 class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir) {
-  def getCommandFile(ensureParentExists: Boolean = false): Path =
+  def getCommandFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultCommandScript)
-  def getReturnCodeFile(ensureParentExists: Boolean = false): Path =
+  }
+
+  def getReturnCodeFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultReturnCode)
-  def getContainerCommandFile(ensureParentExists: Boolean = false): Path =
+  }
+
+  def getContainerCommandFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerRunScript)
-  def getContainerIdFile(ensureParentExists: Boolean = false): Path =
+  }
+
+  def getContainerIdFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerId)
+  }
 
   def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
     Map(

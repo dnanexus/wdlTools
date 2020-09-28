@@ -94,54 +94,57 @@ object TypedAbstractSyntax {
     val wdlType: WdlType
   }
 
-  case class Declaration(name: String, wdlType: WdlType, expr: Option[Expr], loc: SourceLocation)
+  // sections
+
+  /**
+    * A task/workflow input that may/must be overridden by the caller.
+    *
+    * In draft-2 there is no `input {}` block. Bound and unbound declarations may be
+    * mixed together and bound declarations that require evaluation cannot be treated
+    * as inputs.
+    */
+  sealed trait InputParameter extends Variable
+
+  // A compulsory input that has no default, and must be provided by the caller
+  case class RequiredInputParameter(name: String, wdlType: WdlTypes.T, loc: SourceLocation)
+      extends InputParameter
+
+  /**
+    * An input that has a default and may be skipped by the caller.
+    */
+  case class OverridableInputParameterWithDefault(name: String,
+                                                  wdlType: WdlTypes.T,
+                                                  defaultExpr: Expr,
+                                                  loc: SourceLocation)
+      extends InputParameter
+
+  /**
+    * An input that may be omitted by the caller. In that case the value will
+    * be null (or None).
+    */
+  case class OptionalInputParameter(name: String, wdlType: WdlTypes.T_Optional, loc: SourceLocation)
+      extends InputParameter
+
+  case class OutputParameter(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
+      extends Variable
+
+  /**
+    * A variable definition and assignment that does not appear in the input or output section,
+    * i.e. it is private to the task/workflow.
+    */
+  case class PrivateVariable(name: String,
+                             wdlType: WdlType,
+                             expr: Option[Expr],
+                             loc: SourceLocation)
       extends WorkflowElement
       with Variable
 
-  // sections
-
-  /** In draft-2 there is no `input {}` block. Bound and unbound declarations may be mixed together
-    * and bound declarations that require evaluation cannot be treated as inputs.
-    *
-    * This definition based on Cromwell wom.callable.Callable.InputDefinition. It
-    * is easier to use a variant of this interface for backward compatibility with dxWDL.
-    */
-  sealed trait InputDefinition extends Variable
-
-  // A compulsory input that has no default, and must be provided by the caller
-  case class RequiredInputDefinition(name: String, wdlType: WdlTypes.T, loc: SourceLocation)
-      extends InputDefinition
-
-  // An input that has a default and may be skipped by the caller
-  case class OverridableInputDefinitionWithDefault(name: String,
-                                                   wdlType: WdlTypes.T,
-                                                   defaultExpr: Expr,
-                                                   loc: SourceLocation)
-      extends InputDefinition
-
-  // An input whose value should always be calculated from the default, and is
-  // not allowed to be overridden.
-  /*  case class FixedInputDefinitionWithDefault(name : String,
-                                             wdlType : WdlTypes.T,
-                                             defaultExpr : Expr,
-                                             text : SourceLocation) */
-
-  // an input that may be omitted by the caller. In that case the value will
-  // be null (or None).
-  case class OptionalInputDefinition(name: String,
-                                     wdlType: WdlTypes.T_Optional,
-                                     loc: SourceLocation)
-      extends InputDefinition
-
-  case class OutputDefinition(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
-      extends Variable
-
   // A workflow or a task.
-  sealed trait Callable {
+  sealed trait Callable extends Element {
     val name: String
     val wdlType: WdlTypes.T_Callable
-    val inputs: Vector[InputDefinition]
-    val outputs: Vector[OutputDefinition]
+    val inputs: Vector[InputParameter]
+    val outputs: Vector[OutputParameter]
   }
 
   // A command can be simple, with just one continuous string:
@@ -195,10 +198,10 @@ object TypedAbstractSyntax {
   // A task
   case class Task(name: String,
                   wdlType: WdlTypes.T_Task,
-                  inputs: Vector[InputDefinition],
-                  outputs: Vector[OutputDefinition],
+                  inputs: Vector[InputParameter],
+                  outputs: Vector[OutputParameter],
                   command: CommandSection, // the command section is required
-                  declarations: Vector[Declaration],
+                  privateVariables: Vector[PrivateVariable],
                   meta: Option[MetaSection],
                   parameterMeta: Option[MetaSection],
                   runtime: Option[RuntimeSection],
@@ -250,8 +253,8 @@ object TypedAbstractSyntax {
 
   case class Workflow(name: String,
                       wdlType: WdlTypes.T_Workflow,
-                      inputs: Vector[InputDefinition],
-                      outputs: Vector[OutputDefinition],
+                      inputs: Vector[InputParameter],
+                      outputs: Vector[OutputParameter],
                       meta: Option[MetaSection],
                       parameterMeta: Option[MetaSection],
                       body: Vector[WorkflowElement],

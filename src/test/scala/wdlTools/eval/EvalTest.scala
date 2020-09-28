@@ -30,7 +30,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   def parseAndTypeCheckAndGetDeclarations(
       file: Path,
       allowNonstandardCoercions: Boolean = false
-  ): (Eval, Vector[TAT.Declaration]) = {
+  ): (Eval, Vector[TAT.PrivateVariable]) = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -40,8 +40,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
            allowNonstandardCoercions)
     tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
-    val decls: Vector[TAT.Declaration] = wf.body.collect {
-      case x: TAT.Declaration => x
+    val decls: Vector[TAT.PrivateVariable] = wf.body.collect {
+      case x: TAT.PrivateVariable => x
     }
     (evaluator, decls)
   }
@@ -240,7 +240,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyDeclarations(task.declarations, WdlValueBindings.empty)
+    val ctx = evaluator.applyDeclarations(task.privateVariables, WdlValueBindings.empty)
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -343,7 +343,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("constants.wdl"))
 
     decls.foreach {
-      case TAT.Declaration(id, wdlType, Some(expr), _) =>
+      case TAT.PrivateVariable(id, wdlType, Some(expr), _) =>
         val expected: Option[WdlValues.V] = allExpectedResults(id)
         //println(s"${id} ${wdlType} ${expr} ${expected}")
         expected match {
@@ -363,7 +363,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "not be able to access unsupported file protocols" in {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("bad_protocol.wdl"))
     decls match {
-      case Vector(TAT.Declaration(_, wdlType, Some(expr), _)) =>
+      case Vector(TAT.PrivateVariable(_, wdlType, Some(expr), _)) =>
         assertThrows[EvalException] {
           evaluator.applyConstAndCoerce(expr, wdlType)
         }

@@ -238,6 +238,16 @@ case class LocalFileSource(override val value: String,
       Files.copy(localPath, file)
     }
   }
+
+  // two LocalFileSources may differ in `value`s but have the same `localPath`
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case that: LocalFileSource => this.localPath == that.localPath
+      case _                     => false
+    }
+  }
+
+  override def toString: String = localPath.toString
 }
 
 case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,

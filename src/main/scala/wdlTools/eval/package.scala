@@ -25,21 +25,23 @@ import wdlTools.util.FileUtils
 class EvalPaths(rootDir: Path, tempDir: Path) {
   private var cache: Map[String, Path] = Map.empty
 
-  protected def getOrCreateDir(key: String, path: Path, ensureExists: Boolean): Path = {
-    cache.getOrElse(key, if (ensureExists) {
-      val resolved = FileUtils.createDirectories(path)
-      cache += (key -> resolved)
-      resolved
-    } else {
-      path
-    })
+  protected def createDir(key: String, path: Path): Path = {
+    val resolved = FileUtils.createDirectories(path)
+    cache += (key -> resolved)
+    resolved
   }
 
-  def getRootDir(ensureExists: Boolean = false): Path =
-    getOrCreateDir("root", rootDir, ensureExists)
+  protected def getOrCreateDir(key: String, path: Path, ensureExists: Boolean): Path = {
+    cache.getOrElse(key, if (ensureExists) createDir(key, path) else path)
+  }
 
-  def getTempDir(ensureExists: Boolean = false): Path =
+  def getRootDir(ensureExists: Boolean = false): Path = {
+    getOrCreateDir("root", rootDir, ensureExists)
+  }
+
+  def getTempDir(ensureExists: Boolean = false): Path = {
     getOrCreateDir("temp", tempDir, ensureExists)
+  }
 
   /**
     * The execution directory - used as the base dir for relative paths (e.g. for glob search).
@@ -59,14 +61,16 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
   /**
     * The file that has a copy of standard output.
     */
-  def getStdoutFile(ensureParentExists: Boolean = false): Path =
+  def getStdoutFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(EvalPaths.DefaultStdout)
+  }
 
   /**
     * The file that has a copy of standard error.
     */
-  def getStderrFile(ensureParentExists: Boolean = false): Path =
+  def getStderrFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(EvalPaths.DefaultStderr)
+  }
 }
 
 object EvalPaths {

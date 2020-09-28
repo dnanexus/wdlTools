@@ -57,9 +57,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   implicit val fileListConverter: ValueConverter[List[Path]] =
     listArgConverter[Path](Paths.get(_), exceptionHandler[List[Path]])
   implicit val versionConverter: ValueConverter[WdlVersion] =
-    singleArgConverter[WdlVersion](WdlVersion.withName, exceptionHandler[WdlVersion])
+    singleArgConverter[WdlVersion](WdlVersion.withNameIgnoreCase, exceptionHandler[WdlVersion])
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
-    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withName,
+    singleArgConverter[TypeCheckingRegime](TypeCheckingRegime.withNameIgnoreCase,
                                            exceptionHandler[TypeCheckingRegime])
 
   abstract class WdlToolsSubcommand(name: String, description: String)

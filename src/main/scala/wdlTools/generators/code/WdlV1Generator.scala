@@ -578,14 +578,14 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     }
   }
 
-  private case class InputsBlock(inputs: Vector[InputDefinition])
+  private case class InputsBlock(inputs: Vector[InputParameter])
       extends BlockStatement(Symbols.Input) {
     override def body: Option[Statement] =
       Some(Section(inputs.map {
-        case RequiredInputDefinition(name, wdlType, _) => DeclarationStatement(name, wdlType)
-        case OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+        case RequiredInputParameter(name, wdlType, _) => DeclarationStatement(name, wdlType)
+        case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
           DeclarationStatement(name, wdlType, Some(defaultExpr))
-        case OptionalInputDefinition(name, wdlType, _) => DeclarationStatement(name, wdlType)
+        case OptionalInputParameter(name, wdlType, _) => DeclarationStatement(name, wdlType)
       }))
   }
 
@@ -629,7 +629,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       }.toVector))
   }
 
-  private case class OutputsBlock(outputs: Vector[OutputDefinition])
+  private case class OutputsBlock(outputs: Vector[OutputParameter])
       extends BlockStatement(Symbols.Output) {
     override def body: Option[Statement] =
       Some(Section(outputs.map { output =>
@@ -658,10 +658,10 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private def splitWorkflowElements(elements: Vector[WorkflowElement]): Vector[Statement] = {
     var statements: Vector[Statement] = Vector.empty
-    var declarations: Vector[Declaration] = Vector.empty
+    var declarations: Vector[PrivateVariable] = Vector.empty
 
     elements.foreach {
-      case declaration: Declaration => declarations :+= declaration
+      case declaration: PrivateVariable => declarations :+= declaration
       case other =>
         if (declarations.nonEmpty) {
           statements :+= Section(declarations.map { decl =>
@@ -938,20 +938,20 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
     override def body: Option[Statement] = {
       val statements: Vector[Statement] = {
         val inputs = task.inputs match {
-          case v: Vector[InputDefinition] if v.nonEmpty => Some(InputsBlock(v))
-          case _                                        => None
+          case v: Vector[InputParameter] if v.nonEmpty => Some(InputsBlock(v))
+          case _                                       => None
 
         }
-        val decls = task.declarations match {
-          case v: Vector[Declaration] if v.nonEmpty =>
+        val decls = task.privateVariables match {
+          case v: Vector[PrivateVariable] if v.nonEmpty =>
             Some(Section(v.map { decl =>
               DeclarationStatement(decl.name, decl.wdlType, decl.expr)
             }))
           case _ => None
         }
         val outputs = task.outputs match {
-          case v: Vector[OutputDefinition] if v.nonEmpty => Some(OutputsBlock(v))
-          case _                                         => None
+          case v: Vector[OutputParameter] if v.nonEmpty => Some(OutputsBlock(v))
+          case _                                        => None
         }
         Vector(
             inputs,

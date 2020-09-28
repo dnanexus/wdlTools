@@ -48,11 +48,11 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
     val guest = guestPaths.getOrElse(hostPaths)
     val script = command match {
       case None =>
-        renderer.render(TaskCommandFileGenerator.DEFAULT_EMPTY_COMMAND_SCRIPT,
-                        Map("returnCodeFile" -> guest.getReturnCodeFile()))
+        renderer.render(TaskCommandFileGenerator.DefaultEmptyCommandScript,
+                        Map("returnCodeFile" -> guest.getReturnCodeFile().toString))
       case Some(cmd) =>
         renderer.render(
-            TaskCommandFileGenerator.DEFAULT_COMMAND_SCRIPT,
+            TaskCommandFileGenerator.DefaultCommandScript,
             Map(
                 "command" -> cmd,
                 "homeDir" -> guest.getHomeDir().toString,
@@ -74,7 +74,7 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
                            guestPaths: ExecPaths,
                            maxMemory: Long = SysUtils.availableMemory): Path = {
     val dockerRunScript = renderer.render(
-        TaskCommandFileGenerator.DEFAULT_DOCKER_RUN_SCRIPT,
+        TaskCommandFileGenerator.DefaultDockerRunScript,
         Map(
             "hostRootDir" -> hostPaths.getRootDir(true).toString,
             "containerIdFile" -> hostPaths.getContainerIdFile(true).toString,
@@ -106,9 +106,9 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
 }
 
 object TaskCommandFileGenerator {
-  val DEFAULT_EMPTY_COMMAND_SCRIPT = "/templates/exec/emptyCommandScript.ssp"
-  val DEFAULT_COMMAND_SCRIPT = "/templates/exec/commandScript.ssp"
-  val DEFAULT_DOCKER_RUN_SCRIPT = "/templates/exec/dockerRunScript.ssp"
+  val DefaultEmptyCommandScript = "/templates/exec/emptyCommandScript.ssp"
+  val DefaultCommandScript = "/templates/exec/commandScript.ssp"
+  val DefaultDockerRunScript = "/templates/exec/dockerRunScript.ssp"
 }
 
 case class TaskExecutor(taskContext: TaskContext,

@@ -21,23 +21,23 @@ case class DocumentElements(doc: TAT.Document) {
 
 case class WorkflowScatter(scatter: TAT.Scatter) {
   val identifier: String = scatter.identifier
-  val expr = scatter.expr
+  val expr: TypedAbstractSyntax.Expr = scatter.expr
   val bodyElements: WorkflowBodyElements = WorkflowBodyElements(scatter.body)
 }
 
 case class WorkflowConditional(conditional: TAT.Conditional) {
-  val expr = conditional.expr
+  val expr: TypedAbstractSyntax.Expr = conditional.expr
   val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body)
 }
 
 case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
   val (declarations, calls, scatters, conditionals) = body.foldLeft(
-      (Vector.empty[TAT.Declaration],
+      (Vector.empty[TAT.PrivateVariable],
        Vector.empty[TAT.Call],
        Vector.empty[WorkflowScatter],
        Vector.empty[WorkflowConditional])
   ) {
-    case ((declarations, calls, scatters, conditionals), decl: TAT.Declaration) =>
+    case ((declarations, calls, scatters, conditionals), decl: TAT.PrivateVariable) =>
       (declarations :+ decl, calls, scatters, conditionals)
     case ((declarations, calls, scatters, conditionals), call: TAT.Call) =>
       (declarations, calls :+ call, scatters, conditionals)
@@ -50,7 +50,7 @@ case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
 
 case class WdlTypeBindings(bindings: Map[String, T] = Map.empty,
                            override val elementType: String = "type")
-    extends AbstractBindings[T, WdlTypeBindings](bindings) {
+    extends AbstractBindings[String, T, WdlTypeBindings](bindings) {
   override protected def copyFrom(values: Map[String, T]): WdlTypeBindings = {
     copy(bindings = values)
   }
@@ -369,18 +369,18 @@ object Utils {
     inner(expr, noQuoting)
   }
 
-  def prettyFormatInput(input: TAT.InputDefinition, indent: String = ""): String = {
+  def prettyFormatInput(input: TAT.InputParameter, indent: String = ""): String = {
     input match {
-      case TAT.RequiredInputDefinition(name, wdlType, _) =>
+      case TAT.RequiredInputParameter(name, wdlType, _) =>
         s"${indent}${prettyFormatType(wdlType)} ${name}"
-      case TAT.OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+      case TAT.OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
         s"${indent}${prettyFormatType(wdlType)} ${name} = ${prettyFormatExpr(defaultExpr)}"
-      case TAT.OptionalInputDefinition(name, wdlType, _) =>
+      case TAT.OptionalInputParameter(name, wdlType, _) =>
         s"${indent}${prettyFormatType(wdlType)} ${name}"
     }
   }
 
-  def prettyFormatOutput(output: TAT.OutputDefinition, indent: String = ""): String = {
+  def prettyFormatOutput(output: TAT.OutputParameter, indent: String = ""): String = {
     s"${indent}${prettyFormatType(output.wdlType)} ${output.name} = ${prettyFormatExpr(output.expr)}"
   }
 

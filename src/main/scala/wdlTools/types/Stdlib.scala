@@ -478,20 +478,18 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
     *         matched exactly by the input types.
     */
   private def evalOnePrototype(funcProto: T_Function,
-                               inputTypes: Vector[T]): Option[(T, Boolean)] = {
+                               inputTypes: Vector[T],
+                               ctx: UnificationContext): Option[(T, Priority.Priority)] = {
     val arity = inputTypes.size
-    val args = (arity, funcProto) match {
-      case (0, T_Function0(_, _))                   => Vector.empty
-      case (1, T_Function1(_, arg1, _))             => Vector(arg1)
-      case (2, T_Function2(_, arg1, arg2, _))       => Vector(arg1, arg2)
-      case (3, T_Function3(_, arg1, arg2, arg3, _)) => Vector(arg1, arg2, arg3)
-      case (_, _)                                   => return None
+    val (args, output) = (arity, funcProto) match {
+      case (0, T_Function0(_, output))                   => (Vector.empty, output)
+      case (1, T_Function1(_, arg1, output))             => (Vector(arg1), output)
+      case (2, T_Function2(_, arg1, arg2, output))       => (Vector(arg1, arg2), output)
+      case (3, T_Function3(_, arg1, arg2, arg3, output)) => (Vector(arg1, arg2, arg3), output)
+      case (_, _)                                        => return None
     }
     try {
-      val (unifiedInputs, ctx) = unify.unifyFunctionArguments(args, inputTypes, Map.empty)
-      val allExact = unifiedInputs.forall(_._2)
-      val unifiedOutput = unify.substitute(funcProto.output, ctx)
-      Some((unifiedOutput, allExact))
+      Some(unify.apply(args, inputTypes, output, ctx))
     } catch {
       case _: TypeUnificationException =>
         None
@@ -507,65 +505,76 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
     *                   being evaluated.
     * @return
     */
-  def apply(funcName: String, inputTypes: Vector[T], exprState: ExprState): (T, T_Function) = {
+  def apply(funcName: String,
+            inputTypes: Vector[T],
+            exprState: ExprState,
+            section: Section.Section = Section.Other): (T, T_Function) = {
     val candidates: Vector[T_Function] = funcProtoMap(exprState).get(funcName) match {
       case None =>
         throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
       case Some(protoVec) =>
         protoVec
     }
+    val ctx = UnificationContext(section, inPlaceholder = exprState >= ExprState.InPlaceholder)
     // The function may be overloaded, taking several types of inputs. Try to match all
     // prototypes against the input, preferring the one with exactly matching inputs (if any)
-    val viableCandidates: Vector[((T, T_Function), Boolean)] = candidates.flatMap { funcProto =>
-      try {
-        evalOnePrototype(funcProto, inputTypes) match {
-          case None             => None
-          case Some((t, exact)) => Some(((t, funcProto), exact))
-        }
-      } catch {
-        case e: SubstitutionException =>
-          throw new StdlibFunctionException(e.getMessage)
-      }
-    }
-    viableCandidates.partition(_._2) match {
-      case (Vector(result), _) =>
-        // one exact match
-        logger.trace(
-            s"selected exact match prototype ${result}",
-            minLevel = TraceLevel.VVerbose
-        )
-        result._1
-      case (Vector(), Vector(result)) =>
-        // one coerced match
-        logger.trace(
-            s"selected coerced prototype ${result}",
-            minLevel = TraceLevel.VVerbose
-        )
-        result._1
-      case (Vector(), Vector()) =>
-        // no matches
-        val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
-        val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
-        val msg = s"""|Invoking stdlib function ${funcName} with badly typed arguments
-                      |${candidatesStr}
-                      |inputs: ${inputsStr}
-                      |""".stripMargin
-        throw new StdlibFunctionException(msg)
-      case (v1, v2) =>
-        // Match more than one prototype.
-        val v = if (v1.nonEmpty) v1 else v2
-        val prototypeDescriptions = v
-          .map {
-            case ((_, funcSig), _) =>
-              Utils.prettyFormatType(funcSig)
+    val (priority, viableCandidates): (Priority.Priority,
+                                       Vector[(T, T_Function, Priority.Priority)]) =
+      candidates
+        .flatMap { funcProto =>
+          try {
+            evalOnePrototype(funcProto, inputTypes, ctx) match {
+              case None                => None
+              case Some((t, priority)) => Some((t, funcProto, priority))
+            }
+          } catch {
+            case e: SubstitutionException =>
+              throw new StdlibFunctionException(e.getMessage)
           }
-          .mkString("\n")
-        val msg = s"""|Call to ${funcName} matches ${v.size} prototypes
-                      |inputTypes: ${inputTypes}
-                      |prototypes:
-                      |${prototypeDescriptions}
-                      |""".stripMargin
-        throw new StdlibFunctionException(msg)
+        }
+        .groupBy(_._3)
+        .toVector
+        .sortWith(_._1 < _._1)
+        .headOption
+        .getOrElse({
+          // no matches
+          val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
+          val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
+          val msg =
+            s"""|Invoking stdlib function ${funcName} with badly typed arguments
+                |${candidatesStr}
+
+                |inputs: ${inputsStr}
+
+                |""".stripMargin
+          throw new StdlibFunctionException(msg)
+        })
+    if (viableCandidates.size > 1) {
+      // Match more than one prototype.
+      val prototypeDescriptions = viableCandidates
+        .map {
+          case (_, funcSig, _) => Utils.prettyFormatType(funcSig)
+        }
+        .mkString("\n")
+      val msg = s"""|Call to ${funcName} matches ${viableCandidates.size} prototypes
+                    |inputTypes: ${inputTypes}
+                    |prototypes:
+                    |${prototypeDescriptions}
+                    |""".stripMargin
+      throw new StdlibFunctionException(msg)
     }
+    val (resultType, resultSignature, _) = viableCandidates.head
+    if (priority == Priority.Exact) {
+      logger.trace(
+          s"selected exact match prototype ${resultSignature}",
+          minLevel = TraceLevel.VVerbose
+      )
+    } else {
+      logger.trace(
+          s"selected coerced prototype ${resultSignature}",
+          minLevel = TraceLevel.VVerbose
+      )
+    }
+    (resultType, resultSignature)
   }
 }

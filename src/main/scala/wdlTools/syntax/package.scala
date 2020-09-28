@@ -15,14 +15,28 @@ object WdlVersion {
   val All: Vector[WdlVersion] = Vector(V2, V1, Draft_2).sortWith(_ < _)
 
   def withName(name: String): WdlVersion = {
-    val version = All.collectFirst {
-      case v if v.name == name || v.aliases.contains(name) => v
-    }
-    if (version.isDefined) {
-      version.get
-    } else {
-      throw new NoSuchElementException(s"No value found for ${name}")
-    }
+    All
+      .collectFirst {
+        case v if v.name == name || v.aliases.contains(name) => v
+      }
+      .getOrElse(
+          throw new NoSuchElementException(s"No value found for ${name}")
+      )
+  }
+
+  def withNameIgnoreCase(name: String): WdlVersion = {
+    val nameLc = name.toLowerCase
+    All
+      .collectFirst {
+        case v
+            if v.name.toLowerCase == nameLc || v.aliases
+              .map(_.toLowerCase)
+              .contains(nameLc) =>
+          v
+      }
+      .getOrElse(
+          throw new NoSuchElementException(s"No value found for ${name}")
+      )
   }
 }
 

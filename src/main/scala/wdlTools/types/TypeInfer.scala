@@ -6,6 +6,8 @@ import wdlTools.types.WdlTypes._
 import wdlTools.types.Utils.{isPrimitive, prettyFormatExpr, prettyFormatType}
 import TypeCheckingRegime._
 import wdlTools.types.ExprState.ExprState
+import wdlTools.types.Section.Section
+import wdlTools.types.TypedAbstractSyntax.WdlType
 import wdlTools.util.{
   DuplicateBindingException,
   FileSourceResolver,
@@ -33,10 +35,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //  or have a separate warningHandler parameter
   private var errors = Vector.empty[TypeError]
 
-  // A group of bindings. This is typically a part of the context. For example,
-  // the body of a scatter.
-  type WdlType = WdlTypes.T
-
   // get type restrictions, on a per-version basis
   private def getRuntimeTypeRestrictions(version: WdlVersion): Map[String, Vector[T]] = {
     version match {
@@ -62,7 +60,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     errors = errors :+ TypeError(locSource, reason)
   }
 
-  private def typeEvalExprGetName(expr: TAT.Expr, id: String, ctx: Context): WdlType = {
+  private def typeEvalExprGetName(expr: TAT.Expr, id: String, ctx: TypeContext): T = {
     expr.wdlType match {
       case struct: T_Struct =>
         struct.members.get(id) match {
@@ -117,33 +115,39 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   // unify a vector of types
-  private def unifyTypes(vec: Iterable[WdlType], errMsg: String, locSource: SourceLocation) = {
+  private def unifyTypes(types: Iterable[WdlType],
+                         errMsg: String,
+                         locSource: SourceLocation,
+                         ctx: UnificationContext): T = {
     try {
-      val (t, _) = unify.unifyCollection(vec, Map.empty)
-      t
+      unify.apply(types, ctx)
     } catch {
       case _: TypeUnificationException =>
         handleError(errMsg + " must have the same type, or be coercible to one", locSource)
-        vec.head
+        types.head
     }
   }
 
-  // Add the type to an expression
-  //
+  /**
+    * Adds the type to an expression.
+    */
   private def applyExpr(expr: AST.Expr,
-                        ctx: Context,
+                        ctx: TypeContext,
                         bindings: WdlTypeBindings = WdlTypeBindings.empty,
-                        exprState: ExprState = ExprState.Start): TAT.Expr = {
+                        exprState: ExprState = ExprState.Start,
+                        section: Section = Section.Other): TAT.Expr = {
 
     def nestedStringExpr(expr: AST.Expr,
-                         state: ExprState.ExprState,
+                         nestedState: ExprState.ExprState,
                          exprType: WdlTypes.T = T_String,
                          initialType: WdlTypes.T = T_String): (TAT.Expr, WdlTypes.T) = {
-      val e2 = nested(expr, state)
-      // check that the expression is coercible to an *optional* string - we use
-      // optional here because a null/None/undefined value auto-coerces to the
-      // empty string within a placeholder
-      val t2: T = if (unify.isCoercibleTo(T_Optional(T_String), e2.wdlType)) {
+      val e2 = nested(expr, nestedState)
+      // check that the expression is coercible to a string - we also allow optional because
+      // null/None/undefined value auto-coerces to the empty string within a placeholder
+      val unifyCtx = UnificationContext(section, inPlaceholder = true)
+      val coerces = unify.isCoercibleTo(T_String, e2.wdlType, unifyCtx) ||
+        unify.isCoercibleTo(T_Optional(T_String), e2.wdlType)
+      val t2: T = if (coerces) {
         exprType
       } else {
         handleError(
@@ -204,17 +208,19 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // The array is empty, we can't tell what the array type is.
               TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
             case AST.ExprArray(vec, loc) =>
-              val tVecExprs = vec.map(e => nested(e, nextState))
+              val elementTypes = vec.map(e => nested(e, nextState))
+              val unifyCtx =
+                UnificationContext(section, inPlaceholder = nextState >= ExprState.InPlaceholder)
               val t =
                 try {
-                  T_Array(unify.unifyCollection(tVecExprs.map(_.wdlType), Map.empty)._1)
+                  T_Array(unify.apply(elementTypes.map(_.wdlType), unifyCtx))
                 } catch {
                   case _: TypeUnificationException =>
                     handleError("array elements must have the same type, or be coercible to one",
                                 nestedExpr.loc)
-                    tVecExprs.head.wdlType
+                    elementTypes.head.wdlType
                 }
-              TAT.ExprArray(tVecExprs, t, loc)
+              TAT.ExprArray(elementTypes, t, loc)
             case AST.ExprObject(members, loc) =>
               val members2 = members.map {
                 case AST.ExprMember(key, value, _) =>
@@ -232,11 +238,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 val v = nested(item.value, nextState)
                 k -> v
               }.toMap
-              // unify the key types
-              val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc)
-              // unify the value types
-              val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc)
-              T_Map(tk, tv)
+              // unify the key/value types
+              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc, unifyCtx)
+              val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc, unifyCtx)
               TAT.ExprMap(m, T_Map(tk, tv), loc)
 
             case AST.ExprIdentifier(id, loc) =>
@@ -256,7 +261,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val (trueExpr, trueType) = nestedStringExpr(t, ExprState.InPlaceholder)
               val (falseExpr, falseType) = nestedStringExpr(f, ExprState.InPlaceholder)
               val valueExpr = nested(value, ExprState.InPlaceholder)
-              if (!unify.isCoercibleTo(T_Boolean, valueExpr.wdlType)) {
+              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              if (!unify.isCoercibleTo(T_Boolean, valueExpr.wdlType, unifyCtx)) {
                 val msg =
                   s"""condition ${prettyFormatExpr(valueExpr)} should have boolean type, 
                      |it has type ${prettyFormatType(valueExpr.wdlType)} instead
@@ -273,15 +279,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // ${default="foo" optional_value}
               val (defaultExpr, defaultType) = nestedStringExpr(default, ExprState.InPlaceholder)
               val valueExpr = nested(value, ExprState.InPlaceholder)
+              val unifyCtx = UnificationContext(section, inPlaceholder = true)
               val t = valueExpr.wdlType match {
-                case T_Optional(vt2) if unify.isCoercibleTo(defaultType, vt2) =>
+                case T_Optional(vt2) if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
                   defaultType
-                case T_Optional(vt2) if unify.isCoercibleTo(T_String, vt2) =>
+                case T_Optional(vt2) if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
                   T_String
-                case vt2 if unify.isCoercibleTo(defaultType, vt2) =>
+                case vt2 if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
                   // another unsavory case. The optional_value is NOT optional.
                   defaultType
-                case vt2 if unify.isCoercibleTo(T_String, vt2) =>
+                case vt2 if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
                   // another unsavory case. The optional_value is NOT optional.
                   T_String
                 case _ =>
@@ -298,8 +305,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // ${sep=", " array_value}
               val (sepExpr, _) = nestedStringExpr(sep, ExprState.InPlaceholder)
               val valueExpr = nested(value, ExprState.InPlaceholder)
+              val unifyCtx = UnificationContext(section, inPlaceholder = true)
               val t = valueExpr.wdlType match {
-                case T_Array(x, _) if unify.isCoercibleTo(T_String, x) =>
+                case T_Array(x, _) if unify.isCoercibleTo(T_String, x, unifyCtx) =>
                   T_String
                 case other =>
                   val msg =
@@ -325,7 +333,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   eCond.wdlType
                 } else {
                   try {
-                    unify.unify(eTrueBranch.wdlType, eFalseBranch.wdlType, Map.empty)._1
+                    val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                    unify.apply(eTrueBranch.wdlType, eFalseBranch.wdlType, unifyCtx)
                   } catch {
                     case _: TypeUnificationException =>
                       val msg =
@@ -346,8 +355,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val eIndex = nested(index, nextState)
               val eCollection = nested(collection, nextState)
               val t = (eIndex.wdlType, eCollection.wdlType) match {
-                case (T_Int, T_Array(elementType, _))                                  => elementType
-                case (iType, T_Map(kType, vType)) if unify.isCoercibleTo(kType, iType) => vType
+                case (T_Int, T_Array(elementType, _)) => elementType
+                case (iType, T_Map(kType, vType))
+                    if unify.isCoercibleTo(
+                        kType,
+                        iType,
+                        UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                    ) =>
+                  vType
                 case (T_Int, _) =>
                   handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
                   eIndex.wdlType
@@ -384,7 +399,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     nested(expr, exprState)
   }
 
-  private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: Context): WdlType = {
+  private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: TypeContext): T = {
     t match {
       case _: AST.TypeBoolean     => T_Boolean
       case _: AST.TypeInt         => T_Int
@@ -421,9 +436,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //   Int x = 5
   //   Int x = 7 + y
   private def applyDecl(decl: AST.Declaration,
-                        ctx: Context,
+                        section: Section,
+                        ctx: TypeContext,
                         bindings: WdlTypeBindings,
-                        canShadow: Boolean = false): (TAT.Declaration, WdlTypeBindings) = {
+                        canShadow: Boolean = false): (TAT.PrivateVariable, WdlTypeBindings) = {
 
     val lhsType = typeFromAst(decl.wdlType, decl.loc, ctx)
     val tDecl = decl.expr match {
@@ -432,11 +448,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // TODO: this shouldn't be possible - there are separate types
         //  for input and output declarations, and non-input declarations
         //  must have a value
-        TAT.Declaration(decl.name, lhsType, None, decl.loc)
+        TAT.PrivateVariable(decl.name, lhsType, None, decl.loc)
       case Some(expr) =>
-        val e = applyExpr(expr, ctx, bindings)
+        val e = applyExpr(expr, ctx, bindings, section = section)
         val rhsType = e.wdlType
-        val wdlType = if (unify.isCoercibleTo(lhsType, rhsType)) {
+        val unifyCtx = UnificationContext(section)
+        val wdlType = if (unify.isCoercibleTo(lhsType, rhsType, unifyCtx)) {
           lhsType
         } else {
           val msg =
@@ -447,7 +464,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           handleError(msg, decl.loc)
           lhsType
         }
-        TAT.Declaration(decl.name, wdlType, Some(e), decl.loc)
+        TAT.PrivateVariable(decl.name, wdlType, Some(e), decl.loc)
     }
 
     // There are cases where we want to allow shadowing. For example, it
@@ -463,16 +480,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // return input definitions
   //
   private def applyInputSection(inputSection: AST.InputSection,
-                                ctx: Context): (Vector[TAT.InputDefinition], Context) = {
+                                ctx: TypeContext): (Vector[TAT.InputParameter], TypeContext) = {
     // translate each declaration
     val (tDecls, _, _) =
       inputSection.declarations
-        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], WdlTypeBindings.empty)) {
+        .foldLeft((Vector.empty[TAT.PrivateVariable], Set.empty[String], WdlTypeBindings.empty)) {
           case ((tDecls, names, bindings), decl) =>
             if (names.contains(decl.name)) {
               handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
             }
-            val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings)
+            val (tDecl, afterBindings) = applyDecl(decl, Section.Input, ctx, bindings)
             (tDecls :+ tDecl, names + decl.name, afterBindings)
         }
 
@@ -484,13 +501,13 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         case None => {
           tDecl.wdlType match {
             case t: WdlTypes.T_Optional =>
-              TAT.OptionalInputDefinition(tDecl.name, t, tDecl.loc)
+              TAT.OptionalInputParameter(tDecl.name, t, tDecl.loc)
             case _ =>
-              TAT.RequiredInputDefinition(tDecl.name, tDecl.wdlType, tDecl.loc)
+              TAT.RequiredInputParameter(tDecl.name, tDecl.wdlType, tDecl.loc)
           }
         }
         case Some(expr) =>
-          TAT.OverridableInputDefinitionWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
+          TAT.OverridableInputParameterWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
 
@@ -500,7 +517,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Calculate types for the outputs, and return a new typed output section
   private def applyOutputSection(outputSection: AST.OutputSection,
-                                 ctx: Context): (Vector[TAT.OutputDefinition], Context) = {
+                                 ctx: TypeContext): (Vector[TAT.OutputParameter], TypeContext) = {
     // output variables can shadow input definitions, but not intermediate
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
@@ -509,7 +526,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // translate the declarations
     val (tDecls, _, _) =
       outputSection.declarations
-        .foldLeft((Vector.empty[TAT.Declaration], Set.empty[String], WdlTypeBindings.empty)) {
+        .foldLeft((Vector.empty[TAT.PrivateVariable], Set.empty[String], WdlTypeBindings.empty)) {
           case ((tDecls, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
             if (names.contains(decl.name)) {
@@ -518,7 +535,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             if (both.contains(decl.name)) {
               handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.loc)
             }
-            val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings, canShadow = true)
+            val (tDecl, afterBindings) =
+              applyDecl(decl, Section.Output, ctx, bindings, canShadow = true)
             (tDecls :+ tDecl, names + tDecl.name, afterBindings)
         }
 
@@ -528,7 +546,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         case None =>
           throw new TypeException("Outputs must have expressions", tDecl.loc)
         case Some(expr) =>
-          TAT.OutputDefinition(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
+          TAT.OutputParameter(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
       }
     }
 
@@ -537,7 +555,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   // The runtime section can make use of values defined in declarations
-  private def applyRuntime(rtSection: AST.RuntimeSection, ctx: Context): TAT.RuntimeSection = {
+  private def applyRuntime(rtSection: AST.RuntimeSection, ctx: TypeContext): TAT.RuntimeSection = {
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
     val m = rtSection.kvs.map {
       case AST.RuntimeKV(id, expr, loc) =>
@@ -557,7 +575,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // convert the generic expression syntax into a specialized JSON object
   // language for meta values only.
-  private def applyMetaValue(expr: AST.MetaValue, ctx: Context): TAT.MetaValue = {
+  private def applyMetaValue(expr: AST.MetaValue, ctx: TypeContext): TAT.MetaValue = {
     expr match {
       case AST.MetaValueNull(loc)           => TAT.MetaValueNull(loc)
       case AST.MetaValueBoolean(value, loc) => TAT.MetaValueBoolean(value, loc)
@@ -580,7 +598,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
   }
 
-  private def applyMeta(metaSection: AST.MetaSection, ctx: Context): TAT.MetaSection = {
+  private def applyMeta(metaSection: AST.MetaSection, ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(metaSection.kvs.map {
       case AST.MetaKV(k, v, _) =>
         k -> applyMetaValue(v, ctx)
@@ -588,7 +606,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
-                             ctx: Context): TAT.MetaSection = {
+                             ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
         paramMetaSection.kvs.map { kv: AST.MetaKV =>
           val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
@@ -606,7 +624,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     )
   }
 
-  private def applyHints(hintsSection: AST.HintsSection, ctx: Context): TAT.MetaSection = {
+  private def applyHints(hintsSection: AST.HintsSection, ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
         hintsSection.kvs.map {
           case AST.MetaKV(k, v, _) =>
@@ -618,17 +636,17 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // calculate the type signature of a workflow or a task
   private def calcSignature(
-      inputSection: Vector[TAT.InputDefinition],
-      outputSection: Vector[TAT.OutputDefinition]
+      inputSection: Vector[TAT.InputParameter],
+      outputSection: Vector[TAT.OutputParameter]
   ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
     val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
-      case d: TAT.RequiredInputDefinition =>
+      case d: TAT.RequiredInputParameter =>
         // input is compulsory
         d.name -> (d.wdlType, false)
-      case d: TAT.OverridableInputDefinitionWithDefault =>
+      case d: TAT.OverridableInputParameterWithDefault =>
         // input has a default value, caller may omit it.
         d.name -> (d.wdlType, true)
-      case d: TAT.OptionalInputDefinition =>
+      case d: TAT.OptionalInputParameter =>
         // input is optional, caller can omit it.
         d.name -> (d.wdlType, true)
     }.toMap
@@ -647,7 +665,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // - Assignments to an output variable must match
   //
   // We can't check the validity of the command section.
-  private def applyTask(task: AST.Task, ctx: Context): TAT.Task = {
+  private def applyTask(task: AST.Task, ctx: TypeContext): TAT.Task = {
     val (inputDefs, inputCtx) = task.input match {
       case None               => (Vector.empty, ctx)
       case Some(inputSection) => applyInputSection(inputSection, ctx)
@@ -655,9 +673,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
     // add types to the declarations, and accumulate context
     val (tDeclarations, _) =
-      task.declarations.foldLeft((Vector.empty[TAT.Declaration], WdlTypeBindings.empty)) {
+      task.declarations.foldLeft((Vector.empty[TAT.PrivateVariable], WdlTypeBindings.empty)) {
         case ((tDecls, bindings), decl) =>
-          val (tDecl, afterBindings) = applyDecl(decl, inputCtx, bindings)
+          val (tDecl, afterBindings) = applyDecl(decl, Section.Other, inputCtx, bindings)
           (tDecls :+ tDecl, afterBindings)
       }
     val declCtx = tDeclarations.foldLeft(inputCtx) {
@@ -708,7 +726,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         inputs = inputDefs,
         outputs = outputDefs,
         command = tCommand,
-        declarations = tDeclarations,
+        privateVariables = tDeclarations,
         meta = tMeta,
         parameterMeta = tParamMeta,
         runtime = tRuntime,
@@ -721,7 +739,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //    in the callee
   // 2. all the compulsory callee arguments must be specified. Optionals
   //    and arguments that have defaults can be skipped.
-  private def applyCall(call: AST.Call, ctx: Context): TAT.Call = {
+  private def applyCall(call: AST.Call, ctx: TypeContext): TAT.Call = {
     // The name of the call may or may not contain dots. Examples:
     //
     // call lib.concat as concat     concat
@@ -775,12 +793,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(AST.CallInputs(value, _)) =>
         value.map { inp =>
           val argName = inp.name
-          val tExpr = applyExpr(inp.expr, ctx)
+          val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
           // type-check input argument
+          lazy val unifyCtx = UnificationContext(Section.Call)
           val errorMsg = callee.input.get(argName) match {
             case None =>
               Some(s"call ${call.name} has argument ${argName} that does not exist in the callee")
-            case Some((calleeType, _)) if !unify.isCoercibleTo(calleeType, tExpr.wdlType) =>
+            case Some((calleeType, _))
+                if !unify.isCoercibleTo(calleeType, tExpr.wdlType, unifyCtx) =>
               Some(
                   s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
               )
@@ -844,7 +864,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   // Variable "i" is not visible after the scatter completes.
   // A's members are arrays.
-  private def applyScatter(scatter: AST.Scatter, ctx: Context): (TAT.Scatter, WdlTypeBindings) = {
+  private def applyScatter(scatter: AST.Scatter,
+                           ctx: TypeContext): (TAT.Scatter, WdlTypeBindings) = {
     val eCollection = applyExpr(scatter.expr, ctx)
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
@@ -888,7 +909,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   // Add an optional modifier to all the types inside the body.
   private def applyConditional(cond: AST.Conditional,
-                               ctx: Context): (TAT.Conditional, WdlTypeBindings) = {
+                               ctx: TypeContext): (TAT.Conditional, WdlTypeBindings) = {
     val condExpr = applyExpr(cond.expr, ctx) match {
       case e if e.wdlType == T_Boolean => e
       case e =>
@@ -927,11 +948,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //  2) the typed workflow elements
   private def applyWorkflowElements(
       body: Vector[AST.WorkflowElement],
-      ctx: Context
+      ctx: TypeContext
   ): (Vector[TAT.WorkflowElement], WdlTypeBindings) = {
     body.foldLeft((Vector.empty[TAT.WorkflowElement], WdlTypeBindings.empty)) {
       case ((tElements, bindings), decl: AST.Declaration) =>
-        val (tDecl, afterBindings) = applyDecl(decl, ctx, bindings)
+        val (tDecl, afterBindings) = applyDecl(decl, Section.Other, ctx, bindings)
         (tElements :+ tDecl, afterBindings)
 
       case ((tElements, bindings), wfElement) =>
@@ -963,7 +984,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
   }
 
-  private def applyWorkflow(wf: AST.Workflow, ctx: Context): TAT.Workflow = {
+  private def applyWorkflow(wf: AST.Workflow, ctx: TypeContext): TAT.Workflow = {
     val (inputDefs, inputCtx) = wf.input match {
       case None               => (Vector.empty, ctx)
       case Some(inputSection) => applyInputSection(inputSection, ctx)
@@ -992,8 +1013,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   // Convert from AST to TAT and maintain context
-  private def applyDoc(doc: AST.Document): (TAT.Document, Context) = {
-    val emptyCtx = Context.create(doc, regime, logger)
+  private def applyDoc(doc: AST.Document): (TAT.Document, TypeContext) = {
+    val emptyCtx = TypeContext.create(doc, regime, logger)
 
     // translate each of the elements in the document
     val (elements, elementCtx) =
@@ -1092,7 +1113,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // describing the problem in a human readable fashion. Return a document
   // with types.
   //
-  def apply(doc: AST.Document): (TAT.Document, Context) = {
+  def apply(doc: AST.Document): (TAT.Document, TypeContext) = {
     //val (tDoc, _) = applyDoc(doc)
     //tDoc
     val (tDoc, ctx) = applyDoc(doc)

@@ -17,7 +17,7 @@ abstract class Enum extends Enumeration {
 }
 
 object Enum {
-  implicit def enumFormat[T <: Enum](implicit enu: T): RootJsonFormat[T#Value] =
+  implicit def enumFormat[T <: Enum](implicit enu: T): RootJsonFormat[T#Value] = {
     new RootJsonFormat[T#Value] {
       def write(obj: T#Value): JsValue = {
         JsString(obj.toString)
@@ -34,4 +34,21 @@ object Enum {
         }
       }
     }
+  }
+
+  def min[V <: Ordered[V]](x: V, y: V): V = {
+    if (x <= y) {
+      x
+    } else {
+      y
+    }
+  }
+
+  def max[V <: Ordered[V]](x: V, y: V): V = {
+    if (x >= y) {
+      x
+    } else {
+      y
+    }
+  }
 }

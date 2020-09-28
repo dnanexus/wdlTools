@@ -18,9 +18,9 @@ import wdlTools.types.{ExprGraph, WdlTypes}
 import wdlTools.util.{FileSourceResolver, Logger}
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
-  protected lazy val callableInputs: Map[String, InputDefinition] =
+  protected lazy val callableInputs: Map[String, InputParameter] =
     callable.inputs.map(inp => inp.name -> inp).toMap
-  protected lazy val callableOutputs: Map[String, OutputDefinition] =
+  protected lazy val callableOutputs: Map[String, OutputParameter] =
     callable.outputs.map(out => out.name -> out).toMap
 
   protected def inputOrder: Vector[String]
@@ -34,18 +34,18 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
     inputOrder.foldLeft(WdlValueBindings.empty) {
       case (ctx, declName) =>
         val value = callableInputs(declName) match {
-          case _: RequiredInputDefinition if inputValues.contains(declName) =>
+          case _: RequiredInputParameter if inputValues.contains(declName) =>
             // ensure the required value is not T_Optional
             WdlValueUtils.unwrapOptional(inputValues(declName))
-          case inp: RequiredInputDefinition =>
+          case inp: RequiredInputParameter =>
             throw new ExecException(s"Missing required input ${declName} to task ${callable.name}",
                                     inp.loc)
           case _ if inputValues.contains(declName) =>
             // ensure the optional value is T_Optional
             WdlValueUtils.ensureOptional(inputValues(declName))
-          case _: OptionalInputDefinition =>
+          case _: OptionalInputParameter =>
             WdlValues.V_Null
-          case OverridableInputDefinitionWithDefault(_, wdlType, defaultExpr, loc) =>
+          case OverridableInputParameterWithDefault(_, wdlType, defaultExpr, loc) =>
             // An input definition that has a default value supplied.
             // Typical WDL example would be a declaration like: "Int x = 5"
             try {
@@ -144,9 +144,7 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
 }
 
 object TaskInputOutput {
-  def deserialize(jsValue: JsValue,
-                  inputDef: InputDefinition,
-                  name: String): Option[WdlValues.V] = {
+  def deserialize(jsValue: JsValue, inputDef: InputParameter, name: String): Option[WdlValues.V] = {
     jsValue match {
       case null | JsNull =>
         // treat a value of null as undefined - this will get replaced with

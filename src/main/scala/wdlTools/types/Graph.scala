@@ -196,15 +196,15 @@ object ExprGraph {
     override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
   }
 
-  abstract class ExprGraphBuilder(inputDefs: Vector[InputDefinition],
-                                  outputDefs: Vector[OutputDefinition]) {
+  abstract class ExprGraphBuilder(inputDefs: Vector[InputParameter],
+                                  outputDefs: Vector[OutputParameter]) {
     protected lazy val inputs: Map[String, VarInfo] = {
       inputDefs.map {
-        case req: RequiredInputDefinition =>
+        case req: RequiredInputParameter =>
           req.name -> DeclInfo(req, referenced = true, kind = VarKind.Input)
-        case opt: OptionalInputDefinition =>
+        case opt: OptionalInputParameter =>
           opt.name -> DeclInfo(opt, referenced = false, kind = VarKind.Input)
-        case optWithDefault: OverridableInputDefinitionWithDefault =>
+        case optWithDefault: OverridableInputParameterWithDefault =>
           optWithDefault.name -> DeclInfo(optWithDefault,
                                           referenced = false,
                                           expr = Some(optWithDefault.defaultExpr),
@@ -297,9 +297,9 @@ object ExprGraph {
     def build: ExprGraph
   }
 
-  case class TaskExprGraphBuilder(inputDefs: Vector[InputDefinition] = Vector.empty,
-                                  outputDefs: Vector[OutputDefinition] = Vector.empty,
-                                  declarations: Vector[Declaration] = Vector.empty,
+  case class TaskExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
+                                  outputDefs: Vector[OutputParameter] = Vector.empty,
+                                  declarations: Vector[PrivateVariable] = Vector.empty,
                                   commandParts: Vector[Expr] = Vector.empty,
                                   runtime: Map[String, Expr] = Map.empty)
       extends ExprGraphBuilder(inputDefs, outputDefs) {
@@ -359,7 +359,7 @@ object ExprGraph {
       TaskExprGraphBuilder(
           task.inputs,
           task.outputs,
-          task.declarations,
+          task.privateVariables,
           task.command.parts,
           task.runtime.map(_.kvs).getOrElse(Map.empty)
       )
@@ -421,8 +421,8 @@ object ExprGraph {
     override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
   }
 
-  case class WorkflowExprGraphBuilder(inputDefs: Vector[InputDefinition] = Vector.empty,
-                                      outputDefs: Vector[OutputDefinition] = Vector.empty,
+  case class WorkflowExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
+                                      outputDefs: Vector[OutputParameter] = Vector.empty,
                                       body: Vector[WorkflowElement])
       extends ExprGraphBuilder(inputDefs, outputDefs) {
     private def getScatterPrefix(scatterPath: Vector[Int]): String = {

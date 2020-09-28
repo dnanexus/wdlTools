@@ -297,11 +297,11 @@ case class Eval(paths: EvalPaths,
 
   // Evaluate all the declarations and return a Context
   def applyDeclarations(
-      decls: Vector[TAT.Declaration],
+      decls: Vector[TAT.PrivateVariable],
       bindings: WdlValueBindings = WdlValueBindings.empty
   ): WdlValueBindings = {
     decls.foldLeft(bindings) {
-      case (accu: WdlValueBindings, TAT.Declaration(name, wdlType, Some(expr), loc)) =>
+      case (accu: WdlValueBindings, TAT.PrivateVariable(name, wdlType, Some(expr), loc)) =>
         val ctx = Context(accu)
         val value = apply(expr, ctx)
         val coerced = Coercion.coerceTo(wdlType, value, loc, allowNonstandardCoercions)

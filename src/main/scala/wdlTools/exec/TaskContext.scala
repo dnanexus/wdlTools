@@ -108,7 +108,7 @@ case class TaskContext(task: Task,
   // The inputs and runtime section are evaluated using the host paths
   // (which will be the same as the guest paths, unless we're running in a container)
   private lazy val evalBindings: WdlValueBindings = {
-    val bindings = hostEvaluator.applyDeclarations(task.declarations, inputBindings)
+    val bindings = hostEvaluator.applyDeclarations(task.privateVariables, inputBindings)
     // If there is a command to evaluate, pre-localize all the files/dirs, otherwise
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
@@ -167,7 +167,7 @@ case class TaskContext(task: Task,
     runtime.container match {
       case v if v.isEmpty => None
       case v =>
-        Some(dockerUtils.getImage(v, runtime.getSourceLocation(Runtime.Keys.Container)))
+        Some(dockerUtils.getImage(v, runtime.getSourceLocation(Runtime.ContainerKey)))
     }
   }
 

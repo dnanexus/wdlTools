@@ -148,11 +148,11 @@ class TypedAbstractSyntaxTreeVisitor {
     }
   }
 
-  def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {}
+  def visitDeclaration(ctx: VisitorContext[PrivateVariable]): Unit = {}
 
-  def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {}
+  def visitInputDefinition(ctx: VisitorContext[InputParameter]): Unit = {}
 
-  def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {}
+  def visitOutputDefinition(ctx: VisitorContext[OutputParameter]): Unit = {}
 
   def visitCallName(actualName: String,
                     fullyQualifiedName: String,
@@ -251,20 +251,20 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
     }
   }
 
-  override def visitDeclaration(ctx: VisitorContext[Declaration]): Unit = {
+  override def visitDeclaration(ctx: VisitorContext[PrivateVariable]): Unit = {
     visitDefinition(ctx.element.name, ctx.element.wdlType, ctx.element.expr, ctx)
   }
 
-  override def visitInputDefinition(ctx: VisitorContext[InputDefinition]): Unit = {
+  override def visitInputDefinition(ctx: VisitorContext[InputParameter]): Unit = {
     ctx.element match {
-      case RequiredInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
-      case OptionalInputDefinition(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
-      case OverridableInputDefinitionWithDefault(name, wdlType, defaultExpr, _) =>
+      case RequiredInputParameter(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OptionalInputParameter(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
         visitDefinition(name, wdlType, Some(defaultExpr), ctx)
     }
   }
 
-  override def visitOutputDefinition(ctx: VisitorContext[OutputDefinition]): Unit = {
+  override def visitOutputDefinition(ctx: VisitorContext[OutputParameter]): Unit = {
     visitDefinition(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
   }
 
@@ -296,9 +296,10 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   override def visitBody[P <: Element](body: Vector[WorkflowElement],
                                        parent: VisitorContext[P]): Unit = {
     body.foreach {
-      case decl: Declaration => visitDeclaration(parent.createChildContext[Declaration](decl))
-      case call: Call        => visitCall(parent.createChildContext[Call](call))
-      case scatter: Scatter  => visitScatter(parent.createChildContext[Scatter](scatter))
+      case decl: PrivateVariable =>
+        visitDeclaration(parent.createChildContext[PrivateVariable](decl))
+      case call: Call       => visitCall(parent.createChildContext[Call](call))
+      case scatter: Scatter => visitScatter(parent.createChildContext[Scatter](scatter))
       case conditional: Conditional =>
         visitConditional(parent.createChildContext[Conditional](conditional))
       case other => throw new Exception(s"Unexpected workflow element ${other}")
@@ -334,11 +335,11 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   override def visitWorkflow(ctx: VisitorContext[Workflow]): Unit = {
     visitName[Workflow](ctx.element.name, ctx)
     ctx.element.inputs.foreach { inp =>
-      visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
+      visitInputDefinition(ctx.createChildContext[InputParameter](inp))
     }
     visitBody[Workflow](ctx.element.body, ctx)
     ctx.element.outputs.foreach { out =>
-      visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
+      visitOutputDefinition(ctx.createChildContext[OutputParameter](out))
     }
     if (ctx.element.meta.isDefined) {
       visitMetaSection(ctx.createChildContext[MetaSection](ctx.element.meta.get))
@@ -385,14 +386,14 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   override def visitTask(ctx: VisitorContext[Task]): Unit = {
     visitName[Task](ctx.element.name, ctx)
     ctx.element.inputs.foreach { inp =>
-      visitInputDefinition(ctx.createChildContext[InputDefinition](inp))
+      visitInputDefinition(ctx.createChildContext[InputParameter](inp))
     }
-    ctx.element.declarations.foreach { decl =>
-      visitDeclaration(ctx.createChildContext[Declaration](decl))
+    ctx.element.privateVariables.foreach { decl =>
+      visitDeclaration(ctx.createChildContext[PrivateVariable](decl))
     }
     visitCommandSection(ctx.createChildContext[CommandSection](ctx.element.command))
     ctx.element.outputs.foreach { out =>
-      visitOutputDefinition(ctx.createChildContext[OutputDefinition](out))
+      visitOutputDefinition(ctx.createChildContext[OutputParameter](out))
     }
     if (ctx.element.runtime.isDefined) {
       visitRuntimeSection(ctx.createChildContext[RuntimeSection](ctx.element.runtime.get))

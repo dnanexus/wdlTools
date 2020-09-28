@@ -1,8 +1,9 @@
 package wdlTools.types
 
 import wdlTools.syntax.SourceLocation
+import wdlTools.util.Enum
 
-object TypeCheckingRegime extends Enumeration {
+object TypeCheckingRegime extends Enum {
   type TypeCheckingRegime = Value
   val Lenient, Moderate, Strict = Value
 }

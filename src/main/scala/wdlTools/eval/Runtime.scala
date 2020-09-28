@@ -5,7 +5,9 @@ import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 import wdlTools.util.SymmetricBiMap
 
-case class DiskRequest(size: Long, mountPoint: Option[String], diskType: Option[String])
+case class DiskRequest(size: Long,
+                       mountPoint: Option[String] = None,
+                       diskType: Option[String] = None)
 
 abstract class Runtime(runtime: Map[String, TAT.Expr],
                        userDefaultValues: WdlValueBindings,
@@ -56,17 +58,17 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def container: Vector[String]
 
-  def cpu: Option[Double]
+  def cpu: Double
 
   // allow fractional values - round up to nearest int
-  def memory: Option[Long]
+  def memory: Long
 
   def disks: Vector[DiskRequest]
 
   def isValidReturnCode(returnCode: Int): Boolean = {
-    val loc = getSourceLocation(Runtime.Keys.ReturnCodes)
-    get(Runtime.Keys.ReturnCodes) match {
-      case None                => returnCode == 0
+    val loc = getSourceLocation(Runtime.ReturnCodesKey)
+    get(Runtime.ReturnCodesKey) match {
+      case None                => returnCode == Runtime.ReturnCodesDefault
       case Some(V_String("*")) => true
       case Some(V_Int(i))      => returnCode == i.toInt
       case Some(V_Array(v)) =>
@@ -74,12 +76,12 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
           case V_Int(i) => returnCode == i.toInt
           case other =>
             throw new EvalException(
-                s"Invalid ${Runtime.Keys.ReturnCodes} array item value ${other}",
+                s"Invalid ${Runtime.ReturnCodesKey} array item value ${other}",
                 loc
             )
         }
       case other =>
-        throw new EvalException(s"Invalid ${Runtime.Keys.ReturnCodes} value ${other}", loc)
+        throw new EvalException(s"Invalid ${Runtime.ReturnCodesKey} value ${other}", loc)
     }
   }
 }
@@ -107,52 +109,56 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val container: Vector[String] = {
-    get(Runtime.Keys.Docker) match {
+    get(Runtime.DockerKey) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
         a.map {
           case V_String(s) => s
           case other =>
-            throw new EvalException(s"Invalid ${Runtime.Keys.Docker} array item value ${other}",
-                                    getSourceLocation(Runtime.Keys.Docker))
+            throw new EvalException(s"Invalid ${Runtime.DockerKey} array item value ${other}",
+                                    getSourceLocation(Runtime.DockerKey))
         }
       case other =>
         throw new EvalException(
-            s"Invalid ${Runtime.Keys.Docker} value ${other}",
-            getSourceLocation(Runtime.Keys.Docker)
+            s"Invalid ${Runtime.DockerKey} value ${other}",
+            getSourceLocation(Runtime.DockerKey)
         )
     }
   }
 
-  override def cpu: Option[Double] = {
-    get(Runtime.Keys.Cpu).map {
-      case V_Int(i)    => i.toDouble
-      case V_Float(f)  => f
-      case V_String(s) => s.toDouble
+  override def cpu: Double = {
+    get(Runtime.CpuKey) match {
+      case Some(V_Int(i))    => i.toDouble
+      case Some(V_Float(f))  => f
+      case Some(V_String(s)) => s.toDouble
+      case None              => Runtime.CpuDefault
       case other =>
-        throw new EvalException(s"Invalid ${Runtime.Keys.Cpu} value ${other}",
-                                getSourceLocation(Runtime.Keys.Cpu))
+        throw new EvalException(s"Invalid ${Runtime.CpuKey} value ${other}",
+                                getSourceLocation(Runtime.CpuKey))
     }
   }
 
-  lazy val memory: Option[Long] = {
-    get(Runtime.Keys.Memory).map {
-      case V_Int(i)   => i
-      case V_Float(d) => Utils.floatToInt(d)
-      case V_String(s) =>
-        val d = Utils.sizeStringToFloat(s, getSourceLocation(Runtime.Keys.Memory))
+  lazy val memory: Long = {
+    get(Runtime.MemoryKey) match {
+      case Some(V_Int(i))   => i
+      case Some(V_Float(d)) => Utils.floatToInt(d)
+      case Some(V_String(s)) =>
+        val d = Utils.sizeStringToFloat(s, getSourceLocation(Runtime.MemoryKey))
+        Utils.floatToInt(d)
+      case None =>
+        val d = Utils.sizeStringToFloat(Runtime.MemoryDefault, SourceLocation.empty)
         Utils.floatToInt(d)
       case other =>
-        throw new EvalException(s"Invalid ${Runtime.Keys.Memory} value ${other}",
-                                getSourceLocation(Runtime.Keys.Memory))
+        throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
+                                getSourceLocation(Runtime.MemoryKey))
     }
   }
 
   lazy val disks: Vector[DiskRequest] = {
-    get(Runtime.Keys.Disks) match {
-      case None    => Vector.empty
-      case Some(v) => Runtime.parseDisks(v, loc = getSourceLocation(Runtime.Keys.Disks))
+    get(Runtime.DisksKey) match {
+      case None    => Runtime.parseDisks(V_String(Runtime.DisksDefault))
+      case Some(v) => Runtime.parseDisks(v, loc = getSourceLocation(Runtime.DisksKey))
     }
   }
 }
@@ -164,22 +170,22 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map(
-      Runtime.Keys.Cpu -> V_Int(1),
-      Runtime.Keys.Memory -> V_String("2 GiB"),
-      Runtime.Keys.Gpu -> V_Boolean(false),
-      Runtime.Keys.Disks -> V_String("1 GiB"),
-      Runtime.Keys.MaxRetries -> V_Int(0),
-      Runtime.Keys.ReturnCodes -> V_Int(0)
+      Runtime.CpuKey -> V_Int(1),
+      Runtime.MemoryKey -> V_String(Runtime.MemoryDefault),
+      Runtime.GpuKey -> V_Boolean(Runtime.GpuDefault),
+      Runtime.DisksKey -> V_String(Runtime.DisksDefault),
+      Runtime.MaxRetriesKey -> V_Int(Runtime.MaxRetriesDefault),
+      Runtime.ReturnCodesKey -> V_Int(Runtime.ReturnCodesDefault)
   )
 
   private val allowedKeys: Set[String] = Set(
-      Runtime.Keys.Container,
-      Runtime.Keys.Cpu,
-      Runtime.Keys.Memory,
-      Runtime.Keys.Disks,
-      Runtime.Keys.Gpu,
-      Runtime.Keys.MaxRetries,
-      Runtime.Keys.ReturnCodes
+      Runtime.ContainerKey,
+      Runtime.CpuKey,
+      Runtime.MemoryKey,
+      Runtime.DisksKey,
+      Runtime.GpuKey,
+      Runtime.MaxRetriesKey,
+      Runtime.ReturnCodesKey
   )
 
   override def allows(key: String): Boolean = {
@@ -187,7 +193,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   }
 
   override val aliases: SymmetricBiMap[String] =
-    SymmetricBiMap(Map(Runtime.Keys.Docker -> Runtime.Keys.Container))
+    SymmetricBiMap(Map(Runtime.DockerKey -> Runtime.ContainerKey))
 
   private def intersectTypes(t1: Vector[WdlTypes.T], t2: Vector[WdlTypes.T]): Vector[WdlTypes.T] = {
     (t1, t2) match {
@@ -219,12 +225,12 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
 
     id match {
-      case Runtime.Keys.Container =>
+      case Runtime.ContainerKey =>
         getValue(Vector(WdlTypes.T_String, WdlTypes.T_Array(WdlTypes.T_String)))
-      case Runtime.Keys.Cpu =>
+      case Runtime.CpuKey =>
         // always return cpu as a float
         getValue(Vector(WdlTypes.T_Float))
-      case Runtime.Keys.Memory =>
+      case Runtime.MemoryKey =>
         // always return memory in bytes (round up to nearest byte)
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_String)) match {
           case i: V_Int   => i
@@ -233,20 +239,20 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
             val d = Utils.sizeStringToFloat(s, expr.loc)
             V_Int(Utils.floatToInt(d))
           case other =>
-            throw new EvalException(s"Invalid ${Runtime.Keys.Memory} value ${other}",
-                                    getSourceLocation(Runtime.Keys.Memory))
+            throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
+                                    getSourceLocation(Runtime.MemoryKey))
         }
-      case Runtime.Keys.Disks =>
+      case Runtime.DisksKey =>
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_Array(WdlTypes.T_String), WdlTypes.T_String)) match {
           case i: V_Int   => V_String(s"${i} GiB")
           case V_Float(d) => V_String(s"${d} GiB")
           case v          => v
         }
-      case Runtime.Keys.Gpu =>
+      case Runtime.GpuKey =>
         getValue(Vector(WdlTypes.T_Boolean))
-      case Runtime.Keys.MaxRetries =>
+      case Runtime.MaxRetriesKey =>
         getValue(Vector(WdlTypes.T_Int))
-      case Runtime.Keys.ReturnCodes =>
+      case Runtime.ReturnCodesKey =>
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_Array(WdlTypes.T_Int), WdlTypes.T_String))
       case other =>
         throw new EvalException(s"Runtime key ${other} not allowed in WDL version 2.0+", expr.loc)
@@ -254,7 +260,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val container: Vector[String] = {
-    get(Runtime.Keys.Container) match {
+    get(Runtime.ContainerKey) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
@@ -264,29 +270,31 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
         }
       case other =>
         throw new EvalException(
-            s"Invalid ${Runtime.Keys.Container} value ${other}",
-            getSourceLocation(Runtime.Keys.Container)
+            s"Invalid ${Runtime.ContainerKey} value ${other}",
+            getSourceLocation(Runtime.ContainerKey)
         )
     }
   }
 
-  override def cpu: Option[Double] = {
-    get(Runtime.Keys.Cpu).map {
-      case V_Float(f) => f
-      case other      => throw new EvalException(s"Invalid cpu value ${other}")
+  override def cpu: Double = {
+    get(Runtime.CpuKey) match {
+      case Some(V_Float(f)) => f
+      case None             => throw new RuntimeException("Missing default value for runtime.cpu")
+      case other            => throw new EvalException(s"Invalid cpu value ${other}")
     }
   }
 
-  lazy val memory: Option[Long] = {
-    get(Runtime.Keys.Memory).map {
-      case V_Int(i) => i
-      case other    => throw new EvalException(s"Invalid memory value ${other}")
+  lazy val memory: Long = {
+    get(Runtime.MemoryKey) match {
+      case Some(V_Int(i)) => i
+      case None           => throw new RuntimeException("Missing default value for runtime.memory")
+      case other          => throw new EvalException(s"Invalid memory value ${other}")
     }
   }
 
   lazy val disks: Vector[DiskRequest] = {
-    val loc = getSourceLocation(Runtime.Keys.Disks)
-    get(Runtime.Keys.Disks) match {
+    val loc = getSourceLocation(Runtime.DisksKey)
+    get(Runtime.DisksKey) match {
       case None =>
         throw new EvalException(s"No value for 'disks'", loc)
       case Some(v) =>
@@ -303,16 +311,20 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 }
 
 object Runtime {
-  object Keys {
-    val Container = "container"
-    val Cpu = "cpu"
-    val Disks = "disks"
-    val Docker = "docker"
-    val Gpu = "gpu"
-    val MaxRetries = "maxRetries"
-    val Memory = "memory"
-    val ReturnCodes = "returnCodes"
-  }
+  val ContainerKey = "container"
+  val DockerKey = "docker"
+  val CpuKey = "cpu"
+  val CpuDefault = 1.0
+  val MemoryKey = "memory"
+  val MemoryDefault = "2 GiB"
+  val DisksKey = "disks"
+  val DisksDefault = "1 GiB"
+  val GpuKey = "gpu"
+  val GpuDefault = false
+  val MaxRetriesKey = "maxRetries"
+  val MaxRetriesDefault = 0
+  val ReturnCodesKey = "returnCodes"
+  val ReturnCodesDefault = 0
 
   def fromTask(
       task: TAT.Task,
@@ -360,7 +372,7 @@ object Runtime {
       value: V,
       defaultMountPoint: Option[String] = None,
       defaultDiskType: Option[String] = None,
-      loc: SourceLocation
+      loc: SourceLocation = SourceLocation.empty
   ): Vector[DiskRequest] = {
     value match {
       case V_Int(i) =>
@@ -408,7 +420,7 @@ object Runtime {
         Vector(t)
       case other =>
         throw new EvalException(
-            s"Invalid ${Runtime.Keys.Disks} value ${other}",
+            s"Invalid ${Runtime.DisksKey} value ${other}",
             loc
         )
     }

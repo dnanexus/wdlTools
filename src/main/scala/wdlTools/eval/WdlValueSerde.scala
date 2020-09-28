@@ -34,6 +34,8 @@ object WdlValueSerde {
         case V_Directory(value) => JsString(value)
 
         // compound values
+        case V_Optional(v) =>
+          inner(v)
         case V_Array(vec) =>
           JsArray(vec.map(inner))
         case V_Pair(l, r) =>

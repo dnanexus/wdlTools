@@ -2,18 +2,18 @@ package wdlTools.util
 
 final class DuplicateBindingException(message: String) extends Exception(message)
 
-trait Bindings[T, +Self <: Bindings[T, Self]] {
-  def contains(name: String): Boolean
+trait Bindings[K, T, +Self <: Bindings[K, T, Self]] {
+  def contains(name: K): Boolean
 
-  def keySet: Set[String]
+  def keySet: Set[K]
 
-  def toMap: Map[String, T]
+  def toMap: Map[K, T]
 
   protected val elementType: String
 
-  protected def copyFrom(values: Map[String, T]): Self
+  protected def copyFrom(values: Map[K, T]): Self
 
-  def update(bindings: Map[String, T]): Self = {
+  def update(bindings: Map[K, T]): Self = {
     (keySet & bindings.keySet).toVector match {
       case Vector(name) =>
         throw new DuplicateBindingException(
@@ -28,40 +28,40 @@ trait Bindings[T, +Self <: Bindings[T, Self]] {
     copyFrom(toMap ++ bindings)
   }
 
-  def update(bindings: Bindings[T, _]): Self = {
+  def update(bindings: Bindings[K, T, _]): Self = {
     update(bindings.toMap)
   }
 
-  def add(name: String, value: T): Self = {
-    update(Map(name -> value))
+  def add(key: K, value: T): Self = {
+    update(Map(key -> value))
   }
 
-  def apply(name: String): T
+  def apply(key: K): T
 
-  def get(name: String): Option[T]
+  def get(key: K): Option[T]
 
-  def intersect(names: Set[String]): Self = {
+  def intersect(names: Set[K]): Self = {
     copyFrom((keySet & names).map(name => name -> apply(name)).toMap)
   }
 }
 
-abstract class AbstractBindings[T, +Self <: Bindings[T, Self]](
-    all: Map[String, T] = Map.empty[String, T]
-) extends Bindings[T, Self] {
-  def contains(name: String): Boolean = all.contains(name)
+abstract class AbstractBindings[K, T, +Self <: Bindings[K, T, Self]](
+    all: Map[K, T] = Map.empty[K, T]
+) extends Bindings[K, T, Self] {
+  def contains(key: K): Boolean = all.contains(key)
 
-  def keySet: Set[String] = all.keySet
+  def keySet: Set[K] = all.keySet
 
-  def toMap: Map[String, T] = all
+  def toMap: Map[K, T] = all
 
-  def apply(name: String): T = all(name)
+  def apply(key: K): T = all(key)
 
-  def get(name: String): Option[T] = all.get(name)
+  def get(key: K): Option[T] = all.get(key)
 }
 
 case class DefaultBindings[T](bindings: Map[String, T] = Map.empty,
                               override val elementType: String = "binding")
-    extends AbstractBindings[T, DefaultBindings[T]](bindings) {
+    extends AbstractBindings[String, T, DefaultBindings[T]](bindings) {
   override protected def copyFrom(values: Map[String, T]): DefaultBindings[T] = {
     copy(bindings = values)
   }

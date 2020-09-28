@@ -3,166 +3,272 @@ package wdlTools.types
 import wdlTools.types.Utils.{isPrimitive, prettyFormatType}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
-import wdlTools.util.Logger
+import wdlTools.util.{AbstractBindings, Enum, Logger, TraceLevel}
+
+case class VarTypeBindings(bindings: Map[Int, T])
+    extends AbstractBindings[Int, T, VarTypeBindings](bindings) {
+  override protected val elementType: String = "varType"
+
+  override protected def copyFrom(values: Map[Int, T]): VarTypeBindings = {
+    copy(bindings = values)
+  }
+}
+
+object VarTypeBindings {
+  lazy val empty: VarTypeBindings = VarTypeBindings(Map.empty[Int, T])
+}
+
+object Section extends Enum {
+  type Section = Value
+  val Input, Output, Call, Other = Value
+}
+
+case class UnificationContext(section: Section.Section = Section.Other,
+                              inPlaceholder: Boolean = false)
+
+object UnificationContext {
+  def empty: UnificationContext = UnificationContext()
+}
+
+/**
+  * Coercion priorities:
+  * 0: an exact match of concrete types
+  * 1: an exact match of type variables, e.g. T_Var(0) == T_Var(0)
+  * 2: a non-exact match that is always allowed
+  * 3: a non-exact match that is generally disallowed but is specifically
+  *    allowed in the current context
+  * 4: a non-exact match that is generally disallowed but is specifically
+  *    allowed under the current type-checking regime
+  * 5: a coercion involving T_Any
+  */
+object Priority extends Enum {
+  type Priority = Value
+  val Exact, AlwaysAllowed, VarMatch, ContextAllowed, RegimeAllowed, AnyMatch = Value
+}
 
 /**
   *
   * @param regime Type checking rules. Are we lenient or strict in checking coercions?
   */
 case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) {
-  // A value for each type variable.
-  //
-  // This is used when we have polymorphic types,
-  // such as when calling standard library functions. We need to keep
-  // track of the latest value for each type variable.
-  type VarTypeContext = Map[Int, T]
 
-  // TODO: we need to add priority to coercions, so that if stdlib
-  //  is comparing multiple valid prototypes it can select one
-  //  deterministically, rather than throw an exception
-  private def isCoercibleTo2(left: T, right: T): Boolean = {
-    (left, right) match {
-      // primitive coercions that are always allowed
-      case (l, r) if l == r              => true
-      case (T_Float, T_Int)              => true
-      case (T_String, T_String | T_File) => true
-      case (T_File, T_String | T_File)   => true
+  /**
+    * Determines whether one type can be coerced to another, within the given
+    * context.
+    * @param toType coerce to this type
+    * @param fromType coerce from this type
+    * @param ctx the context in which the coercion is performed - used for
+    *            context-specific coersions
+    * @return If the coercion can be performed, returns Some(priority), where
+    *         priority is the preference of the coercion; otherwise, None.
+    * @throws TypeUnificationException If the types cannot be unified
+    */
+  private def coerces(toType: T,
+                      fromType: T,
+                      ctx: UnificationContext): Option[Priority.Priority] = {
 
-      // Other coercions are not techincally allowed, but are
-      // used often, so we allow them under Lenient regime
-      case (T_Int, T_Float | T_String) if regime <= Lenient =>
-        logger.trace(s"lenient coercion from ${right} to T_Int")
-        true
-      case (T_Float, T_String) if regime <= Lenient =>
-        logger.trace(s"lenient coercion from ${right} to T_Float")
-        true
-      // TODO: these coercions to String should only be allowed 1. in Lenient
-      //  regime, or 2. within string interpolation
-      case (T_String, T_Boolean | T_Int | T_Float) => // if regime <= Lenient =>
-        logger.trace(s"lenient coercion from ${right} to T_String")
-        true
+    def inner(innerTo: T,
+              innerFrom: T,
+              minPriority: Priority.Priority = Priority.Exact): Option[Priority.Priority] = {
+      (innerTo, innerFrom) match {
+        // primitive coercions that are always allowed
+        case (l, r) if l == r   => Some(minPriority)
+        case (T_Float, T_Int)   => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+        case (T_File, T_String) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+        case (T_String, T_File) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
 
-      // unwrap optional types
-      case (T_Optional(l), T_Optional(r)) => isCoercibleTo2(l, r)
-      // T is coercible to T?
-      case (T_Optional(l), r) if regime <= Moderate =>
-        logger.trace(s"moderate coercion from ${right} to optional")
-        isCoercibleTo2(l, r)
+        // unwrap optional types
+        case (T_Optional(l), T_Optional(r)) => inner(l, r, minPriority)
 
-      // complex types
-      case (T_Array(l, _), T_Array(r, _)) =>
-        isCoercibleTo2(l, r)
-      case (T_Map(kl, vl), T_Map(kr, vr)) =>
-        isCoercibleTo2(kl, kr) && isCoercibleTo2(vl, vr)
-      case (T_Pair(l1, l2), T_Pair(r1, r2)) =>
-        isCoercibleTo2(l1, r1) && isCoercibleTo2(l2, r2)
-
-      // structs are equivalent iff they have the same name
-      case (struct1: T_Struct, struct2: T_Struct) =>
-        struct1.name == struct2.name
-
-      // coercions to objects and structs can fail at runtime. We
-      // are not thoroughly checking them here.
-      // TODO: in lenient mode, support Array[String] to Struct coercion as described in
-      //  https://github.com/openwdl/wdl/issues/389
-      case (T_Object, T_Object)    => true
-      case (_: T_Struct, T_Object) => true
-      case (_: T_Struct, _: T_Map) => true
-
-      // polymorphic types must have the same indices and compatible bounds
-      case (T_Var(i, iBounds), T_Var(j, jBounds))
-          if i == j && (iBounds.isEmpty || jBounds.isEmpty || (iBounds | jBounds).nonEmpty) =>
-        true
-
-      // T_Any coerces to anything
-      case (_, T_Any) => true
-      case _          => false
-    }
-  }
-
-  def isCoercibleTo(left: T, right: T): Boolean = {
-    if (left.isInstanceOf[T_Identifier]) {
-      throw new RuntimeException(s"${left} should not appear here")
-    }
-    if (right.isInstanceOf[T_Identifier]) {
-      throw new RuntimeException(s"${right} should not appear here")
-    }
-    (left, right) match {
-      // List of special cases goes here
-
-      // a type T can be coerced to a T? - this isn't great, but it's necessary
-      // since there is no function for doing the coercion explicitly
-      case (T_Optional(l), r) if regime <= Moderate && isCoercibleTo2(l, r) =>
-        true
-
-      // normal cases
-      case (_, _) =>
-        isCoercibleTo2(left, right)
-    }
-  }
-
-  // The least type that [x] and [y] are coercible to.
-  // For example:
-  //    [Int?, Int]  -> Int?
-  //
-  // But we don't want to have:
-  //    Array[String] s = ["a", 1, 3.1]
-  // even if that makes sense, we don't want to have:
-  //    Array[Array[String]] = [[1], ["2"], [1.1]]
-  //
-  //
-  // when calling a polymorphic function things get complicated.
-  // For example:
-  //    select_first([null, 6])
-  // The signature for select first is:
-  //    Array[X?] -> X
-  // we need to figure out that X is Int.
-  //
-  //
-  def unify(t1: T, t2: T, varTypeContext: VarTypeContext): (T, VarTypeContext, Boolean) = {
-    // if they are an exact match then obviously they are compatible
-    if (t1 == t2) {
-      return (t1, varTypeContext, true)
-    }
-    def inner(x: T, y: T, ctx: VarTypeContext): (T, VarTypeContext) = {
-      (x, y) match {
-        // base case, primitive types
-        case (_, _) if isPrimitive(x) && isPrimitive(y) && isCoercibleTo(x, y) =>
-          (x, ctx)
-        case (T_Any, T_Any) => (T_Any, ctx)
-        case (x, T_Any)     => (x, ctx)
-        case (T_Any, x)     => (x, ctx)
-
-        case (T_Object, T_Object)    => (T_Object, ctx)
-        case (T_Object, _: T_Struct) => (T_Object, ctx)
-
-        case (T_Optional(l), T_Optional(r)) =>
-          val (t, ctx2) = inner(l, r, ctx)
-          (T_Optional(t), ctx2)
-
-        // These two cases are really questionable to me. We are allowing an X to
-        // become an X?
-        case (T_Optional(l), r) =>
-          val (t, ctx2) = inner(l, r, ctx)
-          (T_Optional(t), ctx2)
-        case (l, T_Optional(r)) =>
-          val (t, ctx2) = inner(l, r, ctx)
-          (T_Optional(t), ctx2)
-
+        // complex types
         case (T_Array(l, _), T_Array(r, _)) =>
-          val (t, ctx2) = inner(l, r, ctx)
-          (T_Array(t), ctx2)
+          inner(l, r, minPriority)
+        case (T_Map(kTo, vTo), T_Map(kFrom, vFrom)) =>
+          val keyPriority = inner(kTo, kFrom, minPriority)
+          val valuePriority = inner(vTo, vFrom, minPriority)
+          if (keyPriority.isDefined && valuePriority.isDefined) {
+            Some(Enum.max(keyPriority.get, valuePriority.get))
+          } else {
+            None
+          }
+        case (T_Pair(lTo, rTo), T_Pair(lFrom, rFrom)) =>
+          val leftPriority = inner(lTo, lFrom, minPriority)
+          val rightPriority = inner(rTo, rFrom, minPriority)
+          if (leftPriority.isDefined && rightPriority.isDefined) {
+            Some(Enum.max(leftPriority.get, rightPriority.get))
+          } else {
+            None
+          }
+
+        // structs are equivalent iff they have the same name
+        case (T_Struct(nameTo, _), T_Struct(nameFrom, _)) if nameTo == nameFrom =>
+          Some(minPriority)
+        case (_: T_Struct, _: T_Struct) =>
+          None
+
+        // polymorphic types must have the same indices and compatible bounds
+        case (T_Var(i, iBounds), T_Var(j, jBounds))
+            if i == j && (iBounds.isEmpty || jBounds.isEmpty || (iBounds & jBounds).nonEmpty) =>
+          Some(Enum.max(minPriority, Priority.VarMatch))
+
+        // Other coercions are not generally allowed, but are either allowed
+        // in specific contexts or are used often and so allowed under less
+        // strict regimes
+        case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
+          Some(minPriority)
+        case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
+          logger.trace(s"lenient coercion from ${fromType} to T_String")
+          Some(Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_Int, T_Float | T_String) if regime <= Lenient =>
+          // we can allow this coercion assuming 1) a Float value that coerces
+          // exactly to an int, or 2) a String value that can be parsed to an Int -
+          // otherwise an exception should be thrown during evaluation
+          logger.trace(s"lenient coercion from ${fromType} to T_Int")
+          Some(Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_Float, T_String) if regime <= Lenient =>
+          // we can allow this coercion assuming a String value that can be parsed
+          // to a Float - otherwise an exception should be thrown during evaluation
+          logger.trace(s"lenient coercion from T_String to T_Float")
+          Some(Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_Optional(T_File), T_String) if ctx.section == Section.Output =>
+          // Coercing a string to File is allowed within the output section,
+          // since the value will be null if the file doesn't exist.
+          Some(Enum.max(minPriority, Priority.ContextAllowed))
+        case (T_Optional(l), r) if ctx.section == Section.Call =>
+          // in a call, we can provide a non-optional value to an optional parameter
+          inner(l, r, minPriority = Priority.ContextAllowed)
+        case (T_Optional(l), r) if regime <= Moderate =>
+          // T is coercible to T? - this isn't great, but it's necessary
+          // since there is no function for doing the coercion explicitly
+          logger.trace(s"moderate coercion from ${fromType} to optional")
+          inner(l, r, minPriority = Priority.RegimeAllowed)
+
+        // coercions between objects/structs can't be checked - we allow
+        // them and expect an exception during evaluation if the values
+        // are incompatible
+        // TODO: in lenient mode, support Array[String] to Struct coercion as described in
+        //  https://github.com/openwdl/wdl/issues/389
+        case (T_Object, T_Object)    => Some(minPriority)
+        case (_: T_Struct, T_Object) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+        case (_: T_Struct, _: T_Map) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+
+        // T_Any coerces to anything
+        case (_, T_Any) => Some(Enum.max(minPriority, Priority.AnyMatch))
+
+        // cannot coerce to/from identifier
+        case (_: T_Identifier, _) =>
+          throw new RuntimeException(s"${toType} cannot be coerced to")
+        case (_, _: T_Identifier) =>
+          throw new RuntimeException(s"${toType} cannot be coerced from")
+
+        case _ =>
+          logger.trace(
+              s"coercion from ${fromType} to ${toType} not allowed under regime ${regime} and/or in context ${ctx}",
+              minLevel = TraceLevel.VVerbose
+          )
+          None
+      }
+    }
+    inner(toType, fromType)
+  }
+
+  def isCoercibleTo(toType: T,
+                    fromType: T,
+                    ctx: UnificationContext = UnificationContext.empty): Boolean = {
+    coerces(toType, fromType, ctx).isDefined
+  }
+
+  /**
+    * Determines the least type that [t1] and [t2] are coercible to.
+    * @param t1 first type to unify
+    * @param t2 second type to unify
+    * @param ctx UnificationContext
+    * @param varTypes initial VarTypeBindings
+    * @return (unifiedType, varTypes, priority), where unifiedType is the
+    *         the least type that [t1] and [t2] are coercible to, varTypes
+    *         is the updated type map for polymorphic placeholders, and
+    *         priority is the priority value of the coercion.
+    * @throws TypeUnificationException If the types cannot be unified
+    * @example
+    *    [Int?, Int]  -> Int?
+    *
+    * But we don't want to have:
+    *    Array[String] s = ["a", 1, 3.1]
+    * even if that makes sense, we don't want to have:
+    *    Array\[Array\[String\]\] = [[1], ["2"], [1.1]]
+    *
+    * when calling a polymorphic function things get complicated.
+    * For example:
+    *    select_first([null, 6])
+    * The signature for select_first is:
+    *    Array[X?] -> X
+    * we need to figure out that X is Int.
+    */
+  private def unify(
+      t1: T,
+      t2: T,
+      ctx: UnificationContext,
+      varTypes: VarTypeBindings = VarTypeBindings.empty
+  ): (T, VarTypeBindings, Priority.Priority) = {
+    def inner(
+        x: T,
+        y: T,
+        vt: VarTypeBindings,
+        minPriority: Priority.Priority
+    ): (T, VarTypeBindings, Priority.Priority) = {
+      if (x == y) {
+        // exact match
+        return (x, vt, minPriority)
+      }
+      if (isPrimitive(x) && isPrimitive(y)) {
+        val priority = coerces(x, y, ctx)
+        if (priority.nonEmpty) {
+          // compatible primitive types
+          return (x, vt, Enum.max(minPriority, priority.get))
+        }
+      }
+      (x, y) match {
+        case (T_Any, T_Any) =>
+          (T_Any, vt, Priority.AnyMatch)
+        case (x, T_Any) =>
+          (x, vt, Priority.AnyMatch)
+        case (T_Any, x) =>
+          (x, vt, Priority.AnyMatch)
+        case (T_Object, _: T_Struct) =>
+          (T_Object, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
+        case (T_Optional(l), T_Optional(r)) =>
+          val (t, newVarTypes, newMinPriority) = inner(l, r, vt, minPriority)
+          (T_Optional(t), newVarTypes, newMinPriority)
+        case (T_Optional(l), r) if ctx.section == Section.Call =>
+          // in a call, we can provide a non-optional value to an optional parameter
+          val (t, newVarTypes, newPriority) =
+            inner(l, r, vt, Enum.max(minPriority, Priority.ContextAllowed))
+          (T_Optional(t), newVarTypes, newPriority)
+        case (T_Optional(l), r) if regime <= Moderate =>
+          // T is coercible to T? - this isn't great, but it's necessary
+          // since there is no function for doing the coercion explicitly
+          logger.trace(s"moderate coercion from ${r} to optional")
+          val (t, newVarTypes, newPriority) =
+            inner(l, r, vt, Enum.max(minPriority, Priority.RegimeAllowed))
+          (T_Optional(t), newVarTypes, newPriority)
+        case (l, T_Optional(r)) =>
+          val (t, newVarTypes, newPriority) =
+            inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
+          (T_Optional(t), newVarTypes, newPriority)
+        case (T_Array(l, _), T_Array(r, _)) =>
+          val (t, newVarTypes, newPriority) = inner(l, r, vt, minPriority)
+          (T_Array(t), newVarTypes, newPriority)
         case (T_Map(k1, v1), T_Map(k2, v2)) =>
-          val (kt, ctx2) = inner(k1, k2, ctx)
-          val (vt, ctx3) = inner(v1, v2, ctx2)
-          (T_Map(kt, vt), ctx3)
+          val (keyType, kVarTypes, keyPriority) = inner(k1, k2, vt, minPriority)
+          val (valueType, kvVarTypes, valuePriority) = inner(v1, v2, kVarTypes, minPriority)
+          (T_Map(keyType, valueType), kvVarTypes, Enum.max(keyPriority, valuePriority))
         case (T_Pair(l1, r1), T_Pair(l2, r2)) =>
-          val (lt, ctx2) = inner(l1, l2, ctx)
-          val (rt, ctx3) = inner(r1, r2, ctx2)
-          (T_Pair(lt, rt), ctx3)
+          val (leftType, lVarTypes, leftPriority) = inner(l1, l2, vt, minPriority)
+          val (rightType, lrVarTypes, rightPriority) = inner(r1, r2, lVarTypes, minPriority)
+          (T_Pair(leftType, rightType), lrVarTypes, Enum.max(leftPriority, rightPriority))
         case (T_Identifier(l), T_Identifier(r)) if l == r =>
           // a user defined type
-          (T_Identifier(l), ctx)
+          (T_Identifier(l), vt, Enum.max(minPriority, Priority.AlwaysAllowed))
         case (T_Var(i, iBounds), T_Var(j, jBounds)) if i == j =>
           val bounds: Set[T] = (iBounds, jBounds) match {
             case (a, b) if a.nonEmpty && b.nonEmpty =>
@@ -178,107 +284,144 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
             case (_, b) if b.nonEmpty => b
             case _                    => Set.empty
           }
-          (T_Var(i, bounds), ctx)
-
+          (T_Var(i, bounds), vt, Enum.max(minPriority, Priority.VarMatch))
         case (a: T_Var, b: T_Var)
             if a.bounds.isEmpty || b.bounds.isEmpty || (a.bounds & b.bounds).nonEmpty =>
           // found a type equality between two variables
-          val ctx3: VarTypeContext = (ctx.get(a.index), ctx.get(b.index)) match {
-            case (None, None) =>
-              ctx + (a.index -> b)
-            case (None, Some(z: T_Var)) if a.bounds.isEmpty || (a.bounds & z.bounds).nonEmpty =>
-              ctx + (a.index -> z)
-            case (None, Some(z)) if a.bounds.isEmpty || a.bounds.contains(z) =>
-              ctx + (a.index -> z)
-            case (Some(z: T_Var), None) if b.bounds.isEmpty || (b.bounds & z.bounds).nonEmpty =>
-              ctx + (b.index -> z)
-            case (Some(z), None) if b.bounds.isEmpty || b.bounds.contains(z) =>
-              ctx + (b.index -> z)
-            case (Some(z), Some(w)) =>
-              val (_, ctx2) = inner(z, w, ctx)
-              ctx2
-          }
-          (ctx3(a.index), ctx3)
-
+          val minPriority2 = Enum.max(minPriority, Priority.VarMatch)
+          val (newVarTypes, newPriority) =
+            (vt.get(a.index), vt.get(b.index)) match {
+              case (None, None) =>
+                (vt.add(a.index, b), minPriority2)
+              case (None, Some(z: T_Var)) if a.bounds.isEmpty || (a.bounds & z.bounds).nonEmpty =>
+                (vt.add(a.index, z), minPriority2)
+              case (None, Some(z)) if a.bounds.isEmpty || a.bounds.contains(z) =>
+                (vt.add(a.index, z), minPriority2)
+              case (Some(z: T_Var), None) if b.bounds.isEmpty || (b.bounds & z.bounds).nonEmpty =>
+                (vt.add(b.index, z), minPriority2)
+              case (Some(z), None) if b.bounds.isEmpty || b.bounds.contains(z) =>
+                (vt.add(b.index, z), minPriority2)
+              case (Some(z), Some(w)) =>
+                val (_, newVarTypes, newPriority) = inner(z, w, vt, minPriority2)
+                (newVarTypes, newPriority)
+            }
+          (newVarTypes(a.index), newVarTypes, newPriority)
         case (a: T_Var, z) =>
-          ctx.get(a.index) match {
+          vt.get(a.index) match {
             case None if a.bounds.isEmpty || a.bounds.contains(z) =>
               // found a binding for a type variable
-              (z, ctx + (a.index -> z))
+              (z, vt.add(a.index, z), Enum.max(minPriority, Priority.VarMatch))
             case Some(w) =>
               // a binding already exists, choose the more general type
-              inner(w, z, ctx)
+              inner(w, z, vt, Enum.max(minPriority, Priority.VarMatch))
           }
-
         case _ =>
-          throw new TypeUnificationException(s"Types $x and $y do not match")
+          throw new TypeUnificationException(
+              s"There is no common type to which $x and $y are coercible"
+          )
       }
     }
-    val (unifiedType, ctx) = inner(t1, t2, varTypeContext)
-    (unifiedType, ctx, false)
+    inner(t1, t2, varTypes, Priority.Exact)
   }
 
-  // Unify a set of type pairs, and return a solution for the type
-  // variables. If the types cannot be unified throw a TypeUnification exception.
-  //
-  // For example the signature for zip is:
-  //    Array[Pair(X,Y)] zip(Array[X], Array[Y])
-  // In order to type check a declaration like:
-  //    Array[Pair[Int, String]] x  = zip([1, 2, 3], ["a", "b", "c"])
-  // we solve for the X and Y type variables on the right hand
-  // side. This should yield: { X : Int, Y : String }
-  //
-  // The inputs in this example are:
-  //    x = [ T_Array(T_Var(0)), T_Array(T_Var(1)) ]
-  //    y = [ T_Array(T_Int),  T_Array(T_String) ]
-  //
-  // The result is:
-  //    T_Var(0) -> T_Int
-  //    T_Var(1) -> T_String
-  //
-  def unifyFunctionArguments(x: Vector[T],
-                             y: Vector[T],
-                             ctx: VarTypeContext): (Vector[(T, Boolean)], VarTypeContext) = {
-    x.zip(y).foldLeft((Vector.empty[(T, Boolean)], ctx)) {
-      case ((tVec, ctx), (lt, rt)) =>
-        val (t, ctx2, exact) = unify(lt, rt, ctx)
-        (tVec :+ (t, exact), ctx2)
-    }
+  def apply(t1: T, t2: T, ctx: UnificationContext): T = {
+    unify(t1, t2, ctx)._1
   }
 
-  // Unify elements in a collection. For example, a vector of values.
-  def unifyCollection(tVec: Iterable[T], ctx: VarTypeContext): (T, VarTypeContext) = {
-    assert(tVec.nonEmpty)
-    tVec.tail.foldLeft((tVec.head, ctx)) {
-      case ((t, ctx), t2) =>
-        val (tUnified, ctxNew, _) = unify(t, t2, ctx)
-        (tUnified, ctxNew)
-    }
-  }
-
-  // substitute the type variables for the values in type 't'
-  def substitute(t: T, typeBindings: VarTypeContext): T = {
-    def sub(t: T): T = {
-      t match {
-        case T_String | T_File | T_Boolean | T_Int | T_Float => t
-        case a: T_Var if !typeBindings.contains(a.index) =>
+  /**
+    * Substitutes the type variables for the values in type 't'.
+    * @param t type to subsitute
+    * @param varTypes concrete types for polymorphic arguments
+    * @return
+    * @throws SubstitutionException if a type variable cannot be substituted
+    *                               with the concrete type
+    */
+  private def substitute(t: T, varTypes: VarTypeBindings): T = {
+    def inner(innerType: T): T = {
+      innerType match {
+        case T_String | T_File | T_Boolean | T_Int | T_Float => innerType
+        case a: T_Var if !varTypes.contains(a.index) =>
           throw new SubstitutionException(
               s"type variable ${prettyFormatType(a)} does not have a binding"
           )
-        case a: T_Var       => typeBindings(a.index)
-        case x: T_Struct    => x
-        case T_Pair(l, r)   => T_Pair(sub(l), sub(r))
-        case T_Array(t, _)  => T_Array(sub(t))
-        case T_Map(k, v)    => T_Map(sub(k), sub(v))
-        case T_Object       => T_Object
-        case T_Optional(t1) => T_Optional(sub(t1))
-        case T_Any          => T_Any
+        case T_Var(index, _) => varTypes(index)
+        case T_Pair(l, r)    => T_Pair(inner(l), inner(r))
+        case T_Array(t, _)   => T_Array(inner(t))
+        case T_Map(k, v)     => T_Map(inner(k), inner(v))
+        case x: T_Struct     => x
+        case T_Object        => T_Object
+        case T_Optional(t1)  => T_Optional(inner(t1))
+        case T_Any           => T_Any
         case other =>
           throw new SubstitutionException(
               s"Type ${prettyFormatType(other)} should not appear in this context"
           )
       }
     }
-    sub(t)
+    inner(t)
+  }
+
+  /**
+    * Unifies two function signatures and returns the output type.
+    * For polymorphic functions, the best signature is the one with the lowest priority.
+    * @param args1 first set of function parameter types
+    * @param args2 second set of function parameter types
+    * @param ctx UnificationContext
+    * @return (unifiedTypes, varTypes, priority), where types is a Vector of
+    *         the unified type for each argument, varTypes is the updated type
+    *         map for polymorphic placeholders, and priority is the max of the
+    *         priorities for indivisual arguments.
+    * @throws TypeUnificationException If the types cannot be unified
+    * @example
+    * The signature for zip is:
+    *    Array[Pair(X,Y)] zip(Array[X], Array[Y])
+    * In order to type check a declaration like:
+    *    Array\[Pair\[Int, String\]\] x  = zip([1, 2, 3], ["a", "b", "c"])
+    * we solve for the X and Y type variables on the right hand
+    * side. This should yield: { X : Int, Y : String }
+    *
+    * The inputs in this example are:
+    *    x = [ T_Array(T_Var(0)), T_Array(T_Var(1)) ]
+    *    y = [ T_Array(T_Int),  T_Array(T_String) ]
+    *
+    * The result is:
+    *    T_Var(0) -> T_Int
+    *    T_Var(1) -> T_String
+    */
+  def apply(
+      args1: Vector[T],
+      args2: Vector[T],
+      output: T,
+      ctx: UnificationContext
+  ): (T, Priority.Priority) = {
+    assert(args1.size == args2.size)
+    if (args1.isEmpty) {
+      (output, Priority.Exact)
+    }
+    val (priority, newVarTypes) =
+      args1.zip(args2).foldLeft((Priority.Exact, VarTypeBindings.empty)) {
+        case ((priority, vt), (lt, rt)) =>
+          val (_, vt2, priority2) = unify(lt, rt, ctx, vt)
+          (Enum.max(priority, priority2), vt2)
+      }
+    val unifiedType = substitute(output, newVarTypes)
+    (unifiedType, priority)
+  }
+
+  /**
+    * Unifies elements in a collection. For example, a vector of values.
+    * @param types the types to unify
+    * @param ctx UnificationContext
+    * @return
+    * @throws TypeUnificationException If the types cannot be unified
+    */
+  def apply(types: Iterable[T], ctx: UnificationContext): T = {
+    assert(types.nonEmpty)
+    val (unifiedType, _) = types.tail.foldLeft((types.head, VarTypeBindings.empty)) {
+      case ((t, vt), t2) =>
+        val (tUnified, ctxNew, _) = unify(t, t2, ctx, vt)
+        (tUnified, ctxNew)
+    }
+    unifiedType
   }
 }

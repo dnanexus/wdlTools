@@ -18,7 +18,7 @@ import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileSource, Lo
   * @param callables Callables namespace
   * @param namespaces Set of all namespaces in the document tree
   */
-case class Context(
+case class TypeContext(
     version: WdlVersion,
     stdlib: Stdlib,
     docSource: FileSource,
@@ -53,7 +53,7 @@ case class Context(
     None
   }
 
-  def bindInputSection(inputSection: Vector[TAT.InputDefinition]): Context = {
+  def bindInputSection(inputSection: Vector[TAT.InputParameter]): TypeContext = {
     // building bindings
     val bindings = inputSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
@@ -61,7 +61,7 @@ case class Context(
     this.copy(inputs = inputs.update(bindings))
   }
 
-  def bindOutputSection(oututSection: Vector[TAT.OutputDefinition]): Context = {
+  def bindOutputSection(oututSection: Vector[TAT.OutputParameter]): TypeContext = {
     // building bindings
     val bindings = oututSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
@@ -69,7 +69,7 @@ case class Context(
     this.copy(outputs = outputs.update(bindings))
   }
 
-  def bindDeclaration(name: String, wdlType: WdlType): Context = {
+  def bindDeclaration(name: String, wdlType: WdlType): TypeContext = {
     this.copy(declarations = declarations.add(name, wdlType))
   }
 
@@ -77,11 +77,11 @@ case class Context(
     * Merge current declaration bindings.
     * @return
     */
-  def bindDeclarations(bindings: WdlTypeBindings): Context = {
+  def bindDeclarations(bindings: WdlTypeBindings): TypeContext = {
     this.copy(declarations = declarations.update(bindings))
   }
 
-  def bindStruct(s: T_Struct): Context = {
+  def bindStruct(s: T_Struct): TypeContext = {
     aliases.get(s.name) match {
       case Some(existingStruct: T_Struct) if s == existingStruct =>
         // The struct is defined a second time, with the exact same definition. Ignore.
@@ -92,7 +92,7 @@ case class Context(
   }
 
   // add a callable (task/workflow)
-  def bindCallable(callable: T_Callable): Context = {
+  def bindCallable(callable: T_Callable): TypeContext = {
     this.copy(callables = callables.add(callable.name, callable))
   }
 
@@ -109,8 +109,8 @@ case class Context(
   //    call lib.act
   // }
   def bindImportedDoc(namespace: String,
-                      importContext: Context,
-                      typeAliases: Vector[AST.ImportAlias]): Context = {
+                      importContext: TypeContext,
+                      typeAliases: Vector[AST.ImportAlias]): TypeContext = {
     if (this.namespaces.contains(namespace)) {
       throw new DuplicateBindingException(s"namespace ${namespace} already exists")
     }
@@ -165,10 +165,10 @@ case class Context(
   }
 }
 
-object Context {
-  def create(doc: AST.Document, regime: TypeCheckingRegime, logger: Logger): Context = {
+object TypeContext {
+  def create(doc: AST.Document, regime: TypeCheckingRegime, logger: Logger): TypeContext = {
     val wdlVersion = doc.version.value
-    Context(
+    TypeContext(
         version = wdlVersion,
         stdlib = Stdlib(regime, wdlVersion, logger),
         docSource = doc.source

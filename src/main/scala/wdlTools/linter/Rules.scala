@@ -197,7 +197,7 @@ object Rules {
       String,
       Severity,
       WdlVersion,
-      types.Context
+      types.TypeContext
   ) => LinterAstRule
 
   // rules ported from miniwdl
@@ -305,7 +305,7 @@ object Rules {
   case class NonPortableTaskRule(id: String,
                                  severity: Severity,
                                  version: WdlVersion,
-                                 typesContext: types.Context)
+                                 typesContext: types.TypeContext)
       extends LinterAstRule(id, severity) {
     private val containerKeys = Set("docker", "container")
 
@@ -321,7 +321,7 @@ object Rules {
   case class NoTaskInputsRule(id: String,
                               severity: Severity,
                               version: WdlVersion,
-                              typesContext: types.Context)
+                              typesContext: types.TypeContext)
       extends LinterAstRule(id, severity) {
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
       if (ctx.element.input.isEmpty || ctx.element.input.get.declarations.isEmpty) {
@@ -333,7 +333,7 @@ object Rules {
   case class NoTaskOutputsRule(id: String,
                                severity: Severity,
                                version: WdlVersion,
-                               typesContext: types.Context)
+                               typesContext: types.TypeContext)
       extends LinterAstRule(id, severity) {
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
