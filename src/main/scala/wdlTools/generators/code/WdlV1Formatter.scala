@@ -324,37 +324,37 @@ case class WdlV1Formatter(followImports: Boolean = false,
 
     def fromWdlType(wdlType: Type, quantifiers: Vector[Span] = Vector.empty): Span = {
       wdlType match {
-        case TypeOptional(inner, text) =>
-          fromWdlType(inner, quantifiers = Vector(Literal.fromEnd(Symbols.Optional, text)))
-        case TypeArray(inner, nonEmpty, text) =>
+        case TypeOptional(inner, loc) =>
+          fromWdlType(inner, quantifiers = Vector(Literal.fromEnd(Symbols.Optional, loc)))
+        case TypeArray(inner, nonEmpty, loc) =>
           val quant: Vector[Span] = (nonEmpty, quantifiers) match {
             case (true, quant) if quant.nonEmpty =>
               Vector(Literal.fromNext(Symbols.NonEmpty, quantifiers.head)) ++ quant
-            case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, text))
+            case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, loc))
             case (false, _) => quantifiers
           }
-          buildDataType(Symbols.ArrayType, quant, text, Some(fromWdlType(inner)))
-        case TypeMap(keyType, valueType, text) if isPrimitiveType(keyType) =>
+          buildDataType(Symbols.ArrayType, quant, loc, Some(fromWdlType(inner)))
+        case TypeMap(keyType, valueType, loc) if isPrimitiveType(keyType) =>
           buildDataType(Symbols.MapType,
                         quantifiers,
-                        text,
+                        loc,
                         Some(fromWdlType(keyType)),
                         Some(fromWdlType(valueType)))
-        case TypePair(left, right, text) =>
+        case TypePair(left, right, loc) =>
           buildDataType(Symbols.PairType,
                         quantifiers,
-                        text,
+                        loc,
                         Some(fromWdlType(left)),
                         Some(fromWdlType(right)))
-        case TypeStruct(name, _, text) => buildDataType(name, quantifiers, text)
-        case TypeObject(text)          => buildDataType(Symbols.ObjectType, quantifiers, text)
-        case TypeString(text)          => buildDataType(Symbols.StringType, quantifiers, text)
-        case TypeBoolean(text)         => buildDataType(Symbols.BooleanType, quantifiers, text)
-        case TypeInt(text)             => buildDataType(Symbols.IntType, quantifiers, text)
-        case TypeFloat(text)           => buildDataType(Symbols.FloatType, quantifiers, text)
-        case TypeFile(text)            => buildDataType(Symbols.FileType, quantifiers, text)
-        case TypeDirectory(text) =>
-          buildDataType(Symbols.DirectoryType, quantifiers, text)
+        case TypeStruct(name, _, loc) => buildDataType(name, quantifiers, loc)
+        case TypeObject(loc)          => buildDataType(Symbols.ObjectType, quantifiers, loc)
+        case TypeString(loc)          => buildDataType(Symbols.StringType, quantifiers, loc)
+        case TypeBoolean(loc)         => buildDataType(Symbols.BooleanType, quantifiers, loc)
+        case TypeInt(loc)             => buildDataType(Symbols.IntType, quantifiers, loc)
+        case TypeFloat(loc)           => buildDataType(Symbols.FloatType, quantifiers, loc)
+        case TypeFile(loc)            => buildDataType(Symbols.FileType, quantifiers, loc)
+        case TypeDirectory(loc) =>
+          buildDataType(Symbols.DirectoryType, quantifiers, loc)
         case other => throw new Exception(s"Unrecognized type $other")
       }
     }
@@ -472,58 +472,67 @@ case class WdlV1Formatter(followImports: Boolean = false,
 
     expr match {
       // literal values
-      case ValueNone(text) => Literal.fromStart(Symbols.None, text)
-      case ValueString(value, text) =>
+      case ValueNone(loc) => Literal.fromStart(Symbols.None, loc)
+      case ValueString(value, loc) =>
         val v = if (stringModifier.isDefined) {
           stringModifier.get(value)
         } else {
           value
         }
-        Literal.fromStart(v, text, quoting = inPlaceholder || !inStringOrCommand)
-      case ValueBoolean(value, text) => Literal.fromStart(value, text)
-      case ValueInt(value, text)     => Literal.fromStart(value, text)
-      case ValueFloat(value, text)   => Literal.fromStart(value, text)
-      case ExprPair(left, right, text) if !(inStringOrCommand || inPlaceholder) =>
+        Literal.fromStart(v, loc, quoting = inPlaceholder || !inStringOrCommand)
+      case ValueBoolean(value, loc) => Literal.fromStart(value, loc)
+      case ValueInt(value, loc)     => Literal.fromStart(value, loc)
+      case ValueFloat(value, loc)   => Literal.fromStart(value, loc)
+      case ExprPair(left, right, loc) if !(inStringOrCommand || inPlaceholder) =>
         BoundedContainer(
             Vector(nested(left), nested(right)),
-            Some(Literal.fromStart(Symbols.GroupOpen, text),
-                 Literal.fromEnd(Symbols.GroupClose, text)),
+            Some(Literal.fromStart(Symbols.GroupOpen, loc),
+                 Literal.fromEnd(Symbols.GroupClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            text
+            loc
         )
-      case ExprArray(value, text) =>
+      case ExprArray(value, loc) =>
         BoundedContainer(
             value.map(nested(_)),
-            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text),
-                 Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
+            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, loc),
+                 Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            text
+            loc
         )
-      case ExprMap(value, text) =>
+      case ExprMap(value, loc) =>
         BoundedContainer(
             value.map {
               case ExprMember(k, v, itemText) =>
                 KeyValue(nested(k), nested(v), bounds = itemText)
             },
-            Some(Literal.fromStart(Symbols.MapOpen, text), Literal.fromEnd(Symbols.MapClose, text)),
+            Some(Literal.fromStart(Symbols.MapOpen, loc), Literal.fromEnd(Symbols.MapClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            text,
-            Wrapping.Always
+            loc,
+            Wrapping.Always,
+            continue = false
         )
-      case ExprObject(value, text) =>
+      case ExprObject(value, loc) =>
         BoundedContainer(
             value.map {
-              case ExprMember(k, v, memberText) =>
-                KeyValue(nested(k), nested(v), bounds = memberText)
+              case ExprMember(ValueString(k, loc), v, memberText) =>
+                KeyValue(Literal.fromStart(k, loc), nested(v), bounds = memberText)
+              case other =>
+                throw new Exception(s"invalid object member ${other}")
             },
-            Some(Literal.fromStart(Symbols.ObjectOpen, text),
-                 Literal.fromEnd(Symbols.ObjectClose, text)),
+            Some(
+                SpanSequence(
+                    Literal.chainFromStart(Vector(Symbols.Object, Symbols.ObjectOpen), loc),
+                    spacing = Spacing.On
+                ),
+                Literal.fromEnd(Symbols.ObjectClose, loc)
+            ),
             Some(Symbols.ArrayDelimiter),
-            bounds = text,
-            Wrapping.Always
+            bounds = loc,
+            Wrapping.Always,
+            continue = false
         )
       // placeholders
-      case ExprPlaceholderCondition(t, f, value, text) =>
+      case ExprPlaceholderCondition(t, f, value, loc) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,
@@ -534,47 +543,47 @@ case class WdlV1Formatter(followImports: Boolean = false,
                 )
             ),
             inString = inStringOrCommand,
-            bounds = text
+            bounds = loc
         )
-      case ExprPlaceholderDefault(default, value, text) =>
+      case ExprPlaceholderDefault(default, value, loc) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Symbols.DefaultOption, default))),
                     inString = inStringOrCommand,
-                    bounds = text)
-      case ExprPlaceholderSep(sep, value, text) =>
+                    bounds = loc)
+      case ExprPlaceholderSep(sep, value, loc) =>
         Placeholder(nested(value, inPlaceholder = true),
                     placeholderOpen,
                     options = Some(Vector(option(Symbols.SepOption, sep))),
                     inString = inStringOrCommand,
-                    bounds = text)
-      case ExprCompoundString(value, text) if !inPlaceholder =>
-        CompoundString(value.map(nested(_, inString = true)), quoting = !inStringOrCommand, text)
+                    bounds = loc)
+      case ExprCompoundString(value, loc) if !inPlaceholder =>
+        CompoundString(value.map(nested(_, inString = true)), quoting = !inStringOrCommand, loc)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
         val span = other match {
-          case ExprIdentifier(id, text) => Literal.fromStart(id, text)
-          case ExprAt(array, index, text) =>
+          case ExprIdentifier(id, loc) => Literal.fromStart(id, loc)
+          case ExprAt(array, index, loc) =>
             val arraySpan = nested(array, inPlaceholder = inStringOrCommand)
             val prefix = SpanSequence(
                 Vector(arraySpan, Literal.fromPrev(Symbols.IndexOpen, arraySpan))
             )
-            val suffix = Literal.fromEnd(Symbols.IndexClose, text)
+            val suffix = Literal.fromEnd(Symbols.IndexClose, loc)
             BoundedContainer(
                 Vector(nested(index, inPlaceholder = inStringOrCommand)),
                 Some(prefix, suffix),
                 // TODO: shouldn't need a delimiter - index must be exactly length 1
                 Some(Symbols.ArrayDelimiter),
-                bounds = text
+                bounds = loc
             )
-          case ExprIfThenElse(cond, tBranch, fBranch, text) =>
+          case ExprIfThenElse(cond, tBranch, fBranch, loc) =>
             val condSpan = nested(cond, inOperation = false, inPlaceholder = inStringOrCommand)
             val tSpan = nested(tBranch, inOperation = false, inPlaceholder = inStringOrCommand)
             val fSpan = nested(fBranch, inOperation = false, inPlaceholder = inStringOrCommand)
             BoundedContainer(
                 Vector(
-                    Literal.fromStart(Symbols.If, text),
+                    Literal.fromStart(Symbols.If, loc),
                     condSpan,
                     Literal.between(Symbols.Then, condSpan, tSpan),
                     tSpan,
@@ -582,7 +591,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
                     fSpan
                 ),
                 wrapping = Wrapping.AsNeeded,
-                bounds = text
+                bounds = loc
             )
           case ExprApply(oper, Vector(value), loc) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
@@ -604,20 +613,20 @@ case class WdlV1Formatter(followImports: Boolean = false,
                 inString = inStringOrCommand,
                 loc
             )
-          case ExprApply(funcName, elements, text) =>
+          case ExprApply(funcName, elements, loc) =>
             val prefix = SpanSequence(
-                Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), text)
+                Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), loc)
             )
-            val suffix = Literal.fromEnd(Symbols.FunctionCallClose, text)
+            val suffix = Literal.fromEnd(Symbols.FunctionCallClose, loc)
             BoundedContainer(
                 elements.map(nested(_, inPlaceholder = inStringOrCommand)),
                 Some(prefix, suffix),
                 Some(Symbols.ArrayDelimiter),
-                text
+                loc
             )
-          case ExprGetName(e, id, text) =>
+          case ExprGetName(e, id, loc) =>
             val exprSpan = nested(e, inPlaceholder = inStringOrCommand)
-            val idLiteral = Literal.fromEnd(id, text)
+            val idLiteral = Literal.fromEnd(id, loc)
             SpanSequence(
                 Vector(exprSpan, Literal.between(Symbols.Access, exprSpan, idLiteral), idLiteral)
             )
@@ -819,7 +828,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
 
   /**
     * Due to the lack of a formal input section in draft-2, inputs and other declarations (i.e. those
-    * that require evaluation and thus are not allowed as inputs) may be mixed in the source text. A
+    * that require evaluation and thus are not allowed as inputs) may be mixed in the source loc. A
     * TopDeclarations section takes both inputs and other declarations that appear at the top of a
     * workflow or task and formats them correctly using one Multiline for each sub-group of declarations
     * that covers all of the lines starting from the previous group (or startLine for the first element)
@@ -919,31 +928,31 @@ case class WdlV1Formatter(followImports: Boolean = false,
   private def buildMeta(metaValue: MetaValue): Span = {
     metaValue match {
       // literal values
-      case MetaValueNull(text) => Literal.fromStart(Symbols.Null, text)
-      case MetaValueString(value, text) =>
-        Literal.fromStart(value, text, quoting = true)
-      case MetaValueBoolean(value, text) => Literal.fromStart(value, text)
-      case MetaValueInt(value, text)     => Literal.fromStart(value, text)
-      case MetaValueFloat(value, text)   => Literal.fromStart(value, text)
-      case MetaValueArray(value, text) =>
+      case MetaValueNull(loc) => Literal.fromStart(Symbols.Null, loc)
+      case MetaValueString(value, loc) =>
+        Literal.fromStart(value, loc, quoting = true)
+      case MetaValueBoolean(value, loc) => Literal.fromStart(value, loc)
+      case MetaValueInt(value, loc)     => Literal.fromStart(value, loc)
+      case MetaValueFloat(value, loc)   => Literal.fromStart(value, loc)
+      case MetaValueArray(value, loc) =>
         BoundedContainer(
             value.map(buildMeta),
-            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, text),
-                 Literal.fromEnd(Symbols.ArrayLiteralClose, text)),
+            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, loc),
+                 Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            text,
+            loc,
             continue = false
         )
-      case MetaValueObject(value, text) =>
+      case MetaValueObject(value, loc) =>
         BoundedContainer(
             value.map {
               case MetaKV(k, v, memberText) =>
                 KeyValue(Literal.fromStart(k, memberText), buildMeta(v), bounds = memberText)
             },
-            Some(Literal.fromStart(Symbols.ObjectOpen, text),
-                 Literal.fromEnd(Symbols.ObjectClose, text)),
+            Some(Literal.fromStart(Symbols.ObjectOpen, loc),
+                 Literal.fromEnd(Symbols.ObjectClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            bounds = text,
+            bounds = loc,
             Wrapping.Always,
             continue = false
         )
@@ -1204,7 +1213,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately
         val (headExpr: Expr, indent, comment) = command.parts.head match {
-          case ValueString(value, text) =>
+          case ValueString(value, loc) =>
             value match {
               case commandStartRegexp(first, rest) =>
                 first.trim match {
@@ -1213,7 +1222,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (ValueString("", text), None, Some(s))
+                    (ValueString("", loc), None, Some(s))
                   case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment - we don't want to break
                     // anything so we'll just format the whole block as-is
@@ -1225,16 +1234,16 @@ case class WdlV1Formatter(followImports: Boolean = false,
                       case _                                        => (None, rest)
                     }
                     // the first line will be indented, so we need to trim the indent from `rest`
-                    (ValueString(trimmedRest, text), ws, Some(s))
+                    (ValueString(trimmedRest, loc), ws, Some(s))
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (ValueString(s, text), None, None)
+                    (ValueString(s, loc), None, None)
                   case s =>
                     // opening line has some real content, so just trim any leading whitespace
                     val ws = leadingWhitespaceRegexp
                       .findFirstMatchIn(rest)
                       .map(m => m.group(1))
-                    (ValueString(s"${s}\n${rest}", text), ws, None)
+                    (ValueString(s"${s}\n${rest}", loc), ws, None)
                 }
               case _ => throw new RuntimeException("sanity")
             }
@@ -1243,9 +1252,9 @@ case class WdlV1Formatter(followImports: Boolean = false,
 
         def trimLast(last: Expr): Expr = {
           last match {
-            case ValueString(s, text) =>
+            case ValueString(s, loc) =>
               // If the last part is just the whitespace before the close block, throw it out
-              ValueString(commandEndRegexp.replaceFirstIn(s, ""), text)
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""), loc)
             case other =>
               other
           }

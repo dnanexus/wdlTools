@@ -253,7 +253,7 @@ object ExprGraph {
         }
         depName
       } else {
-        val exprStr = expr.map(e => s" expression ${Utils.prettyFormatExpr(e)}").getOrElse("")
+        val exprStr = expr.map(e => s" expression ${TypeUtils.prettyFormatExpr(e)}").getOrElse("")
         throw new Exception(
             s"${varName}${exprStr} references non-task variable ${depName}"
         )
@@ -271,7 +271,7 @@ object ExprGraph {
         case (g, name) =>
           allVars(name) match {
             case DeclInfo(_, _, Some(expr), _) =>
-              val deps = Utils.exprDependencies(expr).keySet.map { dep =>
+              val deps = TypeUtils.exprDependencies(expr).keySet.map { dep =>
                 (resolveDependency(name, dep, Some(expr)), name, scatterPath)
               }
               if (deps.isEmpty) {
@@ -315,12 +315,12 @@ object ExprGraph {
       // Collect required nodes from input, command, runtime, and output blocks
       val commandDeps: Set[String] =
         commandParts.flatMap { expr =>
-          Utils.exprDependencies(expr).keySet.map { dep =>
+          TypeUtils.exprDependencies(expr).keySet.map { dep =>
             resolveDependency("command", dep, Some(expr))
           }
         }.toSet
       val runtimeDeps: Set[String] = runtime.values.flatMap { expr =>
-        Utils.exprDependencies(expr).keySet.map { dep =>
+        TypeUtils.exprDependencies(expr).keySet.map { dep =>
           resolveDependency("runtime", dep, Some(expr))
         }
       }.toSet
@@ -464,7 +464,7 @@ object ExprGraph {
       // add top-level dependencies
       val callDeps: Vector[String] = bodyElements.calls.flatMap { call =>
         val inputDeps = call.inputs.values.flatMap { expr =>
-          Utils.exprDependencies(expr).keySet.map { dep =>
+          TypeUtils.exprDependencies(expr).keySet.map { dep =>
             resolveDependency("command", dep, Some(expr), scatterPath)
           }
         }
@@ -474,7 +474,7 @@ object ExprGraph {
       val blockExprDeps =
         (bodyElements.conditionals.map(_.expr) ++ bodyElements.scatters.map(_.expr)).flatMap {
           expr =>
-            Utils.exprDependencies(expr).keySet.map { dep =>
+            TypeUtils.exprDependencies(expr).keySet.map { dep =>
               resolveDependency("command", dep, Some(expr), scatterPath)
             }
         }

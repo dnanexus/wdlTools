@@ -142,13 +142,13 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   lazy val memory: Long = {
     get(Runtime.MemoryKey) match {
       case Some(V_Int(i))   => i
-      case Some(V_Float(d)) => Utils.floatToInt(d)
+      case Some(V_Float(d)) => EvalUtils.floatToInt(d)
       case Some(V_String(s)) =>
-        val d = Utils.sizeStringToFloat(s, getSourceLocation(Runtime.MemoryKey))
-        Utils.floatToInt(d)
+        val d = EvalUtils.sizeStringToFloat(s, getSourceLocation(Runtime.MemoryKey))
+        EvalUtils.floatToInt(d)
       case None =>
-        val d = Utils.sizeStringToFloat(Runtime.MemoryDefault, SourceLocation.empty)
-        Utils.floatToInt(d)
+        val d = EvalUtils.sizeStringToFloat(Runtime.MemoryDefault, SourceLocation.empty)
+        EvalUtils.floatToInt(d)
       case other =>
         throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
                                 getSourceLocation(Runtime.MemoryKey))
@@ -234,10 +234,10 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
         // always return memory in bytes (round up to nearest byte)
         getValue(Vector(WdlTypes.T_Int, WdlTypes.T_String)) match {
           case i: V_Int   => i
-          case V_Float(d) => V_Int(Utils.floatToInt(d))
+          case V_Float(d) => V_Int(EvalUtils.floatToInt(d))
           case V_String(s) =>
-            val d = Utils.sizeStringToFloat(s, expr.loc)
-            V_Int(Utils.floatToInt(d))
+            val d = EvalUtils.sizeStringToFloat(s, expr.loc)
+            V_Int(EvalUtils.floatToInt(d))
           case other =>
             throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
                                     getSourceLocation(Runtime.MemoryKey))
@@ -376,45 +376,45 @@ object Runtime {
   ): Vector[DiskRequest] = {
     value match {
       case V_Int(i) =>
-        val bytes = Utils.floatToInt(Utils.sizeToFloat(i.toDouble, "GiB", loc))
+        val bytes = EvalUtils.floatToInt(EvalUtils.sizeToFloat(i.toDouble, "GiB", loc))
         Vector(DiskRequest(bytes, defaultMountPoint, defaultDiskType))
       case V_Float(d) =>
-        val bytes = Utils.floatToInt(Utils.sizeToFloat(d, "GiB", loc))
+        val bytes = EvalUtils.floatToInt(EvalUtils.sizeToFloat(d, "GiB", loc))
         Vector(DiskRequest(bytes, defaultMountPoint, defaultDiskType))
       case V_Array(a) =>
         a.flatMap(v => parseDisks(v, defaultMountPoint, defaultDiskType, loc))
       case V_String(s) =>
         val t = s.split("\\s").toVector match {
           case Vector(size) =>
-            val bytes = Utils.floatToInt(Utils.sizeStringToFloat(size, loc, "GiB"))
+            val bytes = EvalUtils.floatToInt(EvalUtils.sizeStringToFloat(size, loc, "GiB"))
             DiskRequest(bytes, defaultMountPoint, defaultDiskType)
           case Vector(a, b) =>
             try {
               // "<size> <suffix>"
-              DiskRequest(Utils.floatToInt(Utils.sizeToFloat(a.toDouble, b, loc)),
+              DiskRequest(EvalUtils.floatToInt(EvalUtils.sizeToFloat(a.toDouble, b, loc)),
                           defaultMountPoint,
                           defaultDiskType)
             } catch {
               case _: Throwable =>
-                DiskRequest(Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")),
+                DiskRequest(EvalUtils.floatToInt(EvalUtils.sizeStringToFloat(b, loc, "GiB")),
                             Some(a),
                             defaultDiskType)
             }
           case Vector(a, b, c) =>
             try {
               // "<mount-point> <size> <suffix>"
-              DiskRequest(Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc)),
+              DiskRequest(EvalUtils.floatToInt(EvalUtils.sizeToFloat(b.toDouble, c, loc)),
                           defaultMountPoint,
                           defaultDiskType)
             } catch {
               case _: Throwable =>
                 // "<mount-point> <size> <disk type>"
-                DiskRequest(Utils.floatToInt(Utils.sizeStringToFloat(b, loc, "GiB")),
+                DiskRequest(EvalUtils.floatToInt(EvalUtils.sizeStringToFloat(b, loc, "GiB")),
                             Some(a),
                             Some(c))
             }
           case Vector(a, b, c, d) =>
-            val bytes = Utils.floatToInt(Utils.sizeToFloat(b.toDouble, c, loc))
+            val bytes = EvalUtils.floatToInt(EvalUtils.sizeToFloat(b.toDouble, c, loc))
             DiskRequest(bytes, Some(a), Some(d))
         }
         Vector(t)

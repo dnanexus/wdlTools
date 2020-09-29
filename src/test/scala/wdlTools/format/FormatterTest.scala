@@ -8,7 +8,7 @@ import wdlTools.generators.code
 import wdlTools.syntax.{Parsers, WdlVersion}
 import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, LinesFileSource}
 
-class BaseTest extends AnyFlatSpec with Matchers {
+class FormatterTest extends AnyFlatSpec with Matchers {
   private val parsers = Parsers()
   private val v1Parser = parsers.getParser(WdlVersion.V1)
 

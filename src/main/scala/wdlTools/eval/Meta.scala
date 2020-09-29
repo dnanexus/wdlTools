@@ -107,28 +107,28 @@ case class Hints(hints: Option[TAT.MetaSection],
                                  wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
     id match {
       case Hints.MaxCpuKey =>
-        super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Float)))
+        super.applyKv(id, value, EvalUtils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Float)))
       case Hints.MaxMemoryKey =>
         super.applyKv(
             id,
             value,
-            Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Int, WdlTypes.T_String))
+            EvalUtils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Int, WdlTypes.T_String))
         ) match {
           case i: V_Int => i
           case V_String(s) =>
-            val d = Utils.sizeStringToFloat(s, value.loc)
-            V_Int(Utils.floatToInt(d))
+            val d = EvalUtils.sizeStringToFloat(s, value.loc)
+            V_Int(EvalUtils.floatToInt(d))
           case other =>
             throw new EvalException(
                 s"Invalid ${Hints.MaxMemoryKey} value ${other}"
             )
         }
       case Hints.ShortTaskKey =>
-        super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
+        super.applyKv(id, value, EvalUtils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
       case Hints.LocalizationOptionalKey =>
-        super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
+        super.applyKv(id, value, EvalUtils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Boolean)))
       case Hints.InputsKey | Hints.OutputsKey =>
-        super.applyKv(id, value, Utils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Object)))
+        super.applyKv(id, value, EvalUtils.checkTypes(id, wdlTypes, Vector(WdlTypes.T_Object)))
       case _ =>
         super.applyKv(id, value, wdlTypes)
     }

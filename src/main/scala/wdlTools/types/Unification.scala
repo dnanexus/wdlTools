@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.types.Utils.{isPrimitive, prettyFormatType}
+import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatType}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
 import wdlTools.util.{AbstractBindings, Enum, Logger, TraceLevel}
@@ -106,6 +106,13 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (_: T_Struct, _: T_Struct) =>
           None
 
+        // coercions from objects can't be checked - we allow them and expect an exception
+        // during evaluation if the values are incompatible
+        // TODO: in lenient mode, support Array[String] to Struct coercion as described in
+        //  https://github.com/openwdl/wdl/issues/389
+        case (T_Object, T_Object)    => Some(minPriority)
+        case (_: T_Struct, T_Object) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+
         // polymorphic types must have the same indices and compatible bounds
         case (T_Var(i, iBounds), T_Var(j, jBounds))
             if i == j && (iBounds.isEmpty || jBounds.isEmpty || (iBounds & jBounds).nonEmpty) =>
@@ -117,13 +124,13 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
           Some(minPriority)
         case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
-          logger.trace(s"lenient coercion from ${fromType} to T_String")
+          logger.trace(s"lenient coercion from ${innerFrom} to T_String")
           Some(Enum.max(minPriority, Priority.RegimeAllowed))
         case (T_Int, T_Float | T_String) if regime <= Lenient =>
           // we can allow this coercion assuming 1) a Float value that coerces
           // exactly to an int, or 2) a String value that can be parsed to an Int -
           // otherwise an exception should be thrown during evaluation
-          logger.trace(s"lenient coercion from ${fromType} to T_Int")
+          logger.trace(s"lenient coercion from ${innerFrom} to T_Int")
           Some(Enum.max(minPriority, Priority.RegimeAllowed))
         case (T_Float, T_String) if regime <= Lenient =>
           // we can allow this coercion assuming a String value that can be parsed
@@ -140,17 +147,26 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_Optional(l), r) if regime <= Moderate =>
           // T is coercible to T? - this isn't great, but it's necessary
           // since there is no function for doing the coercion explicitly
-          logger.trace(s"moderate coercion from ${fromType} to optional")
+          logger.trace(s"moderate coercion from ${innerFrom} to optional")
           inner(l, r, minPriority = Priority.RegimeAllowed)
+        case (T_Struct(structName, members), T_Map(T_String, valueType)) if regime <= Moderate =>
+          // Coersions from Map to struct are not recommended and will fail unless the map key
+          // type is String and the value type is coercible to all the struct member types
+          val memberPriorities = members.view.mapValues { memberType =>
+            inner(memberType, valueType, Enum.max(minPriority, Priority.ContextAllowed))
+          }
+          val invalidCoercions = memberPriorities.filter(_._2.isEmpty).keySet
+          if (invalidCoercions.isEmpty) {
+            logger.trace(s"moderate coercion from ${innerFrom} to ${structName}")
+            Some(memberPriorities.values.flatten.max)
+          } else {
+            logger.trace(
+                s"""invalid coercion from map to ${structName}: one or more member types ${invalidCoercions}
 
-        // coercions between objects/structs can't be checked - we allow
-        // them and expect an exception during evaluation if the values
-        // are incompatible
-        // TODO: in lenient mode, support Array[String] to Struct coercion as described in
-        //  https://github.com/openwdl/wdl/issues/389
-        case (T_Object, T_Object)    => Some(minPriority)
-        case (_: T_Struct, T_Object) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
-        case (_: T_Struct, _: T_Map) => Some(Enum.max(minPriority, Priority.AlwaysAllowed))
+                   |not coercible from ${valueType}""".stripMargin
+            )
+            None
+          }
 
         // T_Any coerces to anything
         case (_, T_Any) => Some(Enum.max(minPriority, Priority.AnyMatch))

@@ -100,13 +100,13 @@ case class Eval(paths: EvalPaths,
       // within an interpolation, null/None renders as empty string
       case V_Null | V_Optional(V_Null) => ""
       case other =>
-        Utils.formatPrimitive(other, loc)
+        EvalUtils.formatPrimitive(other, loc)
     }
   }
 
   private def validateDefault(value: V, loc: SourceLocation): Unit = {
     try {
-      Utils.unwrapOptional(value) match {
+      EvalUtils.unwrapOptional(value) match {
         case V_File(path)      => fileResovler.resolve(path)
         case V_Directory(path) => fileResovler.resolveDirectory(path)
         case _                 => ()
@@ -314,7 +314,7 @@ case class Eval(paths: EvalPaths,
   private def validateConst(value: V, loc: SourceLocation): Unit = {
     val fs: Option[FileSource] =
       try {
-        Utils.unwrapOptional(value) match {
+        EvalUtils.unwrapOptional(value) match {
           case V_File(path)      => Some(fileResovler.resolve(path))
           case V_Directory(path) => Some(fileResovler.resolveDirectory(path))
           case _                 => None
@@ -480,7 +480,7 @@ case class Eval(paths: EvalPaths,
       .map { expr =>
         apply(expr, ctx) match {
           case V_Null => ""
-          case value  => Utils.formatPrimitive(value, expr.loc)
+          case value  => EvalUtils.formatPrimitive(value, expr.loc)
         }
       }
       .mkString("")

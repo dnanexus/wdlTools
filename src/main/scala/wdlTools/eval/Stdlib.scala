@@ -972,7 +972,7 @@ case class Stdlib(paths: EvalPaths,
         V_Float(sizeCore(ctx.args.head, ctx.loc))
       case 2 =>
         val sUnit = getWdlString(ctx.args(1), ctx.loc)
-        val nBytesInUnit = Utils.getSizeMultiplier(sUnit, ctx.loc)
+        val nBytesInUnit = EvalUtils.getSizeMultiplier(sUnit, ctx.loc)
         val nBytes = sizeCore(ctx.args.head, ctx.loc)
         V_Float(nBytes / nBytesInUnit)
       case _ =>
@@ -1150,7 +1150,7 @@ case class Stdlib(paths: EvalPaths,
   }
 
   private def getStringVector(arg: V, loc: SourceLocation): Vector[String] = {
-    getWdlVector(arg, loc).map(vw => Utils.formatPrimitive(vw, loc))
+    getWdlVector(arg, loc).map(vw => EvalUtils.formatPrimitive(vw, loc))
   }
 
   // X select_first(Array[X?])

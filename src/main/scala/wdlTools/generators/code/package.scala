@@ -52,6 +52,7 @@ object Symbols extends BuiltinSymbols {
   val In: String = "in"
   val Input: String = "input"
   val Meta: String = "meta"
+  val Object: String = "object"
   val Output: String = "output"
   val ParameterMeta: String = "parameter_meta"
   val Runtime: String = "runtime"

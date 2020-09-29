@@ -60,7 +60,7 @@ object WdlTypeBindings {
   lazy val empty: WdlTypeBindings = WdlTypeBindings(Map.empty)
 }
 
-object Utils {
+object TypeUtils {
   // TODO: what about T_Any?
   val PrimitiveTypes: Set[T] = Set(T_String, T_File, T_Directory, T_Boolean, T_Int, T_Float)
 

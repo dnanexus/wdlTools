@@ -7,7 +7,7 @@ import wdlTools.util.{AbstractBindings, Bindings}
 
 import scala.annotation.tailrec
 
-object Utils {
+object EvalUtils {
   lazy val SizeUnits: Map[String, Double] = Map(
       "b" -> 1d,
       "kb" -> 1000d,

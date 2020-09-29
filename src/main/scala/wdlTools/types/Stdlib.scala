@@ -164,7 +164,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
           T_Function2("prefix",
                       T_String,
-                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
                       T_Array(T_String)),
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
@@ -279,7 +279,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
           T_Function2("prefix",
                       T_String,
-                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
                       T_Array(T_String)),
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
@@ -401,14 +401,14 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
           T_Function2("prefix",
                       T_String,
-                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
                       T_Array(T_String)),
           T_Function2("suffix",
                       T_String,
-                      T_Array(T_Var(0, Utils.PrimitiveTypes)),
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
                       T_Array(T_String)),
-          T_Function1("quote", T_Array(T_Var(0, Utils.PrimitiveTypes)), T_Array(T_String)),
-          T_Function1("squote", T_Array(T_Var(0, Utils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function1("quote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function1("squote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
           T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
@@ -538,8 +538,8 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
         .headOption
         .getOrElse({
           // no matches
-          val inputsStr = inputTypes.map(Utils.prettyFormatType).mkString("\n")
-          val candidatesStr = candidates.map(Utils.prettyFormatType(_)).mkString("\n")
+          val inputsStr = inputTypes.map(TypeUtils.prettyFormatType).mkString("\n")
+          val candidatesStr = candidates.map(TypeUtils.prettyFormatType(_)).mkString("\n")
           val msg =
             s"""|Invoking stdlib function ${funcName} with badly typed arguments
                 |${candidatesStr}
@@ -553,7 +553,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
       // Match more than one prototype.
       val prototypeDescriptions = viableCandidates
         .map {
-          case (_, funcSig, _) => Utils.prettyFormatType(funcSig)
+          case (_, funcSig, _) => TypeUtils.prettyFormatType(funcSig)
         }
         .mkString("\n")
       val msg = s"""|Call to ${funcName} matches ${viableCandidates.size} prototypes

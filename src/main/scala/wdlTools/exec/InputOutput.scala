@@ -10,7 +10,7 @@ import wdlTools.eval.{
   WdlValueBindings,
   WdlValueSerde,
   WdlValues,
-  Utils => WdlValueUtils
+  EvalUtils => WdlValueUtils
 }
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._

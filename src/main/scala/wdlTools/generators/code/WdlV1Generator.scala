@@ -338,16 +338,23 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             }.toVector,
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.MapOpen), Literal(Symbols.MapClose)),
-            Wrapping.Always
+            Wrapping.Always,
+            continue = false
         )
       case ExprObject(value, _, _) =>
         Container(
             value.map {
-              case (k, v) => KeyValue(nested(k), nested(v))
+              case (ValueString(k, _, _), v) =>
+                KeyValue(Literal(k), nested(v))
+              case other =>
+                throw new Exception(s"invalid object member ${other}")
             }.toVector,
             Some(Symbols.ArrayDelimiter),
-            Some(Literal(Symbols.ObjectOpen), Literal(Symbols.ObjectClose)),
-            Wrapping.Always
+            Some(Sequence(Vector(Literal(Symbols.Object), Literal(Symbols.ObjectOpen)),
+                          spacing = Spacing.On),
+                 Literal(Symbols.ObjectClose)),
+            Wrapping.Always,
+            continue = false
         )
       // placeholders
       case ExprPlaceholderCondition(t, f, value, _, _) =>

@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, SyntaxUtils => SUtil}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
-import wdlTools.types.Utils.{isPrimitive, prettyFormatExpr, prettyFormatType}
+import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatExpr, prettyFormatType}
 import TypeCheckingRegime._
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.Section.Section
@@ -926,11 +926,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       bindings.toMap.map {
         case (callName, callType: T_Call) =>
           val callOutput = callType.output.map {
-            case (name, t) => name -> Utils.ensureOptional(t)
+            case (name, t) => name -> TypeUtils.ensureOptional(t)
           }
           callName -> T_Call(callType.name, callOutput)
         case (varName, typ: WdlType) =>
-          varName -> Utils.ensureOptional(typ)
+          varName -> TypeUtils.ensureOptional(typ)
       }
 
     (TAT.Conditional(condExpr, wfElements, cond.loc), WdlTypeBindings(optionalBindings))
