@@ -32,7 +32,12 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
   }
 
   protected def getOrCreateDir(key: String, path: Path, ensureExists: Boolean): Path = {
-    cache.getOrElse(key, if (ensureExists) createDir(key, path) else path)
+    val resolved = cache.getOrElse(key, if (ensureExists) createDir(key, path) else path)
+    if (Files.exists(resolved)) {
+      resolved.toRealPath()
+    } else {
+      resolved.toAbsolutePath
+    }
   }
 
   def getRootDir(ensureExists: Boolean = false): Path = {

@@ -78,14 +78,14 @@ case class IoSupport(paths: EvalPaths,
     */
   def glob(pattern: String): Vector[String] = {
     logger.trace(s"glob(${pattern})")
-    val baseDir = paths.getHomeDir(true)
-    val matcher: PathMatcher = FileSystems.getDefault
-      .getPathMatcher(s"glob:${baseDir.toString}/${pattern}")
+    val baseDir = paths.getHomeDir(ensureExists = true)
     val retval =
       if (!Files.exists(baseDir)) {
         Vector.empty[String]
       } else {
-        val files = Files
+        val globPath = baseDir.resolve(pattern).normalize()
+        val matcher = FileSystems.getDefault.getPathMatcher(s"glob:${globPath.toString}")
+        Files
           .walk(baseDir)
           .iterator()
           .asScala
@@ -93,7 +93,7 @@ case class IoSupport(paths: EvalPaths,
           .filter(matcher.matches)
           .map(_.toString)
           .toVector
-        files.sorted
+          .sorted
       }
     logger.trace(s"""glob results=${retval.mkString("\n")}""")
     retval
