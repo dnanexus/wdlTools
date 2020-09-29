@@ -1,3 +1,8 @@
+# v0.7.1 (2020-09-29)
+
+* Type-checking bug fixes
+* Error message improvements
+
 # v0.7.0 (2020-09-28)
 
 * Refactoring of `types.Unification`, including additionl UnificationContext, which allows for context-specific type checking
