@@ -327,7 +327,7 @@ object TypeUtils {
 
         // ~{true="--yes" false="--no" boolean_value}
         case TAT.ExprPlaceholderCondition(t, f, value, _, _) =>
-          s"{true=${inner(t, disableQuoting)} false=${inner(f, disableQuoting)} ${inner(value, disableQuoting)}"
+          s"{true=${inner(t, disableQuoting)} false=${inner(f, disableQuoting)} ${inner(value, disableQuoting)}}"
 
         // ~{default="foo" optional_value}
         case TAT.ExprPlaceholderDefault(default, value, _, _) =>
@@ -335,11 +335,11 @@ object TypeUtils {
 
         // ~{sep=", " array_value}
         case TAT.ExprPlaceholderSep(sep, value, _, _) =>
-          s"{sep=${inner(sep, disableQuoting)} ${inner(value, disableQuoting)}"
+          s"{sep=${inner(sep, disableQuoting)} ${inner(value, disableQuoting)}}"
 
         // Access an array element at [index]
         case TAT.ExprAt(array, index, _, _) =>
-          s"${inner(array, disableQuoting)}[${index}]"
+          s"${inner(array, disableQuoting)}[${inner(index, disableQuoting)}]"
 
         // conditional:
         // if (x == 1) then "Sunday" else "Weekday"

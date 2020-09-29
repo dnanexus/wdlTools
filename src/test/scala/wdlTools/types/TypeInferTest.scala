@@ -11,6 +11,7 @@ import wdlTools.util.{FileSourceResolver, Logger}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
+  //private val v1Dir = Paths.get(getClass.getResource("/types/v1").getPath)
   private val structsDir =
     Paths.get(getClass.getResource("/types/v1/structs").getPath)
 

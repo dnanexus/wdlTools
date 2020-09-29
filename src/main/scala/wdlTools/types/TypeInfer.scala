@@ -62,10 +62,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   private def typeEvalExprGetName(expr: TAT.Expr, id: String, ctx: TypeContext): T = {
     expr.wdlType match {
+      case T_Object =>
+        // we can't know at this point whether the specified member exists in
+        // the object, or what its type will be, so we allow it with type T_Any
+        T_Any
       case struct: T_Struct =>
         struct.members.get(id) match {
           case None =>
-            handleError(s"Struct ${struct.name} does not have member ${id} in expression", expr.loc)
+            handleError(s"Struct ${struct.name} does not have member ${id}", expr.loc)
             expr.wdlType
           case Some(t) =>
             t
@@ -73,21 +77,18 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case call: T_Call =>
         call.output.get(id) match {
           case None =>
-            handleError(s"Call object ${call.name} does not have output ${id} in expression",
-                        expr.loc)
+            handleError(s"Call ${call.name} does not have output ${id}", expr.loc)
             expr.wdlType
           case Some(t) =>
             t
         }
-      // An identifier is a struct, and we want to access
-      // a field in it.
-      // Person p = census.p
-      // String name = p.name
       case T_Identifier(structName) =>
-        // produce the struct definition
+        // An identifier is a struct, and we want to access a field in it. Examples:
+        //  Person p = census.p
+        //  String name = p.name
         ctx.aliases.get(structName) match {
           case None =>
-            handleError(s"unknown struct ${structName}", expr.loc)
+            handleError(s"Unknown struct ${structName}", expr.loc)
             expr.wdlType
           case Some(struct: T_Struct) =>
             struct.members.get(id) match {
@@ -97,7 +98,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               case Some(t) => t
             }
           case other =>
-            handleError(s"not a struct ${other}", expr.loc)
+            handleError(s"${other} is not a struct", expr.loc)
             expr.wdlType
         }
 
@@ -105,11 +106,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case T_Pair(l, _) if id.toLowerCase() == "left"  => l
       case T_Pair(_, r) if id.toLowerCase() == "right" => r
       case T_Pair(_, _) =>
-        handleError(s"accessing a pair with (${id}) is illegal", expr.loc)
+        handleError(s"Invalid pair accessor '${id}' (only 'left' and 'right' are allowed)",
+                    expr.loc)
         expr.wdlType
 
       case _ =>
-        handleError(s"member access (${id}) in expression is illegal", expr.loc)
+        handleError(s"Invalid member access ${expr}", expr.loc)
         expr.wdlType
     }
   }
@@ -211,13 +213,18 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val elementTypes = vec.map(e => nested(e, nextState))
               val unifyCtx =
                 UnificationContext(section, inPlaceholder = nextState >= ExprState.InPlaceholder)
+              val wdlTypes = elementTypes.map(_.wdlType)
               val t =
                 try {
-                  T_Array(unify.apply(elementTypes.map(_.wdlType), unifyCtx))
+                  T_Array(unify.apply(wdlTypes, unifyCtx))
                 } catch {
                   case _: TypeUnificationException =>
-                    handleError("array elements must have the same type, or be coercible to one",
-                                nestedExpr.loc)
+                    handleError(
+                        s"""array ${vec} contains multiple incompatible data types 
+                           |${wdlTypes.toSet.mkString(",")}""".stripMargin
+                          .replaceAll("\n", " "),
+                        nestedExpr.loc
+                    )
                     elementTypes.head.wdlType
                 }
               TAT.ExprArray(elementTypes, t, loc)
@@ -264,8 +271,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
               if (!unify.isCoercibleTo(T_Boolean, valueExpr.wdlType, unifyCtx)) {
                 val msg =
-                  s"""condition ${prettyFormatExpr(valueExpr)} should have boolean type, 
-                     |it has type ${prettyFormatType(valueExpr.wdlType)} instead
+                  s"""Condition ${prettyFormatExpr(valueExpr)} has type 
+                     |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean
                      |""".stripMargin.replaceAll("\n", " ")
                 handleError(msg, nestedExpr.loc)
               }
@@ -293,9 +300,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   T_String
                 case _ =>
                   val msg =
-                    s"""|Expression (${prettyFormatExpr(valueExpr)}) must have type coercible to
-                        |(${prettyFormatType(defaultExpr.wdlType)}), it has type 
-                        |(${prettyFormatType(valueExpr.wdlType)}) instead
+                    s"""|Expression ${prettyFormatExpr(valueExpr)} has type 
+                        |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to 
+                        |${prettyFormatType(defaultExpr.wdlType)}
                         |""".stripMargin.replaceAll("\n", " ")
                   handleError(msg, nestedExpr.loc)
                   valueExpr.wdlType
@@ -311,8 +318,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   T_String
                 case other =>
                   val msg =
-                    s"""expression ${prettyFormatExpr(valueExpr)} should be coercible to Array[String],
-                       |but it is ${prettyFormatType(other)}
+                    s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(other)},
+                       |which is not coercible to Array[String]
                        |""".stripMargin.replaceAll("\n", " ")
                   handleError(msg, valueExpr.loc)
                   other
@@ -329,7 +336,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val eFalseBranch = nested(falseBranch, nextState)
               val t = {
                 if (eCond.wdlType != T_Boolean) {
-                  handleError(s"condition ${prettyFormatExpr(eCond)} must be a boolean", eCond.loc)
+                  handleError(
+                      s"""Condition ${prettyFormatExpr(eCond)} has type ${eCond.wdlType}, 
+                         |which is not coercible to Boolean""".stripMargin.replaceAll("\n", " "),
+                      eCond.loc
+                  )
                   eCond.wdlType
                 } else {
                   try {
@@ -338,11 +349,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   } catch {
                     case _: TypeUnificationException =>
                       val msg =
-                        s"""|The branches of a conditional expression must be coercable to the same type
-                            |expression
-                            |  true branch: ${prettyFormatType(eTrueBranch.wdlType)}
-                            |  flase branch: ${prettyFormatType(eFalseBranch.wdlType)}
-                            |""".stripMargin
+                        s"""|Conditional branches ${prettyFormatType(eTrueBranch.wdlType)},
+                            |${prettyFormatType(eFalseBranch.wdlType)} are not coercible to
+                            |a common type""".stripMargin.replaceAll("\n", " ")
                       handleError(msg, nestedExpr.loc)
                       eTrueBranch.wdlType
                   }
@@ -355,7 +364,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val eIndex = nested(index, nextState)
               val eCollection = nested(collection, nextState)
               val t = (eIndex.wdlType, eCollection.wdlType) match {
-                case (T_Int, T_Array(elementType, _)) => elementType
+                case (T_Int, T_Array(elementType, _)) =>
+                  elementType
                 case (iType, T_Map(kType, vType))
                     if unify.isCoercibleTo(
                         kType,
@@ -364,11 +374,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                     ) =>
                   vType
                 case (T_Int, _) =>
-                  handleError(s"${prettyFormatExpr(eIndex)} must be an integer", loc)
+                  handleError(s"Expression ${prettyFormatExpr(eCollection)} must be an array",
+                              eCollection.loc)
+
                   eIndex.wdlType
                 case (_, _) =>
-                  handleError(s"expression ${prettyFormatExpr(eCollection)} must be an array",
-                              eCollection.loc)
+                  handleError(
+                      s"""${prettyFormatExpr(eIndex)} is not a valid index for collection 
+                         |${prettyFormatExpr(eCollection)}""".stripMargin.replaceAll("\n", " "),
+                      loc
+                  )
                   eCollection.wdlType
               }
               TAT.ExprAt(eCollection, eIndex, t, loc)
@@ -457,9 +472,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           lhsType
         } else {
           val msg =
-            s"""|${decl.name} is of type ${prettyFormatType(lhsType)}
-                |but is assigned ${prettyFormatType(rhsType)}
-                |${prettyFormatExpr(e)}
+            s"""|${decl.name} value ${prettyFormatExpr(e)} of type ${prettyFormatType(rhsType)}
+                |is not coercible to ${prettyFormatType(lhsType)}
                 |""".stripMargin.replaceAll("\n", " ")
           handleError(msg, decl.loc)
           lhsType
@@ -497,17 +511,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tInputDefs = tDecls.map { tDecl =>
       // What kind of input is this?
       // compulsory, optional, one with a default
-      tDecl.expr match {
-        case None => {
-          tDecl.wdlType match {
-            case t: WdlTypes.T_Optional =>
-              TAT.OptionalInputParameter(tDecl.name, t, tDecl.loc)
-            case _ =>
-              TAT.RequiredInputParameter(tDecl.name, tDecl.wdlType, tDecl.loc)
-          }
-        }
-        case Some(expr) =>
-          TAT.OverridableInputParameterWithDefault(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
+      (tDecl.wdlType, tDecl.expr) match {
+        case (t: WdlTypes.T_Optional, None) =>
+          TAT.OptionalInputParameter(tDecl.name, t, tDecl.loc)
+        case (_, None) =>
+          TAT.RequiredInputParameter(tDecl.name, tDecl.wdlType, tDecl.loc)
+        case (WdlTypes.T_Optional(t), Some(expr)) =>
+          // drop the optional if this is an input with a default value
+          TAT.OverridableInputParameterWithDefault(tDecl.name, t, expr, tDecl.loc)
+        case (t, Some(expr)) =>
+          TAT.OverridableInputParameterWithDefault(tDecl.name, t, expr, tDecl.loc)
       }
     }
 
@@ -699,9 +712,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       e.wdlType match {
         case x if isPrimitive(x)             => e
         case T_Optional(x) if isPrimitive(x) => e
-        case _ =>
+        case other =>
           handleError(
-              s"Expression ${prettyFormatExpr(e)} in the command section is not coercible to a string",
+              s"""Expression ${prettyFormatExpr(e)} in the command section has type ${other},
+                 |which is not coercible to a string""".stripMargin.replaceAll("\n", " "),
               expr.loc
           )
           TAT.ValueString(prettyFormatExpr(e), T_String, e.loc)

@@ -122,7 +122,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         // in specific contexts or are used often and so allowed under less
         // strict regimes
         case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
-          Some(minPriority)
+          Some(Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
           logger.trace(s"lenient coercion from ${innerFrom} to T_String")
           Some(Enum.max(minPriority, Priority.RegimeAllowed))
