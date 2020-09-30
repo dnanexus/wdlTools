@@ -225,8 +225,10 @@ case class Stdlib(paths: EvalPaths,
       Builtins.Floor -> floor,
       Builtins.Ceil -> ceil,
       Builtins.Round -> round,
-      Builtins.Glob -> glob,
-      Builtins.Sep -> sep
+      Builtins.Sep -> sep,
+      Builtins.Min -> min,
+      Builtins.Max -> max,
+      Builtins.Glob -> glob
   )
 
   // choose the standard library prototypes according to the WDL version
@@ -1250,5 +1252,27 @@ case class Stdlib(paths: EvalPaths,
     val separator = getWdlString(x, ctx.loc)
     val strings = getWdlVector(y, ctx.loc).map(x => getWdlString(x, ctx.loc))
     V_String(strings.mkString(separator))
+  }
+
+  private def min(ctx: FunctionContext): V_Numeric = {
+    ctx.getTwoArgs match {
+      case (V_Int(x), V_Int(y))     => V_Int(Math.min(x, y))
+      case (V_Int(x), V_Float(y))   => V_Float(Math.min(x.toDouble, y))
+      case (V_Float(x), V_Int(y))   => V_Float(Math.min(x, y.toDouble))
+      case (V_Float(x), V_Float(y)) => V_Float(Math.min(x, y))
+      case other =>
+        throw new RuntimeException(s"Cannot apply max() to ${other}")
+    }
+  }
+
+  private def max(ctx: FunctionContext): V_Numeric = {
+    ctx.getTwoArgs match {
+      case (V_Int(x), V_Int(y))     => V_Int(Math.max(x, y))
+      case (V_Int(x), V_Float(y))   => V_Float(Math.max(x.toDouble, y))
+      case (V_Float(x), V_Int(y))   => V_Float(Math.max(x, y.toDouble))
+      case (V_Float(x), V_Float(y)) => V_Float(Math.max(x, y))
+      case other =>
+        throw new RuntimeException(s"Cannot apply max() to ${other}")
+    }
   }
 }

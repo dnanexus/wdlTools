@@ -20,17 +20,17 @@ trait LocalizationDisambiguator {
   *   the same directory for task execution
   * We use the general strategy of creating randomly named directories under root. We use a single
   * directory if possible, but create additional directories to avoid name collision.
-  * @param root the root dir - files are localize to subdirectories under this directory
+  * @param rootDir the root dir - files are localize to subdirectories under this directory
   * @param existingPaths optional Set of paths that should be assumed to already exist locally
   * @param subdirPrefix prefix to add to localization dirs
   * @param disambiguationDirLimit max number of disambiguation subdirs that can be created
   */
-case class SafeLocalizationDisambiguator(root: Path,
+case class SafeLocalizationDisambiguator(rootDir: Path,
                                          existingPaths: Set[Path] = Set.empty,
                                          subdirPrefix: String = "input",
                                          disambiguationDirLimit: Int = 200)
     extends LocalizationDisambiguator {
-  private lazy val primaryDir = Files.createTempDirectory(root, subdirPrefix)
+  private lazy val primaryDir = Files.createTempDirectory(rootDir, subdirPrefix)
   // mapping from source file parent directories to local directories - this
   // ensures that files that were originally from the same directory are
   // localized to the same target directory
@@ -71,14 +71,14 @@ case class SafeLocalizationDisambiguator(root: Path,
           primaryPath
         } else if (disambiguationDirs.size >= disambiguationDirLimit) {
           throw new Exception(
-              s"""|Tried to localize ${source} to local filesystem at ${root}/*/${source.fileName}, 
+              s"""|Tried to localize ${source} to local filesystem at ${rootDir}/*/${source.fileName}, 
                   |but there was a name collision and there are already the maximum number of 
                   |disambiguation directories (${disambiguationDirLimit}).""".stripMargin
                 .replaceAll("\n", " ")
           )
         } else {
           // there is a name collision in primaryDir - create a new dir
-          val newDir = Files.createTempDirectory(root, "input")
+          val newDir = Files.createTempDirectory(rootDir, "input")
           // we should never get a collision according to the guarantees of
           // Files.createTempDirectory, but we check anyway
           if (Files.exists(newDir) || disambiguationDirs.contains(newDir)) {

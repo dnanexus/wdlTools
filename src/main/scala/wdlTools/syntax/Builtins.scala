@@ -32,6 +32,8 @@ trait BuiltinSymbols {
   val Glob = "glob"
   val Keys = "keys"
   val Length = "length"
+  val Min = "min"
+  val Max = "max"
   val Prefix = "prefix"
   val Quote = "quote"
   val Range = "range"
