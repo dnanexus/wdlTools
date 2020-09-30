@@ -140,7 +140,6 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("write_object", T_Object, T_File),
           T_Function1("write_objects", T_Array(T_Object), T_File),
           T_Function1("write_json", T_Any, T_File),
-          // Size can take several kinds of arguments.
           T_Function1("size", T_Optional(T_File), T_Float),
           // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
           T_Function2("size", T_Optional(T_File), T_String, T_Float),
@@ -169,8 +168,6 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
           T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-          // simple functions again
-          // basename has two variants
           T_Function1("basename", T_String, T_String),
           T_Function2("basename", T_String, T_String, T_String),
           T_Function1("floor", T_Float, T_Int),
@@ -253,7 +250,6 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("write_object", T_Object, T_File),
           T_Function1("write_objects", T_Array(T_Object), T_File),
           T_Function1("write_json", T_Any, T_File),
-          // Size can take several kinds of arguments.
           T_Function1("size", T_Optional(T_File), T_Float),
           T_Function1("size", T_Array(T_File), T_Float),
           // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
@@ -284,8 +280,6 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
           T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-          // simple functions again
-          // basename has two variants
           T_Function1("basename", T_String, T_String),
           T_Function2("basename", T_String, T_String, T_String),
           T_Function1("floor", T_Float, T_Int),
@@ -365,7 +359,6 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
           T_Function1("write_map", T_Map(T_String, T_String), T_File),
           T_Function1("write_json", T_Any, T_File),
-          // Size can take several kinds of arguments.
           T_Function1("size", T_Optional(T_File), T_Float),
           T_Function1("size", T_Array(T_File), T_Float),
           // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
@@ -412,16 +405,23 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
           T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-          // simple functions again
-          // basename has two variants
           T_Function1("basename", T_String, T_String),
           T_Function2("basename", T_String, T_String, T_String),
           T_Function1("floor", T_Float, T_Int),
           T_Function1("ceil", T_Float, T_Int),
           T_Function1("round", T_Float, T_Int),
-          // not mentioned in the specification
+          T_Function2("sep", T_String, T_Array(T_String), T_String),
+          // mentioned in the specification but not formally defined
           T_Function1("glob", T_String, T_Array(T_File)),
-          T_Function2("sep", T_String, T_Array(T_String), T_String)
+          // https://github.com/openwdl/wdl/pull/304
+          T_Function2("min", T_Int, T_Int, T_Int),
+          T_Function2("min", T_Int, T_Float, T_Float),
+          T_Function2("min", T_Float, T_Int, T_Float),
+          T_Function2("min", T_Float, T_Float, T_Float),
+          T_Function2("max", T_Int, T_Int, T_Int),
+          T_Function2("max", T_Int, T_Float, T_Float),
+          T_Function2("max", T_Float, T_Int, T_Float),
+          T_Function2("max", T_Float, T_Float, T_Float)
       )
   ).flatten
 

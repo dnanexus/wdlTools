@@ -78,7 +78,7 @@ case class IoSupport(paths: EvalPaths,
     */
   def glob(pattern: String): Vector[String] = {
     logger.trace(s"glob(${pattern})")
-    val baseDir = paths.getHomeDir(ensureExists = true)
+    val baseDir = paths.getWorkDir(ensureExists = true)
     val retval =
       if (!Files.exists(baseDir)) {
         Vector.empty[String]

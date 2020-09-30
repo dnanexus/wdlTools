@@ -19,7 +19,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
   private val linesep = System.lineSeparator()
   private val evalPaths: EvalPaths = EvalPaths.createFromTemp()
-  private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getHomeDir()))
+  private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getWorkDir()))
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parsers.parseDocument(fileResolver.fromPath(UUtil.absolutePath(file)))

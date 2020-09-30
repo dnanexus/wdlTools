@@ -13,7 +13,7 @@
 %>
 <% escapeMarkup = false %>
 <%@ val command: String %>
-<%@ val homeDir: String %>
+<%@ val workDir: String %>
 <%@ val tempDir: String %>
 <%@ val stdoutFile: String %>
 <%@ val stderrFile: String %>
@@ -21,8 +21,8 @@
 <% val bashDollar: String = "$" %>
 #!/bin/bash
 (
-  mkdir -p ${homeDir} ${tempDir} && \
-  cd ${homeDir}
+  mkdir -p ${workDir} ${tempDir} && \
+  cd ${workDir}
   ${command}
 ) \
 > >( tee ${stdoutFile} ) \

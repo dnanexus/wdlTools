@@ -7,7 +7,7 @@ import wdlTools.util.{FileSourceResolver, Logger}
 
 class ExecTest extends AnyFlatSpec with Matchers with Inside {
   private lazy val paths: ExecPaths = ExecPaths.createLocalPathsFromTemp()
-  private lazy val fileResolver = FileSourceResolver.create(Vector(paths.getHomeDir()))
+  private lazy val fileResolver = FileSourceResolver.create(Vector(paths.getWorkDir()))
   private val dockerUtils = DockerUtils(fileResolver, Logger.Quiet)
 
   it should "read a docker manifest file" in {

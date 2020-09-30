@@ -10,8 +10,8 @@ import wdlTools.util.FileUtils
   * evaluation directory is:
   *
   * root
-  * |_home
-  * |_temp
+  * |_work
+  * |_tmp
   * |_meta
   *   |_stdout
   *   |_stderr
@@ -51,9 +51,9 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
   /**
     * The execution directory - used as the base dir for relative paths (e.g. for glob search).
     */
-  def getHomeDir(ensureExists: Boolean = false): Path = {
-    getOrCreateDir(EvalPaths.DefaultHomeDir,
-                   getRootDir(ensureExists).resolve(EvalPaths.DefaultHomeDir),
+  def getWorkDir(ensureExists: Boolean = false): Path = {
+    getOrCreateDir(EvalPaths.DefaultWorkDir,
+                   getRootDir(ensureExists).resolve(EvalPaths.DefaultWorkDir),
                    ensureExists)
   }
 
@@ -79,7 +79,7 @@ class EvalPaths(rootDir: Path, tempDir: Path) {
 }
 
 object EvalPaths {
-  val DefaultHomeDir = "home"
+  val DefaultWorkDir = "work"
   val DefaultTempDir = "tmp"
   val DefaultMetaDir = "meta"
   val DefaultStdout = "stdout"

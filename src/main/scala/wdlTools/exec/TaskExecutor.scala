@@ -55,7 +55,7 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
             TaskCommandFileGenerator.DefaultCommandScript,
             Map(
                 "command" -> cmd,
-                "homeDir" -> guest.getHomeDir().toString,
+                "workDir" -> guest.getWorkDir().toString,
                 "tempDir" -> guest.getTempDir().toString,
                 "returnCodeFile" -> guest.getReturnCodeFile().toString,
                 "stdoutFile" -> guest.getStdoutFile().toString,

@@ -181,7 +181,7 @@ case class TaskContext(task: Task,
 
   def outputs: Map[String, WdlValues.V] = {
     val outputFileResolver =
-      fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getHomeDir()))
+      fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getWorkDir()))
     task.outputs.map { output =>
       val value = outputBindings.get(output.name)
       val resolved: WdlValues.V =

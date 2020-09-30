@@ -45,7 +45,7 @@ class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir
   def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
     Map(
         "root" -> getRootDir(),
-        "home" -> getHomeDir(),
+        "work" -> getWorkDir(),
         "meta" -> getMetaDir(),
         "tmp" -> getTempDir(),
         "stdout" -> getStdoutFile(),

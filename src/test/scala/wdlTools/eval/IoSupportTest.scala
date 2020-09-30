@@ -30,7 +30,7 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val tmpDir = baseDir.resolve("tmp")
     val evalPaths = EvalPaths(baseDir, tmpDir)
     val fileResolver =
-      FileSourceResolver.create(Vector(srcDir, evalPaths.getHomeDir()), Vector(DxProtocol))
+      FileSourceResolver.create(Vector(srcDir, evalPaths.getWorkDir()), Vector(DxProtocol))
     (evalPaths, fileResolver)
   }
 
@@ -74,9 +74,9 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "evaluate globs" in {
     val (evalPaths, fileResolver) = setup()
-    val homeDir = evalPaths.getHomeDir(ensureExists = true)
-    val file1 = homeDir.resolve("file1.txt")
-    val file2 = homeDir.resolve("file2.txt")
+    val workDir = evalPaths.getWorkDir(ensureExists = true)
+    val file1 = workDir.resolve("file1.txt")
+    val file2 = workDir.resolve("file2.txt")
     val files = Set(file1, file2)
     files.foreach { path =>
       FileUtils.writeFileContent(path, "foo")
