@@ -6,12 +6,12 @@ import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers, SyntaxError}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.{TypeCheckingRegime, TypeError, TypeInfer}
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger}
 
 case class LinterParserRuleFactory(rules: Map[String, Severity]) extends ParseTreeListenerFactory {
-  private var listeners: Map[FileSource, Vector[Rules.LinterParserRule]] = Map.empty
+  private var listeners: Map[FileNode, Vector[Rules.LinterParserRule]] = Map.empty
 
-  def getEvents(docSource: FileSource): Vector[LintEvent] =
+  def getEvents(docSource: FileNode): Vector[LintEvent] =
     listeners.get(docSource).map(l => l.flatMap(_.getEvents)).getOrElse(Vector.empty)
 
   override def createParseTreeListeners(
@@ -31,9 +31,9 @@ case class Linter(rules: Map[String, Severity] = Rules.defaultRules,
                   followImports: Boolean = true,
                   fileResolver: FileSourceResolver = FileSourceResolver.get,
                   logger: Logger = Logger.get) {
-  def apply(docSource: FileSource): Map[FileSource, Vector[LintEvent]] = {
-    var parserErrorEvents: Map[FileSource, Vector[LintEvent]] = Map.empty
-    var typeErrorEvents: Map[FileSource, Vector[LintEvent]] = Map.empty
+  def apply(docSource: FileNode): Map[FileNode, Vector[LintEvent]] = {
+    var parserErrorEvents: Map[FileNode, Vector[LintEvent]] = Map.empty
+    var typeErrorEvents: Map[FileNode, Vector[LintEvent]] = Map.empty
 
     def handleParserErrors(errors: Vector[SyntaxError]): Boolean = {
       // convert parser exception to LintEvent
@@ -67,7 +67,7 @@ case class Linter(rules: Map[String, Severity] = Rules.defaultRules,
     )
     val astRules = rules.view.filterKeys(Rules.astRules.contains)
     val result =
-      parsers.getDocumentWalker[Map[FileSource, Vector[LintEvent]]](docSource, Map.empty).walk {
+      parsers.getDocumentWalker[Map[FileNode, Vector[LintEvent]]](docSource, Map.empty).walk {
         (doc, result) =>
           result + (doc.source -> (result.getOrElse(doc.source, Vector.empty) ++ (
               if (!parserErrorEvents.contains(doc.source) && astRules.nonEmpty) {

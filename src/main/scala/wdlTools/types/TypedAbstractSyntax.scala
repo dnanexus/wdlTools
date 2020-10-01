@@ -1,7 +1,7 @@
 package wdlTools.types
 
 import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
@@ -262,7 +262,7 @@ object TypedAbstractSyntax {
       extends Element
       with Callable
 
-  case class Document(source: FileSource,
+  case class Document(source: FileNode,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

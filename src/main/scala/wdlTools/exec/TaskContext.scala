@@ -6,10 +6,10 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{DataSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileSource, FileSourceResolver, Logger}
 
 trait LocalizationDisambiguator {
-  def getLocalPath(fileSource: DataSource): Path
+  def getLocalPath(fileSource: FileSource): Path
 }
 
 /**
@@ -53,25 +53,25 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
     }
   }
 
-  override def getLocalPath(source: DataSource): Path = {
+  override def getLocalPath(source: FileSource): Path = {
     val sourceParent = source.localPath.getParent
     sourceTargetMap.get(sourceParent) match {
       // if we already saw another file from the same parent directory as `source`, try to
       // put `source` in that same directory
-      case Some(parent) if exists(parent.resolve(source.fileName)) =>
+      case Some(parent) if exists(parent.resolve(source.name)) =>
         throw new FileAlreadyExistsException(
             s"Trying to localize ${source} to ${parent} but the file already exists in that directory"
         )
       case Some(parent) =>
-        parent.resolve(source.fileName)
+        parent.resolve(source.name)
       case None =>
-        val primaryPath = primaryDir.resolve(source.fileName)
+        val primaryPath = primaryDir.resolve(source.name)
         if (!exists(primaryPath)) {
           sourceTargetMap += (sourceParent -> primaryDir)
           primaryPath
         } else if (disambiguationDirs.size >= disambiguationDirLimit) {
           throw new Exception(
-              s"""|Tried to localize ${source} to local filesystem at ${rootDir}/*/${source.fileName}, 
+              s"""|Tried to localize ${source} to local filesystem at ${rootDir}/*/${source.name}, 
                   |but there was a name collision and there are already the maximum number of 
                   |disambiguation directories (${disambiguationDirLimit}).""".stripMargin
                 .replaceAll("\n", " ")
@@ -86,7 +86,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
           }
           disambiguationDirs += newDir
           sourceTargetMap += (sourceParent -> newDir)
-          newDir.resolve(source.fileName)
+          newDir.resolve(source.name)
         }
     }
   }

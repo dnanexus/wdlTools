@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
-import wdlTools.util.{FileSource, LocalFileSource, StringFileSource, FileUtils}
+import wdlTools.util.{FileNode, LocalFileSource, StringFileNode, FileUtils}
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
@@ -17,9 +17,9 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
     private val fname = wdlPath.getFileName.toString
     require(fname.endsWith(".wdl"))
     private val wdlName = fname.slice(0, fname.length - 4)
-    private var generatedFiles: Vector[FileSource] = Vector.empty
+    private var generatedFiles: Vector[FileNode] = Vector.empty
 
-    def getGeneratedFiles: Vector[FileSource] = generatedFiles
+    def getGeneratedFiles: Vector[FileNode] = generatedFiles
 
     def getReadmeNameAndPath(elementName: String, developer: Boolean): (String, Path) = {
       val devStr = if (developer) {
@@ -42,7 +42,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles +:= StringFileSource(contents, Some(FileUtils.absolutePath(path)))
+      generatedFiles +:= StringFileNode(contents, Some(FileUtils.absolutePath(path)))
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -53,12 +53,12 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles +:= StringFileSource(contents, Some(FileUtils.absolutePath(path)))
+      generatedFiles +:= StringFileNode(contents, Some(FileUtils.absolutePath(path)))
       readmeName
     }
   }
 
-  def apply(document: Document): Vector[FileSource] = {
+  def apply(document: Document): Vector[FileNode] = {
     val localFileSource = document.source match {
       case lfs: LocalFileSource => lfs
       case _ =>

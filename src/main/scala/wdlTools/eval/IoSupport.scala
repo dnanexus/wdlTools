@@ -5,7 +5,7 @@ import java.nio.charset.Charset
 import java.nio.file._
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, Logger, NoSuchProtocolException}
+import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, Logger, NoSuchProtocolException}
 
 import scala.jdk.CollectionConverters._
 
@@ -14,7 +14,7 @@ case class IoSupport(paths: EvalPaths,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
                      logger: Logger = Logger.get,
                      encoding: Charset = FileUtils.DefaultEncoding) {
-  def getFileSource(uri: String, loc: SourceLocation): FileSource = {
+  def getFileSource(uri: String, loc: SourceLocation): FileNode = {
     try {
       fileResolver.resolve(uri)
     } catch {

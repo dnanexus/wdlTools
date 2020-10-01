@@ -7,7 +7,7 @@ import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
 import wdlTools.linter.{LintEvent, Linter, Rules, Severity}
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileNode, FileSourceResolver}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls
@@ -133,7 +133,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
   }
 
-  private def eventsToJson(events: Map[FileSource, Vector[LintEvent]],
+  private def eventsToJson(events: Map[FileNode, Vector[LintEvent]],
                            rules: Map[String, JsValue]): JsObject = {
     def eventToJson(err: LintEvent): JsObject = {
       val rule = getFields(rules(err.ruleId))
@@ -167,7 +167,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
     }
   }
 
-  private def printEvents(events: Map[FileSource, Vector[LintEvent]],
+  private def printEvents(events: Map[FileNode, Vector[LintEvent]],
                           rules: Map[String, JsValue],
                           printer: PrintStream,
                           effects: Boolean): Unit = {

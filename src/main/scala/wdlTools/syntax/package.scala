@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.{FileSource, StringFileSource}
+import wdlTools.util.{FileNode, StringFileNode}
 
 sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
@@ -54,7 +54,7 @@ object WdlVersion {
   * @param endLine: line (end-inclusive) on which the last token ends
   * @param endCol: column (end-exclusive) at which the last token ends
   */
-case class SourceLocation(source: FileSource, line: Int, col: Int, endLine: Int, endCol: Int)
+case class SourceLocation(source: FileNode, line: Int, col: Int, endLine: Int, endCol: Int)
     extends Ordered[SourceLocation] {
   lazy val lineRange: Range = line to endLine
 
@@ -83,9 +83,9 @@ case class SourceLocation(source: FileSource, line: Int, col: Int, endLine: Int,
 }
 
 object SourceLocation {
-  val empty: SourceLocation = SourceLocation(StringFileSource.empty, 0, 0, 0, 0)
+  val empty: SourceLocation = SourceLocation(StringFileNode.empty, 0, 0, 0, 0)
 
-  def fromSpan(source: FileSource, start: SourceLocation, stop: SourceLocation): SourceLocation = {
+  def fromSpan(source: FileNode, start: SourceLocation, stop: SourceLocation): SourceLocation = {
     SourceLocation(
         source,
         start.line,

@@ -4,7 +4,7 @@ import java.nio.file.{Path, Paths}
 
 import wdlTools.generators.project.ProjectGenerator.{TaskModel, WorkflowModel}
 import wdlTools.generators.project.ProjectGenerator
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 import scala.language.reflectiveCalls
 
@@ -31,6 +31,6 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val tasks =
       args.task.map(_.map(taskName => TaskModel(Some(taskName))).toVector).getOrElse(Vector.empty)
     val generatedFiles = generator.apply(workflow, tasks)
-    FileSource.localizeAll(generatedFiles, Some(outputDir), args.overwrite())
+    FileNode.localizeAll(generatedFiles, Some(outputDir), args.overwrite())
   }
 }

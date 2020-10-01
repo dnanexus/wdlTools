@@ -4,7 +4,7 @@ def indent(value: Any, indent: "    "): String = {
   value.toString.linesIterator.map(line => s"${indent}${line}").mkString("\n")
 }
 %>
-# [${doc.source.fileName}](${doc.source.toString})
+# [${doc.source.name}](${doc.source.toString})
 
 <% if (doc.comment.isDefined) {%>
 ${doc.comment.get}

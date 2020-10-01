@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.nio.file.Files
 
 import wdlTools.generators.project.DocumentationGenerator
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileNode, FileSourceResolver}
 
 import scala.language.reflectiveCalls
 
@@ -17,6 +17,6 @@ case class Docgen(conf: WdlToolsConf) extends Command {
     val docSource = FileSourceResolver.get.resolve(conf.docgen.uri())
     val title = conf.docgen.title.getOrElse(outputDir.getFileName.toString)
     val pages = DocumentationGenerator.apply(docSource, title, conf.docgen.followImports())
-    FileSource.localizeAll(pages, Some(outputDir), overwrite)
+    FileNode.localizeAll(pages, Some(outputDir), overwrite)
   }
 }

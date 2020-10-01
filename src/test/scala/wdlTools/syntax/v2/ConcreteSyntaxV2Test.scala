@@ -6,18 +6,18 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.WdlVersion
 import wdlTools.syntax.v2.ConcreteSyntax._
-import wdlTools.util.{FileSource, Logger, FileSourceResolver}
+import wdlTools.util.{FileNode, Logger, FileSourceResolver}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)
   private val fileResolver = FileSourceResolver.create(Vector(sourcePath))
   private val logger = Logger.Quiet
 
-  private def getSource(fname: String): FileSource = {
+  private def getSource(fname: String): FileNode = {
     fileResolver.fromPath(sourcePath.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileSource): Document = {
+  private def getDocument(FileSource: FileNode): Document = {
     ParseTop(WdlV2Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 

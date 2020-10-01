@@ -5,37 +5,72 @@ import java.net.{HttpURLConnection, URI}
 import java.nio.charset.Charset
 import java.nio.file.{FileAlreadyExistsException, Files, Path, Paths}
 
-import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
+import wdlTools.util.FileUtils.{FileScheme, getUriScheme}
 
 import scala.io.Source
 import scala.reflect.ClassTag
 
-trait DataSource {
+/**
+  * A FileSource is just that - a source of files. It may represent a single file or
+  * a directory of files (such as a local directory or an archive from which files
+  * can be extracted). It may be be physically located on local disk, remotely, or
+  * in memory.
+  */
+trait FileSource {
+
+  /**
+    * The default local path where this FileSource will be localized.
+    */
   def localPath: Path
 
-  def fileName: String = localPath.getFileName.toString
+  /**
+    * The name of this FileSource - defaults to the last component of
+    * localPath.
+    */
+  def name: String = localPath.getFileName.toString
 
+  /**
+    * Whether this FileSource represents a directory.
+    */
   def isDirectory: Boolean
 
   protected def localizeTo(file: Path): Unit
 
-  def localize(file: Path = localPath, overwrite: Boolean = false): Path = {
-    if (Files.exists(file) && !overwrite) {
+  /**
+    * Localizes this FileSource to the specified path.
+    * @param path destination path
+    * @param overwrite whether to overwrite any existing file/directory
+    * @return the absolute destination path
+    */
+  def localize(path: Path = localPath, overwrite: Boolean = false): Path = {
+    if (Files.exists(path) && !overwrite) {
       throw new FileAlreadyExistsException(
           s"file ${localPath} already exists and overwrite = false"
       )
     }
-    val absFile = FileUtils.absolutePath(file)
+    val absFile = FileUtils.absolutePath(path)
     localizeTo(absFile)
     absFile
   }
 
+  /**
+    * Localizes this FileSource to the specified parent directory.
+    * @param dir the destination parent directory
+    * @param overwrite whether to overwrite any existing file/directory
+    * @return the absolute destination path
+    */
   def localizeToDir(dir: Path, overwrite: Boolean = false): Path = {
-    localize(dir.resolve(fileName), overwrite)
+    localize(dir.resolve(name), overwrite)
   }
 }
 
-trait FileSource extends DataSource {
+/**
+  * A FileNode is a FileSource that represents a single phyiscal file.
+  * It has a size, and its contents may be read as bytes or a string.
+  * A FileNode may be a "directory" - such as an archive file that,
+  * when localized, is extracted to a hierarchy of files.
+  */
+trait FileNode extends FileSource {
   override def isDirectory: Boolean = false
 
   /**
@@ -57,24 +92,36 @@ trait FileSource extends DataSource {
   def readLines: Vector[String]
 
   /**
-    * Gets the size of the file in bytes.
-    * @return
+    * The size of the file in bytes.
     */
   def size: Long = readBytes.length
 
   protected def checkFileSize(): Unit = {
     // check that file isn't too big
-    val fileSizeMiB = BigDecimal(size) / FileSource.MiB
-    if (fileSizeMiB > FileSource.MaxFileSizeMiB) {
+    val fileSizeMiB = BigDecimal(size) / FileNode.MiB
+    if (fileSizeMiB > FileNode.MaxFileSizeMiB) {
       throw new Exception(
           s"""${toString} size is ${fileSizeMiB} MiB;
-             |reading files larger than ${FileSource.MaxFileSizeMiB} MiB is unsupported""".stripMargin
+             |reading files larger than ${FileNode.MaxFileSizeMiB} MiB is unsupported""".stripMargin
       )
     }
   }
 }
 
-object FileSource {
+/**
+  * A FileSource that has an address, such as a local file path or a URI.
+  */
+trait AddressableFileSource extends FileSource {
+
+  /**
+    * The original value that was resolved to get this FileSource.
+    */
+  def address: String
+
+  override def toString: String = address
+}
+
+object FileNode {
   val MiB = BigDecimal(1024 * 1024)
   val MaxFileSizeMiB = BigDecimal(256)
 
@@ -84,7 +131,7 @@ object FileSource {
     * @param outputDir the output directory; if None, the URI is converted to an absolute path if possible
     * @param overwrite whether it is okay to overwrite an existing file
     */
-  def localizeAll(docs: Vector[FileSource],
+  def localizeAll(docs: Vector[FileNode],
                   outputDir: Option[Path],
                   overwrite: Boolean = false): Unit = {
     docs.foreach { doc =>
@@ -97,19 +144,9 @@ object FileSource {
   }
 }
 
-trait RealDataSource extends DataSource {
-
-  /**
-    * The original value that was resolved to get this FileSource.
-    */
-  def value: String
-
-  override def toString: String = value
-}
-
-abstract class AbstractRealFileSource(override val value: String, val encoding: Charset)
-    extends RealDataSource
-    with FileSource {
+abstract class AbstractAddressableFileNode(override val address: String, val encoding: Charset)
+    extends AddressableFileSource
+    with FileNode {
 
   override def readString: String = {
     new String(readBytes, encoding)
@@ -120,43 +157,40 @@ abstract class AbstractRealFileSource(override val value: String, val encoding: 
   }
 }
 
-abstract class AbstractRealFolderSource(override val value: String) extends RealDataSource {
-  override def isDirectory: Boolean = true
-}
+case class NoSuchProtocolException(name: String)
+    extends Exception(s"Protocol ${name} not supported")
 
-class NoSuchProtocolException(name: String) extends Exception(s"Protocol ${name} not supported")
-
-class ProtocolFeatureNotSupportedException(name: String, feature: String)
+case class ProtocolFeatureNotSupportedException(name: String, feature: String)
     extends Exception(s"Protocol ${name} does not support feature ${feature}")
 
-// A protocol defined by the user. Intended for allowing access to
-// private/public clouds such as S3, Azure, or dnanexus. This has to be a web
-// protocol, meaning that the prefix has to include "://". Anything
-// else is considered a local file.
-//
-// PREFIX
-//   For S3              s3://
-//   For google cloud    gs://
-//   For dnanexus        dx://
-//
+/**
+  * A protocol for resolving FileSources.
+  */
 trait FileAccessProtocol {
-  val prefixes: Vector[String]
-
-  val supportsDirectories = false
 
   /**
-    * Resolve a URI
-    * @param uri the file URI
-    * @return FileSource
+    * URI schemes that this protocol is able to resolve.
     */
-  def resolve(uri: String): FileSource
+  def schemes: Vector[String]
 
   /**
-    * Resolve a URI that points to a directory. Must only be implemented if `supportsDirectories` is true.
+    * Whether this protocol supports resolving directories.
+    */
+  def supportsDirectories = false
+
+  /**
+    * Resolves a URI to a FileNode.
+    * @param uri the file URI
+    * @return FileNode
+    */
+  def resolve(uri: String): FileNode
+
+  /**
+    * Resolves a URI that points to a directory. Must only be implemented if `supportsDirectories` is true.
     * @param uri the directory URI
     * @return FileSource
     */
-  def resolveDirectory(uri: String): DataSource = {
+  def resolveDirectory(uri: String): FileSource = {
     throw new UnsupportedOperationException
   }
 
@@ -168,20 +202,20 @@ trait FileAccessProtocol {
 
 /**
   * A FileSource for a local file.
-  * @param value the original path/URI used to resolve this file.
-  * @param valuePath the original, non-cannonicalized Path determined from `value` - may be relative
+  * @param address the original path/URI used to resolve this file.
+  * @param originalPath the original, non-cannonicalized Path determined from `value` - may be relative
   * @param localPath the absolute, cannonical path to this file
   * @param logger the logger
   * @param encoding the file encoding
   * @param isDirectory whether this FileSource represents a directory
   */
-case class LocalFileSource(override val value: String,
-                           valuePath: Path,
+case class LocalFileSource(override val address: String,
+                           originalPath: Path,
                            override val localPath: Path,
                            logger: Logger,
                            override val encoding: Charset,
                            override val isDirectory: Boolean = false)
-    extends AbstractRealFileSource(value, encoding) {
+    extends AbstractAddressableFileNode(address, encoding) {
   def checkExists(exists: Boolean): Unit = {
     val existing = Files.exists(localPath)
     if (exists && !existing) {
@@ -205,11 +239,6 @@ case class LocalFileSource(override val value: String,
     }
   }
 
-  /**
-    * Reads the entire file into a byte array.
-    *
-    * @return
-    */
   override def readBytes: Array[Byte] = {
     checkFileSize()
     FileUtils.readFileBytes(localPath)
@@ -251,14 +280,14 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
                                    logger: Logger = Logger.Quiet,
                                    encoding: Charset = FileUtils.DefaultEncoding)
     extends FileAccessProtocol {
-  val prefixes = Vector("", FileUtils.FILE_SCHEME)
+  val schemes = Vector("", FileUtils.FileScheme)
   override val supportsDirectories: Boolean = true
 
   private def uriToPath(uri: String): Path = {
     getUriScheme(uri) match {
-      case Some(FILE_SCHEME) => Paths.get(URI.create(uri))
-      case None              => FileUtils.getPath(uri)
-      case _                 => throw new Exception(s"${uri} is not a path or file:// URI")
+      case Some(FileScheme) => Paths.get(URI.create(uri))
+      case None             => FileUtils.getPath(uri)
+      case _                => throw new Exception(s"${uri} is not a path or file:// URI")
     }
   }
 
@@ -291,17 +320,17 @@ case class LocalFileAccessProtocol(searchPath: Vector[Path] = Vector.empty,
     resolvePath(uriToPath(uri), Some(uri))
   }
 
-  override def resolveDirectory(uri: String): FileSource = {
+  override def resolveDirectory(uri: String): FileNode = {
     resolvePath(uriToPath(uri), Some(uri), isDirectory = true)
   }
 }
 
-case class RemoteFileSource(override val value: String,
-                            uri: URI,
-                            override val encoding: Charset,
-                            logger: Logger,
-                            override val isDirectory: Boolean = false)
-    extends AbstractRealFileSource(value, encoding) {
+case class HttpFileSource(override val address: String,
+                          uri: URI,
+                          override val encoding: Charset,
+                          logger: Logger,
+                          override val isDirectory: Boolean = false)
+    extends AbstractAddressableFileNode(address, encoding) {
   private var hasBytes: Boolean = false
 
   override def localPath: Path = Paths.get(uri.getPath).getFileName
@@ -374,7 +403,7 @@ case class RemoteFileSource(override val value: String,
   override protected def localizeTo(file: Path): Unit = {
     if (isDirectory) {
       // localize to a temp file if this is a "directory" (i.e. an archive we're going to unpack)
-      val dest = Files.createTempFile("temp", fileName)
+      val dest = Files.createTempFile("temp", name)
       try {
         localizeToFile(dest)
         // Unpack the archive and delete the temp file
@@ -394,20 +423,20 @@ case class RemoteFileSource(override val value: String,
 case class HttpFileAccessProtocol(logger: Logger = Logger.Quiet,
                                   encoding: Charset = FileUtils.DefaultEncoding)
     extends FileAccessProtocol {
-  val prefixes = Vector(FileUtils.HTTP_SCHEME, FileUtils.HTTPS_SCHEME)
+  val schemes = Vector(FileUtils.HttpScheme, FileUtils.HttpsScheme)
   // directories are supported via unpacking of archive files
   override val supportsDirectories: Boolean = true
 
-  override def resolve(uri: String): RemoteFileSource = {
+  override def resolve(uri: String): HttpFileSource = {
     resolve(URI.create(uri), Some(uri))
   }
 
-  def resolve(uri: URI, value: Option[String] = None): RemoteFileSource = {
-    RemoteFileSource(value.getOrElse(uri.toString), uri, encoding, logger)
+  def resolve(uri: URI, value: Option[String] = None): HttpFileSource = {
+    HttpFileSource(value.getOrElse(uri.toString), uri, encoding, logger)
   }
 
-  override def resolveDirectory(uri: String): FileSource = {
-    RemoteFileSource(uri, URI.create(uri), encoding, logger, isDirectory = true)
+  override def resolveDirectory(uri: String): FileNode = {
+    HttpFileSource(uri, URI.create(uri), encoding, logger, isDirectory = true)
   }
 }
 
@@ -424,34 +453,34 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
   })
 
   private lazy val protocolMap: Map[String, FileAccessProtocol] =
-    protocols.flatMap(prot => prot.prefixes.map(prefix => prefix -> prot)).toMap
+    protocols.flatMap(prot => prot.schemes.map(prefix => prefix -> prot)).toMap
 
   private[util] def getProtocolForScheme(scheme: String): FileAccessProtocol = {
     protocolMap.get(scheme) match {
-      case None        => throw new NoSuchProtocolException(scheme)
+      case None        => throw NoSuchProtocolException(scheme)
       case Some(proto) => proto
     }
   }
 
   private[util] def getScheme(uriOrPath: String): String = {
-    FileUtils.getUriScheme(uriOrPath).getOrElse(FileUtils.FILE_SCHEME)
+    FileUtils.getUriScheme(uriOrPath).getOrElse(FileUtils.FileScheme)
   }
 
-  def resolve(uriOrPath: String): FileSource = {
+  def resolve(uriOrPath: String): FileNode = {
     getProtocolForScheme(getScheme(uriOrPath)).resolve(uriOrPath)
   }
 
-  def resolveDirectory(uriOrPath: String): DataSource = {
+  def resolveDirectory(uriOrPath: String): FileSource = {
     val scheme = getScheme(uriOrPath)
     val proto = getProtocolForScheme(scheme)
     if (!proto.supportsDirectories) {
-      throw new ProtocolFeatureNotSupportedException(scheme, "directories")
+      throw ProtocolFeatureNotSupportedException(scheme, "directories")
     }
     proto.resolveDirectory(uriOrPath)
   }
 
   def fromPath(path: Path): LocalFileSource = {
-    getProtocolForScheme(FileUtils.FILE_SCHEME) match {
+    getProtocolForScheme(FileUtils.FileScheme) match {
       case proto: LocalFileAccessProtocol =>
         proto.resolvePath(path)
       case other =>
@@ -516,16 +545,19 @@ object FileSourceResolver {
   }
 }
 
-// A VirtualFileSource only exists in memory - it doesn't have an associated URI and so cannot be resolved
-
-abstract class AbstractVirtualFileSource(val name: Option[Path] = None,
-                                         val encoding: Charset = FileUtils.DefaultEncoding)
-    extends FileSource {
-  override lazy val toString: String = name.map(_.toString).getOrElse("<string>")
+/**
+  * A VirtualFileNode only exists in memory.
+  * @param path optional path where this node should be localized
+  * @param encoding character encoding
+  */
+abstract class AbstractVirtualFileNode(val path: Option[Path] = None,
+                                       val encoding: Charset = FileUtils.DefaultEncoding)
+    extends FileNode {
+  override lazy val toString: String = path.map(_.toString).getOrElse("<string>")
 
   override def localPath: Path = {
-    name.getOrElse(
-        throw new RuntimeException("virtual FileSource has no localPath")
+    path.getOrElse(
+        throw new RuntimeException("virtual FileNode has no localPath")
     )
   }
 
@@ -536,31 +568,31 @@ abstract class AbstractVirtualFileSource(val name: Option[Path] = None,
   }
 }
 
-case class StringFileSource(string: String,
-                            override val name: Option[Path] = None,
-                            override val encoding: Charset = FileUtils.DefaultEncoding)
-    extends AbstractVirtualFileSource(name, encoding) {
-  override def readString: String = string
+case class StringFileNode(contents: String,
+                          override val path: Option[Path] = None,
+                          override val encoding: Charset = FileUtils.DefaultEncoding)
+    extends AbstractVirtualFileNode(path, encoding) {
+  override def readString: String = contents
 
   lazy val readLines: Vector[String] = {
-    Source.fromString(string).getLines().toVector
+    Source.fromString(contents).getLines().toVector
   }
 }
 
-object StringFileSource {
-  def withName(name: String, content: String): StringFileSource = {
-    StringFileSource(content, Some(FileUtils.getPath(name)))
+object StringFileNode {
+  def withName(name: String, contents: String): StringFileNode = {
+    StringFileNode(contents, Some(FileUtils.getPath(name)))
   }
 
-  lazy val empty: StringFileSource = StringFileSource("")
+  lazy val empty: StringFileNode = StringFileNode("")
 }
 
-case class LinesFileSource(override val readLines: Vector[String],
-                           override val name: Option[Path] = None,
-                           override val encoding: Charset = FileUtils.DefaultEncoding,
-                           lineSeparator: String = "\n",
-                           trailingNewline: Boolean = true)
-    extends AbstractVirtualFileSource(name, encoding) {
+case class LinesFileNode(override val readLines: Vector[String],
+                         override val path: Option[Path] = None,
+                         override val encoding: Charset = FileUtils.DefaultEncoding,
+                         lineSeparator: String = "\n",
+                         trailingNewline: Boolean = true)
+    extends AbstractVirtualFileNode(path, encoding) {
   override def readString: String = {
     val s = readLines.mkString(lineSeparator)
     if (trailingNewline) {
@@ -571,8 +603,8 @@ case class LinesFileSource(override val readLines: Vector[String],
   }
 }
 
-object LinesFileSource {
-  def withName(name: String, lines: Vector[String]): LinesFileSource = {
-    LinesFileSource(lines, Some(FileUtils.getPath(name)))
+object LinesFileNode {
+  def withName(name: String, lines: Vector[String]): LinesFileNode = {
+    LinesFileNode(lines, Some(FileUtils.getPath(name)))
   }
 }

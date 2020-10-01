@@ -1,7 +1,7 @@
 package wdlTools.syntax.v1
 
 import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.
@@ -184,7 +184,7 @@ object ConcreteSyntax {
       extends Element
 
   case class Version(value: WdlVersion = WdlVersion.V1, loc: SourceLocation) extends Element
-  case class Document(source: FileSource,
+  case class Document(source: FileNode,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

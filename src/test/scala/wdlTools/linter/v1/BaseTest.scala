@@ -6,14 +6,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, Severity}
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileNode, FileSourceResolver}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/linter/${subdir}/${fname}").getPath)
   }
 
-  private def getWdlSource(fname: String, subdir: String): FileSource = {
+  private def getWdlSource(fname: String, subdir: String): FileNode = {
     FileSourceResolver.get.fromPath(getWdlPath(fname, subdir))
   }
 

@@ -5,7 +5,7 @@ import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.BaseWdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Operator, Parsers, SourceLocation, WdlVersion}
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger}
 
 import scala.collection.BufferedIterator
 
@@ -1440,9 +1440,9 @@ case class WdlV1Formatter(followImports: Boolean = false,
     formatElement(document, document.comments)
   }
 
-  def formatDocuments(docSource: FileSource): Map[FileSource, Vector[String]] = {
+  def formatDocuments(docSource: FileNode): Map[FileNode, Vector[String]] = {
     Parsers(followImports, fileResolver, logger = logger)
-      .getDocumentWalker[Map[FileSource, Vector[String]]](docSource, Map.empty)
+      .getDocumentWalker[Map[FileNode, Vector[String]]](docSource, Map.empty)
       .walk { (doc, results) =>
         results + (doc.source -> formatDocument(doc))
       }

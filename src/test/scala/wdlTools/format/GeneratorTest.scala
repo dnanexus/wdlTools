@@ -8,14 +8,14 @@ import wdlTools.eval.{Eval, EvalPaths, WdlValueBindings}
 import wdlTools.generators.code.WdlV1Generator
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSource, FileSourceResolver, LinesFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, LinesFileNode}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {
     Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath)
   }
 
-  private def getWdlSource(fname: String, subdir: String): FileSource = {
+  private def getWdlSource(fname: String, subdir: String): FileNode = {
     FileSourceResolver.get.fromPath(getWdlPath(fname, subdir))
   }
 
@@ -34,12 +34,12 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       validateParse: Boolean = true,
       validateContentSelf: Boolean = false,
       validateContentFile: Boolean = false
-  ): (FileSource, TAT.Document, FileSource, Option[TAT.Document]) = {
+  ): (FileNode, TAT.Document, FileNode, Option[TAT.Document]) = {
     val beforeSrc = getWdlSource(fname = fname, subdir = "before")
     val doc = Parsers.instance.parseDocument(beforeSrc)
     val (tDoc, _) = TypeInfer.instance.apply(doc)
     val generator = WdlV1Generator()
-    val gLines = LinesFileSource(generator.generateDocument(tDoc))
+    val gLines = LinesFileNode(generator.generateDocument(tDoc))
     if (validateContentSelf) {
       gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")
     } else if (validateContentFile) {

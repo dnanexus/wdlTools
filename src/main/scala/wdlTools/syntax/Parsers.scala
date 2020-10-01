@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger}
 
 case class Parsers(
     followImports: Boolean = false,
@@ -29,7 +29,7 @@ case class Parsers(
                                    logger)
   )
 
-  def getWdlVersion(fileSource: FileSource): WdlVersion = {
+  def getWdlVersion(fileSource: FileNode): WdlVersion = {
     parsers
       .collectFirst {
         case (wdlVersion, parser) if parser.canParse(fileSource) => wdlVersion
@@ -39,7 +39,7 @@ case class Parsers(
       )
   }
 
-  def getParser(fileSource: FileSource): WdlParser = {
+  def getParser(fileSource: FileNode): WdlParser = {
     parsers.values.collectFirst {
       case parser if parser.canParse(fileSource) => parser
     } match {
@@ -55,12 +55,12 @@ case class Parsers(
     }
   }
 
-  def parseDocument(fileSource: FileSource): Document = {
+  def parseDocument(fileSource: FileNode): Document = {
     val parser = getParser(fileSource)
     parser.parseDocument(fileSource)
   }
 
-  def getDocumentWalker[T](fileSource: FileSource, results: T): DocumentWalker[T] = {
+  def getDocumentWalker[T](fileSource: FileNode, results: T): DocumentWalker[T] = {
     val parser = getParser(fileSource)
     parser.Walker(fileSource, results)
   }

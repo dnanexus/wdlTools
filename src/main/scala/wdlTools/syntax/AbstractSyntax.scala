@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {
@@ -179,7 +179,7 @@ object AbstractSyntax {
                       loc: SourceLocation)
       extends Element
 
-  case class Document(source: FileSource,
+  case class Document(source: FileNode,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],

@@ -5,7 +5,7 @@ import wdlTools.generators.code.WdlV1Formatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
-import wdlTools.util.{FileSource, InteractiveConsole, LinesFileSource, StringFileSource, FileUtils}
+import wdlTools.util.{FileNode, InteractiveConsole, LinesFileNode, StringFileNode, FileUtils}
 
 import scala.util.control.Breaks._
 
@@ -254,7 +254,7 @@ case class ProjectGenerator(name: String,
   }
 
   def apply(workflowModel: Option[WorkflowModel],
-            taskModels: Vector[TaskModel]): Vector[FileSource] = {
+            taskModels: Vector[TaskModel]): Vector[FileNode] = {
     val tasksAndLinkedInputs = if (interactive) {
       val predefinedTaskInputs = if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
@@ -286,28 +286,28 @@ case class ProjectGenerator(name: String,
                        null,
                        CommentMap.empty)
     val wdlName = s"${name}.wdl"
-    val wdlFile: Vector[FileSource] = Vector(
-        LinesFileSource.withName(wdlName, formatter.formatDocument(doc))
+    val wdlFile: Vector[FileNode] = Vector(
+        LinesFileNode.withName(wdlName, formatter.formatDocument(doc))
     )
-    val readMes: Vector[FileSource] = if (readmes) {
+    val readMes: Vector[FileNode] = if (readmes) {
       readmeGenerator.apply(doc)
     } else {
       Vector.empty
     }
-    val dockerFile: Vector[FileSource] = if (dockerfile) {
-      Vector(StringFileSource.withName("Dockerfile", renderer.render(DOCKERFILE_TEMPLATE)))
+    val dockerFile: Vector[FileNode] = if (dockerfile) {
+      Vector(StringFileNode.withName("Dockerfile", renderer.render(DOCKERFILE_TEMPLATE)))
     } else {
       Vector.empty
     }
-    val testFile: Vector[FileSource] = if (tests) {
+    val testFile: Vector[FileNode] = if (tests) {
       val testPath = FileUtils.getPath("tests").resolve(s"test_${name}.json")
-      Vector(StringFileSource(TestsGenerator.apply(wdlName, doc), Some(testPath)))
+      Vector(StringFileNode(TestsGenerator.apply(wdlName, doc), Some(testPath)))
     } else {
       Vector.empty
     }
-    val makeFile: Vector[FileSource] = if (makefile) {
+    val makeFile: Vector[FileNode] = if (makefile) {
       Vector(
-          StringFileSource
+          StringFileNode
             .withName("Makefile",
                       renderer.render(
                           MAKEFILE_TEMPLATE,

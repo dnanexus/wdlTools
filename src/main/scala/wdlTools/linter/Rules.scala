@@ -7,7 +7,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{ASTVisitor, AllParseTreeListener, Antlr4Util, SourceLocation, WdlVersion}
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.types
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 import scala.collection.mutable
 
@@ -29,7 +29,7 @@ object Rules {
       Grammar
   ) => LinterParserRule
 
-  class LinterParserRule(id: String, severity: Severity, docSource: FileSource)
+  class LinterParserRule(id: String, severity: Severity, docSource: FileNode)
       extends AllParseTreeListener {
     private var events: Vector[LintEvent] = Vector.empty
 

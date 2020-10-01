@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.syntax.{Comment, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger}
 
 class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
@@ -17,19 +17,19 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir))
   private val logger = Logger.Quiet
 
-  private def getTaskSource(fname: String): FileSource = {
+  private def getTaskSource(fname: String): FileNode = {
     fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): FileSource = {
+  private def getWorkflowSource(fname: String): FileNode = {
     fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
-  private def getStructSource(fname: String): FileSource = {
+  private def getStructSource(fname: String): FileNode = {
     fileResolver.fromPath(structsDir.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileSource): Document = {
+  private def getDocument(FileSource: FileNode): Document = {
     ParseTop(WdlV1Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 

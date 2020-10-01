@@ -17,9 +17,9 @@ import sun.security.action.GetPropertyAction
 import scala.io.{Codec, Source}
 
 object FileUtils {
-  val FILE_SCHEME: String = "file"
-  val HTTP_SCHEME: String = "http"
-  val HTTPS_SCHEME: String = "https"
+  val FileScheme: String = "file"
+  val HttpScheme: String = "http"
+  val HttpsScheme: String = "https"
   private val uriRegexp = "^(.+?)://.+".r
   // the spec states that WDL files must use UTF8 encoding
   val DefaultEncoding: Charset = Codec.UTF8.charSet

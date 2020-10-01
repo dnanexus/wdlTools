@@ -3,7 +3,7 @@ package wdlTools.syntax
 import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{FileSource, FileSourceResolver, Logger, TraceLevel}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger, TraceLevel}
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
@@ -33,16 +33,16 @@ abstract class WdlParser(followImports: Boolean = false,
     }
   }
 
-  def canParse(fileSource: FileSource): Boolean
+  def canParse(fileSource: FileNode): Boolean
 
-  def parseDocument(fileSource: FileSource): Document
+  def parseDocument(fileSource: FileNode): Document
 
   def parseExpr(text: String): Expr
 
   def parseType(text: String): Type
 
-  case class Walker[T](fileSource: FileSource, start: T) extends DocumentWalker[T] {
-    def extractDependencies(document: Document): Map[FileSource, Document] = {
+  case class Walker[T](fileSource: FileNode, start: T) extends DocumentWalker[T] {
+    def extractDependencies(document: Document): Map[FileNode, Document] = {
       document.elements.flatMap {
         case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
           Some(FileSourceResolver.get.resolve(addr.value) -> doc.get)
@@ -54,7 +54,7 @@ abstract class WdlParser(followImports: Boolean = false,
       var visited: Set[String] = Set.empty
       var results: T = start
 
-      def addDocument(fileSource: FileSource, doc: Document): Unit = {
+      def addDocument(fileSource: FileNode, doc: Document): Unit = {
         if (!visited.contains(fileSource.toString)) {
           visited += fileSource.toString
           results = visitor(doc, results)

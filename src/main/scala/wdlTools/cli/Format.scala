@@ -17,7 +17,7 @@ case class Format(conf: WdlToolsConf) extends Command {
     val documents = formatter.formatDocuments(docSource)
     documents.foreach {
       case (source, lines) if outputDir.isDefined =>
-        Files.write(outputDir.get.resolve(source.fileName), lines.asJava)
+        Files.write(outputDir.get.resolve(source.name), lines.asJava)
       case (localSource: LocalFileSource, lines) if overwrite =>
         Files.write(localSource.localPath, lines.asJava)
       case (_, lines) =>

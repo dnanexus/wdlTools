@@ -6,22 +6,22 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{FileSource, FileSourceResolver, FileUtils}
+import wdlTools.util.{FileNode, FileSourceResolver, FileUtils}
 
 class BaseTest extends AnyFlatSpec with Matchers {
-  def getBeforePath(fname: String): FileSource = {
+  def getBeforePath(fname: String): FileNode = {
     val path =
       FileUtils.absolutePath(Paths.get(getClass.getResource(s"/upgrade/before/${fname}").getPath))
     FileSourceResolver.get.fromPath(path)
   }
 
-  def getAfterPath(fname: String): FileSource = {
+  def getAfterPath(fname: String): FileNode = {
     val path =
       FileUtils.absolutePath(Paths.get(getClass.getResource(s"/upgrade/after/${fname}").getPath))
     FileSourceResolver.get.fromPath(path)
   }
 
-  def getBeforeAfterPair(fname: String): (FileSource, FileSource) = {
+  def getBeforeAfterPair(fname: String): (FileNode, FileNode) = {
     (getBeforePath(fname), getAfterPath(fname))
   }
 

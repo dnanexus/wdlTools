@@ -6,13 +6,13 @@ import java.nio.file.Files
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException}
 import wdlTools.types.{TypeError, TypeException, TypeInfer}
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileNode, FileSourceResolver}
 
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls
 
 case class TypeCheck(conf: WdlToolsConf) extends Command {
-  private def errorsToJson(errors: Map[FileSource, Vector[TypeError]]): JsObject = {
+  private def errorsToJson(errors: Map[FileNode, Vector[TypeError]]): JsObject = {
     def getError(err: TypeError): JsObject = {
       JsObject(
           Map(
@@ -33,7 +33,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
     }.toVector)))
   }
 
-  private def printErrors(errors: Map[FileSource, Vector[TypeError]],
+  private def printErrors(errors: Map[FileNode, Vector[TypeError]],
                           printer: PrintStream,
                           effects: Boolean): Unit = {
     def colorMsg(msg: String, color: String): String = {
@@ -78,7 +78,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.check.uri())
     val parsers = Parsers(followImports = true)
-    var errors: Map[FileSource, Vector[TypeError]] = Map.empty
+    var errors: Map[FileNode, Vector[TypeError]] = Map.empty
 
     def errorHandler(typeErrors: Vector[TypeError]): Boolean = {
       typeErrors.groupBy(_.loc.source).foreach {

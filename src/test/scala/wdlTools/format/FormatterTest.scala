@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.{Parsers, WdlVersion}
-import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, LinesFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, LinesFileNode}
 
 class FormatterTest extends AnyFlatSpec with Matchers {
   private val parsers = Parsers()
@@ -16,7 +16,7 @@ class FormatterTest extends AnyFlatSpec with Matchers {
     FileUtils.absolutePath(Paths.get(getClass.getResource(s"/format/${subdir}/${fname}").getPath))
   }
 
-  def getWdlSource(fname: String, subdir: String): FileSource = {
+  def getWdlSource(fname: String, subdir: String): FileNode = {
     FileSourceResolver.get.fromPath(getWdlPath(fname, subdir))
   }
 
@@ -47,6 +47,6 @@ class FormatterTest extends AnyFlatSpec with Matchers {
     val formatter = code.WdlV1Formatter()
     val lines = formatter.formatDocument(doc)
     // test that it parses successfully
-    v1Parser.parseDocument(LinesFileSource(lines))
+    v1Parser.parseDocument(LinesFileNode(lines))
   }
 }

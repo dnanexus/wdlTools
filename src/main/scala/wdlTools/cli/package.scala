@@ -14,7 +14,7 @@ import org.rogach.scallop.{
 import wdlTools.syntax.{Antlr4Util, WdlVersion}
 import wdlTools.types.TypeCheckingRegime
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
+import wdlTools.util.FileUtils.{FileScheme, getUriScheme}
 import wdlTools.util.{FileSourceResolver, Logger}
 
 import scala.util.Try
@@ -87,9 +87,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
 
   private def getParent(pathOrUri: String): Path = {
     (getUriScheme(pathOrUri) match {
-      case Some(FILE_SCHEME) => Paths.get(URI.create(pathOrUri))
-      case None              => Paths.get(pathOrUri)
-      case _                 => throw new Exception(s"${pathOrUri} is not a path or file:// URI")
+      case Some(FileScheme) => Paths.get(URI.create(pathOrUri))
+      case None             => Paths.get(pathOrUri)
+      case _                => throw new Exception(s"${pathOrUri} is not a path or file:// URI")
     }).getParent
   }
 

@@ -11,7 +11,7 @@ import wdlTools.syntax.{
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger, StringFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
@@ -21,7 +21,7 @@ case class ParseAll(followImports: Boolean = false,
                     logger: Logger = Logger.get)
     extends WdlParser(followImports, fileResolver, logger) {
 
-  private case class Translator(docSource: FileSource) {
+  private case class Translator(docSource: FileNode) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
         case CST.TypeOptional(t, srcText) =>
@@ -309,7 +309,7 @@ case class ParseAll(followImports: Boolean = false,
     }
   }
 
-  override def canParse(fileSource: FileSource): Boolean = {
+  override def canParse(fileSource: FileNode): Boolean = {
     fileSource.readLines.foreach { line =>
       val trimmed = line.trim
       if (!(trimmed.isEmpty || trimmed.startsWith("#"))) {
@@ -321,7 +321,7 @@ case class ParseAll(followImports: Boolean = false,
     false
   }
 
-  override def parseDocument(fileSource: FileSource): AST.Document = {
+  override def parseDocument(fileSource: FileNode): AST.Document = {
     val grammar = WdlDraft2Grammar.newInstance(fileSource, listenerFactories, logger)
     val visitor = ParseTop(grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
@@ -335,7 +335,7 @@ case class ParseAll(followImports: Boolean = false,
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val docSource = StringFileSource(text)
+    val docSource = StringFileNode(text)
     val parser = ParseTop(
         WdlDraft2Grammar.newInstance(docSource, listenerFactories, logger)
     )
@@ -344,7 +344,7 @@ case class ParseAll(followImports: Boolean = false,
   }
 
   override def parseType(text: String): AST.Type = {
-    val docSource = StringFileSource(text)
+    val docSource = StringFileNode(text)
     val parser = ParseTop(
         WdlDraft2Grammar.newInstance(docSource, listenerFactories, logger)
     )

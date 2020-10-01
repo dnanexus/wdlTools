@@ -14,7 +14,7 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.{FileSource, Logger}
+import wdlTools.util.{FileNode, Logger}
 
 object Antlr4Util {
   private var parserTrace: Boolean = false
@@ -25,7 +25,7 @@ object Antlr4Util {
     currentTrace
   }
 
-  def getSourceLocation(source: FileSource,
+  def getSourceLocation(source: FileNode,
                         startToken: Token,
                         maybeStopToken: Option[Token] = None): SourceLocation = {
     // TODO: for an ending token that containing newlines, the endLine and endCol will be wrong
@@ -39,18 +39,18 @@ object Antlr4Util {
     )
   }
 
-  def getSourceLocation(source: FileSource, ctx: ParserRuleContext): SourceLocation = {
+  def getSourceLocation(source: FileNode, ctx: ParserRuleContext): SourceLocation = {
     val stop = ctx.getStop
     getSourceLocation(source, ctx.getStart, Option(stop))
   }
 
-  def getSourceLocation(source: FileSource, symbol: TerminalNode): SourceLocation = {
+  def getSourceLocation(source: FileNode, symbol: TerminalNode): SourceLocation = {
     getSourceLocation(source, symbol.getSymbol, None)
   }
 
   // Based on Patrick Magee's error handling code (https://github.com/patmagee/wdl4j)
   //
-  case class WdlAggregatingErrorListener(docSource: FileSource) extends BaseErrorListener {
+  case class WdlAggregatingErrorListener(docSource: FileNode) extends BaseErrorListener {
 
     private var errors = Vector.empty[SyntaxError]
 
@@ -84,7 +84,7 @@ object Antlr4Util {
     def hasErrors: Boolean = errors.nonEmpty
   }
 
-  private case class CommentListener(docSource: FileSource,
+  private case class CommentListener(docSource: FileNode,
                                      tokenStream: BufferedTokenStream,
                                      channelIndex: Int)
       extends AllParseTreeListener {
@@ -132,7 +132,7 @@ object Antlr4Util {
       val lexer: Lexer,
       val parser: Parser,
       val listenerFactories: Vector[ParseTreeListenerFactory],
-      val docSource: FileSource,
+      val docSource: FileNode,
       val logger: Logger = Logger.get
   ) {
     val errListener: WdlAggregatingErrorListener = WdlAggregatingErrorListener(docSource)

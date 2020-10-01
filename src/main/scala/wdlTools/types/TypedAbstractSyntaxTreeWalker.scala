@@ -2,13 +2,13 @@ package wdlTools.types
 
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 
 class VisitorContext[E <: Element](val element: E, val parent: Option[VisitorContext[_]] = None) {
-  lazy val docSource: FileSource = element match {
+  lazy val docSource: FileNode = element match {
     case d: Document => d.source
     case _           => findAncestor[Document].get.element.source
   }

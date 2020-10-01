@@ -1,7 +1,7 @@
 package wdlTools.syntax.draft_2
 
 import wdlTools.syntax.{CommentMap, SourceLocation}
-import wdlTools.util.FileSource
+import wdlTools.util.FileNode
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
@@ -175,7 +175,7 @@ object ConcreteSyntax {
                       loc: SourceLocation)
       extends Element
 
-  case class Document(source: FileSource,
+  case class Document(source: FileNode,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
                       loc: SourceLocation,

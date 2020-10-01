@@ -4,7 +4,7 @@ import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileSource, Logger}
+import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileNode, Logger}
 
 /**
   * Type inference context.
@@ -21,7 +21,7 @@ import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileSource, Lo
 case class TypeContext(
     version: WdlVersion,
     stdlib: Stdlib,
-    docSource: FileSource,
+    docSource: FileNode,
     inputs: WdlTypeBindings = WdlTypeBindings(elementType = "input"),
     outputs: WdlTypeBindings = WdlTypeBindings(elementType = "output"),
     declarations: WdlTypeBindings = WdlTypeBindings(elementType = "declaration"),

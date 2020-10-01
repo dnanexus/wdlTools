@@ -1063,7 +1063,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // will be named:
               //    stdlib
               //    C
-              UUtil.changeFileExt(fileResolver.resolve(addr).fileName, dropExt = ".wdl")
+              UUtil.changeFileExt(fileResolver.resolve(addr).name, dropExt = ".wdl")
             case Some(x) => x
           }
 

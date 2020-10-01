@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger}
 
 import scala.jdk.CollectionConverters._
 
@@ -88,7 +88,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
   private val includeList: Option[Set[String]] = None
   private val excludeList: Option[Set[String]] = None
 
-  private def checkCorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
+  private def checkCorrect(file: FileNode, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val checker =
       TypeInfer(regime = flag.getOrElse(TypeCheckingRegime.Moderate),
                 fileResolver = fileResolver,
@@ -103,7 +103,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
     }
   }
 
-  private def checkIncorrect(file: FileSource, flag: Option[TypeCheckingRegime.Value]): Unit = {
+  private def checkIncorrect(file: FileNode, flag: Option[TypeCheckingRegime.Value]): Unit = {
     val checker =
       TypeInfer(regime = flag.getOrElse(TypeCheckingRegime.Moderate),
                 fileResolver = fileResolver,
@@ -137,7 +137,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
   }
 
   "v1 compliance test" should {
-    val testFiles: Vector[(FileSource, TResult)] = {
+    val testFiles: Vector[(FileNode, TResult)] = {
       val testFiles = getWdlSourceFiles(
           Paths.get(getClass.getResource("/types/v1").getPath)
       ).map(p => p.getFileName.toString -> p).toMap
@@ -149,11 +149,11 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
     }
     testFiles.foreach {
       case (testFile, TResult(true, flag)) =>
-        s"type check valid WDL at ${testFile.fileName}" in {
+        s"type check valid WDL at ${testFile.name}" in {
           checkCorrect(testFile, flag)
         }
       case (testFile, TResult(false, flag)) =>
-        s"fail to type check invalid WDL at ${testFile.fileName}" in {
+        s"fail to type check invalid WDL at ${testFile.name}" in {
           checkIncorrect(testFile, flag)
         }
     }

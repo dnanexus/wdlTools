@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
-import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger, StringFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
@@ -13,7 +13,7 @@ case class ParseAll(followImports: Boolean = false,
                     logger: Logger = Logger.get)
     extends WdlParser(followImports, fileResolver, logger) {
 
-  private case class Translator(docSource: FileSource) {
+  private case class Translator(docSource: FileNode) {
     def translateType(t: CST.Type): AST.Type = {
       t match {
         case CST.TypeOptional(t, srcText) =>
@@ -348,7 +348,7 @@ case class ParseAll(followImports: Boolean = false,
 
   private val versionRegexp = "version\\s+(1.0|draft-3).*".r
 
-  override def canParse(fileSource: FileSource): Boolean = {
+  override def canParse(fileSource: FileNode): Boolean = {
     fileSource.readLines.foreach { line =>
       if (!(line.trim.isEmpty || line.startsWith("#"))) {
         return versionRegexp.matches(line.trim)
@@ -357,7 +357,7 @@ case class ParseAll(followImports: Boolean = false,
     false
   }
 
-  override def parseDocument(fileSource: FileSource): AST.Document = {
+  override def parseDocument(fileSource: FileNode): AST.Document = {
     val grammar = WdlV1Grammar.newInstance(fileSource, listenerFactories, logger)
     val visitor = ParseTop(grammar)
     val top: ConcreteSyntax.Document = visitor.parseDocument
@@ -371,14 +371,14 @@ case class ParseAll(followImports: Boolean = false,
   }
 
   override def parseExpr(text: String): AST.Expr = {
-    val docSource = StringFileSource(text)
+    val docSource = StringFileNode(text)
     val parser = ParseTop(WdlV1Grammar.newInstance(docSource, listenerFactories, logger))
     val translator = Translator(docSource)
     translator.translateExpr(parser.parseExpr)
   }
 
   override def parseType(text: String): AST.Type = {
-    val docSource = StringFileSource(text)
+    val docSource = StringFileNode(text)
     val parser = ParseTop(WdlV1Grammar.newInstance(docSource, listenerFactories, logger))
     val translator = Translator(docSource)
     translator.translateType(parser.parseWdlType)

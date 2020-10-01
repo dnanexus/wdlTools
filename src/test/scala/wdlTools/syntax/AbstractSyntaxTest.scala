@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{FileSource, FileSourceResolver, Logger, StringFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, Logger, StringFileNode}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)
@@ -17,11 +17,11 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Quiet
   private val parser = ParseAll(fileResolver = fileResolver, logger = logger)
 
-  private def getTaskSource(fname: String): FileSource = {
+  private def getTaskSource(fname: String): FileNode = {
     fileResolver.fromPath(tasksDir.resolve(fname))
   }
 
-  private def getWorkflowSource(fname: String): FileSource = {
+  private def getWorkflowSource(fname: String): FileNode = {
     fileResolver.fromPath(workflowsDir.resolve(fname))
   }
 
@@ -125,7 +125,7 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
         fileResolver,
         logger = logger
     )
-    val src = StringFileSource(wdl)
+    val src = StringFileNode(wdl)
     val parser = parsers.getParser(src)
     val doc = parser.parseDocument(src)
     doc.version should matchPattern {

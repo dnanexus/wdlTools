@@ -19,7 +19,7 @@ case class Upgrade(conf: WdlToolsConf) extends Command {
       upgrader.upgrade(docSource, conf.upgrade.srcVersion.toOption, conf.upgrade.destVersion())
     documents.foreach {
       case (source, lines) if outputDir.isDefined =>
-        Files.write(outputDir.get.resolve(source.fileName), lines.asJava)
+        Files.write(outputDir.get.resolve(source.name), lines.asJava)
       case (localSource: LocalFileSource, lines) if overwrite =>
         Files.write(localSource.localPath, lines.asJava)
       case (_, lines) =>

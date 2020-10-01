@@ -4,7 +4,7 @@ import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.SyntaxUtils.prettyFormatExpr
 import wdlTools.syntax.{Comment, Parsers, SyntaxUtils}
-import wdlTools.util.{FileSource, FileSourceResolver, FileUtils, StringFileSource}
+import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, StringFileNode}
 
 object DocumentationGenerator {
   //private val TemplatePrefix = "/templates/documentation/"
@@ -100,7 +100,7 @@ object DocumentationGenerator {
                                meta: Vector[KeyValueDocumentation],
                                comment: Option[DocumentationComment])
 
-  case class WdlDocumentation(source: FileSource,
+  case class WdlDocumentation(source: FileNode,
                               imports: Vector[ImportDocumentation],
                               structs: Vector[StructDocumentation],
                               workflow: Option[WorkflowDocumentation],
@@ -248,7 +248,7 @@ object DocumentationGenerator {
               imp.name
                 .map(_.value)
                 .getOrElse(
-                    FileUtils.changeFileExt(FileSourceResolver.get.resolve(imp.addr.value).fileName,
+                    FileUtils.changeFileExt(FileSourceResolver.get.resolve(imp.addr.value).name,
                                             dropExt = ".wdl")
                 ),
               imp.aliases.map(a => a.id1 -> a.id2).toMap,
@@ -343,12 +343,10 @@ object DocumentationGenerator {
     }
   }
 
-  def apply(docSource: FileSource,
-            title: String,
-            followImports: Boolean = true): Vector[FileSource] = {
+  def apply(docSource: FileNode, title: String, followImports: Boolean = true): Vector[FileNode] = {
     val docs =
       Parsers(followImports)
-        .getDocumentWalker[Map[FileSource, WdlDocumentation]](docSource, Map.empty)
+        .getDocumentWalker[Map[FileNode, WdlDocumentation]](docSource, Map.empty)
         .walk { (doc, results) =>
           val docs = generateDocumentation(doc)
           if (docs.isDefined) {
@@ -360,17 +358,17 @@ object DocumentationGenerator {
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
     val renderer = Renderer()
-    val pages: Vector[FileSource] = docs.map {
+    val pages: Vector[FileNode] = docs.map {
       case (source, doc) =>
-        val destFile = FileUtils.changeFileExt(source.fileName, ".wdl", ".md")
-        StringFileSource(
+        val destFile = FileUtils.changeFileExt(source.name, ".wdl", ".md")
+        StringFileNode(
             renderer.render(DocumentTemplate, Map("doc" -> doc)),
             Some(FileUtils.getPath(destFile))
         )
     }.toVector ++ (
         if (structs.nonEmpty) {
           Vector(
-              StringFileSource(
+              StringFileNode(
                   renderer.render(StructsTemplate, Map("structs" -> structs)),
                   Some(FileUtils.getPath("structs.md"))
               )
@@ -379,8 +377,8 @@ object DocumentationGenerator {
           Vector.empty
         }
     )
-    pages :+ StringFileSource(
-        renderer.render(IndexTemplate, Map("title" -> title, "pages" -> pages.map(_.fileName))),
+    pages :+ StringFileNode(
+        renderer.render(IndexTemplate, Map("title" -> title, "pages" -> pages.map(_.name))),
         Some(FileUtils.getPath("index.md"))
     )
   }

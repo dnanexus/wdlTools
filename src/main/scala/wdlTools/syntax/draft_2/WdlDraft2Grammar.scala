@@ -6,17 +6,17 @@ import org.antlr.v4.runtime.{CodePointBuffer, CodePointCharStream, CommonTokenSt
 import org.openwdl.wdl.parser.draft_2.{WdlDraft2Lexer, WdlDraft2Parser}
 import wdlTools.syntax.Antlr4Util.{Grammar, ParseTreeListenerFactory}
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{FileSource, Logger}
+import wdlTools.util.{FileNode, Logger}
 
 case class WdlDraft2Grammar(override val lexer: WdlDraft2Lexer,
                             override val parser: WdlDraft2Parser,
                             override val listenerFactories: Vector[ParseTreeListenerFactory],
-                            override val docSource: FileSource,
+                            override val docSource: FileNode,
                             override val logger: Logger)
     extends Grammar(WdlVersion.Draft_2, lexer, parser, listenerFactories, docSource, logger)
 
 object WdlDraft2Grammar {
-  def newInstance(fileSource: FileSource,
+  def newInstance(fileSource: FileNode,
                   listenerFactories: Vector[ParseTreeListenerFactory],
                   logger: Logger = Logger.get): WdlDraft2Grammar = {
     val codePointBuffer: CodePointBuffer =

@@ -11,9 +11,9 @@ Currently, WDL draft-2 and 1.0 are fully supported, and development/2.0 is parti
 ```scala
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSource, FileSourceResolver}
+import wdlTools.util.{FileNode, FileSourceResolver}
 val parsers = Parsers(followImports = true)
-val wdl: FileSource = FileSourceResolver.get.resolve("file:///path/to/my/wdl")
+val wdl: FileNode = FileSourceResolver.get.resolve("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
 // print the source locations of all tasks in the document
 doc.elements.foreach {
