@@ -4,7 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSource, FileSourceResolver, LocalFileSource, Logger}
+import wdlTools.util.{DataSource, FileSourceResolver, LocalFileSource, Logger}
 
 object Eval {
   lazy val empty: Eval = Eval(EvalPaths.empty, None, FileSourceResolver.get, Logger.get)
@@ -312,7 +312,7 @@ case class Eval(paths: EvalPaths,
   }
 
   private def validateConst(value: V, loc: SourceLocation): Unit = {
-    val fs: Option[FileSource] =
+    val fs: Option[DataSource] =
       try {
         EvalUtils.unwrapOptional(value) match {
           case V_File(path)      => Some(fileResovler.resolve(path))

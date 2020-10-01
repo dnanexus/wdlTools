@@ -1,7 +1,7 @@
 package wdlTools.util
 
 import java.io.EOFException
-
+import scala.io.StdIn
 import wdlTools.util.InteractiveConsole.{Reader, _}
 
 case class InteractiveConsole(promptColor: String = "",
@@ -269,7 +269,7 @@ object InteractiveConsole {
   class IntReader extends Reader[Int] {
     def read: Option[Int] = {
       try {
-        Some(io.StdIn.readInt())
+        Some(StdIn.readInt())
       } catch {
         case _: EOFException          => None
         case e: NumberFormatException => throw new InputException(e)
@@ -291,7 +291,7 @@ object InteractiveConsole {
   object Reader {
     implicit val stringReader: Reader[String] = new Reader[String] {
       def read: Option[String] = {
-        io.StdIn.readLine() match {
+        StdIn.readLine() match {
           case ""   => None
           case line => Some(line)
         }
@@ -303,7 +303,7 @@ object InteractiveConsole {
         Some(choicesToMap(Vector(true, false)))
 
       def read: Option[Boolean] = {
-        io.StdIn.readLine().trim match {
+        StdIn.readLine().trim match {
           case null | ""                  => None
           case "true" | "t" | "yes" | "y" => Some(true)
           case _                          => Some(false)
@@ -314,7 +314,7 @@ object InteractiveConsole {
     implicit val charReader: Reader[Char] = new Reader[Char] {
       def read: Option[Char] = {
         try {
-          Some(io.StdIn.readChar())
+          Some(StdIn.readChar())
         } catch {
           case _: EOFException                    => None
           case e: StringIndexOutOfBoundsException => throw new InputException(e)
@@ -325,7 +325,7 @@ object InteractiveConsole {
     implicit val doubleReader: Reader[Double] = new Reader[Double] {
       def read: Option[Double] = {
         try {
-          Some(io.StdIn.readDouble())
+          Some(StdIn.readDouble())
         } catch {
           case _: EOFException          => None
           case e: NumberFormatException => throw new InputException(e)

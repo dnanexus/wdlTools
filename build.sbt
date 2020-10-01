@@ -107,6 +107,12 @@ libraryDependencies ++= Seq(
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )
 
+// s3
+val awsVersion = "2.15.0"
+libraryDependencies ++= Seq(
+    "software.amazon.awssdk" % "s3" % awsVersion
+)
+
 // If an exception is thrown during tests, show the full
 // stack trace, by adding the "-oF" option to the list.
 //

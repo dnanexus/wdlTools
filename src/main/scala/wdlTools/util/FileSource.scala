@@ -10,43 +10,33 @@ import wdlTools.util.FileUtils.{FILE_SCHEME, getUriScheme}
 import scala.io.Source
 import scala.reflect.ClassTag
 
-trait FileSource {
+trait DataSource {
   def localPath: Path
 
   def fileName: String = localPath.getFileName.toString
 
-  def encoding: Charset
+  def isDirectory: Boolean
 
-  def isDirectory: Boolean = false
+  protected def localizeTo(file: Path): Unit
 
-  protected def checkFileSize(): Unit = {
-    // check that file isn't too big
-    val fileSizeMiB = BigDecimal(size) / FileSource.MiB
-    if (fileSizeMiB > FileSource.MaxFileSizeMiB) {
-      throw new Exception(
-          s"""${toString} size is ${fileSizeMiB} MiB;
-             |reading files larger than ${FileSource.MaxFileSizeMiB} MiB is unsupported""".stripMargin
+  def localize(file: Path = localPath, overwrite: Boolean = false): Path = {
+    if (Files.exists(file) && !overwrite) {
+      throw new FileAlreadyExistsException(
+          s"file ${localPath} already exists and overwrite = false"
       )
     }
+    val absFile = FileUtils.absolutePath(file)
+    localizeTo(absFile)
+    absFile
   }
-
-  /**
-    * Gets the size of the file in bytes.
-    * @return
-    */
-  def size: Long
 
   def localizeToDir(dir: Path, overwrite: Boolean = false): Path = {
     localize(dir.resolve(fileName), overwrite)
   }
+}
 
-  /**
-    * Localizes file to a local path.
-    * @param file destination file
-    * @param overwrite - whether to overwrite an existing file
-    * @return the actual path to which the file was localized
-    */
-  def localize(file: Path = localPath, overwrite: Boolean = false): Path
+trait FileSource extends DataSource {
+  override def isDirectory: Boolean = false
 
   /**
     * Reads the entire file into a byte array.
@@ -65,6 +55,23 @@ trait FileSource {
     * @return
     */
   def readLines: Vector[String]
+
+  /**
+    * Gets the size of the file in bytes.
+    * @return
+    */
+  def size: Long = readBytes.length
+
+  protected def checkFileSize(): Unit = {
+    // check that file isn't too big
+    val fileSizeMiB = BigDecimal(size) / FileSource.MiB
+    if (fileSizeMiB > FileSource.MaxFileSizeMiB) {
+      throw new Exception(
+          s"""${toString} size is ${fileSizeMiB} MiB;
+             |reading files larger than ${FileSource.MaxFileSizeMiB} MiB is unsupported""".stripMargin
+      )
+    }
+  }
 }
 
 object FileSource {
@@ -90,30 +97,7 @@ object FileSource {
   }
 }
 
-abstract class AbstractFileSource(val encoding: Charset) extends FileSource {
-
-  /**
-    * Gets the size of the file in bytes.
-    *
-    * @return
-    */
-  override lazy val size: Long = readBytes.length
-
-  override def localize(file: Path = localPath, overwrite: Boolean = false): Path = {
-    if (Files.exists(file) && !overwrite) {
-      throw new FileAlreadyExistsException(
-          s"file ${localPath} already exists and overwrite = false"
-      )
-    }
-    val absFile = FileUtils.absolutePath(file)
-    localizeTo(absFile)
-    absFile
-  }
-
-  protected def localizeTo(file: Path): Unit
-}
-
-trait RealFileSource extends FileSource {
+trait RealDataSource extends DataSource {
 
   /**
     * The original value that was resolved to get this FileSource.
@@ -123,15 +107,21 @@ trait RealFileSource extends FileSource {
   override def toString: String = value
 }
 
-abstract class AbstractRealFileSource(override val value: String, override val encoding: Charset)
-    extends AbstractFileSource(encoding)
-    with RealFileSource {
+abstract class AbstractRealFileSource(override val value: String, val encoding: Charset)
+    extends RealDataSource
+    with FileSource {
 
-  override lazy val readString: String = new String(readBytes, encoding)
+  override def readString: String = {
+    new String(readBytes, encoding)
+  }
 
-  override lazy val readLines: Vector[String] = {
+  override def readLines: Vector[String] = {
     Source.fromBytes(readBytes, encoding.name).getLines().toVector
   }
+}
+
+abstract class AbstractRealFolderSource(override val value: String) extends RealDataSource {
+  override def isDirectory: Boolean = true
 }
 
 class NoSuchProtocolException(name: String) extends Exception(s"Protocol ${name} not supported")
@@ -166,7 +156,14 @@ trait FileAccessProtocol {
     * @param uri the directory URI
     * @return FileSource
     */
-  def resolveDirectory(uri: String): FileSource = ???
+  def resolveDirectory(uri: String): DataSource = {
+    throw new UnsupportedOperationException
+  }
+
+  /**
+    * Perform any cleanup/shutdown activities. Called immediately before the program exits.
+    */
+  def onExit(): Unit = {}
 }
 
 /**
@@ -215,7 +212,7 @@ case class LocalFileSource(override val value: String,
     */
   override def readBytes: Array[Byte] = {
     checkFileSize()
-    Files.readAllBytes(localPath)
+    FileUtils.readFileBytes(localPath)
   }
 
   // TODO: assess whether it is okay to link instead of copy
@@ -415,6 +412,17 @@ case class HttpFileAccessProtocol(logger: Logger = Logger.Quiet,
 }
 
 case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
+  sys.addShutdownHook({
+    protocols.foreach { proto =>
+      try {
+        proto.onExit()
+      } catch {
+        case ex: Throwable =>
+          Logger.error(s"Error shutting down protocol ${proto}", Some(ex))
+      }
+    }
+  })
+
   private lazy val protocolMap: Map[String, FileAccessProtocol] =
     protocols.flatMap(prot => prot.prefixes.map(prefix => prefix -> prot)).toMap
 
@@ -433,7 +441,7 @@ case class FileSourceResolver(protocols: Vector[FileAccessProtocol]) {
     getProtocolForScheme(getScheme(uriOrPath)).resolve(uriOrPath)
   }
 
-  def resolveDirectory(uriOrPath: String): FileSource = {
+  def resolveDirectory(uriOrPath: String): DataSource = {
     val scheme = getScheme(uriOrPath)
     val proto = getProtocolForScheme(scheme)
     if (!proto.supportsDirectories) {
@@ -510,9 +518,9 @@ object FileSourceResolver {
 
 // A VirtualFileSource only exists in memory - it doesn't have an associated URI and so cannot be resolved
 
-abstract class AbstractVirtualFileSource(name: Option[Path] = None,
-                                         encoding: Charset = FileUtils.DefaultEncoding)
-    extends AbstractFileSource(encoding) {
+abstract class AbstractVirtualFileSource(val name: Option[Path] = None,
+                                         val encoding: Charset = FileUtils.DefaultEncoding)
+    extends FileSource {
   override lazy val toString: String = name.map(_.toString).getOrElse("<string>")
 
   override def localPath: Path = {
@@ -529,7 +537,7 @@ abstract class AbstractVirtualFileSource(name: Option[Path] = None,
 }
 
 case class StringFileSource(string: String,
-                            name: Option[Path] = None,
+                            override val name: Option[Path] = None,
                             override val encoding: Charset = FileUtils.DefaultEncoding)
     extends AbstractVirtualFileSource(name, encoding) {
   override def readString: String = string
@@ -548,7 +556,7 @@ object StringFileSource {
 }
 
 case class LinesFileSource(override val readLines: Vector[String],
-                           name: Option[Path] = None,
+                           override val name: Option[Path] = None,
                            override val encoding: Charset = FileUtils.DefaultEncoding,
                            lineSeparator: String = "\n",
                            trailingNewline: Boolean = true)

@@ -95,6 +95,16 @@ object FileUtils {
     Iterator.continually(in.readLine()).takeWhile(_ != null).mkString("\n")
   }
 
+  def readFileBytes(path: Path, mustExist: Boolean = true): Array[Byte] = {
+    if (Files.exists(path)) {
+      Files.readAllBytes(path)
+    } else if (mustExist) {
+      throw new FileNotFoundException(path.toString)
+    } else {
+      Array.emptyByteArray
+    }
+  }
+
   /**
     * Reads the entire contents of a file as a string. Line endings are not stripped or
     * converted.
@@ -104,13 +114,7 @@ object FileUtils {
   def readFileContent(path: Path,
                       encoding: Charset = DefaultEncoding,
                       mustExist: Boolean = true): String = {
-    if (Files.exists(path)) {
-      new String(Files.readAllBytes(path), encoding)
-    } else if (mustExist) {
-      throw new FileNotFoundException(path.toString)
-    } else {
-      ""
-    }
+    new String(readFileBytes(path, mustExist), encoding)
   }
 
   /**

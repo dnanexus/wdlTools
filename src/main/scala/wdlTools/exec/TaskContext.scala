@@ -6,10 +6,10 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{DataSource, FileSourceResolver, Logger}
 
 trait LocalizationDisambiguator {
-  def getLocalPath(fileSource: FileSource): Path
+  def getLocalPath(fileSource: DataSource): Path
 }
 
 /**
@@ -53,7 +53,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
     }
   }
 
-  override def getLocalPath(source: FileSource): Path = {
+  override def getLocalPath(source: DataSource): Path = {
     val sourceParent = source.localPath.getParent
     sourceTargetMap.get(sourceParent) match {
       // if we already saw another file from the same parent directory as `source`, try to
@@ -122,9 +122,9 @@ case class TaskContext(task: Task,
           fileSource.localize(localizedPath)
           name -> V_File(localizedPath.toString)
         case (name, V_Directory(uri)) =>
-          val fileSource = fileResolver.resolveDirectory(uri)
-          val localizedPath = disambiguator.getLocalPath(fileSource)
-          fileSource.localize(localizedPath)
+          val folderSource = fileResolver.resolveDirectory(uri)
+          val localizedPath = disambiguator.getLocalPath(folderSource)
+          folderSource.localize(localizedPath)
           name -> V_Directory(localizedPath.toString)
         case other => other
       })
