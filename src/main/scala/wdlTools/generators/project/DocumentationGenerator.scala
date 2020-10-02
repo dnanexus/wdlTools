@@ -272,11 +272,11 @@ object DocumentationGenerator {
           WorkflowDocumentation(
               wf.name,
               wf.input
-                .map(inp => getDeclarationDocumentation(inp.declarations, wf.parameterMeta))
+                .map(inp => getDeclarationDocumentation(inp.parameters, wf.parameterMeta))
                 .getOrElse(Vector.empty),
               wf.output
                 .map(inp =>
-                  getDeclarationDocumentation(inp.declarations,
+                  getDeclarationDocumentation(inp.parameters,
                                               wf.parameterMeta,
                                               defaultAllowed = false)
                 )
@@ -291,11 +291,11 @@ object DocumentationGenerator {
           TaskDocumentation(
               task.name,
               task.input
-                .map(inp => getDeclarationDocumentation(inp.declarations, task.parameterMeta))
+                .map(inp => getDeclarationDocumentation(inp.parameters, task.parameterMeta))
                 .getOrElse(Vector.empty),
               task.output
                 .map(inp =>
-                  getDeclarationDocumentation(inp.declarations,
+                  getDeclarationDocumentation(inp.parameters,
                                               task.parameterMeta,
                                               defaultAllowed = false)
                 )

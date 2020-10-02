@@ -24,7 +24,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     tDoc.elements.size should not be 0
     tDoc.elements.collect {
       case task: TAT.Task =>
-        val ctx = evaluator.applyDeclarations(task.privateVariables, WdlValueBindings.empty)
+        val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
         evaluator.applyCommand(task.command, ctx)
     }
   }

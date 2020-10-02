@@ -132,10 +132,7 @@ object TypedAbstractSyntax {
     * A variable definition and assignment that does not appear in the input or output section,
     * i.e. it is private to the task/workflow.
     */
-  case class PrivateVariable(name: String,
-                             wdlType: WdlType,
-                             expr: Option[Expr],
-                             loc: SourceLocation)
+  case class PrivateVariable(name: String, wdlType: WdlType, expr: Expr, loc: SourceLocation)
       extends WorkflowElement
       with Variable
 

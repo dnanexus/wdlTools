@@ -461,7 +461,7 @@ object ProjectGenerator {
                 Some(CallInput(inp.name, ValueString("set my value!", null), null))
               }
             }
-            Some(CallInputs(task.input.get.declarations.flatMap(getInputValue), null))
+            Some(CallInputs(task.input.get.parameters.flatMap(getInputValue), null))
           } else {
             None
           }

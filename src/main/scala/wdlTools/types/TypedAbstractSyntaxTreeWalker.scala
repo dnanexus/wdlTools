@@ -241,10 +241,10 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
     }
   }
 
-  def visitDefinition[P <: Element](name: String,
-                                    wdlType: T,
-                                    expr: Option[Expr],
-                                    parent: VisitorContext[P]): Unit = {
+  def visitVariable[P <: Element](name: String,
+                                  wdlType: T,
+                                  expr: Option[Expr],
+                                  parent: VisitorContext[P]): Unit = {
     visitName(name, parent)
     if (expr.isDefined) {
       visitExpression(parent.createChildContext[Expr](expr.get))
@@ -252,20 +252,20 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
   }
 
   override def visitDeclaration(ctx: VisitorContext[PrivateVariable]): Unit = {
-    visitDefinition(ctx.element.name, ctx.element.wdlType, ctx.element.expr, ctx)
+    visitVariable(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
   }
 
   override def visitInputDefinition(ctx: VisitorContext[InputParameter]): Unit = {
     ctx.element match {
-      case RequiredInputParameter(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
-      case OptionalInputParameter(name, wdlType, _) => visitDefinition(name, wdlType, None, ctx)
+      case RequiredInputParameter(name, wdlType, _) => visitVariable(name, wdlType, None, ctx)
+      case OptionalInputParameter(name, wdlType, _) => visitVariable(name, wdlType, None, ctx)
       case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
-        visitDefinition(name, wdlType, Some(defaultExpr), ctx)
+        visitVariable(name, wdlType, Some(defaultExpr), ctx)
     }
   }
 
   override def visitOutputDefinition(ctx: VisitorContext[OutputParameter]): Unit = {
-    visitDefinition(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
+    visitVariable(ctx.element.name, ctx.element.wdlType, Some(ctx.element.expr), ctx)
   }
 
   override def visitCallName(actualName: String,

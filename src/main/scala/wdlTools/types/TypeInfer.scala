@@ -441,29 +441,17 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
   }
 
-  // check the declaration and add a binding for its (variable -> wdlType)
-  //
-  // In a declaration the right hand type must be coercible to
-  // the left hand type.
-  //
-  // Examples:
-  //   Int x
-  //   Int x = 5
-  //   Int x = 7 + y
-  private def applyDecl(decl: AST.Declaration,
-                        section: Section,
-                        ctx: TypeContext,
-                        bindings: WdlTypeBindings,
-                        canShadow: Boolean = false): (TAT.PrivateVariable, WdlTypeBindings) = {
-
+  private def translateDeclaration(
+      decl: AST.Declaration,
+      section: Section,
+      ctx: TypeContext,
+      bindings: WdlTypeBindings,
+      canShadow: Boolean = false
+  ): (WdlTypes.T, Option[TAT.Expr], WdlTypeBindings) = {
     val lhsType = typeFromAst(decl.wdlType, decl.loc, ctx)
-    val tDecl = decl.expr match {
+    val (wdlType, tExpr) = decl.expr match {
       // Int x
-      case None =>
-        // TODO: this shouldn't be possible - there are separate types
-        //  for input and output declarations, and non-input declarations
-        //  must have a value
-        TAT.PrivateVariable(decl.name, lhsType, None, decl.loc)
+      case None => (lhsType, None)
       case Some(expr) =>
         val e = applyExpr(expr, ctx, bindings, section = section)
         val rhsType = e.wdlType
@@ -478,16 +466,40 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           handleError(msg, decl.loc)
           lhsType
         }
-        TAT.PrivateVariable(decl.name, wdlType, Some(e), decl.loc)
+        (wdlType, Some(e))
     }
-
     // There are cases where we want to allow shadowing. For example, it
     // is legal to have an output variable with the same name as an input variable.
     if (!canShadow && ctx.lookup(decl.name, bindings).isDefined) {
       handleError(s"variable ${decl.name} shadows an existing variable", decl.loc)
     }
+    (wdlType, tExpr, bindings.add(decl.name, wdlType))
+  }
 
-    (tDecl, bindings.add(tDecl.name, tDecl.wdlType))
+  // check the declaration and add a binding for its (variable -> wdlType)
+  //
+  // In a declaration the right hand type must be coercible to
+  // the left hand type.
+  //
+  // Examples:
+  //   Int x
+  //   Int x = 5
+  //   Int x = 7 + y
+  private def applyDeclaration(
+      decl: AST.Declaration,
+      section: Section,
+      ctx: TypeContext,
+      bindings: WdlTypeBindings,
+      canShadow: Boolean = false
+  ): (TAT.PrivateVariable, WdlTypeBindings) = {
+    translateDeclaration(decl, section, ctx, bindings, canShadow) match {
+      case (wdlType, Some(tExpr), newBindings) =>
+        (TAT.PrivateVariable(decl.name, wdlType, tExpr, decl.loc), newBindings)
+      case (wdlType, None, newBindings) =>
+        handleError(s"Private variable ${decl.name} must have an expression", decl.loc)
+        (TAT.PrivateVariable(decl.name, wdlType, TAT.ValueNull(wdlType, decl.loc), decl.loc),
+         newBindings)
+    }
   }
 
   // type check the input section, and see that there are no double definitions.
@@ -495,37 +507,31 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   private def applyInputSection(inputSection: AST.InputSection,
                                 ctx: TypeContext): (Vector[TAT.InputParameter], TypeContext) = {
-    // translate each declaration
-    val (tDecls, _, _) =
-      inputSection.declarations
-        .foldLeft((Vector.empty[TAT.PrivateVariable], Set.empty[String], WdlTypeBindings.empty)) {
-          case ((tDecls, names, bindings), decl) =>
+    val (tInputParams, _, _) =
+      inputSection.parameters
+        .foldLeft((Vector.empty[TAT.InputParameter], Set.empty[String], WdlTypeBindings.empty)) {
+          case ((tInputParams, names, bindings), decl) =>
             if (names.contains(decl.name)) {
               handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
             }
-            val (tDecl, afterBindings) = applyDecl(decl, Section.Input, ctx, bindings)
-            (tDecls :+ tDecl, names + decl.name, afterBindings)
+            val (wdlType, tExpr, afterBindings) =
+              translateDeclaration(decl, Section.Input, ctx, bindings)
+            val tParam = (wdlType, tExpr) match {
+              case (t: WdlTypes.T_Optional, None) =>
+                TAT.OptionalInputParameter(decl.name, t, decl.loc)
+              case (_, None) =>
+                TAT.RequiredInputParameter(decl.name, wdlType, decl.loc)
+              case (t, Some(expr)) =>
+                // drop any optional type wrapper if this is an input with a default value
+                TAT.OverridableInputParameterWithDefault(decl.name,
+                                                         TypeUtils.unwrapOptional(t),
+                                                         expr,
+                                                         decl.loc)
+            }
+            (tInputParams :+ tParam, names + decl.name, afterBindings)
         }
-
-    // convert the typed declarations into input definitions
-    val tInputDefs = tDecls.map { tDecl =>
-      // What kind of input is this?
-      // compulsory, optional, one with a default
-      (tDecl.wdlType, tDecl.expr) match {
-        case (t: WdlTypes.T_Optional, None) =>
-          TAT.OptionalInputParameter(tDecl.name, t, tDecl.loc)
-        case (_, None) =>
-          TAT.RequiredInputParameter(tDecl.name, tDecl.wdlType, tDecl.loc)
-        case (WdlTypes.T_Optional(t), Some(expr)) =>
-          // drop the optional if this is an input with a default value
-          TAT.OverridableInputParameterWithDefault(tDecl.name, t, expr, tDecl.loc)
-        case (t, Some(expr)) =>
-          TAT.OverridableInputParameterWithDefault(tDecl.name, t, expr, tDecl.loc)
-      }
-    }
-
-    val afterCtx = ctx.bindInputSection(tInputDefs)
-    (tInputDefs, afterCtx)
+    val afterCtx = ctx.bindInputSection(tInputParams)
+    (tInputParams, afterCtx)
   }
 
   // Calculate types for the outputs, and return a new typed output section
@@ -534,13 +540,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // output variables can shadow input definitions, but not intermediate
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
-    val both = outputSection.declarations.map(_.name).toSet intersect ctx.declarations.keySet
-
-    // translate the declarations
-    val (tDecls, _, _) =
-      outputSection.declarations
-        .foldLeft((Vector.empty[TAT.PrivateVariable], Set.empty[String], WdlTypeBindings.empty)) {
-          case ((tDecls, names, bindings), decl) =>
+    val both = outputSection.parameters.map(_.name).toSet intersect ctx.declarations.keySet
+    val (tOutputParams, _, _) =
+      outputSection.parameters
+        .foldLeft((Vector.empty[TAT.OutputParameter], Set.empty[String], WdlTypeBindings.empty)) {
+          case ((tOutputParams, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
             if (names.contains(decl.name)) {
               handleError(s"Output section has duplicate definition ${decl.name}", decl.loc)
@@ -548,23 +552,18 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             if (both.contains(decl.name)) {
               handleError(s"Definition ${decl.name} shadows exisiting declarations", decl.loc)
             }
-            val (tDecl, afterBindings) =
-              applyDecl(decl, Section.Output, ctx, bindings, canShadow = true)
-            (tDecls :+ tDecl, names + tDecl.name, afterBindings)
+            val (wdlType, tExpr, afterBindings) =
+              translateDeclaration(decl, Section.Output, ctx, bindings, canShadow = true)
+            val tOutputParam = tExpr match {
+              case Some(tExpr) =>
+                TAT.OutputParameter(decl.name, wdlType, tExpr, decl.loc)
+              case _ =>
+                throw new TypeException("Outputs must have expressions", decl.loc)
+            }
+            (tOutputParams :+ tOutputParam, names + decl.name, afterBindings)
         }
-
-    // convert the declarations into output definitions
-    val outputDefs = tDecls.map { tDecl =>
-      tDecl.expr match {
-        case None =>
-          throw new TypeException("Outputs must have expressions", tDecl.loc)
-        case Some(expr) =>
-          TAT.OutputParameter(tDecl.name, tDecl.wdlType, expr, tDecl.loc)
-      }
-    }
-
-    val afterCtx = ctx.bindOutputSection(outputDefs)
-    (outputDefs, afterCtx)
+    val afterCtx = ctx.bindOutputSection(tOutputParams)
+    (tOutputParams, afterCtx)
   }
 
   // The runtime section can make use of values defined in declarations
@@ -684,11 +683,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(inputSection) => applyInputSection(inputSection, ctx)
     }
 
-    // add types to the declarations, and accumulate context
+    // add types to the private variables, and accumulate context
     val (tDeclarations, _) =
-      task.declarations.foldLeft((Vector.empty[TAT.PrivateVariable], WdlTypeBindings.empty)) {
+      task.privateVariables.foldLeft((Vector.empty[TAT.PrivateVariable], WdlTypeBindings.empty)) {
         case ((tDecls, bindings), decl) =>
-          val (tDecl, afterBindings) = applyDecl(decl, Section.Other, inputCtx, bindings)
+          val (tDecl, afterBindings) = applyDeclaration(decl, Section.Other, inputCtx, bindings)
           (tDecls :+ tDecl, afterBindings)
       }
     val declCtx = tDeclarations.foldLeft(inputCtx) {
@@ -808,20 +807,25 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         value.map { inp =>
           val argName = inp.name
           val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
-          // type-check input argument
-          lazy val unifyCtx = UnificationContext(Section.Call)
-          val errorMsg = callee.input.get(argName) match {
-            case None =>
-              Some(s"call ${call.name} has argument ${argName} that does not exist in the callee")
-            case Some((calleeType, _))
-                if !unify.isCoercibleTo(calleeType, tExpr.wdlType, unifyCtx) =>
-              Some(
-                  s"argument ${argName} has type ${tExpr.wdlType}, it is not coercible to ${calleeType}"
+          if (callee.input.contains(argName)) {
+            // type-check input argument
+            val (calleeInputType, optional) = callee.input(argName)
+            val checkType = if (optional) {
+              TypeUtils.ensureOptional(calleeInputType)
+            } else {
+              TypeUtils.unwrapOptional(calleeInputType)
+            }
+            if (!unify.isCoercibleTo(checkType, tExpr.wdlType, UnificationContext(Section.Call))) {
+              handleError(
+                  s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
+                  call.loc
               )
-            case _ => None
-          }
-          if (errorMsg.nonEmpty) {
-            handleError(errorMsg.get, call.loc)
+            }
+          } else {
+            handleError(
+                s"call '${call.name}' has argument ${argName} that does not exist in the callee",
+                call.loc
+            )
           }
           argName -> tExpr
         }.toMap
@@ -834,12 +838,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         callerInputs.get(argName) match {
           case None if allowNonWorkflowInputs =>
             logger.warning(
-                s"compulsory argument ${argName} to task/workflow ${call.name} is missing"
+                s"compulsory argument '${argName}' to task/workflow ${call.name} is missing"
             )
             Some(argName -> TAT.ValueNone(wdlType, call.loc))
           case None =>
-            handleError(s"compulsory argument ${argName} to task/workflow ${call.name} is missing",
-                        call.loc)
+            handleError(
+                s"compulsory argument '${argName}' to task/workflow ${call.name} is missing",
+                call.loc
+            )
             Some(argName -> TAT.ValueNone(wdlType, call.loc))
           case Some(_) =>
             // argument is provided
@@ -966,7 +972,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   ): (Vector[TAT.WorkflowElement], WdlTypeBindings) = {
     body.foldLeft((Vector.empty[TAT.WorkflowElement], WdlTypeBindings.empty)) {
       case ((tElements, bindings), decl: AST.Declaration) =>
-        val (tDecl, afterBindings) = applyDecl(decl, Section.Other, ctx, bindings)
+        val (tDecl, afterBindings) = applyDeclaration(decl, Section.Other, ctx, bindings)
         (tElements :+ tDecl, afterBindings)
 
       case ((tElements, bindings), wfElement) =>

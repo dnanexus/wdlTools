@@ -994,7 +994,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
       extends BlockStatement(Symbols.Output, outputs.loc) {
     override def body: Option[Statement] =
       Some(
-          DeclarationsSection(outputs.declarations)
+          DeclarationsSection(outputs.parameters)
       )
   }
 
@@ -1152,7 +1152,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
       val bodyElements = splitWorkflowElements(workflow.body)
       val (topSection, body) = if (workflow.input.isDefined) {
         if (bodyElements.nonEmpty && bodyElements.head.isInstanceOf[DeclarationsSection]) {
-          val inputDecls = workflow.input.map(_.declarations.map(DeclarationStatement))
+          val inputDecls = workflow.input.map(_.parameters.map(DeclarationStatement))
           (Some(
                TopDeclarations(
                    inputDecls.get,
@@ -1162,7 +1162,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
            ),
            bodyElements.tail)
         } else {
-          (workflow.input.map(inp => InputsBlock(inp.declarations, inp.loc)), bodyElements)
+          (workflow.input.map(inp => InputsBlock(inp.parameters, inp.loc)), bodyElements)
         }
       } else {
         (None, bodyElements)
@@ -1342,13 +1342,13 @@ case class WdlV1Formatter(followImports: Boolean = false,
       extends InnerSection(task.loc, emtpyLineBetweenStatements = true) {
 
     override val statements: Vector[Statement] = {
-      val otherDecls = task.declarations match {
+      val otherDecls = task.privateVariables match {
         case v: Vector[Declaration] if v.nonEmpty => Some(DeclarationsSection(v))
         case _                                    => None
       }
       val (topSection, declSection) =
         if (task.input.isDefined && otherDecls.isDefined) {
-          val inputDecls = task.input.map(_.declarations.map(DeclarationStatement))
+          val inputDecls = task.input.map(_.parameters.map(DeclarationStatement))
           (Some(
                TopDeclarations(
                    inputDecls.get,
@@ -1358,7 +1358,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
            ),
            None)
         } else {
-          (task.input.map(inp => InputsBlock(inp.declarations, inp.loc)), otherDecls)
+          (task.input.map(inp => InputsBlock(inp.parameters, inp.loc)), otherDecls)
         }
       Vector(
           topSection,

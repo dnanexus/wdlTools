@@ -324,7 +324,7 @@ object Rules {
                               typesContext: types.TypeContext)
       extends LinterAstRule(id, severity) {
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
-      if (ctx.element.input.isEmpty || ctx.element.input.get.declarations.isEmpty) {
+      if (ctx.element.input.isEmpty || ctx.element.input.get.parameters.isEmpty) {
         addEvent(ctx)
       }
     }
@@ -337,7 +337,7 @@ object Rules {
       extends LinterAstRule(id, severity) {
 
     override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
-      if (ctx.element.output.isEmpty || ctx.element.output.get.declarations.isEmpty) {
+      if (ctx.element.output.isEmpty || ctx.element.output.get.parameters.isEmpty) {
         addEvent(ctx)
       }
     }

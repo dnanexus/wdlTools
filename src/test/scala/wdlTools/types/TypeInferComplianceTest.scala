@@ -12,6 +12,7 @@ import scala.jdk.CollectionConverters._
 class TypeInferComplianceTest extends AnyWordSpec with Matchers {
   private val fileResolver = FileSourceResolver.create(
       Vector(
+          Paths.get(getClass.getResource("/types/draft2").getPath),
           Paths.get(getClass.getResource("/types/v1").getPath),
           Paths.get(getClass.getResource("/types/v2").getPath)
       )
@@ -31,6 +32,10 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
   // Expected results for a test, and any additional flags required
   // to run it.
   private case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
+
+  private val draft2ControlTable: Vector[(String, TResult)] = Vector(
+      ("call_with_defaults.wdl", TResult(correct = true))
+  )
 
   private val v1ControlTable: Vector[(String, TResult)] = Vector(
       // workflows
@@ -136,13 +141,13 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
     }
   }
 
-  "v1 compliance test" should {
+  private def complianceTest(controlTable: Vector[(String, TResult)], resourceDir: String): Unit = {
     val testFiles: Vector[(FileNode, TResult)] = {
       val testFiles = getWdlSourceFiles(
-          Paths.get(getClass.getResource("/types/v1").getPath)
+          Paths.get(getClass.getResource(resourceDir).getPath)
       ).map(p => p.getFileName.toString -> p).toMap
       // filter out files that do not appear in the control table
-      v1ControlTable.collect {
+      controlTable.collect {
         case (fileName, result) if testFiles.contains(fileName) && includeExcludeCheck(fileName) =>
           (fileResolver.fromPath(testFiles(fileName)), result)
       }
@@ -157,6 +162,14 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
           checkIncorrect(testFile, flag)
         }
     }
+  }
+
+  "draft2 compliance test" should {
+    complianceTest(draft2ControlTable, "/types/draft2")
+  }
+
+  "v1 compliance test" should {
+    complianceTest(v1ControlTable, "/types/v1")
   }
 
 //  "v2 compliance test" should {

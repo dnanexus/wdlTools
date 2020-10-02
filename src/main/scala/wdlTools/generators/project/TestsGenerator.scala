@@ -39,7 +39,7 @@ object TestsGenerator {
 
     def addInputs(inputs: Option[InputSection]): JsObject = {
       if (inputs.isDefined) {
-        addData(inputs.get.declarations)
+        addData(inputs.get.parameters)
       } else {
         JsObject()
       }
@@ -47,7 +47,7 @@ object TestsGenerator {
 
     def addOutputs(outputs: Option[OutputSection]): JsObject = {
       if (outputs.isDefined) {
-        addData(outputs.get.declarations)
+        addData(outputs.get.parameters)
       } else {
         JsObject()
       }

@@ -62,13 +62,13 @@ class GraphTest extends AnyFlatSpec with Matchers {
         info.kind shouldBe VarKind.Input
       case ("y", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe VarKind.Intermediate
+        info.kind shouldBe VarKind.Private
       case ("f" | "s" | "i" | "d" | "name", info) =>
         info.referenced shouldBe true
         info.kind shouldBe VarKind.Input
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.Intermediate
+        info.kind shouldBe VarKind.Private
       case ("dout", info) =>
         info.referenced shouldBe true
         info.kind shouldBe VarKind.PostCommand

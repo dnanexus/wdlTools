@@ -49,7 +49,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
+    val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
     bindings("k0") shouldBe V_Int(-1)
     bindings("k1") shouldBe V_Int(1)
 
@@ -90,7 +90,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctx = WdlValueBindings(Map("empty_string" -> V_Null))
-    val bindings = evaluator.applyDeclarations(decls, ctx)
+    val bindings = evaluator.applyPrivateVariables(decls, ctx)
 
     bindings("x") shouldBe V_Float(1.4)
     bindings("n1") shouldBe V_Int(1)
@@ -205,7 +205,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "perform coercions" in {
     val file = srcDir.resolve("coercions.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
+    val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
 
     bindings("i1") shouldBe V_Int(13)
     bindings("i3") shouldBe V_Int(8)
@@ -227,7 +227,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("non_standard_coercions.wdl")
     val (evaluator, decls) =
       parseAndTypeCheckAndGetDeclarations(file, allowNonstandardCoercions = true)
-    val bindings = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
+    val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
 
     bindings("i2") shouldBe V_Int(13)
   }
@@ -240,7 +240,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyDeclarations(task.privateVariables, WdlValueBindings.empty)
+    val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -293,21 +293,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve("bad_coercion.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     assertThrows[EvalException] {
-      val _ = evaluator.applyDeclarations(decls, WdlValueBindings.empty)
+      val _ = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
     }
   }
 
   it should "handle null and optionals" taggedAs Edge in {
     val file = srcDir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bd = evaluator.applyDeclarations(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    val bd = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
     bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 
   it should "handle accessing pair values" in {
     val file = srcDir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    evaluator.applyDeclarations(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
   }
 
   it should "handle empty stdout/stderr" in {
@@ -343,7 +343,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("constants.wdl"))
 
     decls.foreach {
-      case TAT.PrivateVariable(id, wdlType, Some(expr), _) =>
+      case TAT.PrivateVariable(id, wdlType, expr, _) =>
         val expected: Option[WdlValues.V] = allExpectedResults(id)
         //println(s"${id} ${wdlType} ${expr} ${expected}")
         expected match {
@@ -363,7 +363,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "not be able to access unsupported file protocols" in {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("bad_protocol.wdl"))
     decls match {
-      case Vector(TAT.PrivateVariable(_, wdlType, Some(expr), _)) =>
+      case Vector(TAT.PrivateVariable(_, wdlType, expr, _)) =>
         assertThrows[EvalException] {
           evaluator.applyConstAndCoerce(expr, wdlType)
         }

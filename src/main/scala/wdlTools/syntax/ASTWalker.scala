@@ -167,13 +167,13 @@ class ASTWalker(followImports: Boolean = false) extends ASTVisitor {
   }
 
   override def visitInputSection(ctx: Context[InputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
+    ctx.element.parameters.foreach { decl =>
       visitDeclaration(createContext[Declaration, InputSection](decl, ctx))
     }
   }
 
   override def visitOutputSection(ctx: Context[OutputSection]): Unit = {
-    ctx.element.declarations.foreach { decl =>
+    ctx.element.parameters.foreach { decl =>
       visitDeclaration(createContext[Declaration, OutputSection](decl, ctx))
     }
   }

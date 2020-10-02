@@ -665,16 +665,16 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private def splitWorkflowElements(elements: Vector[WorkflowElement]): Vector[Statement] = {
     var statements: Vector[Statement] = Vector.empty
-    var declarations: Vector[PrivateVariable] = Vector.empty
+    var privateVariables: Vector[PrivateVariable] = Vector.empty
 
     elements.foreach {
-      case declaration: PrivateVariable => declarations :+= declaration
+      case declaration: PrivateVariable => privateVariables :+= declaration
       case other =>
-        if (declarations.nonEmpty) {
-          statements :+= Section(declarations.map { decl =>
-            DeclarationStatement(decl.name, decl.wdlType, decl.expr)
+        if (privateVariables.nonEmpty) {
+          statements :+= Section(privateVariables.map { decl =>
+            DeclarationStatement(decl.name, decl.wdlType, Some(decl.expr))
           })
-          declarations = Vector.empty
+          privateVariables = Vector.empty
         }
         statements :+= (other match {
           case call: Call               => CallBlock(call)
@@ -684,9 +684,9 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
         })
     }
 
-    if (declarations.nonEmpty) {
-      statements :+= Section(declarations.map { decl =>
-        DeclarationStatement(decl.name, decl.wdlType, decl.expr)
+    if (privateVariables.nonEmpty) {
+      statements :+= Section(privateVariables.map { decl =>
+        DeclarationStatement(decl.name, decl.wdlType, Some(decl.expr))
       })
     }
 
@@ -952,7 +952,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
         val decls = task.privateVariables match {
           case v: Vector[PrivateVariable] if v.nonEmpty =>
             Some(Section(v.map { decl =>
-              DeclarationStatement(decl.name, decl.wdlType, decl.expr)
+              DeclarationStatement(decl.name, decl.wdlType, Some(decl.expr))
             }))
           case _ => None
         }

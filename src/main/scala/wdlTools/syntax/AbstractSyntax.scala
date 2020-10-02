@@ -86,8 +86,8 @@ object AbstractSyntax {
     * and bound declarations that require evaluation cannot be treated as inputs. Thus, the draft-2
     * `InputSection` `SourceLocation` may overlap with other elements.
     */
-  case class InputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element
-  case class OutputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element
+  case class InputSection(parameters: Vector[Declaration], loc: SourceLocation) extends Element
+  case class OutputSection(parameters: Vector[Declaration], loc: SourceLocation) extends Element
 
   // A command can be simple, with just one continuous string:
   //
@@ -141,7 +141,7 @@ object AbstractSyntax {
                   input: Option[InputSection],
                   output: Option[OutputSection],
                   command: CommandSection, // the command section is required
-                  declarations: Vector[Declaration],
+                  privateVariables: Vector[Declaration],
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],

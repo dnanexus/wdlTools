@@ -156,7 +156,7 @@ object ExprGraph {
     *   depends on the command block being evaluated
     */
   object VarKind extends Enumeration {
-    val Input, Output, Intermediate, PostCommand, Scatter = Value
+    val Input, Output, Private, PostCommand, Scatter = Value
   }
 
   trait VarInfo {
@@ -299,14 +299,14 @@ object ExprGraph {
 
   case class TaskExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
                                   outputDefs: Vector[OutputParameter] = Vector.empty,
-                                  declarations: Vector[PrivateVariable] = Vector.empty,
+                                  privateVariables: Vector[PrivateVariable] = Vector.empty,
                                   commandParts: Vector[Expr] = Vector.empty,
                                   runtime: Map[String, Expr] = Map.empty)
       extends ExprGraphBuilder(inputDefs, outputDefs) {
     override protected lazy val allVars: Map[String, VarInfo] = {
       // collect all variables from task
-      val decls: Map[String, VarInfo] = declarations.map { decl =>
-        decl.name -> DeclInfo(decl, referenced = false, expr = decl.expr, VarKind.Intermediate)
+      val decls: Map[String, VarInfo] = privateVariables.map { decl =>
+        decl.name -> DeclInfo(decl, referenced = false, expr = Some(decl.expr), VarKind.Private)
       }.toMap
       inputs ++ outputs ++ decls
     }
@@ -334,11 +334,11 @@ object ExprGraph {
       // Also update VarKind for decls based on whether they
       // are depended on by any non-output expressions.
       val updatedVars = allVars.map {
-        case (name, decl: DeclInfo) if decl.kind == VarKind.Intermediate && graph.contains(name) =>
+        case (name, decl: DeclInfo) if decl.kind == VarKind.Private && graph.contains(name) =>
           val dependentNodes = graph.get(name).outgoing.map(_.to.value)
           val newKind = {
             if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
-              VarKind.Intermediate
+              VarKind.Private
             } else {
               VarKind.PostCommand
             }
@@ -409,7 +409,7 @@ object ExprGraph {
 
   case class CallInfo(element: Call,
                       referenced: Boolean = false,
-                      kind: VarKind.Value = VarKind.Intermediate)
+                      kind: VarKind.Value = VarKind.Private)
       extends VarInfo {
     override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
   }
@@ -431,11 +431,11 @@ object ExprGraph {
 
     private def createBodyInfos(bodyElements: WorkflowBodyElements,
                                 scatterPath: Vector[Int] = Vector.empty): Map[String, VarInfo] = {
-      val decls: Map[String, DeclInfo] = bodyElements.declarations.map { decl =>
+      val decls: Map[String, DeclInfo] = bodyElements.privateVariables.map { decl =>
         decl.name -> DeclInfo(decl,
                               referenced = false,
-                              expr = decl.expr,
-                              kind = VarKind.Intermediate)
+                              expr = Some(decl.expr),
+                              kind = VarKind.Private)
       }.toMap
       val calls = bodyElements.calls.map { call =>
         call.actualName -> CallInfo(call)

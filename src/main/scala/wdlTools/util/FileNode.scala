@@ -65,6 +65,19 @@ trait FileSource {
 }
 
 /**
+  * A FileSource that has an address, such as a local file path or a URI.
+  */
+trait AddressableFileSource extends FileSource {
+
+  /**
+    * The original value that was resolved to get this FileSource.
+    */
+  def address: String
+
+  override def toString: String = address
+}
+
+/**
   * A FileNode is a FileSource that represents a single phyiscal file.
   * It has a size, and its contents may be read as bytes or a string.
   * A FileNode may be a "directory" - such as an archive file that,
@@ -106,19 +119,6 @@ trait FileNode extends FileSource {
       )
     }
   }
-}
-
-/**
-  * A FileSource that has an address, such as a local file path or a URI.
-  */
-trait AddressableFileSource extends FileSource {
-
-  /**
-    * The original value that was resolved to get this FileSource.
-    */
-  def address: String
-
-  override def toString: String = address
 }
 
 object FileNode {

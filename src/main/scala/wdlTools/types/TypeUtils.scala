@@ -31,7 +31,7 @@ case class WorkflowConditional(conditional: TAT.Conditional) {
 }
 
 case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
-  val (declarations, calls, scatters, conditionals) = body.foldLeft(
+  val (privateVariables, calls, scatters, conditionals) = body.foldLeft(
       (Vector.empty[TAT.PrivateVariable],
        Vector.empty[TAT.Call],
        Vector.empty[WorkflowScatter],
