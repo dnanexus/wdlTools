@@ -47,6 +47,7 @@ object Symbols extends BuiltinSymbols {
   val Call: String = "call"
   val Command: String = "command"
   val Else: String = "else"
+  val Hints: String = "hints"
   val If: String = "if"
   val Import: String = "import"
   val In: String = "in"

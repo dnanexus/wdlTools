@@ -1338,27 +1338,33 @@ case class WdlV1Formatter(followImports: Boolean = false,
       Some(RuntimeMetadataSection(runtime.kvs, runtime.loc))
   }
 
+  private case class HintsBlock(hints: HintsSection)
+      extends BlockStatement(Symbols.Hints, hints.loc) {
+    override def body: Option[Statement] =
+      Some(MetadataSection(hints.kvs, hints.loc))
+  }
+
   private case class TaskSections(task: Task)
       extends InnerSection(task.loc, emtpyLineBetweenStatements = true) {
 
     override val statements: Vector[Statement] = {
-      val otherDecls = task.privateVariables match {
+      val privateVars = task.privateVariables match {
         case v: Vector[Declaration] if v.nonEmpty => Some(DeclarationsSection(v))
         case _                                    => None
       }
       val (topSection, declSection) =
-        if (task.input.isDefined && otherDecls.isDefined) {
-          val inputDecls = task.input.map(_.parameters.map(DeclarationStatement))
+        if (task.input.isDefined && privateVars.isDefined) {
+          val inputVars = task.input.map(_.parameters.map(DeclarationStatement))
           (Some(
                TopDeclarations(
-                   inputDecls.get,
-                   otherDecls.get.statements,
+                   inputVars.get,
+                   privateVars.get.statements,
                    line
                )
            ),
            None)
         } else {
-          (task.input.map(inp => InputsBlock(inp.parameters, inp.loc)), otherDecls)
+          (task.input.map(inp => InputsBlock(inp.parameters, inp.loc)), privateVars)
         }
       Vector(
           topSection,
@@ -1366,6 +1372,7 @@ case class WdlV1Formatter(followImports: Boolean = false,
           Some(CommandBlock(task.command)),
           task.output.map(OutputsBlock),
           task.runtime.map(RuntimeBlock),
+          task.hints.map(HintsBlock),
           task.meta.map(MetaBlock),
           task.parameterMeta.map(ParameterMetaBlock)
       ).flatten

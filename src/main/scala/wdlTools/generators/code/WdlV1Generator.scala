@@ -299,6 +299,15 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
       )
     }
 
+    def string(value: String): Literal = {
+      val v = if (stringModifier.isDefined) {
+        stringModifier.get(value)
+      } else {
+        value
+      }
+      Literal(v, quoting = inPlaceholder || !inStringOrCommand)
+    }
+
     def option(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
@@ -308,17 +317,13 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
     expr match {
       // literal values
-      case ValueNone(_, _) => Literal(Symbols.None)
-      case ValueString(value, _, _) =>
-        val v = if (stringModifier.isDefined) {
-          stringModifier.get(value)
-        } else {
-          value
-        }
-        Literal(v, quoting = inPlaceholder || !inStringOrCommand)
-      case ValueBoolean(value, _, _) => Literal(value)
-      case ValueInt(value, _, _)     => Literal(value)
-      case ValueFloat(value, _, _)   => Literal(value)
+      case ValueNone(_, _)             => Literal(Symbols.None)
+      case ValueString(value, _, _)    => string(value)
+      case ValueFile(value, _, _)      => string(value)
+      case ValueDirectory(value, _, _) => string(value)
+      case ValueBoolean(value, _, _)   => Literal(value)
+      case ValueInt(value, _, _)       => Literal(value)
+      case ValueFloat(value, _, _)     => Literal(value)
       case ExprPair(left, right, _, _) if !(inStringOrCommand || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
@@ -966,6 +971,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
             Some(CommandBlock(task.command)),
             outputs,
             task.runtime.map(RuntimeBlock),
+            task.hints.map(hints => MetaBlock(Symbols.Hints, hints.kvs)),
             task.meta.map(meta => MetaBlock(Symbols.Meta, meta.kvs)),
             task.parameterMeta.map(paramMeta => MetaBlock(Symbols.ParameterMeta, paramMeta.kvs))
         ).flatten

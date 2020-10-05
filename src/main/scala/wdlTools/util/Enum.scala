@@ -10,6 +10,10 @@ abstract class Enum extends Enumeration {
 
   def names: SortedSet[String] = values.map(_.toString)
 
+  def hasName(name: String): Boolean = names.contains(name)
+
+  def hasNameIgnoreCase(name: String): Boolean = byLowerCaseName.contains(name.toLowerCase)
+
   def withNameIgnoreCase(name: String): Value = {
     byLowerCaseName.getOrElse(name.toLowerCase,
                               throw new NoSuchElementException(s"No value found for '$name'"))
