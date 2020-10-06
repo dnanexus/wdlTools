@@ -71,13 +71,13 @@ object SysUtils {
   }
 
   /**
-    * Get the total system memory size in bytes.
-    * @return
+    * The total memory size.
+    * @note this is annotated `nowarn` because it uses a function (getTotalPhysicalMemorySize)
+    *       that is deprecated in JDK11 but not replaced until JDK14
+    * @return total memory size in bytes
     */
   @nowarn
-  def availableMemory: Long = {
-    // this uses a function (getTotalPhysicalMemorySize) that is deprecated in JDK11
-    // but not replaced until JDK14
+  def totalMemorySize: Long = {
     val mbean = ManagementFactory.getOperatingSystemMXBean
       .asInstanceOf[com.sun.management.OperatingSystemMXBean]
     mbean.getTotalPhysicalMemorySize

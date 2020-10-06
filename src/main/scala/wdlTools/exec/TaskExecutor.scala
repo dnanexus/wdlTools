@@ -72,7 +72,7 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
   def writeDockerRunScript(imageName: String,
                            hostPaths: ExecPaths,
                            guestPaths: ExecPaths,
-                           maxMemory: Long = SysUtils.availableMemory): Path = {
+                           maxMemory: Long = SysUtils.totalMemorySize): Path = {
     val dockerRunScript = renderer.render(
         TaskCommandFileGenerator.DefaultDockerRunScript,
         Map(
