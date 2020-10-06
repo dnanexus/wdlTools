@@ -3,6 +3,7 @@ package wdlTools.util
 import java.lang.management.ManagementFactory
 import java.nio.file.Path
 
+import scala.annotation.nowarn
 import scala.concurrent.{Await, Future, TimeoutException, blocking, duration}
 import scala.concurrent.ExecutionContext.Implicits._
 import scala.sys.process.{Process, ProcessLogger}
@@ -69,11 +70,14 @@ object SysUtils {
     }
   }
 
-  // Figure how much memory is available.
-  //
-  // We may need to check the cgroup itself. Not sure how portable that is.
-  //val totalAvailableMemoryBytes = Utils.readFileContent("/sys/fs/cgroup/memory/memory.limit_in_bytes").toInt
+  /**
+    * Get the total system memory size in bytes.
+    * @return
+    */
+  @nowarn
   def availableMemory: Long = {
+    // this uses a function (getTotalPhysicalMemorySize) that is deprecated in JDK11
+    // but not replaced until JDK14
     val mbean = ManagementFactory.getOperatingSystemMXBean
       .asInstanceOf[com.sun.management.OperatingSystemMXBean]
     mbean.getTotalPhysicalMemorySize

@@ -61,6 +61,14 @@ object JsUtils {
     }
   }
 
+  def getLong(js: JsValue, fieldName: Option[String] = None): Long = {
+    get(js, fieldName) match {
+      case JsNumber(value) => value.toLong
+      case JsString(value) => value.toLong
+      case other           => throw new Exception(s"Expected a number, got ${other}")
+    }
+  }
+
   def getBoolean(js: JsValue, fieldName: Option[String] = None): Boolean = {
     get(js, fieldName) match {
       case JsBoolean(value)  => value
