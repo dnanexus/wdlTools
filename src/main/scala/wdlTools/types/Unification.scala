@@ -3,10 +3,9 @@ package wdlTools.types
 import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatType}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
-import wdlTools.util.{AbstractBindings, Enum, Logger, TraceLevel}
+import wdlTools.util.{AbstractBindings, Bindings, Enum, Logger, TraceLevel}
 
-case class VarTypeBindings(bindings: Map[Int, T])
-    extends AbstractBindings[Int, T, VarTypeBindings](bindings) {
+case class VarTypeBindings(bindings: Map[Int, T]) extends AbstractBindings[Int, T](bindings) {
   override protected val elementType: String = "varType"
 
   override protected def copyFrom(values: Map[Int, T]): VarTypeBindings = {
@@ -224,14 +223,14 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
       t1: T,
       t2: T,
       ctx: UnificationContext,
-      varTypes: VarTypeBindings = VarTypeBindings.empty
-  ): (T, VarTypeBindings, Priority.Priority) = {
+      varTypes: Bindings[Int, T] = VarTypeBindings.empty
+  ): (T, Bindings[Int, T], Priority.Priority) = {
     def inner(
         x: T,
         y: T,
-        vt: VarTypeBindings,
+        vt: Bindings[Int, T],
         minPriority: Priority.Priority
-    ): (T, VarTypeBindings, Priority.Priority) = {
+    ): (T, Bindings[Int, T], Priority.Priority) = {
       if (x == y) {
         // exact match
         return (x, vt, minPriority)
@@ -352,7 +351,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     * @throws SubstitutionException if a type variable cannot be substituted
     *                               with the concrete type
     */
-  private def substitute(t: T, varTypes: VarTypeBindings): T = {
+  private def substitute(t: T, varTypes: Bindings[Int, T]): T = {
     def inner(innerType: T): T = {
       innerType match {
         case T_String | T_File | T_Boolean | T_Int | T_Float => innerType
@@ -414,8 +413,9 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     if (args1.isEmpty) {
       (output, Priority.Exact)
     }
+    val init: Bindings[Int, T] = VarTypeBindings.empty
     val (priority, newVarTypes) =
-      args1.zip(args2).foldLeft((Priority.Exact, VarTypeBindings.empty)) {
+      args1.zip(args2).foldLeft((Priority.Exact, init)) {
         case ((priority, vt), (lt, rt)) =>
           val (_, vt2, priority2) = unify(lt, rt, ctx, vt)
           (Enum.max(priority, priority2), vt2)
@@ -433,7 +433,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     */
   def apply(types: Iterable[T], ctx: UnificationContext): T = {
     assert(types.nonEmpty)
-    val (unifiedType, _) = types.tail.foldLeft((types.head, VarTypeBindings.empty)) {
+    val init: Bindings[Int, T] = VarTypeBindings.empty
+    val (unifiedType, _) = types.tail.foldLeft((types.head, init)) {
       case ((t, vt), t2) =>
         val (tUnified, ctxNew, _) = unify(t, t2, ctx, vt)
         (tUnified, ctxNew)

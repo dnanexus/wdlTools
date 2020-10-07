@@ -4,9 +4,9 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.eval.{Eval, Runtime, WdlValueBindings, WdlValueSerde, WdlValues}
+import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger}
 
 trait LocalizationDisambiguator {
   def getLocalPath(fileSource: FileSource): Path
@@ -93,10 +93,10 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
 }
 
 case class TaskContext(task: Task,
-                       inputBindings: WdlValueBindings,
+                       inputBindings: Bindings[String, V],
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
-                       defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
+                       defaultRuntimeValues: Option[VBindings] = None,
                        taskIO: TaskInputOutput,
                        fileResolver: FileSourceResolver = FileSourceResolver.get,
                        logger: Logger = Logger.get) {
@@ -107,15 +107,15 @@ case class TaskContext(task: Task,
   }
   // The inputs and runtime section are evaluated using the host paths
   // (which will be the same as the guest paths, unless we're running in a container)
-  private lazy val evalBindings: WdlValueBindings = {
-    val bindings = hostEvaluator.applyPrivateVariables(task.privateVariables, inputBindings)
+  private lazy val evalBindings: VBindings = {
+    val bindings = hostEvaluator.applyPrivateVariables(task.privateVariables, inputBindings).toMap
     // If there is a command to evaluate, pre-localize all the files/dirs, otherwise
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
-    if (hasCommand) {
+    WdlValueBindings(if (hasCommand) {
       val disambiguator = SafeLocalizationDisambiguator(hostEvaluator.paths.getRootDir(true))
       // TODO: put localization behind a trait so we can swap in e.g. a parallelized implementation
-      WdlValueBindings(bindings.toMap.map {
+      bindings.map {
         case (name, V_File(uri)) =>
           val fileSource = fileResolver.resolve(uri)
           val localizedPath = disambiguator.getLocalPath(fileSource)
@@ -127,12 +127,12 @@ case class TaskContext(task: Task,
           folderSource.localize(localizedPath)
           name -> V_Directory(localizedPath.toString)
         case other => other
-      })
+      }
     } else {
       bindings
-    }
+    })
   }
-  lazy val runtime: Runtime[WdlValueBindings] =
+  lazy val runtime: Runtime =
     Runtime.fromTask(task, hostEvaluator, Some(evalBindings), defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
@@ -171,8 +171,9 @@ case class TaskContext(task: Task,
     }
   }
 
-  lazy val outputBindings: WdlValueBindings = {
-    task.outputs.foldLeft(evalBindings) {
+  lazy val outputBindings: Bindings[String, V] = {
+    val init: Bindings[String, V] = evalBindings
+    task.outputs.foldLeft(init) {
       case (accu, output) =>
         val outputValue = hostEvaluator.applyExpr(output.expr, accu)
         accu.add(output.name, outputValue)
@@ -218,7 +219,7 @@ object TaskContext {
                task: Task,
                hostEvaluator: Eval,
                guestEvaluator: Option[Eval] = None,
-               defaultRuntimeValues: WdlValueBindings = WdlValueBindings.empty,
+               defaultRuntimeValues: Option[VBindings] = None,
                taskIO: TaskInputOutput,
                strict: Boolean = false): TaskContext = {
     val inputs = taskIO.inputsFromJson(jsInputs, hostEvaluator, strict)

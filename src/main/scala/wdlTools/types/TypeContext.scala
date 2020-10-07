@@ -4,7 +4,7 @@ import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{DefaultBindings, DuplicateBindingException, FileNode, Logger}
+import wdlTools.util.{Bindings, DefaultBindings, DuplicateBindingException, FileNode, Logger}
 
 /**
   * Type inference context.
@@ -22,18 +22,18 @@ case class TypeContext(
     version: WdlVersion,
     stdlib: Stdlib,
     docSource: FileNode,
-    inputs: WdlTypeBindings = WdlTypeBindings(elementType = "input"),
-    outputs: WdlTypeBindings = WdlTypeBindings(elementType = "output"),
-    declarations: WdlTypeBindings = WdlTypeBindings(elementType = "declaration"),
-    aliases: DefaultBindings[T_Struct] =
+    inputs: Bindings[String, T] = WdlTypeBindings(elementType = "input"),
+    outputs: Bindings[String, T] = WdlTypeBindings(elementType = "output"),
+    declarations: Bindings[String, T] = WdlTypeBindings(elementType = "declaration"),
+    aliases: Bindings[String, T_Struct] =
       DefaultBindings[T_Struct](Map.empty[String, T_Struct], elementType = "struct"),
-    callables: DefaultBindings[T_Callable] =
+    callables: Bindings[String, T_Callable] =
       DefaultBindings[T_Callable](Map.empty[String, T_Callable], elementType = "callable"),
     namespaces: Set[String] = Set.empty
 ) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName: String, bindings: WdlTypeBindings): Option[WdlType] = {
+  def lookup(varName: String, bindings: Bindings[String, T]): Option[WdlType] = {
     inputs.get(varName) match {
       case None    => ()
       case Some(t) => return Some(t)
@@ -77,7 +77,7 @@ case class TypeContext(
     * Merge current declaration bindings.
     * @return
     */
-  def bindDeclarations(bindings: WdlTypeBindings): TypeContext = {
+  def bindDeclarations(bindings: Bindings[String, T]): TypeContext = {
     this.copy(declarations = declarations.update(bindings))
   }
 

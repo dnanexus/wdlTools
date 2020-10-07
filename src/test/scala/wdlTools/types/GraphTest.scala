@@ -162,7 +162,7 @@ class GraphTest extends AnyFlatSpec with Matchers {
     val fileSource = fileResolver.resolve("many_structs.wdl")
     val doc = parsers.parseDocument(fileSource)
     val (_, ctx) = typeInfer.apply(doc)
-    val graph = TypeGraph.buildFromStructTypes(ctx.aliases.bindings)
+    val graph = TypeGraph.buildFromStructTypes(ctx.aliases.toMap)
     val ordered = GraphUtils.toOrderedVector(graph)
     val expected = Vector(
         Set("Coord", "Bunk", "Foo", "SampleReports"),

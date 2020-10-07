@@ -9,6 +9,7 @@ import wdlTools.types.ExprState.ExprState
 import wdlTools.types.Section.Section
 import wdlTools.types.TypedAbstractSyntax.WdlType
 import wdlTools.util.{
+  Bindings,
   DuplicateBindingException,
   FileSourceResolver,
   Logger,
@@ -135,7 +136,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     */
   private def applyExpr(expr: AST.Expr,
                         ctx: TypeContext,
-                        bindings: WdlTypeBindings = WdlTypeBindings.empty,
+                        bindings: Bindings[String, T] = WdlTypeBindings.empty,
                         exprState: ExprState = ExprState.Start,
                         section: Section = Section.Other): TAT.Expr = {
 
@@ -445,9 +446,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       decl: AST.Declaration,
       section: Section,
       ctx: TypeContext,
-      bindings: WdlTypeBindings,
+      bindings: Bindings[String, T],
       canShadow: Boolean = false
-  ): (WdlTypes.T, Option[TAT.Expr], WdlTypeBindings) = {
+  ): (WdlTypes.T, Option[TAT.Expr], Bindings[String, T]) = {
     val lhsType = typeFromAst(decl.wdlType, decl.loc, ctx)
     val (wdlType, tExpr) = decl.expr match {
       // Int x
@@ -489,9 +490,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       decl: AST.Declaration,
       section: Section,
       ctx: TypeContext,
-      bindings: WdlTypeBindings,
+      bindings: Bindings[String, T],
       canShadow: Boolean = false
-  ): (TAT.PrivateVariable, WdlTypeBindings) = {
+  ): (TAT.PrivateVariable, Bindings[String, T]) = {
     translateDeclaration(decl, section, ctx, bindings, canShadow) match {
       case (wdlType, Some(tExpr), newBindings) =>
         (TAT.PrivateVariable(decl.name, wdlType, tExpr, decl.loc), newBindings)
@@ -507,9 +508,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   //
   private def applyInputSection(inputSection: AST.InputSection,
                                 ctx: TypeContext): (Vector[TAT.InputParameter], TypeContext) = {
+    val init: Bindings[String, T] = WdlTypeBindings.empty
     val (tInputParams, _, _) =
       inputSection.parameters
-        .foldLeft((Vector.empty[TAT.InputParameter], Set.empty[String], WdlTypeBindings.empty)) {
+        .foldLeft((Vector.empty[TAT.InputParameter], Set.empty[String], init)) {
           case ((tInputParams, names, bindings), decl) =>
             if (names.contains(decl.name)) {
               handleError(s"Input section has duplicate definition ${decl.name}", inputSection.loc)
@@ -541,9 +543,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     // values. This is weird, but is used here:
     // https://github.com/gatk-workflows/gatk4-germline-snps-indels/blob/master/tasks/JointGenotypingTasks-terra.wdl#L590
     val both = outputSection.parameters.map(_.name).toSet intersect ctx.declarations.keySet
+    val init: Bindings[String, T] = WdlTypeBindings.empty
     val (tOutputParams, _, _) =
       outputSection.parameters
-        .foldLeft((Vector.empty[TAT.OutputParameter], Set.empty[String], WdlTypeBindings.empty)) {
+        .foldLeft((Vector.empty[TAT.OutputParameter], Set.empty[String], init)) {
           case ((tOutputParams, names, bindings), decl) =>
             // check the declaration and add a binding for its (variable -> wdlType)
             if (names.contains(decl.name)) {
@@ -684,8 +687,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
 
     // add types to the private variables, and accumulate context
+    val init: Bindings[String, T] = WdlTypeBindings.empty
     val (tDeclarations, _) =
-      task.privateVariables.foldLeft((Vector.empty[TAT.PrivateVariable], WdlTypeBindings.empty)) {
+      task.privateVariables.foldLeft((Vector.empty[TAT.PrivateVariable], init)) {
         case ((tDecls, bindings), decl) =>
           val (tDecl, afterBindings) = applyDeclaration(decl, Section.Other, inputCtx, bindings)
           (tDecls :+ tDecl, afterBindings)
@@ -969,8 +973,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   private def applyWorkflowElements(
       body: Vector[AST.WorkflowElement],
       ctx: TypeContext
-  ): (Vector[TAT.WorkflowElement], WdlTypeBindings) = {
-    body.foldLeft((Vector.empty[TAT.WorkflowElement], WdlTypeBindings.empty)) {
+  ): (Vector[TAT.WorkflowElement], Bindings[String, T]) = {
+    val init: Bindings[String, T] = WdlTypeBindings.empty
+    body.foldLeft((Vector.empty[TAT.WorkflowElement], init)) {
       case ((tElements, bindings), decl: AST.Declaration) =>
         val (tDecl, afterBindings) = applyDeclaration(decl, Section.Other, ctx, bindings)
         (tElements :+ tDecl, afterBindings)

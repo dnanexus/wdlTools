@@ -15,7 +15,7 @@ import wdlTools.eval.{
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
-import wdlTools.util.{FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSourceResolver, Logger}
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
   protected lazy val callableInputs: Map[String, InputParameter] =
@@ -29,9 +29,10 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
 
   def inputsFromValues(inputValues: Map[String, WdlValues.V],
                        evaluator: Eval,
-                       strict: Boolean = false): WdlValueBindings = {
+                       strict: Boolean = false): Bindings[String, WdlValues.V] = {
     // resolve default values for any missing inputs
-    inputOrder.foldLeft(WdlValueBindings.empty) {
+    val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
+    inputOrder.foldLeft(init) {
       case (ctx, declName) =>
         val value = callableInputs(declName) match {
           case _: RequiredInputParameter if inputValues.contains(declName) =>
@@ -69,8 +70,9 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
     }
   }
 
-  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): WdlValueBindings = {
-    outputOrder.foldLeft(WdlValueBindings.empty) {
+  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
+    val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
+    outputOrder.foldLeft(init) {
       case (outCtx, declName) =>
         val out = callableOutputs(declName)
         outCtx.add(declName,
@@ -93,7 +95,7 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
 
   def inputsFromJson(jsInputs: Map[String, JsValue],
                      evaluator: Eval,
-                     strict: Boolean = false): WdlValueBindings = {
+                     strict: Boolean = false): Bindings[String, WdlValues.V] = {
     val values = callableInputs.flatMap {
       case (declName, inp) =>
         // lookup by fully-qualified name first, then plain name
@@ -138,7 +140,7 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
   def outputsToJson(evaluator: Eval,
                     ctx: WdlValueBindings,
                     prefixTaskName: Boolean = true): JsObject = {
-    val outputValues: WdlValueBindings = evaluateOutputs(evaluator, ctx)
+    val outputValues = evaluateOutputs(evaluator, ctx)
     outputValuesToJson(outputValues.toMap, prefixTaskName)
   }
 }

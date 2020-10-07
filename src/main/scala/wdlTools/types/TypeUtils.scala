@@ -50,7 +50,7 @@ case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
 
 case class WdlTypeBindings(bindings: Map[String, T] = Map.empty,
                            override val elementType: String = "type")
-    extends AbstractBindings[String, T, WdlTypeBindings](bindings) {
+    extends AbstractBindings[String, T](bindings) {
   override protected def copyFrom(values: Map[String, T]): WdlTypeBindings = {
     copy(bindings = values)
   }

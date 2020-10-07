@@ -9,9 +9,9 @@ case class DiskRequest(size: Long,
                        mountPoint: Option[String] = None,
                        diskType: Option[String] = None)
 
-abstract class Runtime[B <: VBindings[B]](runtime: Map[String, TAT.Expr],
-                                          userDefaultValues: VBindings[B],
-                                          runtimeLocation: SourceLocation) {
+abstract class Runtime(runtime: Map[String, TAT.Expr],
+                       userDefaultValues: Option[VBindings],
+                       runtimeLocation: SourceLocation) {
   private var cache: Map[String, Option[V]] = Map.empty
 
   val defaults: Map[String, V]
@@ -37,7 +37,7 @@ abstract class Runtime[B <: VBindings[B]](runtime: Map[String, TAT.Expr],
           get(aliases.get(id), wdlTypes)
         case None =>
           // TODO: check type
-          userDefaultValues.get(id, wdlTypes).orElse(defaults.get(id))
+          userDefaultValues.flatMap(_.get(id, wdlTypes)).orElse(defaults.get(id))
       }
       cache += (id -> value)
     }
@@ -88,8 +88,8 @@ abstract class Runtime[B <: VBindings[B]](runtime: Map[String, TAT.Expr],
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
-                          ctx: Option[WdlValueBindings] = None,
-                          userDefaultValues: WdlValueBindings = WdlValueBindings.empty,
+                          ctx: Option[VBindings],
+                          userDefaultValues: Option[VBindings],
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map.empty
@@ -165,8 +165,8 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
-                     ctx: Option[WdlValueBindings] = None,
-                     userDefaultValues: WdlValueBindings = WdlValueBindings.empty,
+                     ctx: Option[VBindings],
+                     userDefaultValues: Option[VBindings],
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
   val defaults: Map[String, V] = Map(
@@ -329,9 +329,9 @@ object Runtime {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[WdlValueBindings] = None,
-      defaultValues: WdlValueBindings = WdlValueBindings.empty
-  ): Runtime[WdlValueBindings] = {
+      ctx: Option[VBindings] = None,
+      defaultValues: Option[VBindings] = None
+  ): Runtime = {
     create(task.runtime,
            evaluator,
            ctx,
@@ -342,10 +342,10 @@ object Runtime {
   def create(
       runtime: Option[TAT.RuntimeSection],
       evaluator: Eval,
-      ctx: Option[WdlValueBindings] = None,
-      defaultValues: WdlValueBindings = WdlValueBindings.empty,
+      ctx: Option[VBindings] = None,
+      defaultValues: Option[VBindings] = None,
       runtimeLocation: Option[SourceLocation] = None
-  ): Runtime[WdlValueBindings] = {
+  ): Runtime = {
     val loc = runtime
       .map(_.loc)
       .orElse(runtimeLocation)

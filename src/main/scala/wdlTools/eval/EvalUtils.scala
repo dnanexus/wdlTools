@@ -195,7 +195,7 @@ object EvalUtils {
   }
 }
 
-trait VBindings[+Self <: VBindings[Self]] extends Bindings[String, V, Self] {
+trait VBindings extends Bindings[String, V] {
   val allowNonstandardCoercions: Boolean
 
   def get(id: String,
@@ -210,8 +210,8 @@ trait VBindings[+Self <: VBindings[Self]] extends Bindings[String, V, Self] {
 case class WdlValueBindings(bindings: Map[String, V] = Map.empty,
                             allowNonstandardCoercions: Boolean = false,
                             override val elementType: String = "value")
-    extends AbstractBindings[String, V, WdlValueBindings](bindings)
-    with VBindings[WdlValueBindings] {
+    extends AbstractBindings[String, V](bindings)
+    with VBindings {
   override protected def copyFrom(values: Map[String, V]): WdlValueBindings = {
     copy(bindings = values)
   }

@@ -51,16 +51,14 @@ case class Exec(conf: WdlToolsConf) extends Command {
     } else {
       JsUtils.getFields(JsUtils.jsFromString(inputsString))
     }
-    val runtimeDefaults: WdlValueBindings = conf.exec.runtimeDefaults.toOption match {
-      case None => WdlValueBindings.empty
-      case Some(path) =>
-        WdlValueBindings(
-            JsUtils
-              .getFields(JsUtils.jsFromFile(path))
-              .view
-              .mapValues(WdlValueSerde.deserialize)
-              .toMap
-        )
+    val runtimeDefaults = conf.exec.runtimeDefaults.toOption.map { path =>
+      WdlValueBindings(
+          JsUtils
+            .getFields(JsUtils.jsFromFile(path))
+            .view
+            .mapValues(WdlValueSerde.deserialize)
+            .toMap
+      )
     }
     val wdlVersion = doc.version.value
     val (hostPaths: ExecPaths, guestPaths: Option[ExecPaths]) = if (conf.exec.container()) {
