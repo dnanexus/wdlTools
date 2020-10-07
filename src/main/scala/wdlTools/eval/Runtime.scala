@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.SymmetricBiMap
+import wdlTools.util.{Bindings, SymmetricBiMap}
 
 case class DiskRequest(size: Long,
                        mountPoint: Option[String] = None,
@@ -88,7 +88,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
-                          ctx: Option[VBindings],
+                          ctx: Option[Bindings[String, V]],
                           userDefaultValues: Option[VBindings],
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -165,7 +165,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
-                     ctx: Option[VBindings],
+                     ctx: Option[Bindings[String, V]],
                      userDefaultValues: Option[VBindings],
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
@@ -329,7 +329,7 @@ object Runtime {
   def fromTask(
       task: TAT.Task,
       evaluator: Eval,
-      ctx: Option[VBindings] = None,
+      ctx: Option[Bindings[String, V]] = None,
       defaultValues: Option[VBindings] = None
   ): Runtime = {
     create(task.runtime,
@@ -342,7 +342,7 @@ object Runtime {
   def create(
       runtime: Option[TAT.RuntimeSection],
       evaluator: Eval,
-      ctx: Option[VBindings] = None,
+      ctx: Option[Bindings[String, V]] = None,
       defaultValues: Option[VBindings] = None,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {

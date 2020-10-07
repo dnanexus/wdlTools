@@ -10,9 +10,9 @@ import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
   * @param runtime runtime section
   * @param hints hints section
   */
-case class RuntimeAttributes(runtime: Option[Runtime],
-                             hints: Option[Hints],
-                             defaultValues: Option[VBindings]) {
+case class RuntimeAttributes(runtime: Option[Runtime] = None,
+                             hints: Option[Hints] = None,
+                             defaultValues: Option[VBindings] = None) {
   def contains(id: String): Boolean = {
     runtime.exists(_.contains(id)) || hints.exists(_.contains(id)) || defaultValues.exists(
         _.contains(id)
