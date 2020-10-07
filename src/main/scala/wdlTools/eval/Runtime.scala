@@ -2,7 +2,8 @@ package wdlTools.eval
 
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
-import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
+import wdlTools.types.{TypedAbstractSyntax => TAT}
+import wdlTools.types.WdlTypes._
 import wdlTools.util.{Bindings, SymmetricBiMap}
 
 case class DiskRequest(size: Long,
@@ -26,9 +27,9 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
     ))
   }
 
-  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[WdlTypes.T] = Vector.empty): V
+  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V
 
-  def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[V] = {
+  def get(id: String, wdlTypes: Vector[T] = Vector.empty): Option[V] = {
     if (!cache.contains(id)) {
       val value = runtime.get(id) match {
         case Some(expr) =>
@@ -67,7 +68,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def isValidReturnCode(returnCode: Int): Boolean = {
     val loc = getSourceLocation(Runtime.ReturnCodesKey)
-    get(Runtime.ReturnCodesKey) match {
+    get(Runtime.ReturnCodesKey, Vector(T_String, T_Int, T_Array(T_Int))) match {
       case None                => returnCode == Runtime.ReturnCodesDefault
       case Some(V_String("*")) => true
       case Some(V_Int(i))      => returnCode == i.toInt
@@ -99,7 +100,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
   override protected def applyKv(id: String,
                                  expr: TAT.Expr,
-                                 wdlType: Vector[WdlTypes.T] = Vector.empty): V = {
+                                 wdlType: Vector[T] = Vector.empty): V = {
     (ctx, wdlType) match {
       case (Some(c), Vector()) => evaluator.applyExpr(expr, c)
       case (Some(c), v)        => evaluator.applyExprAndCoerce(expr, v, c)
@@ -109,7 +110,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val container: Vector[String] = {
-    get(Runtime.DockerKey) match {
+    get(Runtime.DockerKey, Vector(T_String, T_Array(T_String))) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
@@ -128,7 +129,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   override def cpu: Double = {
-    get(Runtime.CpuKey) match {
+    get(Runtime.CpuKey, Vector(T_Int, T_Float, T_String)) match {
       case Some(V_Int(i))    => i.toDouble
       case Some(V_Float(f))  => f
       case Some(V_String(s)) => s.toDouble
@@ -140,7 +141,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val memory: Long = {
-    get(Runtime.MemoryKey) match {
+    get(Runtime.MemoryKey, Vector(T_Int, T_Float, T_String)) match {
       case Some(V_Int(i))   => i
       case Some(V_Float(d)) => EvalUtils.floatToInt(d)
       case Some(V_String(s)) =>
@@ -156,7 +157,10 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val disks: Vector[DiskRequest] = {
-    get(Runtime.DisksKey) match {
+    get(
+        Runtime.DisksKey,
+        Vector(T_Int, T_Float, T_String, T_Array(T_Int), T_Array(T_Float), T_Array(T_String))
+    ) match {
       case None    => Runtime.parseDisks(V_String(Runtime.DisksDefault))
       case Some(v) => Runtime.parseDisks(v, loc = getSourceLocation(Runtime.DisksKey))
     }
@@ -195,7 +199,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   override val aliases: SymmetricBiMap[String] =
     SymmetricBiMap(Map(Runtime.DockerKey -> Runtime.ContainerKey))
 
-  private def intersectTypes(t1: Vector[WdlTypes.T], t2: Vector[WdlTypes.T]): Vector[WdlTypes.T] = {
+  private def intersectTypes(t1: Vector[T], t2: Vector[T]): Vector[T] = {
     (t1, t2) match {
       case (Vector(), v) => v
       case (v, Vector()) => v
@@ -208,10 +212,8 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
-  protected def applyKv(id: String,
-                        expr: TAT.Expr,
-                        wdlType: Vector[WdlTypes.T] = Vector.empty): V = {
-    def getValue(allowed: Vector[WdlTypes.T]): V = {
+  protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V = {
+    def getValue(allowed: Vector[T]): V = {
       (ctx, wdlType) match {
         case (Some(c), Vector()) =>
           evaluator.applyExprAndCoerce(expr, allowed, c)
@@ -226,13 +228,13 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 
     id match {
       case Runtime.ContainerKey =>
-        getValue(Vector(WdlTypes.T_String, WdlTypes.T_Array(WdlTypes.T_String)))
+        getValue(Vector(T_String, T_Array(T_String)))
       case Runtime.CpuKey =>
         // always return cpu as a float
-        getValue(Vector(WdlTypes.T_Float))
+        getValue(Vector(T_Float))
       case Runtime.MemoryKey =>
         // always return memory in bytes (round up to nearest byte)
-        getValue(Vector(WdlTypes.T_Int, WdlTypes.T_String)) match {
+        getValue(Vector(T_Int, T_String)) match {
           case i: V_Int   => i
           case V_Float(d) => V_Int(EvalUtils.floatToInt(d))
           case V_String(s) =>
@@ -243,24 +245,24 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                                     getSourceLocation(Runtime.MemoryKey))
         }
       case Runtime.DisksKey =>
-        getValue(Vector(WdlTypes.T_Int, WdlTypes.T_Array(WdlTypes.T_String), WdlTypes.T_String)) match {
+        getValue(Vector(T_Int, T_Array(T_String), T_String)) match {
           case i: V_Int   => V_String(s"${i} GiB")
           case V_Float(d) => V_String(s"${d} GiB")
           case v          => v
         }
       case Runtime.GpuKey =>
-        getValue(Vector(WdlTypes.T_Boolean))
+        getValue(Vector(T_Boolean))
       case Runtime.MaxRetriesKey =>
-        getValue(Vector(WdlTypes.T_Int))
+        getValue(Vector(T_Int))
       case Runtime.ReturnCodesKey =>
-        getValue(Vector(WdlTypes.T_Int, WdlTypes.T_Array(WdlTypes.T_Int), WdlTypes.T_String))
+        getValue(Vector(T_Int, T_Array(T_Int), T_String))
       case other =>
         throw new EvalException(s"Runtime key ${other} not allowed in WDL version 2.0+", expr.loc)
     }
   }
 
   lazy val container: Vector[String] = {
-    get(Runtime.ContainerKey) match {
+    get(Runtime.ContainerKey, Vector(T_String, T_Array(T_String))) match {
       case None              => Vector.empty
       case Some(V_String(s)) => Vector(s)
       case Some(V_Array(a)) =>
@@ -277,7 +279,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   }
 
   override def cpu: Double = {
-    get(Runtime.CpuKey) match {
+    get(Runtime.CpuKey, Vector(T_Float)) match {
       case Some(V_Float(f)) => f
       case None             => throw new RuntimeException("Missing default value for runtime.cpu")
       case other            => throw new EvalException(s"Invalid cpu value ${other}")
@@ -285,7 +287,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   }
 
   lazy val memory: Long = {
-    get(Runtime.MemoryKey) match {
+    get(Runtime.MemoryKey, Vector(T_Int)) match {
       case Some(V_Int(i)) => i
       case None           => throw new RuntimeException("Missing default value for runtime.memory")
       case other          => throw new EvalException(s"Invalid memory value ${other}")
@@ -294,9 +296,10 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
 
   lazy val disks: Vector[DiskRequest] = {
     val loc = getSourceLocation(Runtime.DisksKey)
-    get(Runtime.DisksKey) match {
-      case None =>
-        throw new EvalException(s"No value for 'disks'", loc)
+    get(
+        Runtime.DisksKey,
+        Vector(T_Int, T_Float, T_String, T_Array(T_Int), T_Array(T_Float), T_Array(T_String))
+    ) match {
       case Some(v) =>
         Runtime.parseDisks(v, loc = loc).map {
           case DiskRequest(_, _, Some(diskType)) =>
@@ -306,6 +309,8 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
             )
           case other => other
         }
+      case None =>
+        throw new EvalException(s"No value for 'disks'", loc)
     }
   }
 }

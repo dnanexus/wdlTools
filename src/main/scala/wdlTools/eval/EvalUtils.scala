@@ -201,9 +201,14 @@ trait VBindings extends Bindings[String, V] {
   def get(id: String,
           wdlTypes: Vector[WdlTypes.T] = Vector.empty,
           sourceLocation: SourceLocation = SourceLocation.empty): Option[WdlValues.V] = {
-    get(id).map(value =>
-      Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions)
-    )
+    val value = get(id)
+    if (wdlTypes.nonEmpty) {
+      value.map(value =>
+        Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions)
+      )
+    } else {
+      value
+    }
   }
 }
 

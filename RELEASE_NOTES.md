@@ -1,3 +1,11 @@
+# v0.8.0 (dev)
+
+* Added support for new WDL v2 `min` and `max` functions
+* Complete WDL v2 support in code formatter and generator
+* Refactoring of `FileSource`, `EvalPaths`, and `Bindings` that will causes breaking changes
+* Correctly handle optional parameters in task calls
+* Fix JDK11 deprecation error
+
 # v0.7.1 (2020-09-29)
 
 * Type-checking bug fixes
