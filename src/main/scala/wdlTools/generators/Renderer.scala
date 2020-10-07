@@ -10,10 +10,20 @@ import org.fusesource.scalate.TemplateEngine
 //  TemplateName
 //}
 
-case class Renderer(engine: TemplateEngine = new TemplateEngine) {
+case class Renderer(engine: TemplateEngine = Renderer.defaultTemplateEngine) {
   def render(templateName: String, attrs: Map[String, Any] = Map.empty): String = {
     engine.layout(templateName, attrs)
   }
+}
+
+object Renderer {
+  def createTemplateEngine(escapeMarkup: Boolean = false): TemplateEngine = {
+    val engine = new TemplateEngine
+    engine.escapeMarkup = escapeMarkup
+    engine
+  }
+
+  lazy val defaultTemplateEngine: TemplateEngine = createTemplateEngine()
 }
 
 // TODO: switch to using Beard - the only problem is that the official
