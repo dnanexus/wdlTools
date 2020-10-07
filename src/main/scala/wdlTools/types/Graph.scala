@@ -537,6 +537,32 @@ object GraphUtils {
   val ScatterNodePrefix: String = "__scatter__"
 
   /**
+    * Gets an ordered Vector of the nodes in `graph` starting at root node `root`. The graph
+    * must be directed and acyclic.
+    * @param graph a directed graph
+    * @param root the root node
+    * @tparam X the value type of the graph
+    * @return a Vector with all the nodes in the subgraph of `graph` that starts at `root`,
+    *         in topological order.
+    * @throws Exception if there is a cycle in the graph
+    */
+  def toOrderedVector[X](graph: Graph[X, DiEdge], root: X, filterNodes: Set[X]): Vector[X] = {
+    if (graph.nonEmpty && !graph.contains(root)) {
+      throw new Exception(s"Invalid dependency graph - does not contain root node ${root}")
+    }
+    if (graph.size <= 1) {
+      Vector.empty[X]
+    } else {
+      graph.get(root).withSubgraph().topologicalSort(ignorePredecessors = true) match {
+        case Left(cycle) =>
+          throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
+        case Right(value) =>
+          value.toVector.map(_.value).filterNot(filterNodes.contains)
+      }
+    }
+  }
+
+  /**
     * Convenience method to get an ordered Vector of the nodes in a String-typed DiGraph.
     * @param graph the graph
     * @param root the root node, defaults to `RootNode`
@@ -548,24 +574,5 @@ object GraphUtils {
       filterNodes: Set[String] = Set(RootNode)
   ): Vector[String] = {
     toOrderedVector[String](graph, root, filterNodes)
-  }
-
-  /**
-    * Gets an ordered Vector of the nodes in `graph` starting at root node `root`. The graph
-    * must be directed and acyclic.
-    * @param graph a directed graph
-    * @param root the root node
-    * @tparam X the value type of the graph
-    * @return a Vector with all the nodes in the subgraph of `graph` that starts at `root`,
-    *         in topological order.
-    * @throws Exception if there is a cycle in the graph
-    */
-  def toOrderedVector[X](graph: Graph[X, DiEdge], root: X, filterNodes: Set[X]): Vector[X] = {
-    graph.get(root).withSubgraph().topologicalSort(ignorePredecessors = true) match {
-      case Left(cycle) =>
-        throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
-      case Right(value) =>
-        value.toVector.map(_.value).filterNot(filterNodes.contains)
-    }
   }
 }
