@@ -9,9 +9,9 @@ case class DiskRequest(size: Long,
                        mountPoint: Option[String] = None,
                        diskType: Option[String] = None)
 
-abstract class Runtime(runtime: Map[String, TAT.Expr],
-                       userDefaultValues: WdlValueBindings,
-                       runtimeLocation: SourceLocation) {
+abstract class Runtime[B <: VBindings[B]](runtime: Map[String, TAT.Expr],
+                                          userDefaultValues: VBindings[B],
+                                          runtimeLocation: SourceLocation) {
   private var cache: Map[String, Option[V]] = Map.empty
 
   val defaults: Map[String, V]
@@ -28,16 +28,16 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[WdlTypes.T] = Vector.empty): V
 
-  def get(id: String, wdlType: Vector[WdlTypes.T] = Vector.empty): Option[V] = {
+  def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[V] = {
     if (!cache.contains(id)) {
       val value = runtime.get(id) match {
         case Some(expr) =>
-          Some(applyKv(id, expr, wdlType))
+          Some(applyKv(id, expr, wdlTypes))
         case None if aliases.contains(id) =>
-          get(aliases.get(id), wdlType)
+          get(aliases.get(id), wdlTypes)
         case None =>
           // TODO: check type
-          userDefaultValues.get(id).orElse(defaults.get(id))
+          userDefaultValues.get(id, wdlTypes).orElse(defaults.get(id))
       }
       cache += (id -> value)
     }
@@ -331,7 +331,7 @@ object Runtime {
       evaluator: Eval,
       ctx: Option[WdlValueBindings] = None,
       defaultValues: WdlValueBindings = WdlValueBindings.empty
-  ): Runtime = {
+  ): Runtime[WdlValueBindings] = {
     create(task.runtime,
            evaluator,
            ctx,
@@ -345,7 +345,7 @@ object Runtime {
       ctx: Option[WdlValueBindings] = None,
       defaultValues: WdlValueBindings = WdlValueBindings.empty,
       runtimeLocation: Option[SourceLocation] = None
-  ): Runtime = {
+  ): Runtime[WdlValueBindings] = {
     val loc = runtime
       .map(_.loc)
       .orElse(runtimeLocation)

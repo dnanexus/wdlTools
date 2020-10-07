@@ -132,7 +132,7 @@ case class TaskContext(task: Task,
       bindings
     }
   }
-  lazy val runtime: Runtime =
+  lazy val runtime: Runtime[WdlValueBindings] =
     Runtime.fromTask(task, hostEvaluator, Some(evalBindings), defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
