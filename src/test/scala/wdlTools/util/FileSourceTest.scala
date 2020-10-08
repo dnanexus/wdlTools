@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 class FileSourceTest extends AnyFlatSpec with Matchers {
   case object DxProtocol extends FileAccessProtocol {
     val schemes = Vector("dx")
-    override def resolve(uri: String): FileNode = ???
+    override def resolve(address: String): AddressableFileNode = ???
   }
   private val resolver = FileSourceResolver.create(userProtocols = Vector(DxProtocol))
 

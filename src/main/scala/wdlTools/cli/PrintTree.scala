@@ -9,8 +9,7 @@ import scala.language.reflectiveCalls
 case class PrintTree(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.printTree.uri())
-    val parsers = Parsers(followImports = false)
-    val document = parsers.parseDocument(docSource)
+    val document = Parsers.default.parseDocument(docSource)
     if (conf.printTree.typed()) {
       def ignoreImports(p: Product): Option[String] = {
         p match {

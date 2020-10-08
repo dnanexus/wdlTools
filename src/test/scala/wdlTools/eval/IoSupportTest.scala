@@ -7,8 +7,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.util.{
+  AddressableFileNode,
   FileAccessProtocol,
-  FileNode,
   FileSourceResolver,
   FileUtils,
   Logger,
@@ -21,7 +21,7 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
 
   case object DxProtocol extends FileAccessProtocol {
     val schemes = Vector("dx")
-    override def resolve(uri: String): FileNode = ???
+    override def resolve(address: String): AddressableFileNode = ???
   }
 
   private def setup(): (EvalPaths, FileSourceResolver) = {
@@ -40,8 +40,8 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val p = Files.createTempFile("Y", ".txt")
     try {
       val buf = "hello bunny"
-      val docSrc = StringFileNode(buf, Some(p))
-      docSrc.localize(overwrite = true)
+      val docSrc = StringFileNode(buf)
+      docSrc.localize(p, overwrite = true)
       val (evalPaths, fileResolver) = setup()
       val ioSupp = IoSupport(evalPaths, fileResolver, logger)
       val len = ioSupp.size(p.toString, placeholderSourceLocation)
@@ -57,8 +57,8 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val p = Files.createTempFile("Y", ".txt")
     val buf = "make Shasta full"
     try {
-      val docSrc = StringFileNode(buf, Some(p))
-      docSrc.localize(overwrite = true)
+      val docSrc = StringFileNode(buf)
+      docSrc.localize(p, overwrite = true)
       val (evalPaths, fileResolver) = setup()
       val stdlib = Stdlib(evalPaths, WdlVersion.V1, fileResolver, logger)
       val retval =

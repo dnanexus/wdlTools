@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
-import wdlTools.util.{FileNode, LocalFileSource, StringFileNode, FileUtils}
+import wdlTools.util.{LocalFileSource, FileUtils}
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"
@@ -13,13 +13,13 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
   val TASK_README_DEVELOPER_TEMPLATE = "/templates/readme/TaskReadme.developer.md.ssp"
 
   case class Generator(wdlSource: LocalFileSource) {
-    private val wdlPath = wdlSource.localPath
+    private val wdlPath = wdlSource.canonicalPath
     private val fname = wdlPath.getFileName.toString
     require(fname.endsWith(".wdl"))
     private val wdlName = fname.slice(0, fname.length - 4)
-    private var generatedFiles: Vector[FileNode] = Vector.empty
+    private var generatedFiles: Map[Path, String] = Map.empty
 
-    def getGeneratedFiles: Vector[FileNode] = generatedFiles
+    def getGeneratedFiles: Map[Path, String] = generatedFiles
 
     def getReadmeNameAndPath(elementName: String, developer: Boolean): (String, Path) = {
       val devStr = if (developer) {
@@ -28,7 +28,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         ""
       }
       val newName = s"Readme.${devStr}${wdlName}.${elementName}.md"
-      val newPath = wdlPath.getParent.resolve(newName)
+      val newPath = FileUtils.absolutePath(wdlPath.getParent.resolve(newName))
       (newName, newPath)
     }
 
@@ -42,7 +42,7 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         WORKFLOW_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("workflow" -> workflow, "tasks" -> tasks))
-      generatedFiles +:= StringFileNode(contents, Some(FileUtils.absolutePath(path)))
+      generatedFiles += (path -> contents)
     }
 
     def generateTaskReadme(task: Task, developer: Boolean): String = {
@@ -53,12 +53,12 @@ case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer
         TASK_README_TEMPLATE
       }
       val contents = renderer.render(templateName, Map("task" -> task))
-      generatedFiles +:= StringFileNode(contents, Some(FileUtils.absolutePath(path)))
+      generatedFiles += (path -> contents)
       readmeName
     }
   }
 
-  def apply(document: Document): Vector[FileNode] = {
+  def apply(document: Document): Map[Path, String] = {
     val localFileSource = document.source match {
       case lfs: LocalFileSource => lfs
       case _ =>

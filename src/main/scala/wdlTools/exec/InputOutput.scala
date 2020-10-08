@@ -15,7 +15,7 @@ import wdlTools.eval.{
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
-import wdlTools.util.{Bindings, FileSourceResolver, Logger}
+import wdlTools.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
   protected lazy val callableInputs: Map[String, InputParameter] =
@@ -163,47 +163,59 @@ object TaskInputOutput {
     }
   }
 
-  def resolveWdlValue(name: String,
-                      wdlType: WdlTypes.T,
-                      wdlValue: Option[WdlValues.V],
-                      fileResolver: FileSourceResolver,
-                      loc: SourceLocation,
-                      optional: Boolean = false): WdlValues.V = {
-    def resolveFile(path: String): WdlValues.V = {
-      val resolved = fileResolver.resolve(path).localPath
-      if (Files.isDirectory(resolved)) {
-        throw new ExecException(
-            s"${path} is a directory for File output ${name}",
-            loc
-        )
-      } else if (Files.exists(resolved)) {
-        WdlValues.V_File(resolved.toString)
-      } else if (optional) {
-        WdlValues.V_Null
-      } else {
-        throw new ExecException(
-            s"File ${path} does not exist for required output ${name}",
-            loc
-        )
+  def resolveOutputValue(name: String,
+                         wdlType: WdlTypes.T,
+                         wdlValue: Option[WdlValues.V],
+                         fileResolver: FileSourceResolver,
+                         loc: SourceLocation,
+                         optional: Boolean = false): WdlValues.V = {
+    def resolveFile(address: String): WdlValues.V = {
+      fileResolver.resolve(address) match {
+        case local: LocalFileSource =>
+          val path = local.canonicalPath
+          if (Files.isDirectory(path)) {
+            throw new ExecException(
+                s"${address} is a directory for File output ${name}",
+                loc
+            )
+          } else if (Files.exists(path)) {
+            WdlValues.V_File(path.toString)
+          } else if (optional) {
+            WdlValues.V_Null
+          } else {
+            throw new ExecException(
+                s"File ${address} does not exist for required output ${name}",
+                loc
+            )
+          }
+        case _ =>
+          // this is a remote file source
+          WdlValues.V_File(address)
       }
     }
 
-    def resolveDirectory(path: String): WdlValues.V = {
-      val resolved = fileResolver.resolveDirectory(path).localPath
-      if (Files.isDirectory(resolved)) {
-        WdlValues.V_Directory(resolved.toString)
-      } else if (Files.exists(resolved)) {
-        throw new ExecException(
-            s"${path} is a file for Directory output ${name}",
-            loc
-        )
-      } else if (optional) {
-        WdlValues.V_Null
-      } else {
-        throw new ExecException(
-            s"Directory ${path} does not exist for required output ${name}",
-            loc
-        )
+    def resolveDirectory(address: String): WdlValues.V = {
+      fileResolver.resolveDirectory(address) match {
+        case local: LocalFileSource =>
+          val path = local.canonicalPath
+          if (Files.isDirectory(path)) {
+            WdlValues.V_Directory(path.toString)
+          } else if (Files.exists(path)) {
+            throw new ExecException(
+                s"${address} is a file for Directory output ${name}",
+                loc
+            )
+          } else if (optional) {
+            WdlValues.V_Null
+          } else {
+            throw new ExecException(
+                s"Directory ${address} does not exist for required output ${name}",
+                loc
+            )
+          }
+        case _ =>
+          // this is a remote file source
+          WdlValues.V_File(address)
       }
     }
 
@@ -216,7 +228,7 @@ object TaskInputOutput {
 
       // unwrap non-null value of optional type
       case (WdlTypes.T_Optional(t), v) =>
-        resolveWdlValue(name, t, v, fileResolver, loc, optional = true)
+        resolveOutputValue(name, t, v, fileResolver, loc, optional = true)
 
       // allow missing/null conversion to empty array/map/object
       case (WdlTypes.T_Array(_, false), None | Some(WdlValues.V_Null)) =>
@@ -257,17 +269,17 @@ object TaskInputOutput {
       case (WdlTypes.T_Array(t, _), Some(WdlValues.V_Array(vec))) =>
         WdlValues.V_Array(vec.zipWithIndex.map {
           case (item, idx) =>
-            resolveWdlValue(s"${name}[${idx}]",
-                            t,
-                            Some(item),
-                            fileResolver,
-                            loc,
-                            optional = optional)
+            resolveOutputValue(s"${name}[${idx}]",
+                               t,
+                               Some(item),
+                               fileResolver,
+                               loc,
+                               optional = optional)
         })
       case (WdlTypes.T_Map(keyType, valueType), Some(WdlValues.V_Map(members))) =>
         WdlValues.V_Map(members.map {
           case (k, v) =>
-            val key = resolveWdlValue(
+            val key = resolveOutputValue(
                 s"${name}.${k}",
                 keyType,
                 Some(k),
@@ -275,7 +287,7 @@ object TaskInputOutput {
                 loc,
                 optional = optional
             )
-            val value = resolveWdlValue(
+            val value = resolveOutputValue(
                 s"${name}.${k}",
                 valueType,
                 Some(v),
@@ -288,12 +300,12 @@ object TaskInputOutput {
       case (_, Some(WdlValues.V_Object(members))) =>
         WdlValues.V_Object(members.map {
           case (k, v) =>
-            k -> resolveWdlValue(s"${name}.${k}",
-                                 WdlTypes.T_Any,
-                                 Some(v),
-                                 fileResolver,
-                                 loc,
-                                 optional = optional)
+            k -> resolveOutputValue(s"${name}.${k}",
+                                    WdlTypes.T_Any,
+                                    Some(v),
+                                    fileResolver,
+                                    loc,
+                                    optional = optional)
         })
       case (WdlTypes.T_Struct(structName, memberTypes),
             Some(WdlValues.V_Struct(_, memberValues))) =>
@@ -301,12 +313,12 @@ object TaskInputOutput {
             structName,
             memberTypes.map {
               case (memberName, memberType) =>
-                memberName -> resolveWdlValue(s"${name}.${memberName}",
-                                              memberType,
-                                              memberValues.get(memberName),
-                                              fileResolver,
-                                              loc,
-                                              optional = optional)
+                memberName -> resolveOutputValue(s"${name}.${memberName}",
+                                                 memberType,
+                                                 memberValues.get(memberName),
+                                                 fileResolver,
+                                                 loc,
+                                                 optional = optional)
 
             }
         )

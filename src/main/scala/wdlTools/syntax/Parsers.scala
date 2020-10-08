@@ -67,5 +67,5 @@ case class Parsers(
 }
 
 object Parsers {
-  lazy val instance: Parsers = Parsers()
+  lazy val default: Parsers = Parsers()
 }

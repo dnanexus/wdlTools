@@ -24,6 +24,7 @@ object Renderer {
   }
 
   lazy val defaultTemplateEngine: TemplateEngine = createTemplateEngine()
+  lazy val default: Renderer = Renderer()
 }
 
 // TODO: switch to using Beard - the only problem is that the official

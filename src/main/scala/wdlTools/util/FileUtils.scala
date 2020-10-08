@@ -87,12 +87,23 @@ object FileUtils {
     changeFileExt(prefix, addExt = suffix)
   }
 
+  def linesToString(lines: IterableOnce[String],
+                    lineSeparator: String = DefaultLineSeparator,
+                    trailingNewline: Boolean = false): String = {
+    val s = lines.iterator.mkString(lineSeparator)
+    if (trailingNewline) {
+      s + lineSeparator
+    } else {
+      s
+    }
+  }
+
   def readStdinContent(encoding: Charset = DefaultEncoding): String = {
     if (System.in.available() == 0) {
       return ""
     }
     val in = new BufferedReader(new InputStreamReader(System.in, encoding))
-    Iterator.continually(in.readLine()).takeWhile(_ != null).mkString("\n")
+    linesToString(Iterator.continually(in.readLine()).takeWhile(_ != null))
   }
 
   def readFileBytes(path: Path, mustExist: Boolean = true): Array[Byte] = {

@@ -1,11 +1,13 @@
 package wdlTools.generators.project
 
+import java.nio.file.Paths
+
 import wdlTools.generators.{Renderer, code}
 import wdlTools.generators.code.WdlV1Formatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
-import wdlTools.util.{FileNode, InteractiveConsole, LinesFileNode, StringFileNode, FileUtils}
+import wdlTools.util.{FileUtils, InteractiveConsole}
 
 import scala.util.control.Breaks._
 
@@ -254,7 +256,7 @@ case class ProjectGenerator(name: String,
   }
 
   def apply(workflowModel: Option[WorkflowModel],
-            taskModels: Vector[TaskModel]): Vector[FileNode] = {
+            taskModels: Vector[TaskModel]): Map[String, String] = {
     val tasksAndLinkedInputs = if (interactive) {
       val predefinedTaskInputs = if (workflowModel.isDefined) {
         populateWorkflow(workflowModel.get)
@@ -286,36 +288,37 @@ case class ProjectGenerator(name: String,
                        null,
                        CommentMap.empty)
     val wdlName = s"${name}.wdl"
-    val wdlFile: Vector[FileNode] = Vector(
-        LinesFileNode.withName(wdlName, formatter.formatDocument(doc))
+    val wdlFile = Map(
+        wdlName -> FileUtils.linesToString(formatter.formatDocument(doc), trailingNewline = true)
     )
-    val readMes: Vector[FileNode] = if (readmes) {
-      readmeGenerator.apply(doc)
+    val readMes = if (readmes) {
+      readmeGenerator.apply(doc).map {
+        case (path, content) => path.getFileName.toString -> content
+      }
     } else {
-      Vector.empty
+      Map.empty
     }
-    val dockerFile: Vector[FileNode] = if (dockerfile) {
-      Vector(StringFileNode.withName("Dockerfile", renderer.render(DOCKERFILE_TEMPLATE)))
+    val dockerFile = if (dockerfile) {
+      Map("Dockerfile" -> renderer.render(DOCKERFILE_TEMPLATE))
     } else {
-      Vector.empty
+      Map.empty
     }
-    val testFile: Vector[FileNode] = if (tests) {
-      val testPath = FileUtils.getPath("tests").resolve(s"test_${name}.json")
-      Vector(StringFileNode(TestsGenerator.apply(wdlName, doc), Some(testPath)))
+    val testFile = if (tests) {
+      val testPath = Paths.get("tests").resolve(s"test_${name}.json").toString
+      Map(testPath -> TestsGenerator.apply(wdlName, doc))
     } else {
-      Vector.empty
+      Map.empty
     }
-    val makeFile: Vector[FileNode] = if (makefile) {
-      Vector(
-          StringFileNode
-            .withName("Makefile",
-                      renderer.render(
-                          MAKEFILE_TEMPLATE,
-                          Map("name" -> name, "test" -> tests, "docker" -> dockerfile)
-                      ))
+    val makeFile = if (makefile) {
+      Map(
+          "Makefile" ->
+            renderer.render(
+                MAKEFILE_TEMPLATE,
+                Map("name" -> name, "test" -> tests, "docker" -> dockerfile)
+            )
       )
     } else {
-      Vector.empty
+      Map.empty
     }
     wdlFile ++ readMes ++ dockerFile ++ testFile ++ makeFile
   }

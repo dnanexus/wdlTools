@@ -6,10 +6,10 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{Bindings, FileSource, FileSourceResolver, Logger}
+import wdlTools.util.{AddressableFileSource, Bindings, FileSourceResolver, Logger}
 
 trait LocalizationDisambiguator {
-  def getLocalPath(fileSource: FileSource): Path
+  def getLocalPath(fileSource: AddressableFileSource): Path
 }
 
 /**
@@ -34,7 +34,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
   // mapping from source file parent directories to local directories - this
   // ensures that files that were originally from the same directory are
   // localized to the same target directory
-  private var sourceTargetMap: Map[Path, Path] = Map.empty
+  private var sourceToTarget: Map[String, Path] = Map.empty
   // keep track of which disambiguation dirs we've created
   private var disambiguationDirs: Set[Path] = Set(primaryDir)
   // keep track of which Paths we've returned so we can detect collisions
@@ -53,11 +53,11 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
     }
   }
 
-  override def getLocalPath(source: FileSource): Path = {
-    val sourceParent = source.localPath.getParent
-    sourceTargetMap.get(sourceParent) match {
-      // if we already saw another file from the same parent directory as `source`, try to
-      // put `source` in that same directory
+  override def getLocalPath(source: AddressableFileSource): Path = {
+    val sourceFolder = source.folder
+    sourceToTarget.get(sourceFolder) match {
+      // if we already saw another file from the same source folder as `source`, try to
+      // put `source` in that same target directory
       case Some(parent) if exists(parent.resolve(source.name)) =>
         throw new FileAlreadyExistsException(
             s"Trying to localize ${source} to ${parent} but the file already exists in that directory"
@@ -67,7 +67,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
       case None =>
         val primaryPath = primaryDir.resolve(source.name)
         if (!exists(primaryPath)) {
-          sourceTargetMap += (sourceParent -> primaryDir)
+          sourceToTarget += (sourceFolder -> primaryDir)
           primaryPath
         } else if (disambiguationDirs.size >= disambiguationDirLimit) {
           throw new Exception(
@@ -85,7 +85,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
             throw new Exception(s"collision with existing dir ${newDir}")
           }
           disambiguationDirs += newDir
-          sourceTargetMap += (sourceParent -> newDir)
+          sourceToTarget += (sourceFolder -> newDir)
           newDir.resolve(source.name)
         }
     }
@@ -186,11 +186,11 @@ case class TaskContext(task: Task,
     task.outputs.map { output =>
       val value = outputBindings.get(output.name)
       val resolved: WdlValues.V =
-        TaskInputOutput.resolveWdlValue(output.name,
-                                        output.wdlType,
-                                        value,
-                                        outputFileResolver,
-                                        output.loc)
+        TaskInputOutput.resolveOutputValue(output.name,
+                                           output.wdlType,
+                                           value,
+                                           outputFileResolver,
+                                           output.loc)
       output.name -> resolved
     }.toMap
   }

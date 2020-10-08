@@ -340,7 +340,7 @@ case class ParseAll(followImports: Boolean = false,
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (followImports) {
             val parent = doc.source match {
-              case fs: LocalFileSource => Some(fs.localPath.getParent)
+              case fs: LocalFileSource => Some(fs.canonicalPath.getParent)
               case _                   => None
             }
             followImport(importDoc.addr.value, parent)

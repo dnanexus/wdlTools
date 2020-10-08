@@ -21,7 +21,7 @@ case class Upgrade(conf: WdlToolsConf) extends Command {
       case (source, lines) if outputDir.isDefined =>
         Files.write(outputDir.get.resolve(source.name), lines.asJava)
       case (localSource: LocalFileSource, lines) if overwrite =>
-        Files.write(localSource.localPath, lines.asJava)
+        Files.write(localSource.canonicalPath, lines.asJava)
       case (_, lines) =>
         println(lines.mkString(System.lineSeparator()))
     }

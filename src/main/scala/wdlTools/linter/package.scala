@@ -1,6 +1,5 @@
 package wdlTools.linter
 
-import wdlTools.linter.Severity.Severity
 import wdlTools.syntax.SourceLocation
 
 object Severity extends Enumeration {
@@ -10,7 +9,7 @@ object Severity extends Enumeration {
 }
 
 case class LintEvent(ruleId: String,
-                     severity: Severity,
+                     severity: Severity.Severity,
                      loc: SourceLocation,
                      message: Option[String] = None)
     extends Ordered[LintEvent] {

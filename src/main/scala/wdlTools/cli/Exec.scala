@@ -22,7 +22,7 @@ import scala.language.reflectiveCalls
 case class Exec(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.exec.uri())
-    val (doc: TAT.Document, _) = TypeInfer().apply(Parsers().parseDocument(docSource))
+    val (doc: TAT.Document, _) = TypeInfer().apply(Parsers.default.parseDocument(docSource))
     val taskName = conf.exec.task.toOption
     val tasks = doc.elements.collect {
       case task: TAT.Task if taskName.isEmpty          => task

@@ -36,7 +36,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       validateContentFile: Boolean = false
   ): (FileNode, TAT.Document, FileNode, Option[TAT.Document]) = {
     val beforeSrc = getWdlSource(fname = fname, subdir = "before")
-    val doc = Parsers.instance.parseDocument(beforeSrc)
+    val doc = Parsers.default.parseDocument(beforeSrc)
     val (tDoc, _) = TypeInfer.instance.apply(doc)
     val generator = WdlV1Generator()
     val gLines = LinesFileNode(generator.generateDocument(tDoc))
@@ -47,7 +47,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       gLines.readLines.mkString("\n") shouldBe afterSrc.readLines.mkString("\n")
     }
     val gtDoc = if (validateParse) {
-      val gDoc = Parsers.instance.parseDocument(gLines)
+      val gDoc = Parsers.default.parseDocument(gLines)
       Some(TypeInfer.instance.apply(gDoc)._1)
     } else {
       None

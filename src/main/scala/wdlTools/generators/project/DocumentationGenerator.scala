@@ -4,7 +4,7 @@ import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.SyntaxUtils.prettyFormatExpr
 import wdlTools.syntax.{Comment, Parsers, SyntaxUtils}
-import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, StringFileNode}
+import wdlTools.util.{FileNode, FileSourceResolver, FileUtils}
 
 object DocumentationGenerator {
   //private val TemplatePrefix = "/templates/documentation/"
@@ -343,7 +343,9 @@ object DocumentationGenerator {
     }
   }
 
-  def apply(docSource: FileNode, title: String, followImports: Boolean = true): Vector[FileNode] = {
+  def apply(docSource: FileNode,
+            title: String,
+            followImports: Boolean = true): Map[String, String] = {
     val docs =
       Parsers(followImports)
         .getDocumentWalker[Map[FileNode, WdlDocumentation]](docSource, Map.empty)
@@ -358,28 +360,21 @@ object DocumentationGenerator {
     // All structs share the same namespace so we put them on a separate page
     val structs = docs.values.flatMap(d => d.structs).toVector
     val renderer = Renderer()
-    val pages: Vector[FileNode] = docs.map {
+    val pages = docs.map {
       case (source, doc) =>
-        val destFile = FileUtils.changeFileExt(source.name, ".wdl", ".md")
-        StringFileNode(
-            renderer.render(DocumentTemplate, Map("doc" -> doc)),
-            Some(FileUtils.getPath(destFile))
-        )
-    }.toVector ++ (
-        if (structs.nonEmpty) {
-          Vector(
-              StringFileNode(
-                  renderer.render(StructsTemplate, Map("structs" -> structs)),
-                  Some(FileUtils.getPath("structs.md"))
-              )
-          )
-        } else {
-          Vector.empty
-        }
+        val destName = FileUtils.changeFileExt(source.name, ".wdl", ".md")
+        destName -> renderer.render(DocumentTemplate, Map("doc" -> doc))
+    }
+    val structsPage = if (structs.nonEmpty) {
+      Map(
+          "structs.md" -> renderer.render(StructsTemplate, Map("structs" -> structs))
+      )
+    } else {
+      Map.empty
+    }
+    val indexPage = Map(
+        "index.md" -> renderer.render(IndexTemplate, Map("title" -> title, "pages" -> pages.keys))
     )
-    pages :+ StringFileNode(
-        renderer.render(IndexTemplate, Map("title" -> title, "pages" -> pages.map(_.name))),
-        Some(FileUtils.getPath("index.md"))
-    )
+    pages ++ structsPage ++ indexPage
   }
 }
