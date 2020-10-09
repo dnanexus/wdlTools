@@ -81,7 +81,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
           val newDir = Files.createTempDirectory(rootDir, "input")
           // we should never get a collision according to the guarantees of
           // Files.createTempDirectory, but we check anyway
-          if (Files.exists(newDir) || disambiguationDirs.contains(newDir)) {
+          if (disambiguationDirs.contains(newDir)) {
             throw new Exception(s"collision with existing dir ${newDir}")
           }
           disambiguationDirs += newDir
