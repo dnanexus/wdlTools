@@ -5,8 +5,8 @@ import java.nio.file.{Path, Paths}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.{Eval, EvalPaths, WdlValueBindings}
-import wdlTools.generators.code.WdlV1Generator
-import wdlTools.syntax.Parsers
+import wdlTools.generators.code.WdlGenerator
+import wdlTools.syntax.{Parsers, WdlVersion}
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
 import wdlTools.util.{FileNode, FileSourceResolver, LinesFileNode}
 
@@ -33,12 +33,13 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       fname: String,
       validateParse: Boolean = true,
       validateContentSelf: Boolean = false,
-      validateContentFile: Boolean = false
+      validateContentFile: Boolean = false,
+      wdlVersion: WdlVersion = WdlVersion.V1
   ): (FileNode, TAT.Document, FileNode, Option[TAT.Document]) = {
     val beforeSrc = getWdlSource(fname = fname, subdir = "before")
     val doc = Parsers.default.parseDocument(beforeSrc)
     val (tDoc, _) = TypeInfer.instance.apply(doc)
-    val generator = WdlV1Generator()
+    val generator = WdlGenerator(Some(wdlVersion))
     val gLines = LinesFileNode(generator.generateDocument(tDoc))
     if (validateContentSelf) {
       gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")

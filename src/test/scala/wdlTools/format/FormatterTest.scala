@@ -28,7 +28,7 @@ class FormatterTest extends AnyFlatSpec with Matchers {
   it should "reformat simple WDL" in {
     val beforeSrc = getWdlSource(fname = "simple.wdl", subdir = "before")
     val expected = getWdlSource(fname = "simple.wdl", subdir = "after")
-    val formatter = code.WdlV1Formatter()
+    val formatter = code.WdlFormatter()
     val documents = formatter.formatDocuments(beforeSrc)
     documents(beforeSrc).mkString("\n") shouldBe expected.readString
   }
@@ -36,7 +36,7 @@ class FormatterTest extends AnyFlatSpec with Matchers {
   it should "format add.wdl" in {
     val beforeSrc = getWdlSource(fname = "add.wdl", subdir = "before")
     val expected = getWdlSource(fname = "add.wdl", subdir = "after")
-    val formatter = code.WdlV1Formatter()
+    val formatter = code.WdlFormatter()
     val documents = formatter.formatDocuments(beforeSrc)
     documents(beforeSrc).mkString("\n") shouldBe expected.readString
   }
@@ -44,7 +44,7 @@ class FormatterTest extends AnyFlatSpec with Matchers {
   it should "format task with complex metadata" in {
     val beforeSrc = getWdlSource(fname = "meta_object_values.wdl", subdir = "before")
     val doc = v1Parser.parseDocument(beforeSrc)
-    val formatter = code.WdlV1Formatter()
+    val formatter = code.WdlFormatter()
     val lines = formatter.formatDocument(doc)
     // test that it parses successfully
     v1Parser.parseDocument(LinesFileNode(lines))

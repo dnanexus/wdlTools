@@ -9,21 +9,21 @@ case class Upgrader(followImports: Boolean = false,
   private val parsers = Parsers(followImports, fileResolver, logger = logger)
 
   def upgrade(docSource: FileNode,
-              srcVersion: Option[WdlVersion] = None,
-              destVersion: WdlVersion = WdlVersion.V1): Map[FileNode, Seq[String]] = {
-    val parser = if (srcVersion.isDefined) {
-      parsers.getParser(srcVersion.get)
+              sourceVersion: Option[WdlVersion] = None,
+              targetVersion: WdlVersion = WdlVersion.V1): Map[FileNode, Seq[String]] = {
+    val parser = if (sourceVersion.isDefined) {
+      parsers.getParser(sourceVersion.get)
     } else {
       parsers.getParser(docSource)
     }
 
     // the parser will follow imports, so the formatter should not
-    val formatter = WdlV1Formatter(followImports)
+    val formatter = WdlFormatter(Some(targetVersion), followImports)
 
     // parse and format the document (and any imports)
     parser.Walker[Map[FileNode, Seq[String]]](docSource, Map.empty).walk { (doc, results) =>
-      if (doc.version.value >= destVersion) {
-        throw new Exception(s"Cannot convert WDL version ${doc.version} to ${destVersion}")
+      if (doc.version.value >= targetVersion) {
+        throw new Exception(s"Cannot convert WDL version ${doc.version} to ${targetVersion}")
       }
       results + (doc.source -> formatter.formatDocument(doc))
     }

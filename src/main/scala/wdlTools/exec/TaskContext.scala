@@ -55,7 +55,7 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
 
   override def getLocalPath(source: AddressableFileSource): Path = {
     val sourceFolder = source.folder
-    sourceToTarget.get(sourceFolder) match {
+    val localPath = sourceToTarget.get(sourceFolder) match {
       // if we already saw another file from the same source folder as `source`, try to
       // put `source` in that same target directory
       case Some(parent) if exists(parent.resolve(source.name)) =>
@@ -89,6 +89,8 @@ case class SafeLocalizationDisambiguator(rootDir: Path,
           newDir.resolve(source.name)
         }
     }
+    localizedPaths += localPath
+    localPath
   }
 }
 

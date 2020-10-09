@@ -1,13 +1,229 @@
 package wdlTools.generators.code
 
-import wdlTools.generators.code.BaseWdlGenerator._
+import wdlTools.generators.code.WdlGenerator._
+import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
 import wdlTools.syntax.{Operator, WdlVersion}
 
-case class WdlV1Generator(omitNullInputs: Boolean = true) {
+import scala.collection.mutable
+
+object WdlGenerator {
+  trait Composite extends Sized {
+
+    /**
+      * Format the contents of the composite. The `lineGenerator` passed to this method
+      * must have `isLineBegun == true` on both entry and exit.
+      *
+      * @param lineGenerator the LineGenerator
+      */
+    def generateContents(lineGenerator: LineGenerator): Unit
+  }
+
+  class LineGenerator(
+      indenting: Indenting = Indenting.IfNotIndented,
+      indentStep: Int = 2,
+      initialIndentSteps: Int = 0,
+      indentation: String = " ",
+      wrapping: Wrapping = Wrapping.AsNeeded,
+      maxLineWidth: Int = 100,
+      private val lines: mutable.Buffer[String],
+      private val currentLine: mutable.StringBuilder,
+      private var currentIndentSteps: Int = 0,
+      private var currentSpacing: Spacing = Spacing.On,
+      private val lineBegun: MutableHolder[Boolean] = MutableHolder[Boolean](false),
+      private val skipNextSpace: MutableHolder[Boolean] = MutableHolder[Boolean](false)
+  ) {
+
+    /**
+      * Derive a new LineFormatter with the current state modified by the specified parameters.
+      *
+      * @param increaseIndent whether to incerase the indent by one step
+      * @param newIndenting new value for `indenting`
+      * @param newSpacing new value for `spacing`
+      * @param newWrapping new value for `wrapping`
+      * @return
+      */
+    def derive(increaseIndent: Boolean = false,
+               continuing: Boolean = false,
+               newIndenting: Indenting = indenting,
+               newSpacing: Spacing = currentSpacing,
+               newWrapping: Wrapping = wrapping): LineGenerator = {
+      val indentSteps = if (continuing) currentIndentSteps else initialIndentSteps
+      val newInitialIndentSteps = indentSteps + (if (increaseIndent) 1 else 0)
+      val newCurrentIndentSteps =
+        if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
+          newInitialIndentSteps
+        } else {
+          currentIndentSteps
+        }
+      new LineGenerator(newIndenting,
+                        indentStep,
+                        newInitialIndentSteps,
+                        indentation,
+                        newWrapping,
+                        maxLineWidth,
+                        lines,
+                        currentLine,
+                        newCurrentIndentSteps,
+                        newSpacing,
+                        lineBegun,
+                        skipNextSpace)
+    }
+
+    def isLineBegun: Boolean = lineBegun.value
+
+    def atLineStart: Boolean = {
+      currentLine.length <= (currentIndentSteps * indentStep)
+    }
+
+    def getIndent(changeSteps: Int = 0): String = {
+      indentation * ((currentIndentSteps + changeSteps) * indentStep)
+    }
+
+    def lengthRemaining: Int = {
+      if (atLineStart) {
+        maxLineWidth
+      } else {
+        maxLineWidth - currentLine.length
+      }
+    }
+
+    def emptyLine(): Unit = {
+      require(!isLineBegun)
+      lines.append("")
+    }
+
+    def beginLine(): Unit = {
+      require(!isLineBegun)
+      currentLine.append(getIndent())
+      lineBegun.value = true
+    }
+
+    private def dent(indenting: Indenting): Unit = {
+      indenting match {
+        case Indenting.Always =>
+          currentIndentSteps += 1
+        case Indenting.IfNotIndented if currentIndentSteps == initialIndentSteps =>
+          currentIndentSteps += 1
+        case Indenting.Dedent if currentIndentSteps > initialIndentSteps =>
+          currentIndentSteps -= 1
+        case Indenting.Reset =>
+          currentIndentSteps = initialIndentSteps
+        case Indenting.Never =>
+          currentIndentSteps = 0
+        case _ => ()
+      }
+    }
+
+    def endLine(continue: Boolean = false): Unit = {
+      require(isLineBegun)
+      if (!atLineStart) {
+        lines.append(currentLine.toString)
+        if (continue) {
+          dent(indenting)
+        } else {
+          dent(Indenting.Reset)
+        }
+      }
+      currentLine.clear()
+      lineBegun.value = false
+      skipNextSpace.value = false
+    }
+
+    /**
+      * Append a single `sized`.
+      * @param sized the `sized` to append
+      * @param continue whether to continue the current indenting
+      * # true
+      * Int i = 1 +
+      *   (2 * 3) -
+      *   (4 / 5)
+      * # false
+      * {
+      *   x: 1,
+      *   y: 2
+      * }
+      */
+    def append(sized: Sized, continue: Boolean = true): Unit = {
+      require(isLineBegun)
+      if (wrapping == Wrapping.Always) {
+        endLine(continue = continue)
+        beginLine()
+      } else {
+        val addSpace = currentLine.nonEmpty &&
+          currentSpacing == Spacing.On &&
+          !skipNextSpace.value &&
+          !currentLine.last.isWhitespace &&
+          currentLine.last != indentation.last
+        if (wrapping != Wrapping.Never && lengthRemaining < sized.length + (if (addSpace) 1 else 0)) {
+          endLine(continue = continue)
+          beginLine()
+        } else if (addSpace) {
+          currentLine.append(" ")
+        }
+      }
+      sized match {
+        case c: Composite => c.generateContents(this)
+        case a =>
+          currentLine.append(a.toString)
+          if (skipNextSpace.value) {
+            skipNextSpace.value = false
+          }
+      }
+    }
+
+    def appendAll(sizeds: Vector[Sized], continue: Boolean = true): Unit = {
+      sizeds.foreach(sized => append(sized, continue))
+    }
+
+    // TODO: these two methods are a hack - they are currently needed to handle the case of
+    //  printing a prefix followed by any number of spans followed by a suffix, and suppress
+    //  the space after the prefix and before the suffix. Ideally, this would be handled by
+    //  `append` using a different `Spacing` value.
+
+    def appendPrefix(prefix: Sized): Unit = {
+      append(prefix)
+      skipNextSpace.value = true
+    }
+
+    def appendSuffix(suffix: Sized): Unit = {
+      skipNextSpace.value = true
+      append(suffix)
+    }
+
+    def toVector: Vector[String] = {
+      lines.toVector
+    }
+  }
+
+  object LineGenerator {
+    def apply(indenting: Indenting = Indenting.IfNotIndented,
+              indentStep: Int = 2,
+              initialIndentSteps: Int = 0,
+              indentation: String = " ",
+              wrapping: Wrapping = Wrapping.AsNeeded,
+              maxLineWidth: Int = 100): LineGenerator = {
+      val lines: mutable.Buffer[String] = mutable.ArrayBuffer.empty
+      val currentLine: mutable.StringBuilder = new StringBuilder(maxLineWidth)
+      new LineGenerator(indenting,
+                        indentStep,
+                        initialIndentSteps,
+                        indentation,
+                        wrapping,
+                        maxLineWidth,
+                        lines,
+                        currentLine)
+    }
+  }
+}
+
+case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs: Boolean = true) {
+  if (targetVersion.exists(_ < WdlVersion.V1)) {
+    throw new Exception(s"WDL version ${targetVersion.get} is not supported")
+  }
 
   private case class Literal(value: Any, quoting: Boolean = false) extends Sized {
     override lazy val length: Int = toString.length
@@ -499,7 +715,7 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
 
   private case class VersionStatement(version: Version) extends Statement {
     private val keywordToken = Literal(Symbols.Version)
-    private val versionToken = Literal(WdlVersion.V1.name)
+    private val versionToken = Literal(targetVersion.getOrElse(version.value).name)
 
     override def format(lineGenerator: LineGenerator): Unit = {
       lineGenerator.beginLine()
@@ -1022,7 +1238,12 @@ case class WdlV1Generator(omitNullInputs: Boolean = true) {
   def generateElement(element: Element,
                       headerLines: Vector[String] = Vector.empty): Vector[String] = {
     val stmt = element match {
-      case d: Document => DocumentSections(d)
+      case d: Document =>
+        val version = targetVersion.getOrElse(d.version.value)
+        if (version < WdlVersion.V1) {
+          throw new Exception(s"WDL version ${version} is not supported")
+        }
+        DocumentSections(d)
       case t: Task     => TaskBlock(t)
       case w: Workflow => WorkflowBlock(w)
       case other =>
