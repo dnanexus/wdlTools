@@ -1,4 +1,4 @@
-# v0.8.0 (dev)
+# v0.8.0 (2020-10-09)
 
 * Added support for new WDL v2 `min` and `max` functions
 * Complete WDL v2 support in code formatter and generator
