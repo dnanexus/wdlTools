@@ -1,3 +1,7 @@
+# v0.8.1 (2020-10-10)
+
+* Bugfixes
+
 # v0.8.0 (2020-10-09)
 
 * Added support for new WDL v2 `min` and `max` functions

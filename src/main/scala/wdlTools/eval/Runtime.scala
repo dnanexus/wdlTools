@@ -22,9 +22,13 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   def allows(id: String): Boolean
 
   def contains(id: String): Boolean = {
-    cache.contains(id) || runtime.contains(id) || (aliases.contains(id) && contains(
-        aliases.get(id)
-    ))
+    allows(id) && (
+        cache.contains(id) ||
+        runtime.contains(id) ||
+        (aliases.contains(id) && contains(aliases.get(id))) ||
+        userDefaultValues.exists(_.contains(id)) ||
+        defaults.contains(id)
+    )
   }
 
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V
