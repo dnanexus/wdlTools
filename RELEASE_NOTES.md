@@ -24,7 +24,7 @@
     * `*InputDefinition` -> `*InputParameter`
     * `OutputDefinition` -> `OutputParameter`
     * `Task.declarations` -> `Task.privateVariables`
-* Renamed `types.Context` -> `Types.TypeContext`    
+* Renamed `types.Context` -> `types.TypeContext`    
 * Add default values for all reserved runtime keys (as per the [PR](https://github.com/openwdl/wdl/pull/315))
 * Override `LocalFileSource.equals` to compare based on `localPath`    
 * Renamed Utils classes
