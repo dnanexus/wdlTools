@@ -21,3 +21,5 @@ gen/
 
 # test corpora
 src/test/resources/corpora
+
+.gradle/

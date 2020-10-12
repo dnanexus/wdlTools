@@ -265,7 +265,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_Optional(l), r) if regime <= Moderate =>
           // T is coercible to T? - this isn't great, but it's necessary
           // since there is no function for doing the coercion explicitly
-          logger.trace(s"moderate coercion from ${r} to optional")
+          logger.trace(s"moderate coercion from ${r} to optional", minPriority = TraceLevel.VVerbose)
           val (t, newVarTypes, newPriority) =
             inner(l, r, vt, Enum.max(minPriority, Priority.RegimeAllowed))
           (T_Optional(t), newVarTypes, newPriority)

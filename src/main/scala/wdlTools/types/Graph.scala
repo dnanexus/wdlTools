@@ -11,6 +11,24 @@ import wdlTools.types.WdlTypes.{T, T_Array, T_Map, T_Optional, T_Struct}
 
 case class ElementNode(element: Element)
 
+/**
+  * Graph of the DocumentElements in a Document. The graph starts from
+  * the main Document and includes all imports.
+  *
+  * Each Document has a namespace that consists of 1) the workflow,
+  * tasks, and structs defined within that document, 2) any imported
+  * Documents, which are named either with their alias or (if they
+  * don't have an alias) the document name without the path prefix or
+  * the '.wdl' suffix, and 3) any structs in imported documents, which
+  * are named either by their alias or (if they don't have an alias) by
+  * their name. If a Document imports another Document, it has access to
+  * all the members of that Document's namespace (using dotted notation).
+  *
+  * @param graph
+  * @param wdlVersion
+  * @param namespaces
+  * @param structDefs
+  */
 case class ElementGraph(graph: Graph[ElementNode, DiEdge],
                         wdlVersion: WdlVersion,
                         namespaces: Map[String, Document],
