@@ -2,15 +2,20 @@ package wdlTools.util
 
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 
-import scala.collection.SortedSet
+import scala.collection.immutable.{ListMap, SortedSet}
 
 abstract class Enum extends Enumeration {
-  private lazy val byLowerCaseName: Map[String, Value] =
-    values.map(x => x.toString.toLowerCase -> x).toMap
+  def names: SortedSet[String] = SortedSet.from(values.map(_.toString))
 
-  def names: SortedSet[String] = values.map(_.toString)
+  protected lazy val nameToValue: ListMap[String, Value] = {
+    ListMap.from(values.map(x => x.toString -> x))
+  }
 
-  def hasName(name: String): Boolean = names.contains(name)
+  private lazy val byLowerCaseName: Map[String, Value] = nameToValue.map {
+    case (key, value) => key.toLowerCase -> value
+  }
+
+  def hasName(name: String): Boolean = nameToValue.contains(name)
 
   def hasNameIgnoreCase(name: String): Boolean = byLowerCaseName.contains(name.toLowerCase)
 
