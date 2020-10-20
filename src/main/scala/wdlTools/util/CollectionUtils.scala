@@ -1,6 +1,6 @@
 package wdlTools.util
 
-object Collections {
+object CollectionUtils {
   implicit class IterableExtensions[A](iterable: Iterable[A]) {
     def asOption: Option[IterableOnce[A]] = {
       if (iterable.nonEmpty) {
