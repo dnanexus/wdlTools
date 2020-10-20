@@ -69,6 +69,14 @@ object JsUtils {
     }
   }
 
+  def getDouble(js: JsValue, fieldName: Option[String] = None): Double = {
+    get(js, fieldName) match {
+      case JsNumber(value) => value.toDouble
+      case JsString(value) => value.toDouble
+      case other           => throw new Exception(s"Expected a number, got ${other}")
+    }
+  }
+
   def getBoolean(js: JsValue, fieldName: Option[String] = None): Boolean = {
     get(js, fieldName) match {
       case JsBoolean(value)  => value
