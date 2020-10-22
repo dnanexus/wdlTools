@@ -20,6 +20,7 @@ object Wrapping extends Enumeration {
   val Never, // Never wrap adjacent statements
   AsNeeded, // Wrap adjacent statements as needed (i.e. when the statement
   // is longer than the maximum line length)
+  AllOrNone, // Either wrap all statements or none of them
   Always // Always wrap
   = Value
 }
@@ -35,6 +36,11 @@ trait Sized {
     * The length of the element in characters, if it were formatted without line-wrapping.
     */
   def length: Int
+
+  /**
+    * The length of the element's first line, if it were formatted with line-wrapping.
+    */
+  def firstLineLength: Int = length
 }
 
 /**

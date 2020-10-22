@@ -47,18 +47,13 @@ object WdlGenerator {
       * @return
       */
     def derive(increaseIndent: Boolean = false,
-               continuing: Boolean = false,
+               newIndentSteps: Option[Int] = None,
                newIndenting: Indenting = indenting,
                newSpacing: Spacing = currentSpacing,
                newWrapping: Wrapping = wrapping): LineGenerator = {
-      val indentSteps = if (continuing) currentIndentSteps else initialIndentSteps
-      val newInitialIndentSteps = indentSteps + (if (increaseIndent) 1 else 0)
-      val newCurrentIndentSteps =
-        if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
-          newInitialIndentSteps
-        } else {
-          currentIndentSteps
-        }
+      val newInitialIndentSteps =
+        newIndentSteps.getOrElse(initialIndentSteps + (if (increaseIndent) 1 else 0))
+      val newCurrentIndentSteps = Math.max(currentIndentSteps, newInitialIndentSteps)
       new LineGenerator(newIndenting,
                         indentStep,
                         newInitialIndentSteps,
@@ -79,16 +74,16 @@ object WdlGenerator {
       currentLine.length <= (currentIndentSteps * indentStep)
     }
 
+    def getIndentSteps(changeSteps: Int = 0): Int = {
+      currentIndentSteps + changeSteps
+    }
+
     def getIndent(changeSteps: Int = 0): String = {
-      indentation * ((currentIndentSteps + changeSteps) * indentStep)
+      indentation * (getIndentSteps(changeSteps) * indentStep)
     }
 
     def lengthRemaining: Int = {
-      if (atLineStart) {
-        maxLineWidth
-      } else {
-        maxLineWidth - currentLine.length
-      }
+      maxLineWidth - Math.max(currentLine.length, currentIndentSteps * indentStep)
     }
 
     def emptyLine(): Unit = {
@@ -121,7 +116,9 @@ object WdlGenerator {
     def endLine(continue: Boolean = false): Unit = {
       require(isLineBegun)
       if (!atLineStart) {
-        lines.append(currentLine.toString)
+        // the line could have trailing whitespace, such as from a comment or
+        // when a space was added prior to a line-wrap - trim it off
+        lines.append(currentLine.toString.replaceAll("""(?m)\s+$""", ""))
         if (continue) {
           dent(indenting)
         } else {
@@ -137,11 +134,12 @@ object WdlGenerator {
       * Append a single `sized`.
       * @param sized the `sized` to append
       * @param continue whether to continue the current indenting
-      * # true
+      * @example
+      * # continue = true
       * Int i = 1 +
       *   (2 * 3) -
       *   (4 / 5)
-      * # false
+      * # continue = false
       * {
       *   x: 1,
       *   y: 2
@@ -158,7 +156,9 @@ object WdlGenerator {
           !skipNextSpace.value &&
           !currentLine.last.isWhitespace &&
           currentLine.last != indentation.last
-        if (wrapping != Wrapping.Never && lengthRemaining < sized.length + (if (addSpace) 1 else 0)) {
+        if (wrapping != Wrapping.Never && lengthRemaining < (
+                sized.firstLineLength + (if (addSpace) 1 else 0)
+            )) {
           endLine(continue = continue)
           beginLine()
         } else if (addSpace) {
@@ -166,7 +166,8 @@ object WdlGenerator {
         }
       }
       sized match {
-        case c: Composite => c.generateContents(this)
+        case c: Composite =>
+          c.generateContents(this)
         case a =>
           currentLine.append(a.toString)
           if (skipNextSpace.value) {
@@ -244,20 +245,34 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       extends Composite {
     require(sizeds.nonEmpty)
 
-    override lazy val length: Int = sizeds.map(_.length).sum + (
-        if (spacing == Spacing.On) sizeds.length else 0
-    )
+    override lazy val length: Int = {
+      sizeds.map(_.length).sum + (if (spacing == Spacing.On) sizeds.length else 0)
+    }
+
+    override lazy val firstLineLength: Int = {
+      if (wrapping == Wrapping.Never || wrapping == Wrapping.AllOrNone) {
+        length
+      } else {
+        sizeds.head.firstLineLength
+      }
+    }
 
     override def generateContents(lineGenerator: LineGenerator): Unit = {
-      lineGenerator
-        .derive(newSpacing = spacing, newWrapping = wrapping)
-        .appendAll(sizeds, continue)
+      val contentGenerator = if (wrapping == Wrapping.AllOrNone) {
+        // inherit the lineGenerator's wrapping
+        lineGenerator.derive(newSpacing = spacing)
+      } else {
+        // override the lineGenerator's wrapping
+        lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping)
+      }
+      contentGenerator.appendAll(sizeds, continue)
     }
   }
 
   private abstract class Group(ends: Option[(Sized, Sized)] = None,
                                val wrapping: Wrapping = Wrapping.Never,
-                               val spacing: Spacing = Spacing.On)
+                               val spacing: Spacing = Spacing.On,
+                               val continue: Boolean = false)
       extends Composite {
 
     private val endLengths: (Int, Int) =
@@ -265,20 +280,34 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
     override lazy val length: Int = body.map(_.length).getOrElse(0) + endLengths._1 + endLengths._2
 
+    override lazy val firstLineLength: Int = {
+      if (wrapping == Wrapping.Never || wrapping == Wrapping.AllOrNone || body.isEmpty) {
+        length
+      } else if (ends.isDefined) {
+        ends.get._1.length
+      } else {
+        body.get.firstLineLength
+      }
+    }
+
     override def generateContents(lineGenerator: LineGenerator): Unit = {
       if (ends.isDefined) {
         val (prefix, suffix) = ends.get
         if (body.nonEmpty && (
-                wrapping == Wrapping.Always || (wrapping != Wrapping.Never && length > lineGenerator.lengthRemaining)
+                wrapping == Wrapping.Always || (
+                    wrapping != Wrapping.Never && length > lineGenerator.lengthRemaining
+                )
             )) {
-          lineGenerator.append(prefix)
-          lineGenerator.endLine()
+          val bodyIndent = lineGenerator.getIndentSteps(1)
 
+          lineGenerator.append(prefix)
+          lineGenerator.endLine(continue = continue)
+
+          val effectiveWrapping = if (wrapping == Wrapping.AllOrNone) Wrapping.Always else wrapping
           val bodyGenerator = lineGenerator
-            .derive(increaseIndent = true,
-                    continuing = true,
+            .derive(newIndentSteps = Some(bodyIndent),
                     newSpacing = Spacing.On,
-                    newWrapping = wrapping)
+                    newWrapping = effectiveWrapping)
           bodyGenerator.beginLine()
           bodyGenerator.append(body.get)
           bodyGenerator.endLine()
@@ -286,7 +315,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           lineGenerator.beginLine()
           lineGenerator.append(suffix)
         } else {
-          val adjacentGenerator = lineGenerator.derive(newSpacing = spacing, newWrapping = wrapping)
+          val effectiveWrapping = if (wrapping == Wrapping.AllOrNone) Wrapping.Never else wrapping
+          val adjacentGenerator =
+            lineGenerator.derive(newSpacing = spacing, newWrapping = effectiveWrapping)
           adjacentGenerator.appendPrefix(prefix)
           if (body.nonEmpty) {
             adjacentGenerator.append(body.get)
@@ -305,8 +336,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                                delimiter: Option[String] = None,
                                ends: Option[(Sized, Sized)] = None,
                                override val wrapping: Wrapping = Wrapping.AsNeeded,
-                               continue: Boolean = true)
-      extends Group(ends = ends, wrapping = wrapping) {
+                               override val continue: Boolean = true)
+      extends Group(ends = ends, wrapping = wrapping, continue = continue) {
 
     override lazy val body: Option[Composite] = if (items.nonEmpty) {
       Some(
@@ -337,7 +368,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       extends Composite {
     private val delimiterLiteral: Literal = Literal(delimiter)
 
-    override def length: Int = key.length + delimiterLiteral.length + value.length + 1
+    override lazy val firstLineLength: Int = key.length + delimiterLiteral.length
+
+    override lazy val length: Int = firstLineLength + value.length + 1
 
     override def generateContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator
@@ -488,16 +521,19 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       parentOperation: Option[String] = None,
       stringModifier: Option[String => String] = None
   ): Sized = {
-    // Builds an expression that occurs nested within another expression. By default, passes
-    //all the current parameter values to the nested call.
-    // @param nestedExpression the nested Expr
-    // @param placeholderOpen  override the current value of `placeholderOpen`
-    // @param inString         override the current value of `inString`
-    // @param inPlaceholder    override the current value of `inPlaceholder`
-    // @param inOperation      override the current value of `inOperation`
-    // @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-    //                         same operations are not grouped.
-    // @return a Sized
+
+    /**
+      * Builds an expression that occurs nested within another expression. By default, passes
+      * all the current parameter values to the nested call.
+      * @param nestedExpression the nested Expr
+      * @param placeholderOpen  override the current value of `placeholderOpen`
+      * @param inString         override the current value of `inString`
+      * @param inPlaceholder    override the current value of `inPlaceholder`
+      * @param inOperation      override the current value of `inOperation`
+      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+      *                         same operations are not grouped.
+      * @return a Sized
+      */
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
@@ -550,7 +586,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         Container(
             value.map(nested(_)),
             Some(Symbols.ArrayDelimiter),
-            Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose))
+            Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
+            wrapping = Wrapping.AllOrNone
         )
       case ExprMap(value, _, _) =>
         Container(
@@ -637,8 +674,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                     tSized,
                     Literal(Symbols.Else),
                     fSized
-                ),
-                wrapping = Wrapping.AsNeeded
+                )
             )
           case ExprApply(oper, _, Vector(value), _, _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
@@ -831,6 +867,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             value.map(buildMeta),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
+            wrapping = Wrapping.AllOrNone,
             continue = false
         )
       case MetaValueObject(value, _) =>
@@ -931,9 +968,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       val kv = KeyValue(
           key,
-          Container(value,
-                    delimiter = Some(s"${Symbols.ArrayDelimiter}"),
-                    wrapping = Wrapping.Always)
+          Container(value, delimiter = Some(Symbols.ArrayDelimiter), wrapping = Wrapping.Always)
       )
       kv.generateContents(lineGenerator)
     }
@@ -1038,11 +1073,19 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
     private val commandEndRegexp = "\n*\\s*$".r
 
+    // check whether there is at least one non-whitespace command part
+    private def hasCommand: Boolean = {
+      command.parts.exists {
+        case ValueString(value, _, _) => value.trim.nonEmpty
+        case _                        => true
+      }
+    }
+
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator.appendAll(
           Vector(Literal(Symbols.Command), Literal(Symbols.CommandOpen))
       )
-      if (command.parts.nonEmpty) {
+      if (hasCommand) {
         lineGenerator.endLine()
 
         // The parser swallows anyting after the opening token ('{' or '<<<') as part of the comment
@@ -1081,9 +1124,11 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                       .map(m => m.group(1))
                     (ValueString(s"${s}\n${rest}", wdlType, text), ws)
                 }
-              case _ => throw new RuntimeException("sanity")
+              case other =>
+                throw new RuntimeException(s"unexpected command part ${other}")
             }
-          case other => (other, None)
+          case other =>
+            (other, None)
         }
 
         def trimLast(last: Expr): Expr = {

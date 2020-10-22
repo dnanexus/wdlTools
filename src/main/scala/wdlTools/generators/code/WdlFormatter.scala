@@ -114,18 +114,13 @@ object WdlFormatter {
       * @return
       */
     def derive(increaseIndent: Boolean = false,
-               continuing: Boolean = false,
+               newIndentSteps: Option[Int] = None,
                newIndenting: Indenting = indenting,
                newSpacing: Spacing = currentSpacing,
                newWrapping: Wrapping = wrapping): LineFormatter = {
-      val indentSteps = if (continuing) currentIndentSteps else initialIndentSteps
-      val newInitialIndentSteps = indentSteps + (if (increaseIndent) 1 else 0)
-      val newCurrentIndentSteps =
-        if (increaseIndent && newInitialIndentSteps > currentIndentSteps) {
-          newInitialIndentSteps
-        } else {
-          currentIndentSteps
-        }
+      val newInitialIndentSteps =
+        newIndentSteps.getOrElse(initialIndentSteps + (if (increaseIndent) 1 else 0))
+      val newCurrentIndentSteps = Math.max(currentIndentSteps, newInitialIndentSteps)
       new LineFormatter(comments,
                         newIndenting,
                         indentStep,
@@ -150,15 +145,16 @@ object WdlFormatter {
       currentLine.length <= (currentIndentSteps * indentStep)
     }
 
-    def getIndent(changeSteps: Int = 0): String =
-      indentation * ((currentIndentSteps + changeSteps) * indentStep)
+    def getIndentSteps(changeSteps: Int = 0): Int = {
+      currentIndentSteps + changeSteps
+    }
+
+    def getIndent(changeSteps: Int = 0): String = {
+      indentation * (getIndentSteps(changeSteps) * indentStep)
+    }
 
     def lengthRemaining: Int = {
-      if (atLineStart) {
-        maxLineWidth
-      } else {
-        maxLineWidth - currentLine.length
-      }
+      maxLineWidth - Math.max(currentLine.length, currentIndentSteps * indentStep)
     }
 
     def beginSection(section: Multiline): Unit = {
@@ -217,7 +213,9 @@ object WdlFormatter {
         currentLineComments.clear()
       }
       if (!atLineStart) {
-        lines.append(currentLine.toString)
+        // the line could have trailing whitespace, such as from a comment or
+        // when a space was added prior to a line-wrap - trim it off
+        lines.append(currentLine.toString.replaceAll("""(?m)\s+$""", ""))
         if (continue) {
           dent(indenting)
         } else {
@@ -360,7 +358,9 @@ object WdlFormatter {
           !skipNextSpace.value &&
           !currentLine.last.isWhitespace &&
           currentLine.last != indentation.last
-        if (wrapping != Wrapping.Never && lengthRemaining < span.length + (if (addSpace) 1 else 0)) {
+        if (wrapping != Wrapping.Never && lengthRemaining < (
+                span.firstLineLength + (if (addSpace) 1 else 0)
+            )) {
           endLine(continue = continue)
           beginLine()
         } else if (addSpace) {
@@ -558,10 +558,22 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         if (spacing == Spacing.On) spans.length else 0
     )
 
+    override lazy val firstLineLength: Int = {
+      if (wrapping == Wrapping.Never || wrapping == Wrapping.AllOrNone) {
+        length
+      } else {
+        spans.head.firstLineLength
+      }
+    }
+
     override def formatContents(lineFormatter: LineFormatter): Unit = {
-      lineFormatter
-        .derive(newSpacing = spacing, newWrapping = wrapping)
-        .appendAll(spans, continue)
+      val contentFormatter = if (wrapping == Wrapping.AllOrNone) {
+        // inherit the lineFormatter's wrapping
+        lineFormatter.derive(newSpacing = spacing)
+      } else {
+        lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping)
+      }
+      contentFormatter.appendAll(spans, continue)
     }
 
     override def line: Int = spans.head.line
@@ -585,7 +597,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
   private abstract class Group(ends: Option[(Span, Span)] = None,
                                val wrapping: Wrapping = Wrapping.Never,
-                               val spacing: Spacing = Spacing.On)
+                               val spacing: Spacing = Spacing.On,
+                               val continue: Boolean = false)
       extends Composite {
 
     private val endLengths: (Int, Int) =
@@ -595,34 +608,42 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       .map(_.length)
       .getOrElse(0) + endLengths._1 + endLengths._2
 
+    override lazy val firstLineLength: Int = {
+      if (wrapping == Wrapping.Never || wrapping == Wrapping.AllOrNone || body.isEmpty) {
+        length
+      } else if (ends.isDefined) {
+        ends.get._1.length
+      } else {
+        body.get.firstLineLength
+      }
+    }
+
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       if (ends.isDefined) {
         val (prefix, suffix) = ends.get
-        val wrapAndIndentEnds = wrapping != Wrapping.Never && endLengths._1 > lineFormatter.lengthRemaining
-        if (wrapAndIndentEnds) {
-          lineFormatter.endLine(continue = true)
-          lineFormatter.beginLine()
-        }
         if (body.nonEmpty && (
                 wrapping == Wrapping.Always || (wrapping != Wrapping.Never && length > lineFormatter.lengthRemaining)
             )) {
-          lineFormatter.append(prefix)
+          val bodyIndent = lineFormatter.getIndentSteps(1)
 
+          lineFormatter.append(prefix)
+          lineFormatter.endLine(continue = continue)
+
+          val effectiveWrapping = if (wrapping == Wrapping.AllOrNone) Wrapping.Always else wrapping
           val bodyFormatter = lineFormatter
-            .derive(increaseIndent = wrapAndIndentEnds,
-                    continuing = true,
+            .derive(newIndentSteps = Some(bodyIndent),
                     newSpacing = Spacing.On,
-                    newWrapping = wrapping)
-          bodyFormatter.endLine(continue = true)
+                    newWrapping = effectiveWrapping)
           bodyFormatter.beginLine()
           bodyFormatter.append(body.get)
+          bodyFormatter.endLine()
 
-          lineFormatter.endLine(continue = wrapAndIndentEnds)
           lineFormatter.beginLine()
           lineFormatter.append(suffix)
         } else {
+          val effectiveWrapping = if (wrapping == Wrapping.AllOrNone) Wrapping.Never else wrapping
           val adjacentFormatter =
-            lineFormatter.derive(newSpacing = spacing, newWrapping = wrapping)
+            lineFormatter.derive(newSpacing = spacing, newWrapping = effectiveWrapping)
           adjacentFormatter.appendPrefix(prefix)
           if (body.nonEmpty) {
             adjacentFormatter.append(body.get)
@@ -642,7 +663,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                                    ends: Option[(Span, Span)] = None,
                                    override val wrapping: Wrapping = Wrapping.AsNeeded,
                                    continue: Boolean = true)
-      extends Group(ends = ends, wrapping = wrapping) {
+      extends Group(ends = ends, wrapping = wrapping, continue = continue) {
 
     override lazy val body: Option[Composite] = if (items.nonEmpty) {
       Some(
@@ -689,12 +710,14 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       delimiter: Option[String] = None,
       override val bounds: SourceLocation,
       override val wrapping: Wrapping = Wrapping.Never,
-      continue: Boolean = true
-  ) extends Container(items,
-                        delimiter = delimiter,
-                        ends = ends,
-                        wrapping = wrapping,
-                        continue = continue)
+      override val continue: Boolean = true
+  ) extends Container(
+          items,
+          delimiter = delimiter,
+          ends = ends,
+          wrapping = wrapping,
+          continue = continue
+      )
       with BoundedComposite
 
   private case class KeyValue(key: Span,
@@ -705,7 +728,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       extends BoundedComposite {
     private val delimiterLiteral: Literal = Literal.fromPrev(delimiter, key)
 
-    override def length: Int = key.length + delimiterLiteral.length + value.length + 1
+    override def firstLineLength: Int = key.length + delimiterLiteral.length
+
+    override def length: Int = firstLineLength + value.length + 1
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter
@@ -872,16 +897,19 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       parentOperation: Option[String] = None,
       stringModifier: Option[String => String] = None
   ): Span = {
-    // Builds an expression that occurs nested within another expression. By default, passes
-    //all the current parameter values to the nested call.
-    // @param nestedExpression the nested Expr
-    // @param placeholderOpen  override the current value of `placeholderOpen`
-    // @param inString         override the current value of `inString`
-    // @param inPlaceholder    override the current value of `inPlaceholder`
-    // @param inOperation      override the current value of `inOperation`
-    // @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-    //                         same operations are not grouped.
-    // @return a Span
+
+    /**
+      * Builds an expression that occurs nested within another expression. By default, passes
+      * all the current parameter values to the nested call.
+      * @param nestedExpression the nested Expr
+      * @param placeholderOpen  override the current value of `placeholderOpen`
+      * @param inString         override the current value of `inString`
+      * @param inPlaceholder    override the current value of `inPlaceholder`
+      * @param inOperation      override the current value of `inOperation`
+      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+      *                         same operations are not grouped.
+      * @return a Span
+      */
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
@@ -933,7 +961,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             Some(Literal.fromStart(Symbols.ArrayLiteralOpen, loc),
                  Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
             Some(Symbols.ArrayDelimiter),
-            loc
+            loc,
+            wrapping = Wrapping.AllOrNone
         )
       case ExprMap(value, loc) =>
         BoundedContainer(
@@ -1378,6 +1407,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                  Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
             Some(Symbols.ArrayDelimiter),
             loc,
+            wrapping = Wrapping.AllOrNone,
             continue = false
         )
       case MetaValueObject(value, loc) =>
@@ -1476,9 +1506,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       extends OpenSection(emtpyLineBetweenStatements = true)
 
   private case class CallInputArgsContainer(args: Vector[Container])
-      extends Container(args,
-                        delimiter = Some(s"${Symbols.ArrayDelimiter}"),
-                        wrapping = Wrapping.Always) {
+      extends Container(args, delimiter = Some(Symbols.ArrayDelimiter), wrapping = Wrapping.Always) {
     require(args.nonEmpty)
 
     override def line: Int = args.head.line
@@ -1641,14 +1669,22 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     //private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
     //private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
 
+    // check whether there is at least one non-whitespace command part
+    private def hasCommand: Boolean = {
+      command.parts.exists {
+        case ValueString(value, _) => value.trim.nonEmpty
+        case _                     => true
+      }
+    }
+
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       lineFormatter.appendAll(
           Literal.chainFromStart(Vector(Symbols.Command, Symbols.CommandOpen), command.loc)
       )
-      if (command.parts.nonEmpty) {
+      if (hasCommand) {
         // The parser swallows anyting after the opening token ('{' or '<<<')
         // as part of the comment block, so we need to parse out any in-line
-        // comment and append it separately
+        // comment and append it separately.
         val (headExpr: Expr, indent, comment) = command.parts.head match {
           case ValueString(value, loc) =>
             value match {
@@ -1682,9 +1718,11 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                       .map(m => m.group(1))
                     (ValueString(s"${s}\n${rest}", loc), ws, None)
                 }
-              case _ => throw new RuntimeException("sanity")
+              case other =>
+                throw new RuntimeException(s"unexpected command part ${other}")
             }
-          case other => (other, None, None)
+          case other =>
+            (other, None, None)
         }
 
         def trimLast(last: Expr): Expr = {

@@ -111,4 +111,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "correctly format object literal" in {
     generate("struct_literal.wdl", validateContentFile = true)
   }
+
+  it should "handle calls inputs with function call values" in {
+    generate("call_with_function.wdl", validateContentFile = true)
+  }
 }
