@@ -522,18 +522,18 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       stringModifier: Option[String => String] = None
   ): Sized = {
 
-    /**
-      * Builds an expression that occurs nested within another expression. By default, passes
-      * all the current parameter values to the nested call.
-      * @param nestedExpression the nested Expr
-      * @param placeholderOpen  override the current value of `placeholderOpen`
-      * @param inString         override the current value of `inString`
-      * @param inPlaceholder    override the current value of `inPlaceholder`
-      * @param inOperation      override the current value of `inOperation`
-      * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-      *                         same operations are not grouped.
-      * @return a Sized
-      */
+    /*
+     * Builds an expression that occurs nested within another expression. By default, passes
+     * all the current parameter values to the nested call.
+     * @param nestedExpression the nested Expr
+     * @param placeholderOpen  override the current value of `placeholderOpen`
+     * @param inString         override the current value of `inString`
+     * @param inPlaceholder    override the current value of `inPlaceholder`
+     * @param inOperation      override the current value of `inOperation`
+     * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
+     *                         same operations are not grouped.
+     * @return a Sized
+     */
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
                inString: Boolean = inStringOrCommand,
