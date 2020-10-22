@@ -1,3 +1,7 @@
+# v0.8.4 (2020-10-22)
+
+* Bugfixes for code generator/formatter
+
 # v0.8.3 (2020-10-14)
 
 * Bugfixes
