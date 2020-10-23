@@ -11,7 +11,7 @@ import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
 import wdlTools.types.ExprState
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, Logger}
 
 import scala.io.Source
 

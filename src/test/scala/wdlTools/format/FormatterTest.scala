@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.{Parsers, WdlVersion}
-import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, LinesFileNode}
+import dx.util.{FileNode, FileSourceResolver, FileUtils, LinesFileNode}
 
 class FormatterTest extends AnyFlatSpec with Matchers {
   private val parsers = Parsers()

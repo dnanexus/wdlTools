@@ -1,6 +1,6 @@
 package wdlTools.cli
 
-import wdlTools.util.Logger
+import dx.util.Logger
 
 object Main extends App {
   val conf = new WdlToolsConf(args.toVector)

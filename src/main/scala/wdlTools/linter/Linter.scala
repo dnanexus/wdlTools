@@ -6,7 +6,7 @@ import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{Antlr4Util, Parsers, SyntaxError}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.{TypeCheckingRegime, TypeError, TypeInfer}
-import wdlTools.util.{FileNode, FileSourceResolver, Logger}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 case class LinterParserRuleFactory(rules: Map[String, Severity]) extends ParseTreeListenerFactory {
   private var listeners: Map[FileNode, Vector[Rules.LinterParserRule]] = Map.empty

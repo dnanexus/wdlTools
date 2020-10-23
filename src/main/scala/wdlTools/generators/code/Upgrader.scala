@@ -1,7 +1,7 @@
 package wdlTools.generators.code
 
 import wdlTools.syntax.{Parsers, WdlVersion}
-import wdlTools.util.{FileNode, FileSourceResolver, Logger}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 case class Upgrader(followImports: Boolean = false,
                     fileResolver: FileSourceResolver = FileSourceResolver.get,

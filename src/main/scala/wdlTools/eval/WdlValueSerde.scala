@@ -3,7 +3,7 @@ package wdlTools.eval
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.types.WdlTypes
-import wdlTools.util.Bindings
+import dx.util.Bindings
 
 // an error that occurs during (de)serialization of JSON
 final class JsonSerializationException(message: String) extends Exception(message)

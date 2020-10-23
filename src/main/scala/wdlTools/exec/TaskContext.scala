@@ -6,7 +6,7 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.util.{AddressableFileSource, Bindings, FileSourceResolver, Logger}
+import dx.util.{AddressableFileSource, Bindings, FileSourceResolver, Logger}
 
 trait LocalizationDisambiguator {
   def getLocalPath(fileSource: AddressableFileSource): Path

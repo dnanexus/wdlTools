@@ -11,7 +11,7 @@ import wdlTools.syntax.Parsers
 import wdlTools.types.ExprGraph.VarKind
 import wdlTools.types.TypedAbstractSyntax.Task
 import wdlTools.types.WdlTypes._
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, Logger}
 
 class GraphTest extends AnyFlatSpec with Matchers {
   private val fileResolver = FileSourceResolver.create(

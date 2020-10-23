@@ -1,7 +1,7 @@
 package wdlTools.syntax.v2
 
 import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
 // outside this package. Please use the abstract syntax instead.

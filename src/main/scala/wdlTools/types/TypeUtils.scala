@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.syntax.Operator
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.AbstractBindings
+import dx.util.AbstractBindings
 
 case class DocumentElements(doc: TAT.Document) {
   val (imports, structDefs, tasks) = doc.elements.foldLeft(

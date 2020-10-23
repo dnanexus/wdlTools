@@ -1,7 +1,7 @@
 package wdlTools.types
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.Enum
+import dx.util.Enum
 
 object TypeCheckingRegime extends Enum {
   type TypeCheckingRegime = Value

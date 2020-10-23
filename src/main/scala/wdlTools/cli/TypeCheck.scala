@@ -6,7 +6,7 @@ import java.nio.file.Files
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
 import wdlTools.syntax.{Parsers, SyntaxException}
 import wdlTools.types.{TypeError, TypeException, TypeInfer}
-import wdlTools.util.{FileNode, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver}
 
 import scala.io.AnsiColor
 import scala.language.reflectiveCalls

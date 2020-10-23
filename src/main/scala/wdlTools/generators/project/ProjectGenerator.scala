@@ -7,7 +7,7 @@ import wdlTools.generators.code.WdlFormatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
-import wdlTools.util.{FileUtils, InteractiveConsole}
+import dx.util.{FileUtils, InteractiveConsole}
 
 import scala.util.control.Breaks._
 

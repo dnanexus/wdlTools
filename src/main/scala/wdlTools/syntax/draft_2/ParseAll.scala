@@ -11,7 +11,7 @@ import wdlTools.syntax.{
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import wdlTools.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
+import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,

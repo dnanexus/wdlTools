@@ -15,7 +15,7 @@ import wdlTools.eval.{
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
-import wdlTools.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
+import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
   protected lazy val callableInputs: Map[String, InputParameter] =

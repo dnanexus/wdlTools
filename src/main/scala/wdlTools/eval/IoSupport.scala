@@ -5,7 +5,7 @@ import java.nio.charset.Charset
 import java.nio.file._
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileNode, FileSourceResolver, FileUtils, Logger, NoSuchProtocolException}
+import dx.util.{FileNode, FileSourceResolver, FileUtils, Logger, NoSuchProtocolException}
 
 import scala.jdk.CollectionConverters._
 

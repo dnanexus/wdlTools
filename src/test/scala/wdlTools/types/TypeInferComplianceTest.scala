@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileNode, FileSourceResolver, Logger}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 import scala.jdk.CollectionConverters._
 

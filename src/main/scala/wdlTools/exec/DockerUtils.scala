@@ -5,7 +5,7 @@ import java.nio.file.Files
 import spray.json._
 import wdlTools.eval.EvalException
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{
+import dx.util.{
   FileSourceResolver,
   FileUtils,
   Logger,

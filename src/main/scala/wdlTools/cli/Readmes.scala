@@ -5,7 +5,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path}
 import wdlTools.generators.Renderer
 import wdlTools.generators.project.ReadmeGenerator
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, FileUtils}
+import dx.util.{FileSourceResolver, FileUtils}
 
 import scala.language.reflectiveCalls
 

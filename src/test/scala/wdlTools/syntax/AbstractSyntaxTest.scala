@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.syntax.v1.ParseAll
-import wdlTools.util.{FileNode, FileSourceResolver, Logger, StringFileNode}
+import dx.util.{FileNode, FileSourceResolver, Logger, StringFileNode}
 
 class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
   private val tasksDir = Paths.get(getClass.getResource("/syntax/v1/tasks").getPath)

@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
-import wdlTools.util.{AbstractBindings, Bindings}
+import dx.util.{AbstractBindings, Bindings}
 
 import scala.annotation.tailrec
 
