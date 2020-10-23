@@ -4,7 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, FileSource, FileSourceResolver, LocalFileSource, Logger}
+import dx.util.{Bindings, FileSource, FileSourceResolver, LocalFileSource, Logger}
 
 object Eval {
   lazy val empty: Eval = Eval(DefaultEvalPaths.empty, None, FileSourceResolver.get, Logger.get)

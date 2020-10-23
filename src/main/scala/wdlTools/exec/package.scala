@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import spray.json.{JsString, JsValue}
 import wdlTools.eval.{DefaultEvalPaths, EvalPaths}
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.FileUtils
+import dx.util.FileUtils
 
 // A runtime error
 final class ExecException(message: String) extends Exception(message) {

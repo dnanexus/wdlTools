@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger, FileUtils => UUtil}
+import dx.util.{FileSourceResolver, Logger, FileUtils => UUtil}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {

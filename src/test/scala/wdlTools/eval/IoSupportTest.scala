@@ -6,7 +6,7 @@ import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{SourceLocation, WdlVersion}
-import wdlTools.util.{
+import dx.util.{
   AddressableFileNode,
   FileAccessProtocol,
   FileSourceResolver,

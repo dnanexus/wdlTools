@@ -3,7 +3,7 @@ package wdlTools.types
 import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatType}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
-import wdlTools.util.{AbstractBindings, Bindings, Enum, Logger, TraceLevel}
+import dx.util.{AbstractBindings, Bindings, Enum, Logger, TraceLevel}
 
 case class VarTypeBindings(bindings: Map[Int, T]) extends AbstractBindings[Int, T](bindings) {
   override protected val elementType: String = "varType"

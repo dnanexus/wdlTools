@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
-import wdlTools.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
+import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,

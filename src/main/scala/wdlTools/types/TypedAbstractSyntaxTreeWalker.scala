@@ -2,7 +2,7 @@ package wdlTools.types
 
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag

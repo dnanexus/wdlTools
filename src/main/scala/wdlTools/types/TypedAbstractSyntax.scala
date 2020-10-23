@@ -1,7 +1,7 @@
 package wdlTools.types
 
 import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {

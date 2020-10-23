@@ -16,7 +16,7 @@ import wdlTools.exec.{
 }
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileSourceResolver, FileUtils, JsUtils, Logger, errorMessage}
+import dx.util.{FileSourceResolver, FileUtils, JsUtils, Logger, errorMessage}
 
 import scala.language.reflectiveCalls
 

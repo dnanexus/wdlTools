@@ -1,3 +1,7 @@
+# v0.9.0 (dev)
+
+* Moved common code (wdlTools.util.*) to separate package, dxCommon
+
 # v0.8.4 (2020-10-22)
 
 * Bugfixes for code generator/formatter

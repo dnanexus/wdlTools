@@ -6,7 +6,7 @@ import org.antlr.v4.runtime.{CodePointBuffer, CodePointCharStream, CommonTokenSt
 import org.openwdl.wdl.parser.v1.{WdlV1Lexer, WdlV1Parser}
 import wdlTools.syntax.Antlr4Util.{Grammar, ParseTreeListenerFactory}
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{FileNode, Logger}
+import dx.util.{FileNode, Logger}
 
 case class WdlV1Grammar(override val lexer: WdlV1Lexer,
                         override val parser: WdlV1Parser,

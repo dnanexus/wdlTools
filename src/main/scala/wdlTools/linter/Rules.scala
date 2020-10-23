@@ -7,7 +7,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{ASTVisitor, AllParseTreeListener, Antlr4Util, SourceLocation, WdlVersion}
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.types
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 import scala.collection.mutable
 

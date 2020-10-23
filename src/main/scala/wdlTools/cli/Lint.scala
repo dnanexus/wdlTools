@@ -7,7 +7,7 @@ import spray.json.{JsObject, JsString, JsValue}
 import spray.json._
 import wdlTools.linter.Severity.Severity
 import wdlTools.linter.{LintEvent, Linter, Rules, Severity}
-import wdlTools.util.{FileNode, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver}
 
 import scala.io.{AnsiColor, Source}
 import scala.language.reflectiveCalls

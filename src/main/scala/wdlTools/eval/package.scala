@@ -3,7 +3,7 @@ package wdlTools.eval
 import java.nio.file.{Files, Path}
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.FileUtils
+import dx.util.FileUtils
 
 trait EvalPaths {
   def getRootDir(ensureExists: Boolean = false): Path

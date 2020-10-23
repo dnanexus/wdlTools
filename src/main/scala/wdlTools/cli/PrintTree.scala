@@ -2,7 +2,7 @@ package wdlTools.cli
 
 import wdlTools.syntax.{AbstractSyntax, Parsers}
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax}
-import wdlTools.util.{FileSourceResolver, prettyFormat}
+import dx.util.{FileSourceResolver, prettyFormat}
 
 import scala.language.reflectiveCalls
 

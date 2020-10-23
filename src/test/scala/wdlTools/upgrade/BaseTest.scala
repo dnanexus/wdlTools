@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.generators.code
 import wdlTools.syntax.WdlVersion
-import wdlTools.util.{FileNode, FileSourceResolver, FileUtils}
+import dx.util.{FileNode, FileSourceResolver, FileUtils}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   def getBeforePath(fname: String): FileNode = {

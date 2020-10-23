@@ -6,7 +6,7 @@ import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.WdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, SourceLocation, WdlVersion}
-import wdlTools.util.{FileNode, FileSourceResolver, Logger}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 import scala.collection.{BufferedIterator, mutable}
 

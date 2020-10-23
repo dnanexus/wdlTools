@@ -8,7 +8,7 @@ import TypeCheckingRegime._
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.Section.Section
 import wdlTools.types.TypedAbstractSyntax.WdlType
-import wdlTools.util.{
+import dx.util.{
   Bindings,
   DuplicateBindingException,
   FileSourceResolver,

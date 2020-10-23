@@ -3,7 +3,7 @@ package wdlTools.syntax
 import java.nio.file.Path
 
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import wdlTools.util.{FileNode, FileSourceResolver, Logger, TraceLevel}
+import dx.util.{FileNode, FileSourceResolver, Logger, TraceLevel}
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T

@@ -4,7 +4,7 @@ import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.SyntaxUtils.prettyFormatExpr
 import wdlTools.syntax.{Comment, Parsers, SyntaxUtils}
-import wdlTools.util.{FileNode, FileSourceResolver, FileUtils}
+import dx.util.{FileNode, FileSourceResolver, FileUtils}
 
 object DocumentationGenerator {
   //private val TemplatePrefix = "/templates/documentation/"

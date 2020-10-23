@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.linter.{LintEvent, Linter, Severity}
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.{FileNode, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver}
 
 class BaseTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {

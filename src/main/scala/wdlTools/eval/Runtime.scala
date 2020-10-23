@@ -4,7 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
-import wdlTools.util.{Bindings, SymmetricBiMap}
+import dx.util.{Bindings, SymmetricBiMap}
 
 case class DiskRequest(size: Long,
                        mountPoint: Option[String] = None,

@@ -4,7 +4,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Path, Paths}
 
 import wdlTools.generators.project.ProjectGenerator.{TaskModel, WorkflowModel}
 import wdlTools.generators.project.ProjectGenerator
-import wdlTools.util.FileUtils
+import dx.util.FileUtils
 
 import scala.language.reflectiveCalls
 

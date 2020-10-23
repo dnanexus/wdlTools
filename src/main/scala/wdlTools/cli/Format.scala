@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.nio.file.Files
 
 import wdlTools.generators.code.WdlFormatter
-import wdlTools.util.{FileSourceResolver, LocalFileSource}
+import dx.util.{FileSourceResolver, LocalFileSource}
 
 import scala.jdk.CollectionConverters._
 import scala.language.reflectiveCalls

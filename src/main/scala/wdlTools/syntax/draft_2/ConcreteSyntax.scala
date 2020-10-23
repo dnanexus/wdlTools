@@ -1,7 +1,7 @@
 package wdlTools.syntax.draft_2
 
 import wdlTools.syntax.{CommentMap, SourceLocation}
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
 // underlying the grammar is Antlr4.
