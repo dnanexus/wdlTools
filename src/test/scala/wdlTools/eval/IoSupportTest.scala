@@ -8,6 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import dx.util.{
   AddressableFileNode,
+  EvalPaths,
   FileAccessProtocol,
   FileSourceResolver,
   FileUtils,

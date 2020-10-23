@@ -2,10 +2,10 @@ package wdlTools.exec
 
 import java.nio.file.{Files, Path, Paths}
 
+import dx.util.{ExecPaths, FileUtils}
 import spray.json.{JsString, JsValue}
-import wdlTools.eval.{DefaultEvalPaths, EvalPaths}
+import wdlTools.eval.DefaultEvalPaths
 import wdlTools.syntax.SourceLocation
-import dx.util.FileUtils
 
 // A runtime error
 final class ExecException(message: String) extends Exception(message) {
@@ -23,18 +23,6 @@ object ExecException {
   def formatMessage(msg: String, loc: SourceLocation): String = {
     s"${msg} at ${loc}"
   }
-}
-
-trait ExecPaths extends EvalPaths {
-  def getCommandFile(ensureParentExists: Boolean = false): Path
-
-  def getReturnCodeFile(ensureParentExists: Boolean = false): Path
-
-  def getContainerCommandFile(ensureParentExists: Boolean = false): Path
-
-  def getContainerIdFile(ensureParentExists: Boolean = false): Path
-
-  def toJson(onlyExisting: Boolean = true): Map[String, JsValue]
 }
 
 class DefaultExecPaths(rootDir: Path, tempDir: Path)

@@ -4,7 +4,7 @@ import java.nio.file.{Files, Path}
 
 import spray.json.{JsNumber, JsObject, JsString, JsValue}
 import wdlTools.generators.Renderer
-import dx.util.{FileUtils, Logger, SysUtils, errorMessage}
+import dx.util.{ExecPaths, FileUtils, Logger, SysUtils, errorMessage}
 
 sealed trait TaskExecutorResult {
   def toJson: Map[String, JsValue]

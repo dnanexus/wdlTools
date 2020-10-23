@@ -3,49 +3,7 @@ package wdlTools.eval
 import java.nio.file.{Files, Path}
 
 import wdlTools.syntax.SourceLocation
-import dx.util.FileUtils
-
-trait EvalPaths {
-  def getRootDir(ensureExists: Boolean = false): Path
-
-  def getTempDir(ensureExists: Boolean = false): Path
-
-  /**
-    * The execution directory - used as the base dir for relative paths (e.g. for glob search).
-    */
-  def getWorkDir(ensureExists: Boolean = false): Path
-
-  def getMetaDir(ensureExists: Boolean = false): Path
-
-  /**
-    * The file that has a copy of standard output.
-    */
-  def getStdoutFile(ensureParentExists: Boolean = false): Path
-
-  /**
-    * The file that has a copy of standard error.
-    */
-  def getStderrFile(ensureParentExists: Boolean = false): Path
-}
-
-abstract class BaseEvalPaths extends EvalPaths {
-  private var cache: Map[String, Path] = Map.empty
-
-  protected def createDir(key: String, path: Path): Path = {
-    val resolved = FileUtils.createDirectories(path)
-    cache += (key -> resolved)
-    resolved
-  }
-
-  protected def getOrCreateDir(key: String, path: Path, ensureExists: Boolean): Path = {
-    val resolved = cache.getOrElse(key, if (ensureExists) createDir(key, path) else path)
-    if (Files.exists(resolved)) {
-      resolved.toRealPath()
-    } else {
-      resolved.toAbsolutePath
-    }
-  }
-}
+import dx.util.{BaseEvalPaths, FileUtils}
 
 /**
   * Paths configuration for evaluation of IO-related expressions. The general structure of an
@@ -110,15 +68,15 @@ object DefaultEvalPaths {
   val DefaultStdout = "stdout"
   val DefaultStderr = "stderr"
 
-  def apply(rootDir: Path, tempDir: Path): EvalPaths = {
+  def apply(rootDir: Path, tempDir: Path): DefaultEvalPaths = {
     new DefaultEvalPaths(rootDir, tempDir)
   }
 
-  def create(): EvalPaths = {
+  def create(): DefaultEvalPaths = {
     DefaultEvalPaths(FileUtils.cwd, FileUtils.systemTempDir)
   }
 
-  def createFromTemp(): EvalPaths = {
+  def createFromTemp(): DefaultEvalPaths = {
     val rootDir = Files.createTempDirectory("eval")
     val tempDir = rootDir.resolve(DefaultTempDir)
     DefaultEvalPaths(rootDir, tempDir)
@@ -126,7 +84,7 @@ object DefaultEvalPaths {
 
   // an EvalConfig where all the paths point to /dev/null - only useful for
   // testing where there are no I/O functions used
-  lazy val empty: EvalPaths = DefaultEvalPaths(FileUtils.NullPath, FileUtils.NullPath)
+  lazy val empty: DefaultEvalPaths = DefaultEvalPaths(FileUtils.NullPath, FileUtils.NullPath)
 }
 
 // A runtime error
