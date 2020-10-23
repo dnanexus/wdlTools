@@ -3,7 +3,7 @@ package wdlTools.cli
 import java.nio.file.{FileAlreadyExistsException, Files}
 
 import wdlTools.generators.project.DocumentationGenerator
-import wdlTools.util.{FileSourceResolver, FileUtils}
+import dx.util.{FileSourceResolver, FileUtils}
 
 import scala.language.reflectiveCalls
 

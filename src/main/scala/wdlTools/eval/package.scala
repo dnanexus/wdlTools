@@ -3,7 +3,7 @@ package wdlTools.eval
 import java.nio.file.{Files, Path}
 
 import wdlTools.syntax.SourceLocation
-import wdlTools.util.FileUtils
+import dx.util.FileUtils
 
 /**
   * Paths configuration for evaluation of IO-related expressions. The general structure of an

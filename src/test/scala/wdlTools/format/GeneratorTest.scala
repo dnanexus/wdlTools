@@ -8,7 +8,7 @@ import wdlTools.eval.{Eval, EvalPaths, WdlValueBindings}
 import wdlTools.generators.code.WdlGenerator
 import wdlTools.syntax.{Parsers, WdlVersion}
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import wdlTools.util.{FileNode, FileSourceResolver, LinesFileNode}
+import dx.util.{FileNode, FileSourceResolver, LinesFileNode}
 
 class GeneratorTest extends AnyFlatSpec with Matchers {
   def getWdlPath(fname: String, subdir: String): Path = {

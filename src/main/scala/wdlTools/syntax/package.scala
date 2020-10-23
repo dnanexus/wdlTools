@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.{FileNode, StringFileNode}
+import dx.util.{FileNode, StringFileNode}
 
 sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {

@@ -4,7 +4,7 @@ import WdlTypes.{T_Function2, T_Var, _}
 import wdlTools.syntax.{Operator, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.{Logger, TraceLevel}
+import dx.util.{Logger, TraceLevel}
 
 case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logger = Logger.get) {
   private val unify = Unification(regime)

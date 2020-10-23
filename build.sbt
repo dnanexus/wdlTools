@@ -77,10 +77,11 @@ assemblyJarName in assembly := "wdlTools.jar"
 logLevel in assembly := Level.Info
 //assemblyOutputPath in assembly := file("applet_resources/resources/dxWDL.jar")
 
-resolvers ++= Seq(
-    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
-)
+//resolvers ++= Seq(
+//    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
+//)
 
+val dxCommonVersion = "0.1.0"
 val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
@@ -92,6 +93,7 @@ val scalatestVersion = "3.1.1"
 //val beardVersion = "0.3.1"
 
 libraryDependencies ++= Seq(
+    "com.dnanexus" % "dxCommon" % dxCommonVersion,
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
     // command line parser

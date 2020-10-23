@@ -4,7 +4,7 @@ import wdlTools.syntax.{WdlVersion, AbstractSyntax => AST}
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
-import wdlTools.util.{Bindings, DefaultBindings, DuplicateBindingException, FileNode, Logger}
+import dx.util.{Bindings, DefaultBindings, DuplicateBindingException, FileNode, Logger}
 
 /**
   * Type inference context.

@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, Logger}
 
 class GatkTest extends AnyWordSpec with Matchers {
   private val fileResolver = FileSourceResolver.create(

@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, Logger}
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal

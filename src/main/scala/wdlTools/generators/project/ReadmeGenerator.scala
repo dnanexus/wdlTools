@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import wdlTools.generators.Renderer
 import wdlTools.syntax.AbstractSyntax.{Document, Task, Workflow}
-import wdlTools.util.{LocalFileSource, FileUtils}
+import dx.util.{LocalFileSource, FileUtils}
 
 case class ReadmeGenerator(developerReadmes: Boolean = false, renderer: Renderer = Renderer()) {
   val WORKFLOW_README_TEMPLATE = "/templates/readme/WorkflowReadme.md.ssp"

@@ -3,7 +3,7 @@ package wdlTools.exec
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, Logger}
 
 class ExecTest extends AnyFlatSpec with Matchers with Inside {
   private lazy val paths: ExecPaths = ExecPaths.createLocalPathsFromTemp()

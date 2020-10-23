@@ -14,8 +14,8 @@ import org.rogach.scallop.{
 import wdlTools.syntax.{Antlr4Util, WdlVersion}
 import wdlTools.types.TypeCheckingRegime
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
-import wdlTools.util.FileUtils.{FileScheme, getUriScheme}
-import wdlTools.util.{FileSourceResolver, Logger}
+import dx.util.FileUtils.{FileScheme, getUriScheme}
+import dx.util.{FileSourceResolver, Logger}
 
 import scala.util.Try
 

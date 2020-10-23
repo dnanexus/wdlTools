@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import wdlTools.util.FileNode
+import dx.util.FileNode
 
 // An abstract syntax for the Workflow Description Language (WDL)
 object AbstractSyntax {

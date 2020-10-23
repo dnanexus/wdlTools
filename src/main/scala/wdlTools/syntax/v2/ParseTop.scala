@@ -8,7 +8,7 @@ import org.openwdl.wdl.parser.v2.{WdlV2Parser, WdlV2ParserBaseVisitor}
 import wdlTools.syntax.Antlr4Util.getSourceLocation
 import wdlTools.syntax.v2.ConcreteSyntax._
 import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException, WdlVersion}
-import wdlTools.util.Logger
+import dx.util.Logger
 
 import scala.jdk.CollectionConverters._
 

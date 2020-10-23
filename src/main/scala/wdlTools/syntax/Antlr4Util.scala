@@ -14,7 +14,7 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import wdlTools.util.{FileNode, Logger}
+import dx.util.{FileNode, Logger}
 
 object Antlr4Util {
   private var parserTrace: Boolean = false

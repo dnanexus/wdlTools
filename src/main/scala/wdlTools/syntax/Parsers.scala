@@ -2,7 +2,7 @@ package wdlTools.syntax
 
 import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
-import wdlTools.util.{FileNode, FileSourceResolver, Logger}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 case class Parsers(
     followImports: Boolean = false,
