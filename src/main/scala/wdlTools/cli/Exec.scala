@@ -5,6 +5,7 @@ import java.nio.file.Paths
 import spray.json.JsValue
 import wdlTools.eval.{Eval, WdlValueBindings, WdlValueSerde}
 import wdlTools.exec.{
+  DefaultExecPaths,
   ExecPaths,
   TaskContext,
   TaskExecutor,
@@ -63,10 +64,10 @@ case class Exec(conf: WdlToolsConf) extends Command {
     val wdlVersion = doc.version.value
     val (hostPaths: ExecPaths, guestPaths: Option[ExecPaths]) = if (conf.exec.container()) {
       val (host, guest) =
-        ExecPaths.createLocalContainerPair(containerMountDir = Paths.get("/home/wdlTools"))
+        DefaultExecPaths.createLocalContainerPair(containerMountDir = Paths.get("/home/wdlTools"))
       (host, Some(guest))
     } else {
-      (ExecPaths.createLocalPathsFromTemp(), None)
+      (DefaultExecPaths.createLocalPathsFromTemp(), None)
     }
     val hostEvaluator = Eval(hostPaths, Some(wdlVersion))
     val taskIO = TaskInputOutput(task)

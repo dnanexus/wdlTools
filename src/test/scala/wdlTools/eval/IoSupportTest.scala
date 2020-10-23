@@ -28,7 +28,7 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val baseDir = Files.createTempDirectory("eval")
     baseDir.toFile.deleteOnExit()
     val tmpDir = baseDir.resolve("tmp")
-    val evalPaths = EvalPaths(baseDir, tmpDir)
+    val evalPaths = DefaultEvalPaths(baseDir, tmpDir)
     val fileResolver =
       FileSourceResolver.create(Vector(srcDir, evalPaths.getWorkDir()), Vector(DxProtocol))
     (evalPaths, fileResolver)

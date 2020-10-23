@@ -7,7 +7,7 @@ import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
 import wdlTools.util.{Bindings, FileSource, FileSourceResolver, LocalFileSource, Logger}
 
 object Eval {
-  lazy val empty: Eval = Eval(EvalPaths.empty, None, FileSourceResolver.get, Logger.get)
+  lazy val empty: Eval = Eval(DefaultEvalPaths.empty, None, FileSourceResolver.get, Logger.get)
 
   def createBindingsFromEnv(env: Map[String, (WdlTypes.T, V)]): Bindings[String, V] = {
     WdlValueBindings(env.map { case (name, (_, v)) => name -> v })

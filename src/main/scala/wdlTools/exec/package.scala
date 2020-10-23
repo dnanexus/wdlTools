@@ -3,7 +3,7 @@ package wdlTools.exec
 import java.nio.file.{Files, Path, Paths}
 
 import spray.json.{JsString, JsValue}
-import wdlTools.eval.EvalPaths
+import wdlTools.eval.{DefaultEvalPaths, EvalPaths}
 import wdlTools.syntax.SourceLocation
 import wdlTools.util.FileUtils
 
@@ -25,21 +25,35 @@ object ExecException {
   }
 }
 
-class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir) {
+trait ExecPaths extends EvalPaths {
+  def getCommandFile(ensureParentExists: Boolean = false): Path
+
+  def getReturnCodeFile(ensureParentExists: Boolean = false): Path
+
+  def getContainerCommandFile(ensureParentExists: Boolean = false): Path
+
+  def getContainerIdFile(ensureParentExists: Boolean = false): Path
+
+  def toJson(onlyExisting: Boolean = true): Map[String, JsValue]
+}
+
+class DefaultExecPaths(rootDir: Path, tempDir: Path)
+    extends DefaultEvalPaths(rootDir, tempDir)
+    with ExecPaths {
   def getCommandFile(ensureParentExists: Boolean = false): Path = {
-    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultCommandScript)
+    getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultCommandScript)
   }
 
   def getReturnCodeFile(ensureParentExists: Boolean = false): Path = {
-    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultReturnCode)
+    getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultReturnCode)
   }
 
   def getContainerCommandFile(ensureParentExists: Boolean = false): Path = {
-    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerRunScript)
+    getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultContainerRunScript)
   }
 
   def getContainerIdFile(ensureParentExists: Boolean = false): Path = {
-    getMetaDir(ensureParentExists).resolve(ExecPaths.DefaultContainerId)
+    getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultContainerId)
   }
 
   def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
@@ -65,14 +79,14 @@ class ExecPaths(rootDir: Path, tempDir: Path) extends EvalPaths(rootDir, tempDir
   }
 }
 
-object ExecPaths {
+object DefaultExecPaths {
   val DefaultCommandScript = "commandScript"
   val DefaultReturnCode = "returnCode"
   val DefaultContainerRunScript = "containerRunScript"
   val DefaultContainerId = "containerId"
 
   def apply(executionDir: Path, tempDir: Path): ExecPaths = {
-    new ExecPaths(executionDir, tempDir)
+    new DefaultExecPaths(executionDir, tempDir)
   }
 
   def createLocalPathsFromDir(executionDir: Path = FileUtils.cwd,
@@ -80,18 +94,18 @@ object ExecPaths {
     if (!Files.isDirectory(executionDir)) {
       throw new ExecException(s"${executionDir} does not exist or is not a directory")
     }
-    ExecPaths(executionDir, tempDir)
+    DefaultExecPaths(executionDir, tempDir)
   }
 
   def createLocalPathsFromTemp(): ExecPaths = {
     val rootDir = Files.createTempDirectory("wdlTools")
-    val tempDir = rootDir.resolve(EvalPaths.DefaultTempDir)
-    ExecPaths(rootDir, tempDir)
+    val tempDir = rootDir.resolve(DefaultEvalPaths.DefaultTempDir)
+    DefaultExecPaths(rootDir, tempDir)
   }
 
   def createContainerPaths(containerExecutionDir: Path,
                            containerTempDir: Path = Paths.get("/tmp")): ExecPaths = {
-    ExecPaths(containerExecutionDir, containerTempDir)
+    DefaultExecPaths(containerExecutionDir, containerTempDir)
   }
 
   def createLocalContainerPair(

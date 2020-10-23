@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import wdlTools.util.{FileSourceResolver, Logger}
 
 class ExecTest extends AnyFlatSpec with Matchers with Inside {
-  private lazy val paths: ExecPaths = ExecPaths.createLocalPathsFromTemp()
+  private lazy val paths: ExecPaths = DefaultExecPaths.createLocalPathsFromTemp()
   private lazy val fileResolver = FileSourceResolver.create(Vector(paths.getWorkDir()))
   private val dockerUtils = DockerUtils(fileResolver, Logger.Quiet)
 
