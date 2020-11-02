@@ -1080,7 +1080,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
           val tAliases = importDoc.aliases.map {
             case AST.ImportAlias(id1, id2, loc) =>
-              TAT.ImportAlias(id1, id2, beforeCtx.aliases(id1), loc)
+              importCtx.aliases.get(id1) match {
+                case Some(referee) => TAT.ImportAlias(id1, id2, referee, loc)
+                case None =>
+                  handleError(s"missing struct ${id1}", loc)
+                  TAT.ImportAlias(id1, id2, T_Struct(id1, Map.empty), loc)
+              }
           }
 
           val tImportDoc = TAT.ImportDoc(namespace, tAliases, addr, tDoc, importDoc.loc)

@@ -141,7 +141,7 @@ case class TypeContext(
       case (name, importedStruct: T_Struct) =>
         aliasMapping.get(name) match {
           case None          => name -> importedStruct
-          case Some(altName) => altName -> T_Struct(altName, importedStruct.members)
+          case Some(altName) => altName -> importedStruct
         }
       case (_, other) =>
         throw new RuntimeException(s"Expecting a struct but got ${other}")

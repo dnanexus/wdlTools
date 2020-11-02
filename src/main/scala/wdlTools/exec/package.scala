@@ -3,7 +3,6 @@ package wdlTools.exec
 import java.nio.file.{Files, Path, Paths}
 
 import dx.util.{ExecPaths, FileUtils}
-import spray.json.{JsString, JsValue}
 import wdlTools.eval.DefaultEvalPaths
 import wdlTools.syntax.SourceLocation
 
@@ -42,28 +41,6 @@ class DefaultExecPaths(rootDir: Path, tempDir: Path)
 
   def getContainerIdFile(ensureParentExists: Boolean = false): Path = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultContainerId)
-  }
-
-  def toJson(onlyExisting: Boolean = true): Map[String, JsValue] = {
-    Map(
-        "root" -> getRootDir(),
-        "work" -> getWorkDir(),
-        "meta" -> getMetaDir(),
-        "tmp" -> getTempDir(),
-        "stdout" -> getStdoutFile(),
-        "stderr" -> getStderrFile(),
-        "commands" -> getCommandFile(),
-        "returnCode" -> getReturnCodeFile(),
-        "containerCommands" -> getContainerCommandFile(),
-        "containerId" -> getContainerIdFile()
-    ).flatMap {
-      case (key, path) =>
-        if (!onlyExisting || Files.exists(path)) {
-          Some(key -> JsString(path.toString))
-        } else {
-          None
-        }
-    }
   }
 }
 
