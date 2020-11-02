@@ -1,4 +1,4 @@
-# v0.9.0 (dev)
+# v0.9.0 (2020-11-02)
 
 * Moved common code (wdlTools.util.*) to separate package, dxCommon
 * Fixed struct aliasing bug
