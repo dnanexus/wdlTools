@@ -91,6 +91,7 @@ val katanVersion = "0.6.1"
 val graphVersion = "1.13.2"
 val scalatestVersion = "3.1.1"
 //val beardVersion = "0.3.1"
+val re2jVersion = "1.5"
 
 libraryDependencies ++= Seq(
     "com.dnanexus" % "dxCommon" % dxCommonVersion,
@@ -100,11 +101,16 @@ libraryDependencies ++= Seq(
     "org.rogach" %% "scallop" % scallopVersion,
     // template engine
     "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
-//    "de.zalando" %% "beard" % beardVersion,
-    "com.typesafe" % "config" % typesafeVersion,
+    // "de.zalando" %% "beard" % beardVersion,
     "io.spray" %% "spray-json" % sprayVersion,
+    // csv parser
     "com.nrinaudo" %% "kantan.csv" % katanVersion,
+    // POSIX regexp library
+    "com.google.re2j" % "re2j" % re2jVersion,
+    // graph library
     "org.scala-graph" %% "graph-core" % graphVersion,
+    // configuration
+    "com.typesafe" % "config" % typesafeVersion,
     //---------- Test libraries -------------------//
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )

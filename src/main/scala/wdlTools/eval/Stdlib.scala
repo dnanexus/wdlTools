@@ -2,6 +2,8 @@ package wdlTools.eval
 
 import java.nio.file.{Path, Paths}
 
+import com.google.re2j.Pattern
+import dx.util.{EvalPaths, FileSourceResolver, Logger}
 import kantan.csv.CsvConfiguration.{Header, QuotePolicy}
 import kantan.csv._
 import kantan.csv.ops._
@@ -11,7 +13,6 @@ import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
 import wdlTools.types.ExprState
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
-import dx.util.{EvalPaths, FileSourceResolver, Logger}
 
 import scala.io.Source
 
@@ -985,19 +986,21 @@ case class Stdlib(paths: EvalPaths,
     }
   }
 
-  // String sub(String, String, String)
-  //
-  // Given 3 String parameters input, pattern, replace, this function
-  // will replace any occurrence matching pattern in input by
-  // replace. pattern is expected to be a regular expression.
-  //
-  // since: draft-2
+  /**
+    * Given 3 String parameters `input`, `pattern`, `replace`), this
+    * function will replace any occurrence matching `pattern` in `input`
+    * by `replace`. Pattern is expected to be a POSIX extended regular
+    * expression. Pattern matching is done using the Google RE2 library.
+    *
+    * signature: String sub(String, String, String)
+    * since: draft-2
+    */
   private def sub(ctx: FunctionContext): V_String = {
-    val (a, b, c) = ctx.getThreeArgs
-    val input = getWdlString(a, ctx.loc)
-    val pattern = getWdlString(b, ctx.loc)
-    val replace = getWdlString(c, ctx.loc)
-    V_String(input.replaceAll(pattern, replace))
+    val (input, pattern, replace) = ctx.getThreeArgs
+    val re2Pattern = Pattern.compile(getWdlString(pattern, ctx.loc), 0)
+    val re2Matcher = re2Pattern.matcher(getWdlString(input, ctx.loc))
+    val result = re2Matcher.replaceAll(getWdlString(replace, ctx.loc))
+    V_String(result)
   }
 
   // Array[Int] range(Int)

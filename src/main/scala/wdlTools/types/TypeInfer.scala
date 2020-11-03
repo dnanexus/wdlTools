@@ -894,7 +894,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val elementType = eCollection.wdlType match {
       case T_Array(elementType, _) => elementType
       case other =>
-        handleError(s"Scatter collection ${scatter.identifier} is not an array type", scatter.loc)
+        handleError(s"Scatter collection ${scatter.expr} is not an array type", scatter.loc)
         other
     }
     // add a binding for the iteration variable
