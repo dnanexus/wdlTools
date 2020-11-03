@@ -28,7 +28,7 @@ object SyntaxUtils {
 
         case ExprCompoundString(value: Vector[Expr], _) =>
           val vec = value.map(x => inner(x)).mkString(", ")
-          s"ExprCompoundString(${vec})"
+          s"CompoundString(${vec})"
         case ExprPair(l, r, _) => s"(${inner(l)}, ${inner(r)})"
         case ExprArray(value: Vector[Expr], _) =>
           "[" + value.map(x => inner(x)).mkString(", ") + "]"
@@ -43,7 +43,12 @@ object SyntaxUtils {
           val m = value
             .map(x => inner(x))
             .mkString(", ")
-          s"object($m)"
+          s"object {$m}"
+        case ExprStruct(name, members: Vector[ExprMember], _) =>
+          val m = members
+            .map(x => inner(x))
+            .mkString(", ")
+          s"${name} {$m}"
         // ~{true="--yes" false="--no" boolean_value}
         case ExprPlaceholderCondition(t: Expr, f: Expr, value: Expr, _) =>
           s"{true=${inner(t)} false=${inner(f)} ${inner(value)}"

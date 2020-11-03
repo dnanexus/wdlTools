@@ -365,7 +365,7 @@ string
     }
   }
 
-  // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  // | object_or_struct LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
   override def visitObject_literal(ctx: WdlV2Parser.Object_literalContext): Expr = {
     val ids: Vector[Expr] = ctx.object_literal_key.asScala.toVector
       .map(visitObject_literal_key)
@@ -385,7 +385,13 @@ string
                        expr.loc.endCol)
       ExprMember(id, expr, textSource)
     }
-    ExprObjectLiteral(members, getSourceLocation(grammar.docSource, ctx))
+    ctx.object_or_struct() match {
+      case ctx: WdlV2Parser.StructnameContext =>
+        val name = ctx.Identifier().toString
+        ExprStructLiteral(name, members, getSourceLocation(grammar.docSource, ctx))
+      case ctx: WdlV2Parser.ObjectContext =>
+        ExprObjectLiteral(members, getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | NOT expr #negate
@@ -548,7 +554,7 @@ string
 	| LBRACK (expr (COMMA expr)*)* RBRACK #array_literal
 	| LPAREN expr COMMA expr RPAREN #pair_literal
 	| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
-	| OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+	| object_or_struct LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
 	| NOT expr #negate
 	| (PLUS | MINUS) expr #unarysigned
 	| expr_core LBRACK expr RBRACK #at
@@ -562,17 +568,17 @@ string
       case group: WdlV2Parser.Expression_groupContext => visitExpression_group(group)
       case primitives: WdlV2Parser.PrimitivesContext =>
         visitPrimitive_literal(primitives.primitive_literal())
-      case array_literal: WdlV2Parser.Array_literalContext => visitArray_literal(array_literal)
-      case pair_literal: WdlV2Parser.Pair_literalContext   => visitPair_literal(pair_literal)
-      case map_literal: WdlV2Parser.Map_literalContext     => visitMap_literal(map_literal)
-      case obj_literal: WdlV2Parser.Object_literalContext  => visitObject_literal(obj_literal)
-      case negate: WdlV2Parser.NegateContext               => visitNegate(negate)
-      case unarysigned: WdlV2Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
-      case at: WdlV2Parser.AtContext                       => visitAt(at)
-      case ifthenelse: WdlV2Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
-      case apply: WdlV2Parser.ApplyContext                 => visitApply(apply)
-      case left_name: WdlV2Parser.Left_nameContext         => visitLeft_name(left_name)
-      case get_name: WdlV2Parser.Get_nameContext           => visitGet_name(get_name)
+      case array_literal: WdlV2Parser.Array_literalContext   => visitArray_literal(array_literal)
+      case pair_literal: WdlV2Parser.Pair_literalContext     => visitPair_literal(pair_literal)
+      case map_literal: WdlV2Parser.Map_literalContext       => visitMap_literal(map_literal)
+      case object_literal: WdlV2Parser.Object_literalContext => visitObject_literal(object_literal)
+      case negate: WdlV2Parser.NegateContext                 => visitNegate(negate)
+      case unarysigned: WdlV2Parser.UnarysignedContext       => visitUnarysigned(unarysigned)
+      case at: WdlV2Parser.AtContext                         => visitAt(at)
+      case ifthenelse: WdlV2Parser.IfthenelseContext         => visitIfthenelse(ifthenelse)
+      case apply: WdlV2Parser.ApplyContext                   => visitApply(apply)
+      case left_name: WdlV2Parser.Left_nameContext           => visitLeft_name(left_name)
+      case get_name: WdlV2Parser.Get_nameContext             => visitGet_name(get_name)
       case _ =>
         throw new SyntaxException("bad expression", getSourceLocation(grammar.docSource, ctx))
     }

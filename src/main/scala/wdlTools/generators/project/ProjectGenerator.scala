@@ -66,8 +66,9 @@ case class ProjectGenerator(name: String,
       case ExprArray(value, _)                                            => value.exists(requiresEvaluation)
       case ExprMap(value, _) =>
         value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
-      case ExprObject(value, _) => value.exists(member => requiresEvaluation(member.value))
-      case _                    => true
+      case ExprObject(members, _)    => members.exists(member => requiresEvaluation(member.value))
+      case ExprStruct(_, members, _) => members.exists(member => requiresEvaluation(member.value))
+      case _                         => true
     }
   }
 

@@ -230,13 +230,27 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
               TAT.ExprArray(elementTypes, t, loc)
             case AST.ExprObject(members, loc) =>
-              val members2 = members.map {
+              val tMembers = members.map {
                 case AST.ExprMember(key, value, _) =>
                   val k = nested(key, nextState)
                   val v = nested(value, nextState)
                   k -> v
               }.toMap
-              TAT.ExprObject(members2, T_Object, loc)
+              TAT.ExprObject(tMembers, T_Object, loc)
+            case AST.ExprStruct(name, members, loc) =>
+              val tMembers = members.map {
+                case AST.ExprMember(key, value, _) =>
+                  val k = nested(key, nextState)
+                  val v = nested(value, nextState)
+                  k -> v
+              }.toMap
+              val wdlType = ctx.aliases.get(name) match {
+                case Some(structType: T_Struct) => structType
+                case _ =>
+                  handleError(s"Struct type ${name} is not defined", nestedExpr.loc)
+                  T_Object
+              }
+              TAT.ExprObject(tMembers, wdlType, loc)
             case AST.ExprMap(m, loc) if m.isEmpty =>
               // The key and value types are unknown.
               TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), loc)
@@ -256,11 +270,10 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // an identifier has to be bound to a known type. Lookup the the type,
               // and add it to the expression.
               val t = ctx.lookup(id, bindings) match {
+                case Some(t) => t
                 case None =>
                   handleError(s"Identifier ${id} is not defined", nestedExpr.loc)
                   T_Any
-                case Some(t) =>
-                  t
               }
               TAT.ExprIdentifier(id, t, loc)
 

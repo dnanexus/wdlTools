@@ -105,6 +105,10 @@ final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, loc: SourceLocation) = {
     this(SyntaxException.formatMessage(msg, loc))
   }
+  def this(msg: String, cause: Throwable) = {
+    this(msg)
+    initCause(cause)
+  }
   def this(errors: Seq[SyntaxError]) = {
     this(SyntaxException.formatMessageFromErrorList(errors))
   }

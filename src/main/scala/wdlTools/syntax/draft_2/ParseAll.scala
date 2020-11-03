@@ -324,7 +324,13 @@ case class ParseAll(followImports: Boolean = false,
   override def parseDocument(fileSource: FileNode): AST.Document = {
     val grammar = WdlDraft2Grammar.newInstance(fileSource, listenerFactories, logger)
     val visitor = ParseTop(grammar)
-    val top: ConcreteSyntax.Document = visitor.parseDocument
+    val top: ConcreteSyntax.Document =
+      try {
+        visitor.parseDocument
+      } catch {
+        case ex: Throwable =>
+          throw new SyntaxException(s"error parsing document ${fileSource.toString}", ex)
+      }
     val errorListener = grammar.errListener
     if (errorListener.hasErrors && errorHandler
           .forall(eh => eh(errorListener.getErrors))) {

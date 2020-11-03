@@ -39,11 +39,12 @@ object DocumentationGenerator {
         }
       case ListValueDocumentation(value, _) =>
         s"${value.map(x => formatMetaValue(x, indent + "    ")).mkString(", ")}"
-      case MapValueDocumentation(value, _) =>
+      case MapValueDocumentation(value, name, _) =>
         val indent2 = s"${indent}    "
+        val nameStr = name.map(n => s"${n}:").getOrElse("")
         val items =
           value.map(x => s"${indent2}* ${x._1}: ${formatMetaValue(x._2, indent2 + "    ")}")
-        s"\n${items.mkString("\n")}"
+        s"${nameStr}\n${items.mkString("\n")}"
     }
   }
 
@@ -62,6 +63,7 @@ object DocumentationGenerator {
       extends ValueDocumentation
 
   case class MapValueDocumentation(value: Map[String, ValueDocumentation],
+                                   name: Option[String],
                                    comment: Option[DocumentationComment])
       extends ValueDocumentation
 
@@ -138,6 +140,7 @@ object DocumentationGenerator {
           case MetaValueObject(value, text) =>
             MapValueDocumentation(
                 value.map(v => v.id -> getMetaValueDocumentation(v.value, text.line)).toMap,
+                None,
                 comment
             )
           case other => SimpleValueDocumentation(other, comment)
@@ -159,6 +162,15 @@ object DocumentationGenerator {
                 value
                   .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
                   .toMap,
+                None,
+                comment
+            )
+          case ExprStruct(name, members, text) =>
+            DocumentationGenerator.MapValueDocumentation(
+                members
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
+                  .toMap,
+                Some(name),
                 comment
             )
           case ExprMap(value, text) =>
@@ -166,6 +178,7 @@ object DocumentationGenerator {
                 value
                   .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
                   .toMap,
+                None,
                 comment
             )
           case ExprArray(value, text) =>

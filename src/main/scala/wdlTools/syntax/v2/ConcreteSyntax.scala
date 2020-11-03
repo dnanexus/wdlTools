@@ -45,6 +45,8 @@ object ConcreteSyntax {
   case class ExprMember(key: Expr, value: Expr, loc: SourceLocation) extends Expr
   case class ExprMapLiteral(value: Vector[ExprMember], loc: SourceLocation) extends Expr
   case class ExprObjectLiteral(value: Vector[ExprMember], loc: SourceLocation) extends Expr
+  case class ExprStructLiteral(name: String, members: Vector[ExprMember], loc: SourceLocation)
+      extends Expr
   case class ExprArrayLiteral(value: Vector[Expr], loc: SourceLocation) extends Expr
 
   case class ExprIdentifier(id: String, loc: SourceLocation) extends Expr

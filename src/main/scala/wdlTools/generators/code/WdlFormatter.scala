@@ -996,6 +996,26 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             Wrapping.Always,
             continue = false
         )
+      case ExprStruct(name, members, loc) =>
+        BoundedContainer(
+            members.map {
+              case ExprMember(ValueString(k, loc), v, memberText) =>
+                KeyValue(Literal.fromStart(k, loc), nested(v), bounds = memberText)
+              case other =>
+                throw new Exception(s"invalid object member ${other}")
+            },
+            Some(
+                SpanSequence(
+                    Literal.chainFromStart(Vector(name, Symbols.ObjectOpen), loc),
+                    spacing = Spacing.On
+                ),
+                Literal.fromEnd(Symbols.ObjectClose, loc)
+            ),
+            Some(Symbols.ArrayDelimiter),
+            bounds = loc,
+            Wrapping.Always,
+            continue = false
+        )
       // placeholders
       case ExprPlaceholderCondition(t, f, value, loc) =>
         Placeholder(

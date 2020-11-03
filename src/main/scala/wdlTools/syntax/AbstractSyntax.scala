@@ -51,6 +51,7 @@ object AbstractSyntax {
   case class ExprMember(key: Expr, value: Expr, loc: SourceLocation) extends Expr
   case class ExprMap(value: Vector[ExprMember], loc: SourceLocation) extends Expr
   case class ExprObject(value: Vector[ExprMember], loc: SourceLocation) extends Expr
+  case class ExprStruct(name: String, members: Vector[ExprMember], loc: SourceLocation) extends Expr
 
   // These are expressions of kind:
   //
