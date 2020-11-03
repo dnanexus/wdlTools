@@ -603,6 +603,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         val name = wdlType match {
           case T_Object          => Symbols.Object
           case T_Struct(name, _) => name
+          case _ =>
+            throw new Exception(s"unexpected object wdlType ${wdlType}")
         }
         Container(
             value.map {
