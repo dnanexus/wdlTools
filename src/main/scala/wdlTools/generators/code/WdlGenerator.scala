@@ -599,7 +599,11 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             Wrapping.Always,
             continue = false
         )
-      case ExprObject(value, _, _) =>
+      case ExprObject(value, wdlType, _) =>
+        val name = wdlType match {
+          case T_Object          => Symbols.Object
+          case T_Struct(name, _) => name
+        }
         Container(
             value.map {
               case (ValueString(k, _, _), v) =>
@@ -608,8 +612,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 throw new Exception(s"invalid object member ${other}")
             }.toVector,
             Some(Symbols.ArrayDelimiter),
-            Some(Sequence(Vector(Literal(Symbols.Object), Literal(Symbols.ObjectOpen)),
-                          spacing = Spacing.On),
+            Some(Sequence(Vector(Literal(name), Literal(Symbols.ObjectOpen)), spacing = Spacing.On),
                  Literal(Symbols.ObjectClose)),
             Wrapping.Always,
             continue = false

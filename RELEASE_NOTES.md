@@ -1,6 +1,6 @@
 # Change log
 
-## v0.10.0 (dev)
+## v0.10.0 (2020-11-03)
 
 * Implemented two accepted spec changes in WDL development/2.0:
     * [openwdl #243](https://github.com/openwdl/wdl/pull/243): Use RE2 for regular expression matching in `sub()` function
