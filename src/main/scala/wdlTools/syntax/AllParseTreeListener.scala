@@ -52,6 +52,8 @@ class AllParseTreeListener
   def exitString_expr_with_string_part(ctx: ParserRuleContext): Unit = {}
   def enterString(ctx: ParserRuleContext): Unit = {}
   def exitString(ctx: ParserRuleContext): Unit = {}
+  def enterMulti_string_component(ctx: ParserRuleContext): Unit = {}
+  def exitMulti_string_component(ctx: ParserRuleContext): Unit = {}
   def enterMulti_string_part(ctx: ParserRuleContext): Unit = {}
   def exitMulti_string_part(ctx: ParserRuleContext): Unit = {}
   def enterString_expr_with_multi_string_part(ctx: ParserRuleContext): Unit = {}
@@ -150,6 +152,8 @@ class AllParseTreeListener
   def exitMeta_string_part(ctx: ParserRuleContext): Unit = {}
   def enterMeta_string(ctx: ParserRuleContext): Unit = {}
   def exitMeta_string(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_multi_string_component(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_multi_string_component(ctx: ParserRuleContext): Unit = {}
   def enterMeta_multi_string_part(ctx: ParserRuleContext): Unit = {}
   def exitMeta_multi_string_part(ctx: ParserRuleContext): Unit = {}
   def enterMeta_multi_string(ctx: ParserRuleContext): Unit = {}
@@ -1492,6 +1496,12 @@ class AllParseTreeListener
   override def exitString(ctx: WdlV2Parser.StringContext): Unit = {
     exitString(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterMulti_string_component(ctx: WdlV2Parser.Multi_string_componentContext): Unit = {
+    enterMulti_string_component(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMulti_string_component(ctx: WdlV2Parser.Multi_string_componentContext): Unit = {
+    exitMulti_string_component(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterMulti_string_part(ctx: WdlV2Parser.Multi_string_partContext): Unit = {
     enterMulti_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1796,6 +1806,16 @@ class AllParseTreeListener
   override def exitMeta_string(ctx: WdlV2Parser.Meta_stringContext): Unit = {
     exitMeta_string(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterMeta_multi_string_component(
+      ctx: WdlV2Parser.Meta_multi_string_componentContext
+  ): Unit = {
+    enterMeta_multi_string_component(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_multi_string_component(
+      ctx: WdlV2Parser.Meta_multi_string_componentContext
+  ): Unit = {
+    exitMeta_multi_string_component(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterMeta_multi_string_part(ctx: WdlV2Parser.Meta_multi_string_partContext): Unit = {
     enterMeta_multi_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1808,6 +1828,7 @@ class AllParseTreeListener
   override def exitMeta_multi_string(ctx: WdlV2Parser.Meta_multi_stringContext): Unit = {
     exitMeta_multi_string(ctx.asInstanceOf[ParserRuleContext])
   }
+
   override def enterMeta_array(ctx: WdlV2Parser.Meta_arrayContext): Unit = {
     enterMeta_array(ctx.asInstanceOf[ParserRuleContext])
   }

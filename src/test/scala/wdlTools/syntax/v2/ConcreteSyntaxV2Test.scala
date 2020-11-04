@@ -58,15 +58,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
       case _          => throw new Exception("not a task")
     }
     task.input.get.declarations.head.expr.get match {
-      case ExprCompoundString(parts, loc) =>
-        parts.map {
-          case ExprString(s, _) => s
-          case _                => throw new Exception("expected ExprString")
-        } shouldBe Vector(
-            "This is a",
-            " ",
-            "multiline string"
-        )
+      case ExprString(s, loc) =>
+        s shouldBe "This is a multiline string"
         loc.line shouldBe 5
         loc.col shouldBe 15
         loc.endLine shouldBe 6
@@ -75,15 +68,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
         throw new Exception("expected ExprString")
     }
     task.declarations(0).expr.get match {
-      case ExprCompoundString(parts, loc) =>
-        parts.map {
-          case ExprString(s, _) => s
-          case _                => throw new Exception("expected ExprString")
-        } shouldBe Vector(
-            "This is a",
-            "\n",
-            "multiline string with a margin"
-        )
+      case ExprString(s, loc) =>
+        s shouldBe "This is a\nmultiline string with a margin"
         loc.line shouldBe 9
         loc.col shouldBe 13
         loc.endLine shouldBe 10
@@ -92,15 +78,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
         throw new Exception("expected ExprString")
     }
     task.declarations(1).expr.get match {
-      case ExprCompoundString(parts, loc) =>
-        parts.map {
-          case ExprString(s, _) => s
-          case _                => throw new Exception("expected ExprString")
-        } shouldBe Vector(
-            "This is a",
-            "\n                ",
-            "multiline string with an indent"
-        )
+      case ExprString(s, loc) =>
+        s shouldBe "This is a\n                multiline string with an indent"
         loc.line shouldBe 12
         loc.col shouldBe 13
         loc.endLine shouldBe 13

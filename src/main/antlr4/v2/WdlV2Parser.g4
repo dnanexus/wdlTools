@@ -62,20 +62,24 @@ string
   | SQUOTE string_part string_expr_with_string_part* SQUOTE
   ;
 
-multi_string_part
+multi_string_component
   : MultiStringPart
   | MultiStringNewline
   | MultiStringMargin
   | MultiStringIndent
   ;
 
+multi_string_part
+  : multi_string_component*
+  ;
+
 string_expr_with_multi_string_part
-  : string_expr_part multi_string_part*
+  : string_expr_part multi_string_part
   ;
 
 multi_string
-  : MULTIDQUOTE multi_string_part+ string_expr_with_multi_string_part* MULTIDQUOTE
-  | MULTISQUOTE multi_string_part+ string_expr_with_multi_string_part* MULTISQUOTE
+  : MULTIDQUOTE multi_string_part string_expr_with_multi_string_part* MULTIDQUOTE
+  | MULTISQUOTE multi_string_part string_expr_with_multi_string_part* MULTISQUOTE
   ;
 
 primitive_literal
@@ -199,16 +203,20 @@ meta_string
   | MetaSquote meta_string_part MetaSquote
   ;
 
-meta_multi_string_part
+meta_multi_string_component
   : MetaMultiStringPart
   | MetaMultiStringNewline
   | MetaMultiStringMargin
   | MetaMultiStringIndent
   ;
 
+meta_multi_string_part
+  : meta_multi_string_component*
+  ;
+
 meta_multi_string
-  : MetaMultiDquote meta_multi_string_part+ MetaMultiDquote
-  | MetaMultiSquote meta_multi_string_part+ MetaMultiSquote
+  : MetaMultiDquote meta_multi_string_part MetaMultiDquote
+  | MetaMultiSquote meta_multi_string_part MetaMultiSquote
   ;
 
 meta_array

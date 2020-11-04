@@ -160,18 +160,20 @@ wdl_type
 
   override def visitMulti_string_part(ctx: WdlV2Parser.Multi_string_partContext): ExprString = {
     val loc = getSourceLocation(grammar.docSource, ctx)
-    val s = if (ctx.MultiStringPart() != null) {
-      ctx.MultiStringPart().getText
-    } else if (ctx.MultiStringNewline() != null) {
-      " "
-    } else if (ctx.MultiStringMargin() != null) {
-      "\n"
-    } else if (ctx.MultiStringIndent() != null) {
-      ctx.MultiStringIndent().getText.dropRight(1) + " "
-    } else {
-      throw new SyntaxException(s"invalid MultiStringPart ${ctx}", loc)
+    val strings = ctx.multi_string_component().asScala.map { part =>
+      if (part.MultiStringPart() != null) {
+        part.MultiStringPart().getText
+      } else if (part.MultiStringNewline() != null) {
+        " "
+      } else if (part.MultiStringMargin() != null) {
+        "\n"
+      } else if (part.MultiStringIndent() != null) {
+        part.MultiStringIndent().getText.dropRight(1) + " "
+      } else {
+        throw new SyntaxException(s"invalid MultiStringPart ${ctx}", loc)
+      }
     }
-    ExprString(s, loc)
+    ExprString(strings.mkString, loc)
   }
 
   private def getStringExprPart(exprPart: Expr, stringPart: Expr, ctx: ParserRuleContext): Expr = {
@@ -197,18 +199,19 @@ wdl_type
       ctx: WdlV2Parser.String_expr_with_multi_string_partContext
   ): Expr = {
     val exprPart = visitExpr(ctx.string_expr_part().expr())
-    val stringPart =
-      ctx
-        .multi_string_part()
-        .asScala
-        .map(visitMulti_string_part)
-        .filterNot(_.value.isEmpty)
-        .toVector match {
-        case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
-        case Vector(e) => e
-        case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
-      }
+    val stringPart = visitMulti_string_part(ctx.multi_string_part())
     getStringExprPart(exprPart, stringPart, ctx)
+  }
+
+  private def getStringExpr(stringPart: ExprString,
+                            exprParts: Vector[Expr],
+                            ctx: ParserRuleContext): Expr = {
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    (stringPart, exprParts) match {
+      case (ExprString(s, _), Vector())           => ExprString(s, loc)
+      case (ExprString(s, _), parts) if s.isEmpty => ExprCompoundString(parts, loc)
+      case (s, parts)                             => ExprCompoundString(s +: parts, loc)
+    }
   }
 
   /*
@@ -229,13 +232,7 @@ string
         case ExprCompoundString(v, _) => v
         case e                        => Vector(e)
       }
-    (stringPart, exprParts) match {
-      case (s: ExprString, Vector()) => s
-      case (ExprString(s, _), parts) if s.isEmpty =>
-        ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
-      case (s, parts) =>
-        ExprCompoundString(s +: parts, getSourceLocation(grammar.docSource, ctx))
-    }
+    getStringExpr(stringPart, exprParts, ctx)
   }
 
   /*
@@ -245,12 +242,7 @@ multi_string
   ;
    */
   override def visitMulti_string(ctx: WdlV2Parser.Multi_stringContext): Expr = {
-    val stringParts = ctx
-      .multi_string_part()
-      .asScala
-      .map(visitMulti_string_part)
-      .filterNot(_.value.isEmpty)
-      .toVector
+    val stringPart = visitMulti_string_part(ctx.multi_string_part())
     val exprParts: Vector[Expr] = ctx
       .string_expr_with_multi_string_part()
       .asScala
@@ -260,12 +252,7 @@ multi_string
         case ExprCompoundString(v, _) => v
         case e                        => Vector(e)
       }
-    stringParts ++ exprParts match {
-      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) => e
-      case v =>
-        ExprCompoundString(v, getSourceLocation(grammar.docSource, ctx))
-    }
+    getStringExpr(stringPart, exprParts, ctx)
   }
 
   /* primitive_literal
@@ -748,6 +735,7 @@ any_decls
     MetaValueString(
         ctx
           .meta_multi_string_part()
+          .meta_multi_string_component()
           .asScala
           .map { part =>
             if (part.MetaMultiStringPart() != null) {
