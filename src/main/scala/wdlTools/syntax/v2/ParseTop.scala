@@ -158,6 +158,30 @@ wdl_type
     }
   }
 
+  override def visitMulti_string_part(ctx: WdlV2Parser.Multi_string_partContext): ExprString = {
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    val s = if (ctx.MultiStringPart() != null) {
+      ctx.MultiStringPart().getText
+    } else if (ctx.MultiStringNewline() != null) {
+      " "
+    } else if (ctx.MultiStringMargin() != null) {
+      "\n"
+    } else if (ctx.MultiStringIndent() != null) {
+      ctx.MultiStringIndent().getText.dropRight(1) + " "
+    } else {
+      throw new SyntaxException(s"invalid MultiStringPart ${ctx}", loc)
+    }
+    ExprString(s, loc)
+  }
+
+  private def getStringExprPart(exprPart: Expr, stringPart: Expr, ctx: ParserRuleContext): Expr = {
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    (exprPart, stringPart) match {
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
+    }
+  }
+
   /* string_expr_with_string_part
   : string_expr_part string_part
   ; */
@@ -166,11 +190,25 @@ wdl_type
   ): Expr = {
     val exprPart = visitExpr(ctx.string_expr_part().expr())
     val stringPart = visitString_part(ctx.string_part())
-    val loc = getSourceLocation(grammar.docSource, ctx)
-    (exprPart, stringPart) match {
-      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
-      case (e, s)                             => ExprCompoundString(Vector(e, s), loc)
-    }
+    getStringExprPart(exprPart, stringPart, ctx)
+  }
+
+  override def visitString_expr_with_multi_string_part(
+      ctx: WdlV2Parser.String_expr_with_multi_string_partContext
+  ): Expr = {
+    val exprPart = visitExpr(ctx.string_expr_part().expr())
+    val stringPart =
+      ctx
+        .multi_string_part()
+        .asScala
+        .map(visitMulti_string_part)
+        .filterNot(_.value.isEmpty)
+        .toVector match {
+        case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
+        case Vector(e) => e
+        case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+      }
+    getStringExprPart(exprPart, stringPart, ctx)
   }
 
   /*
@@ -182,7 +220,7 @@ string
   override def visitString(ctx: WdlV2Parser.StringContext): Expr = {
     val stringPart =
       ExprString(ctx.string_part().getText, getSourceLocation(grammar.docSource, ctx.string_part()))
-    val exprPart: Vector[Expr] = ctx
+    val exprParts: Vector[Expr] = ctx
       .string_expr_with_string_part()
       .asScala
       .map(visitString_expr_with_string_part)
@@ -191,7 +229,7 @@ string
         case ExprCompoundString(v, _) => v
         case e                        => Vector(e)
       }
-    (stringPart, exprPart) match {
+    (stringPart, exprParts) match {
       case (s: ExprString, Vector()) => s
       case (ExprString(s, _), parts) if s.isEmpty =>
         ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
@@ -200,32 +238,61 @@ string
     }
   }
 
+  /*
+multi_string
+  : MULTIDQUOTE multi_string_part string_expr_with_multi_string_part* MULTIDQUOTE
+  | MULTISQUOTE multi_string_part string_expr_with_multi_string_part* MULTISQUOTE
+  ;
+   */
+  override def visitMulti_string(ctx: WdlV2Parser.Multi_stringContext): Expr = {
+    val stringParts = ctx
+      .multi_string_part()
+      .asScala
+      .map(visitMulti_string_part)
+      .filterNot(_.value.isEmpty)
+      .toVector
+    val exprParts: Vector[Expr] = ctx
+      .string_expr_with_multi_string_part()
+      .asScala
+      .map(visitString_expr_with_multi_string_part)
+      .toVector
+      .flatMap {
+        case ExprCompoundString(v, _) => v
+        case e                        => Vector(e)
+      }
+    stringParts ++ exprParts match {
+      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
+      case Vector(e) => e
+      case v =>
+        ExprCompoundString(v, getSourceLocation(grammar.docSource, ctx))
+    }
+  }
+
   /* primitive_literal
-	: None
-	| BoolLiteral
-	| number
-	| string
-	| Identifier
-	; */
+    : None
+    | BoolLiteral
+    | number
+    | string
+    | Identifier
+    ; */
   override def visitPrimitive_literal(ctx: WdlV2Parser.Primitive_literalContext): Expr = {
     if (ctx.NONELITERAL() != null) {
-      return ExprNone(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.BoolLiteral() != null) {
+      ExprNone(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.BoolLiteral() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return ExprBoolean(value, getSourceLocation(grammar.docSource, ctx))
+      ExprBoolean(value, getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.number() != null) {
+      visitNumber(ctx.number())
+    } else if (ctx.string() != null) {
+      visitString(ctx.string())
+    } else if (ctx.multi_string() != null) {
+      visitMulti_string(ctx.multi_string())
+    } else if (ctx.Identifier() != null) {
+      ExprIdentifier(ctx.getText, getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("Not one of four supported variants of primitive_literal",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.number() != null) {
-      return visitNumber(ctx.number())
-    }
-    if (ctx.string() != null) {
-      return visitString(ctx.string())
-    }
-    if (ctx.Identifier() != null) {
-      return ExprIdentifier(ctx.getText, getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException("Not one of four supported variants of primitive_literal",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   override def visitLor(ctx: WdlV2Parser.LorContext): Expr = {
@@ -635,36 +702,33 @@ any_decls
     : BoolLiteral
     | number
     | string
+    | multi_string
     | meta_object
     | meta_array
     | NULL_LITERAL
     ; */
   override def visitMeta_value(ctx: WdlV2Parser.Meta_valueContext): MetaValue = {
     if (ctx.MetaNull() != null) {
-      return MetaValueNull(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.MetaBool() != null) {
+      MetaValueNull(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaBool() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return MetaValueBoolean(value, getSourceLocation(grammar.docSource, ctx))
+      MetaValueBoolean(value, getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaInt() != null) {
+      MetaValueInt(ctx.MetaInt().getText.toLong, getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaFloat() != null) {
+      MetaValueFloat(ctx.MetaFloat().getText.toDouble, getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.meta_string() != null) {
+      visitMeta_string(ctx.meta_string())
+    } else if (ctx.meta_multi_string() != null) {
+      visitMeta_multi_string(ctx.meta_multi_string())
+    } else if (ctx.meta_array() != null) {
+      visitMeta_array(ctx.meta_array())
+    } else if (ctx.meta_object() != null) {
+      visitMeta_object(ctx.meta_object())
+    } else {
+      throw new SyntaxException("Not one of four supported variants of meta_value",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.MetaInt() != null) {
-      return MetaValueInt(ctx.MetaInt().getText.toLong, getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.MetaFloat() != null) {
-      return MetaValueFloat(ctx.MetaFloat().getText.toDouble,
-                            getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.meta_string() != null) {
-      return visitMeta_string(ctx.meta_string())
-    }
-    if (ctx.meta_array() != null) {
-      return visitMeta_array(ctx.meta_array())
-    }
-    if (ctx.meta_object() != null) {
-      return visitMeta_object(ctx.meta_object())
-    }
-    throw new SyntaxException("Not one of four supported variants of meta_value",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   /* meta_string
@@ -674,6 +738,32 @@ any_decls
   override def visitMeta_string(ctx: WdlV2Parser.Meta_stringContext): MetaValueString = {
     MetaValueString(
         ctx.meta_string_part().MetaStringPart().asScala.toVector.map(x => x.getText).mkString,
+        getSourceLocation(grammar.docSource, ctx)
+    )
+  }
+
+  override def visitMeta_multi_string(
+      ctx: WdlV2Parser.Meta_multi_stringContext
+  ): MetaValueString = {
+    MetaValueString(
+        ctx
+          .meta_multi_string_part()
+          .asScala
+          .map { part =>
+            if (part.MetaMultiStringPart() != null) {
+              part.MetaMultiStringPart().getText
+            } else if (part.MetaMultiStringNewline() != null) {
+              " "
+            } else if (part.MetaMultiStringMargin() != null) {
+              "\n"
+            } else if (part.MetaMultiStringIndent() != null) {
+              part.MetaMultiStringIndent().getText.dropRight(1) + " "
+            } else {
+              throw new SyntaxException(s"invalid MetaMultiStringPart ${ctx}",
+                                        getSourceLocation(grammar.docSource, ctx))
+            }
+          }
+          .mkString,
         getSourceLocation(grammar.docSource, ctx)
     )
   }

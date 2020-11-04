@@ -90,6 +90,8 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
+MULTISQUOTE: '\'\'\'' -> pushMode(MultiSquoteInterpolatedString);
+MULTIDQUOTE: '"""' -> pushMode(MultiDquoteInterpolatedString);
 
 WHITESPACE
 	: [ \t\r\n]+ -> channel(HIDDEN)
@@ -118,6 +120,37 @@ DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommand
 DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(StringPart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
 DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
+
+
+mode MultiSquoteInterpolatedString;
+
+MultiSQuoteEscapedChar: '\\' . -> type(MultiStringPart);
+MultiSQuoteDollarString: '$'  -> type(MultiStringPart);
+MultiSQuoteTildeString: '~' -> type(MultiStringPart);
+MultiSQuoteCurlyString: '{' -> type(MultiStringPart);
+MultiSQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
+MultiSQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(MultiStringPart);
+EndMultiSquote: '\'\'\'' ->  popMode, type(MULTISQUOTE);
+MultiSQuote: '\'' -> type(MultiStringPart);
+MultiStringMargin: [\r\n] [ \t]* '|';
+MultiStringIndent: [\r\n] [ \t]* '>';
+MultiStringNewline: [\r\n] [ \t]*;
+MultiStringPart: ~[$~{\r\n']+;
+
+mode MultiDquoteInterpolatedString;
+
+MultiDQuoteEscapedChar: '\\' . -> type(MultiStringPart);
+MultiDQuoteTildeString: '~' -> type(MultiStringPart);
+MultiDQuoteDollarString: '$' -> type(MultiStringPart);
+MultiDQUoteCurlString: '{' -> type(MultiStringPart);
+MultiDQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+MultiDQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MultiStringPart);
+EndMultiDQuote: '"""' ->  popMode, type(MULTIDQUOTE);
+MultiDQuote: '"' -> type(MultiStringPart);
+MultiDQuoteStringMargin: [\r\n] [ \t]* '|' -> type(MultiStringMargin);
+MultiDQuoteStringIndent: [\r\n] [ \t]* '>' -> type(MultiStringIndent);
+MultiDQuoteStringNewline: [\r\n] [ \t]* -> type(MultiStringNewline);
+MultiDQuoteStringPart: ~[$~{\r\n"]+ -> type(MultiStringPart);
 
 mode Command;
 
@@ -174,6 +207,8 @@ MetaFloat: FloatLiteral -> popMode;
 MetaNull: 'null' -> popMode;
 MetaSquote: '\'' -> pushMode(MetaSquoteString);
 MetaDquote: '"' -> pushMode(MetaDquoteString);
+MetaMultiSquote: '\'\'\'' -> pushMode(MetaMultiSquoteString);
+MetaMultiDquote: '"""' -> pushMode(MetaMultiDquoteString);
 MetaEmptyObject: '{' [ \t\r\n]* '}' -> popMode;
 MetaEmptyArray: '[' [ \t\r\n]* ']' -> popMode;
 MetaLbrack: '[' -> pushMode(MetaArray), pushMode(MetaValue);
@@ -193,6 +228,28 @@ MetaDquoteEscapedChar: '\\' . -> type(MetaStringPart);
 MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
+
+mode MetaMultiSquoteString;
+
+MetaMultiSquoteEscapedChar: '\\' . -> type(MetaMultiStringPart);
+MetaMultiSquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(MetaMultiStringPart);
+MetaEndMultiSquote: '\'\'\'' ->  popMode, type(MetaMultiSquote), popMode;
+MetaMultiSQuoteLiteral: '\'' -> type(MetaMultiStringPart);
+MetaMultiStringMargin: [\r\n] [ \t]* '|';
+MetaMultiStringIndent: [\r\n] [ \t]* '>';
+MetaMultiStringNewline: [\r\n] [ \t]*;
+MetaMultiStringPart: ~[\r\n']+;
+
+mode MetaMultiDquoteString;
+
+MetaMultiDquoteEscapedChar: '\\' . -> type(MetaMultiStringPart);
+MetaMultiDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaMultiStringPart);
+MetaEndMultiDquote: '"""' ->  popMode, type(MetaMultiDquote), popMode;
+MetaMultiDQuoteLiteral: '"' -> type(MetaMultiStringPart);
+MetaMultiDQuoteStringMargin: [\r\n] [ \t]* '|' -> type(MetaMultiStringMargin);
+MetaMultiDQuoteStringIndent: [\r\n] [ \t]* '>' -> type(MetaMultiStringIndent);
+MetaMultiDQuoteStringNewline: [\r\n] [ \t]* -> type(MetaMultiStringNewline);
+MetaMultiDQuoteStringPart: ~[\r\n"]+ -> type(MetaMultiStringPart);
 
 mode MetaArray;
 

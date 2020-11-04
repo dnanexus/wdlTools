@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.WdlVersion
 import wdlTools.syntax.v2.ConcreteSyntax._
-import dx.util.{FileNode, Logger, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)
@@ -17,8 +17,8 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
     fileResolver.fromPath(sourcePath.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileNode): Document = {
-    ParseTop(WdlV2Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
+  private def getDocument(fileSource: FileNode): Document = {
+    ParseTop(WdlV2Grammar.newInstance(fileSource, Vector.empty, logger = logger)).parseDocument
   }
 
   it should "handle various types" in {
@@ -49,5 +49,94 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
 
   it should "parse a task with complex hints" in {
     getDocument(getSource("complex_hint_values.wdl"))
+  }
+
+  it should "parse multiline strings" in {
+    val doc = getDocument(getSource("multiline_string.wdl"))
+    val task = doc.elements.head match {
+      case task: Task => task
+      case _          => throw new Exception("not a task")
+    }
+    task.input.get.declarations.head.expr.get match {
+      case ExprCompoundString(parts, loc) =>
+        parts.map {
+          case ExprString(s, _) => s
+          case _                => throw new Exception("expected ExprString")
+        } shouldBe Vector(
+            "This is a",
+            " ",
+            "multiline string"
+        )
+        loc.line shouldBe 5
+        loc.col shouldBe 15
+        loc.endLine shouldBe 6
+        loc.endCol shouldBe 37
+      case _ =>
+        throw new Exception("expected ExprString")
+    }
+    task.declarations(0).expr.get match {
+      case ExprCompoundString(parts, loc) =>
+        parts.map {
+          case ExprString(s, _) => s
+          case _                => throw new Exception("expected ExprString")
+        } shouldBe Vector(
+            "This is a",
+            "\n",
+            "multiline string with a margin"
+        )
+        loc.line shouldBe 9
+        loc.col shouldBe 13
+        loc.endLine shouldBe 10
+        loc.endCol shouldBe 49
+      case _ =>
+        throw new Exception("expected ExprString")
+    }
+    task.declarations(1).expr.get match {
+      case ExprCompoundString(parts, loc) =>
+        parts.map {
+          case ExprString(s, _) => s
+          case _                => throw new Exception("expected ExprString")
+        } shouldBe Vector(
+            "This is a",
+            "\n                ",
+            "multiline string with an indent"
+        )
+        loc.line shouldBe 12
+        loc.col shouldBe 13
+        loc.endLine shouldBe 13
+        loc.endCol shouldBe 50
+      case _ =>
+        throw new Exception("expected ExprString")
+    }
+    task.meta.get.kvs(0).value match {
+      case MetaValueString(s, loc) =>
+        s shouldBe "This is a multiline string"
+        loc.line shouldBe 31
+        loc.col shouldBe 7
+        loc.endLine shouldBe 32
+        loc.endCol shouldBe 29
+      case _ =>
+        throw new Exception("expected MetaValueString")
+    }
+    task.meta.get.kvs(1).value match {
+      case MetaValueString(s, loc) =>
+        s shouldBe "This is a\nmultiline string with a margin"
+        loc.line shouldBe 33
+        loc.col shouldBe 7
+        loc.endLine shouldBe 34
+        loc.endCol shouldBe 43
+      case _ =>
+        throw new Exception("expected MetaValueString")
+    }
+    task.meta.get.kvs(2).value match {
+      case MetaValueString(s, loc) =>
+        s shouldBe "This is a\n          multiline string with an indent"
+        loc.line shouldBe 35
+        loc.col shouldBe 7
+        loc.endLine shouldBe 36
+        loc.endCol shouldBe 44
+      case _ =>
+        throw new Exception("expected MetaValueString")
+    }
   }
 }

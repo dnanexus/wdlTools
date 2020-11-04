@@ -62,10 +62,27 @@ string
   | SQUOTE string_part string_expr_with_string_part* SQUOTE
   ;
 
+multi_string_part
+  : MultiStringPart
+  | MultiStringNewline
+  | MultiStringMargin
+  | MultiStringIndent
+  ;
+
+string_expr_with_multi_string_part
+  : string_expr_part multi_string_part*
+  ;
+
+multi_string
+  : MULTIDQUOTE multi_string_part+ string_expr_with_multi_string_part* MULTIDQUOTE
+  | MULTISQUOTE multi_string_part+ string_expr_with_multi_string_part* MULTISQUOTE
+  ;
+
 primitive_literal
   : BoolLiteral
   | number
   | string
+  | multi_string
   | NONELITERAL
   | Identifier
   ;
@@ -168,6 +185,7 @@ meta_value
   | MetaInt
   | MetaFloat
   | meta_string
+  | meta_multi_string
   | meta_object
   | meta_array
   ;
@@ -179,6 +197,18 @@ meta_string_part
 meta_string
   : MetaDquote meta_string_part MetaDquote
   | MetaSquote meta_string_part MetaSquote
+  ;
+
+meta_multi_string_part
+  : MetaMultiStringPart
+  | MetaMultiStringNewline
+  | MetaMultiStringMargin
+  | MetaMultiStringIndent
+  ;
+
+meta_multi_string
+  : MetaMultiDquote meta_multi_string_part+ MetaMultiDquote
+  | MetaMultiSquote meta_multi_string_part+ MetaMultiSquote
   ;
 
 meta_array
