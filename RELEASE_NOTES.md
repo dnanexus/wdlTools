@@ -1,5 +1,10 @@
 # Change log
 
+## v0.10.1 (2020-11-05)
+
+* Add support for struct literals in the code generator
+* Add support for direct resolution of fully qualified names during evaluation of identifiers of pair, object, and call types
+
 ## v0.10.0 (2020-11-03)
 
 * Implemented two accepted spec changes in WDL development/2.0:

@@ -3,7 +3,7 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
-import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT}
+import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT, TypeUtils}
 import dx.util.{Bindings, EvalPaths, FileSource, FileSourceResolver, LocalFileSource, Logger}
 
 object Eval {
@@ -238,12 +238,31 @@ case class Eval(paths: EvalPaths,
               )
           }
 
-        case TAT.ExprGetName(TAT.ExprIdentifier(id, _: WdlTypes.T_Call, _), fieldName, _, _)
-            if nestedCtx.bindings.contains(s"$id.$fieldName") =>
-          // Access the output of a call - the env has bindings for the fully-qualified name
-          // For example:
-          //   Int z = x.a
-          nestedCtx.bindings(s"$id.$fieldName")
+        case TAT.ExprGetName(TAT.ExprIdentifier(id, idType, _), fieldName, _, _)
+            if nestedCtx.bindings.contains(s"${id}.${fieldName}") =>
+          // These cases are a bit of a hack - they enable resolution of a fully-qualified name
+          // when the LHS is an identifier, rather than having to first evaluate the LHS expression.
+          // In practice, this can be used by a runtime engine to simplify call inputs/outputs - e.g.
+          // if task Bar refers to the output of task Foo (say Foo.result), rather than having to make
+          // the Foo call object (or some serialized version thereof) avaialble to Bar, it can just
+          // expose an output parameter "Bar.result".
+          val fqnResolutionAllowed = TypeUtils.unwrapOptional(idType) match {
+            case _: WdlTypes.T_Pair if Set("left", "right").contains(fieldName) => true
+            case WdlTypes.T_Struct(_, members) if members.contains(fieldName)   => true
+            case WdlTypes.T_Object                                              => true
+            case WdlTypes.T_Any                                                 => true
+            case WdlTypes.T_Call(_, output) if output.contains(fieldName)       => true
+            case _                                                              => false
+          }
+          if (fqnResolutionAllowed) {
+            nestedCtx.bindings(s"$id.$fieldName")
+          } else {
+            throw new EvalException(
+                s"""'${id}.${fieldName}' is present in the evaluation context, but fully-qualified name 
+                   |resolution is not allowed for identifier of type ${idType}""".stripMargin
+                  .replaceAll("\n", " ")
+            )
+          }
 
         case TAT.ExprGetName(e: TAT.Expr, fieldName, _, loc) =>
           // Evaluate the expression, then access the field
