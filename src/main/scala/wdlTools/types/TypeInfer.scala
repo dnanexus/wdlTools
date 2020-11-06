@@ -17,6 +17,8 @@ import dx.util.{
   FileUtils => UUtil
 }
 
+import scala.collection.immutable.{SeqMap, TreeSeqMap}
+
 /**
   * Type inference
   * @param regime Type checking rules. Are we lenient or strict in checking coercions?
@@ -230,20 +232,24 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
               TAT.ExprArray(elementTypes, t, loc)
             case AST.ExprObject(members, loc) =>
-              val tMembers = members.map {
-                case AST.ExprMember(key, value, _) =>
-                  val k = nested(key, nextState)
-                  val v = nested(value, nextState)
-                  k -> v
-              }.toMap
+              val tMembers = members
+                .map {
+                  case AST.ExprMember(key, value, _) =>
+                    val k = nested(key, nextState)
+                    val v = nested(value, nextState)
+                    (k, v)
+                }
+                .to(TreeSeqMap)
               TAT.ExprObject(tMembers, T_Object, loc)
             case AST.ExprStruct(name, members, loc) =>
-              val tMembers = members.map {
-                case AST.ExprMember(key, value, _) =>
-                  val k = nested(key, nextState)
-                  val v = nested(value, nextState)
-                  k -> v
-              }.toMap
+              val tMembers = members
+                .map {
+                  case AST.ExprMember(key, value, _) =>
+                    val k = nested(key, nextState)
+                    val v = nested(value, nextState)
+                    (k, v)
+                }
+                .to(TreeSeqMap)
               val wdlType = ctx.aliases.get(name) match {
                 case Some(structType: T_Struct) => structType
                 case _ =>
@@ -253,17 +259,20 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               TAT.ExprObject(tMembers, wdlType, loc)
             case AST.ExprMap(m, loc) if m.isEmpty =>
               // The key and value types are unknown.
-              TAT.ExprMap(Map.empty, T_Map(T_Any, T_Any), loc)
+              TAT.ExprMap(SeqMap.empty, T_Map(T_Any, T_Any), loc)
             case AST.ExprMap(value, loc) =>
-              val m: Map[TAT.Expr, TAT.Expr] = value.map { item: AST.ExprMember =>
-                val k = nested(item.key, nextState)
-                val v = nested(item.value, nextState)
-                k -> v
-              }.toMap
+              val m = value
+                .map { item: AST.ExprMember =>
+                  val k = nested(item.key, nextState)
+                  val v = nested(item.value, nextState)
+                  (k, v)
+                }
+                .to(TreeSeqMap)
               // unify the key/value types
               val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
-              val tk = unifyTypes(m.keys.map(_.wdlType), "map keys", loc, unifyCtx)
-              val tv = unifyTypes(m.values.map(_.wdlType), "map values", loc, unifyCtx)
+              val (keys, values) = m.unzip
+              val tk = unifyTypes(keys.map(_.wdlType), "map keys", loc, unifyCtx)
+              val tv = unifyTypes(values.map(_.wdlType), "map values", loc, unifyCtx)
               TAT.ExprMap(m, T_Map(tk, tv), loc)
 
             case AST.ExprIdentifier(id, loc) =>
@@ -449,9 +458,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         }
       case _: AST.TypeObject => T_Object
       case AST.TypeStruct(name, members, _) =>
-        T_Struct(name, members.map {
-          case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, loc, ctx)
-        }.toMap)
+        T_Struct(name,
+                 members
+                   .map {
+                     case AST.StructMember(name, t2, _) => name -> typeFromAst(t2, loc, ctx)
+                   }
+                   .to(TreeSeqMap))
     }
   }
 
@@ -585,19 +597,21 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: TypeContext): TAT.RuntimeSection = {
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
-    val m = rtSection.kvs.map {
-      case AST.RuntimeKV(id, expr, loc) =>
-        val tExpr = applyExpr(expr, ctx)
-        // if there are type restrictions, check that the type of the expression is coercible to
-        // one of the allowed types
-        if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
-          throw new TypeException(
-              s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
-              loc
-          )
-        }
-        id -> tExpr
-    }.toMap
+    val m = rtSection.kvs
+      .map {
+        case AST.RuntimeKV(id, expr, loc) =>
+          val tExpr = applyExpr(expr, ctx)
+          // if there are type restrictions, check that the type of the expression is coercible to
+          // one of the allowed types
+          if (!restrictions.get(id).forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+            throw new TypeException(
+                s"runtime id ${id} is not coercible to one of the allowed types ${restrictions(id)}",
+                loc
+            )
+          }
+          id -> tExpr
+      }
+      .to(TreeSeqMap)
     TAT.RuntimeSection(m, rtSection.loc)
   }
 
@@ -614,10 +628,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         TAT.MetaValueArray(vec.map(applyMetaValue(_, ctx)), loc)
       case AST.MetaValueObject(members, loc) =>
         TAT.MetaValueObject(
-            members.map {
-              case AST.MetaKV(key, value, _) =>
-                key -> applyMetaValue(value, ctx)
-            }.toMap,
+            members
+              .map {
+                case AST.MetaKV(key, value, _) =>
+                  key -> applyMetaValue(value, ctx)
+              }
+              .to(TreeSeqMap),
             loc
         )
       case other =>
@@ -627,37 +643,44 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   private def applyMeta(metaSection: AST.MetaSection, ctx: TypeContext): TAT.MetaSection = {
-    TAT.MetaSection(metaSection.kvs.map {
-      case AST.MetaKV(k, v, _) =>
-        k -> applyMetaValue(v, ctx)
-    }.toMap, metaSection.loc)
+    TAT.MetaSection(metaSection.kvs
+                      .map {
+                        case AST.MetaKV(k, v, _) =>
+                          k -> applyMetaValue(v, ctx)
+                      }
+                      .to(TreeSeqMap),
+                    metaSection.loc)
   }
 
   private def applyParamMeta(paramMetaSection: AST.ParameterMetaSection,
                              ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
-        paramMetaSection.kvs.map { kv: AST.MetaKV =>
-          val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
-            applyMetaValue(kv.value, ctx)
-          } else {
-            handleError(
-                s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
-                kv.loc
-            )
-            TAT.MetaValueNull(kv.value.loc)
+        paramMetaSection.kvs
+          .map { kv: AST.MetaKV =>
+            val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
+              applyMetaValue(kv.value, ctx)
+            } else {
+              handleError(
+                  s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
+                  kv.loc
+              )
+              TAT.MetaValueNull(kv.value.loc)
+            }
+            kv.id -> metaValue
           }
-          kv.id -> metaValue
-        }.toMap,
+          .to(TreeSeqMap),
         paramMetaSection.loc
     )
   }
 
   private def applyHints(hintsSection: AST.HintsSection, ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
-        hintsSection.kvs.map {
-          case AST.MetaKV(k, v, _) =>
-            k -> applyMetaValue(v, ctx)
-        }.toMap,
+        hintsSection.kvs
+          .map {
+            case AST.MetaKV(k, v, _) =>
+              k -> applyMetaValue(v, ctx)
+          }
+          .to(TreeSeqMap),
         hintsSection.loc
     )
   }
@@ -666,22 +689,26 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   private def calcSignature(
       inputSection: Vector[TAT.InputParameter],
       outputSection: Vector[TAT.OutputParameter]
-  ): (Map[String, (WdlType, Boolean)], Map[String, WdlType]) = {
-    val inputType: Map[String, (WdlType, Boolean)] = inputSection.map {
-      case d: TAT.RequiredInputParameter =>
-        // input is compulsory
-        d.name -> (d.wdlType, false)
-      case d: TAT.OverridableInputParameterWithDefault =>
-        // input has a default value, caller may omit it.
-        d.name -> (d.wdlType, true)
-      case d: TAT.OptionalInputParameter =>
-        // input is optional, caller can omit it.
-        d.name -> (d.wdlType, true)
-    }.toMap
+  ): (SeqMap[String, (WdlType, Boolean)], SeqMap[String, WdlType]) = {
+    val inputType: SeqMap[String, (WdlType, Boolean)] = inputSection
+      .map {
+        case d: TAT.RequiredInputParameter =>
+          // input is compulsory
+          d.name -> (d.wdlType, false)
+        case d: TAT.OverridableInputParameterWithDefault =>
+          // input has a default value, caller may omit it.
+          d.name -> (d.wdlType, true)
+        case d: TAT.OptionalInputParameter =>
+          // input is optional, caller can omit it.
+          d.name -> (d.wdlType, true)
+      }
+      .to(TreeSeqMap)
 
-    val outputType: Map[String, WdlType] = outputSection.map { tDecl =>
-      tDecl.name -> tDecl.wdlType
-    }.toMap
+    val outputType: SeqMap[String, WdlType] = outputSection
+      .map { tDecl =>
+        tDecl.name -> tDecl.wdlType
+      }
+      .to(TreeSeqMap)
 
     (inputType, outputType)
   }
@@ -788,7 +815,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val callee: T_Callable = ctx.callables.get(call.name) match {
       case None =>
         handleError(s"called task/workflow ${call.name} is not defined", call.loc)
-        WdlTypes.T_Task(call.name, Map.empty, Map.empty)
+        WdlTypes.T_Task(call.name, SeqMap.empty, SeqMap.empty)
       case Some(x: T_Callable) => x
     }
 
@@ -796,7 +823,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val callType = T_Call(actualName, callee.output)
     val wdlType = if (ctx.declarations contains actualName) {
       handleError(s"call ${actualName} shadows an existing definition", call.loc)
-      T_Call(actualName, Map.empty)
+      T_Call(actualName, SeqMap.empty)
     } else {
       callType
     }
@@ -810,43 +837,46 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               s"call ${actualName} after clause refers to non-call declaration ${after.name}",
               after.loc
           )
-          T_Call(after.name, Map.empty)
+          T_Call(after.name, SeqMap.empty)
         case None =>
           handleError(s"call ${actualName} after clause refers to non-existant call ${after.name}",
                       after.loc)
-          T_Call(after.name, Map.empty)
+          T_Call(after.name, SeqMap.empty)
       }
     }
 
     // convert inputs
-    val callerInputs: Map[String, TAT.Expr] = call.inputs match {
+    val callerInputs: SeqMap[String, TAT.Expr] = call.inputs match {
       case Some(AST.CallInputs(value, _)) =>
-        value.map { inp =>
-          val argName = inp.name
-          val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
-          if (callee.input.contains(argName)) {
-            // type-check input argument
-            val (calleeInputType, optional) = callee.input(argName)
-            val checkType = if (optional) {
-              TypeUtils.ensureOptional(calleeInputType)
+        value
+          .map { inp =>
+            val argName = inp.name
+            val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
+            if (callee.input.contains(argName)) {
+              // type-check input argument
+              val (calleeInputType, optional) = callee.input(argName)
+              val checkType = if (optional) {
+                TypeUtils.ensureOptional(calleeInputType)
+              } else {
+                TypeUtils.unwrapOptional(calleeInputType)
+              }
+              if (!unify
+                    .isCoercibleTo(checkType, tExpr.wdlType, UnificationContext(Section.Call))) {
+                handleError(
+                    s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
+                    call.loc
+                )
+              }
             } else {
-              TypeUtils.unwrapOptional(calleeInputType)
-            }
-            if (!unify.isCoercibleTo(checkType, tExpr.wdlType, UnificationContext(Section.Call))) {
               handleError(
-                  s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
+                  s"call '${call.name}' has argument ${argName} that does not exist in the callee",
                   call.loc
               )
             }
-          } else {
-            handleError(
-                s"call '${call.name}' has argument ${argName} that does not exist in the callee",
-                call.loc
-            )
+            argName -> tExpr
           }
-          argName -> tExpr
-        }.toMap
-      case None => Map.empty
+          .to(TreeSeqMap)
+      case None => SeqMap.empty
     }
 
     // check that all the compulsory arguments are provided
@@ -1097,7 +1127,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 case Some(referee) => TAT.ImportAlias(id1, id2, referee, loc)
                 case None =>
                   handleError(s"missing struct ${id1}", loc)
-                  TAT.ImportAlias(id1, id2, T_Struct(id1, Map.empty), loc)
+                  TAT.ImportAlias(id1, id2, T_Struct(id1, SeqMap.empty), loc)
               }
           }
 

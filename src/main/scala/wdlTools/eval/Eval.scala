@@ -3,8 +3,10 @@ package wdlTools.eval
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
-import wdlTools.types.{ExprState, WdlTypes, TypedAbstractSyntax => TAT, TypeUtils}
+import wdlTools.types.{ExprState, TypeUtils, WdlTypes, TypedAbstractSyntax => TAT}
 import dx.util.{Bindings, EvalPaths, FileSource, FileSourceResolver, LocalFileSource, Logger}
+
+import scala.collection.immutable.TreeSeqMap
 
 object Eval {
   lazy val empty: Eval = Eval(DefaultEvalPaths.empty, None, FileSourceResolver.get, Logger.get)
@@ -142,19 +144,23 @@ case class Eval(paths: EvalPaths,
             case (k, v) => inner(k, nestedCtx) -> inner(v, nestedCtx)
           })
         case TAT.ExprObject(value, _, _) =>
-          V_Object(value.map {
-            case (k, v) =>
-              // an object literal key can be a string or identifier
-              val key = inner(k, nestedCtx) match {
-                case V_String(s) => s
-                case _ =>
-                  throw new EvalException(
-                      s"invalid key ${k}, object literal key must be a string",
-                      expr.loc
-                  )
-              }
-              key -> inner(v, nestedCtx)
-          })
+          V_Object(
+              value
+                .map {
+                  case (k, v) =>
+                    // an object literal key can be a string or identifier
+                    val key = inner(k, nestedCtx) match {
+                      case V_String(s) => s
+                      case _ =>
+                        throw new EvalException(
+                            s"invalid key ${k}, object literal key must be a string",
+                            expr.loc
+                        )
+                    }
+                    key -> inner(v, nestedCtx)
+                }
+                .to(TreeSeqMap)
+          )
 
         case TAT.ExprIdentifier(id, _, _) =>
           // accessing a variable
@@ -225,13 +231,17 @@ case class Eval(paths: EvalPaths,
               )
             case (_: V_Array, _) =>
               throw new EvalException(s"array access requires an array and an integer", loc)
-            case (V_Map(value), key) if value.contains(key) =>
-              value(key)
             case (V_Map(value), key) =>
-              throw new EvalException(
-                  s"map ${value} does not contain key ${key}",
-                  loc
-              )
+              value
+                .collectFirst {
+                  case (k, v) if k == key => v
+                }
+                .getOrElse(
+                    throw new EvalException(
+                        s"map ${value} does not contain key ${key}",
+                        loc
+                    )
+                )
             case _ =>
               throw new EvalException(
                   s"Invalid array/map ${collectionVal} and/or index ${indexVal}"

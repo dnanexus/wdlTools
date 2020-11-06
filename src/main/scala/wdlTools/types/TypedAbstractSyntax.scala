@@ -3,6 +3,11 @@ package wdlTools.types
 import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
 import dx.util.FileNode
 
+// Use SeqMap for all map attributes, which maintains insert
+// order - this is important for the code formatter to be
+// able to maintain the ordering of elements
+import scala.collection.immutable.SeqMap
+
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
   type WdlType = WdlTypes.T
@@ -38,8 +43,9 @@ object TypedAbstractSyntax {
 
   case class ExprPair(l: Expr, r: Expr, wdlType: WdlType, loc: SourceLocation) extends Expr
   case class ExprArray(value: Vector[Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprMap(value: Map[Expr, Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprObject(value: Map[Expr, Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ExprMap(value: SeqMap[Expr, Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ExprObject(value: SeqMap[Expr, Expr], wdlType: WdlType, loc: SourceLocation)
+      extends Expr
 
   // These are expressions of kind:
   //
@@ -158,7 +164,7 @@ object TypedAbstractSyntax {
   //     echo ~{input_string}
   // >>>
   case class CommandSection(parts: Vector[Expr], loc: SourceLocation) extends Element
-  case class RuntimeSection(kvs: Map[String, Expr], loc: SourceLocation) extends Element
+  case class RuntimeSection(kvs: SeqMap[String, Expr], loc: SourceLocation) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
@@ -167,11 +173,12 @@ object TypedAbstractSyntax {
   case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
   case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
-  case class MetaValueObject(value: Map[String, MetaValue], loc: SourceLocation) extends MetaValue
+  case class MetaValueObject(value: SeqMap[String, MetaValue], loc: SourceLocation)
+      extends MetaValue
   case class MetaValueArray(value: Vector[MetaValue], loc: SourceLocation) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
-  case class MetaSection(kvs: Map[String, MetaValue], loc: SourceLocation) extends Element
+  case class MetaSection(kvs: SeqMap[String, MetaValue], loc: SourceLocation) extends Element
 
   case class Version(value: WdlVersion, loc: SourceLocation) extends Element
 
@@ -188,7 +195,7 @@ object TypedAbstractSyntax {
   // a definition of a struct
   case class StructDefinition(name: String,
                               wdlType: WdlTypes.T_Struct,
-                              members: Map[String, WdlType],
+                              members: SeqMap[String, WdlType],
                               loc: SourceLocation)
       extends DocumentElement
 
@@ -228,7 +235,7 @@ object TypedAbstractSyntax {
                   alias: Option[String],
                   afters: Vector[WdlTypes.T_Call],
                   actualName: String,
-                  inputs: Map[String, Expr],
+                  inputs: SeqMap[String, Expr],
                   loc: SourceLocation)
       extends WorkflowElement
 

@@ -81,7 +81,7 @@ logLevel in assembly := Level.Info
 //    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
 //)
 
-val dxCommonVersion = "0.2.0"
+val dxCommonVersion = "0.2.1"
 val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"

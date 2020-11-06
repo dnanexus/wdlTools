@@ -79,8 +79,8 @@ object Coercion {
           // ensure 1) members2 keys are a subset of members1 keys, 2) members2
           // values are coercible to the corresponding types, and 3) any keys
           // in members1 that do not appear in members2 are optional
-          val keys1 = members1.keySet
-          val keys2 = members2.keySet
+          val keys1 = members1.keys.toSet
+          val keys2 = members2.keys.toSet
           val extra = keys2.diff(keys1)
           if (extra.nonEmpty) {
             throw new EvalException(

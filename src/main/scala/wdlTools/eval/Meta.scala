@@ -84,7 +84,7 @@ object Meta {
       meta: Option[TAT.MetaSection],
       userDefaultValues: Option[VBindings] = None
   ): Meta = {
-    val kvs = meta.map(_.kvs).getOrElse(Map.empty)
+    val kvs = meta.map(_.kvs.toMap).getOrElse(Map.empty)
     version match {
       case WdlVersion.Draft_2 => Draft2Meta(kvs, userDefaultValues)
       case _                  => V1Meta(kvs, userDefaultValues)

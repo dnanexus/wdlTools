@@ -386,15 +386,22 @@ case class Stdlib(paths: EvalPaths,
             case (x, y) => inner(x, y)
           }
         case (V_Map(m1), V_Map(m2)) if m1.size != m2.size => false
-        case (V_Map(m1), V_Map(m2)) =>
-          val keysEqual = m1.keySet.zip(m2.keySet).forall {
-            case (k1, k2) => inner(k1, k2)
+        case (V_Map(m1), V_Map(m2))                       =>
+          // maps are potentially unordered, and keys may not be
+          // equal (by Scala's definition), so we have to do an
+          // all-by-all comparison of keys
+          val (keyMap, remaining) = m1.keys.foldLeft(Vector.empty[(V, V)], m2.keySet) {
+            case ((accu, m2), k1) =>
+              val k2 = m2
+                .collectFirst {
+                  case k2 if inner(k1, k2) => k2
+                }
+                .getOrElse(return false)
+              (accu :+ (k1, k2), m2 - k2)
           }
-          if (!keysEqual) {
-            false
-          } else {
-            // now we know the keys are all equal
-            m1.keys.forall(k => inner(m1(k), m2(k)))
+          assert(remaining.isEmpty)
+          keyMap.forall {
+            case (k1, k2) => inner(m1(k1), m2(k2))
           }
         case (V_Optional(v1), V_Optional(v2)) =>
           inner(v1, v2)

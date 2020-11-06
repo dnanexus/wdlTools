@@ -2,6 +2,8 @@ package wdlTools.syntax
 
 import dx.util.{FileNode, StringFileNode}
 
+import scala.collection.immutable.TreeMap
+
 sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
   def compare(that: WdlVersion): Int = this.order - that.order
@@ -138,7 +140,7 @@ case class Comment(value: String, loc: SourceLocation) extends Ordered[Comment] 
   override def compare(that: Comment): Int = loc.line - that.loc.line
 }
 
-case class CommentMap(comments: Map[Int, Comment]) {
+case class CommentMap(comments: TreeMap[Int, Comment]) {
   def nonEmpty: Boolean = {
     comments.nonEmpty
   }
@@ -148,7 +150,7 @@ case class CommentMap(comments: Map[Int, Comment]) {
   lazy val maxLine: Int = comments.keys.max
 
   def filterWithin(range: Seq[Int]): CommentMap = {
-    CommentMap(comments.view.filterKeys(range.contains).toMap)
+    CommentMap(comments.view.filterKeys(range.contains).to(TreeMap))
   }
 
   def toSortedVector: Vector[Comment] = {
@@ -165,5 +167,5 @@ case class CommentMap(comments: Map[Int, Comment]) {
 }
 
 object CommentMap {
-  val empty: CommentMap = CommentMap(Map.empty)
+  val empty: CommentMap = CommentMap(TreeMap.empty)
 }

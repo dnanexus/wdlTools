@@ -133,7 +133,7 @@ class TypedAbstractSyntaxTreeVisitor {
       case ExprPair(l, r, _, _)                         => Vector(l, r)
       case ExprArray(value, _, _)                       => value
       case ExprMap(value, _, _)                         => value.keys.toVector ++ value.values.toVector
-      case ExprObject(value, _, _)                      => value.values.toVector
+      case ExprObject(value, _, _)                      => value.keys.toVector ++ value.values.toVector
       case ExprPlaceholderCondition(t, f, value, _, _)  => Vector(t, f, value)
       case ExprPlaceholderDefault(default, value, _, _) => Vector(default, value)
       case ExprPlaceholderSep(sep, value, _, _)         => Vector(sep, value)

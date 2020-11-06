@@ -9,6 +9,8 @@ import wdlTools.Edge
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
+import scala.collection.Map
+
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
   private val v1Dir = Paths.get(getClass.getResource("/types/v1").getPath)
@@ -88,6 +90,6 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
       case task: TAT.Task => task
     }
     subTasks.size shouldBe 1
-    topTasks.head should equal(subTasks.head)
+    topTasks.head shouldBe subTasks.head
   }
 }

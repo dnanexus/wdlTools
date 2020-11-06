@@ -311,16 +311,17 @@ object TaskInputOutput {
             Some(WdlValues.V_Struct(_, memberValues))) =>
         WdlValues.V_Struct(
             structName,
-            memberTypes.map {
-              case (memberName, memberType) =>
-                memberName -> resolveOutputValue(s"${name}.${memberName}",
-                                                 memberType,
-                                                 memberValues.get(memberName),
-                                                 fileResolver,
-                                                 loc,
-                                                 optional = optional)
+            memberTypes
+              .map {
+                case (memberName, memberType) =>
+                  memberName -> resolveOutputValue(s"${name}.${memberName}",
+                                                   memberType,
+                                                   memberValues.get(memberName),
+                                                   fileResolver,
+                                                   loc,
+                                                   optional = optional)
 
-            }
+              }
         )
 
       case _ =>

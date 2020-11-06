@@ -115,7 +115,7 @@ object WdlValueSerde {
 
         // maps
         case (WdlTypes.T_Map(keyType, valueType), JsObject(fields)) =>
-          val m: Map[V, V] = fields.map {
+          val m = fields.map {
             case (k: String, v: JsValue) =>
               val kWdl = inner(JsString(k), keyType, s"${innerName}.${k}")
               val vWdl = inner(v, valueType, s"${innerName}.${k}")
@@ -156,12 +156,13 @@ object WdlValueSerde {
         // structs
         case (WdlTypes.T_Struct(structName, typeMap), JsObject(fields)) =>
           // convert each field
-          val m = fields.map {
-            case (key, value) =>
-              val t: WdlTypes.T = typeMap(key)
-              val elem: V = inner(value, t, s"${innerName}.${key}")
-              key -> elem
-          }
+          val m = fields
+            .map {
+              case (key, value) =>
+                val t: WdlTypes.T = typeMap(key)
+                val elem: V = inner(value, t, s"${innerName}.${key}")
+                key -> elem
+            }
           V_Struct(structName, m)
 
         case _ =>

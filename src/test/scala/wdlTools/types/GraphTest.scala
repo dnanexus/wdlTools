@@ -13,6 +13,8 @@ import wdlTools.types.TypedAbstractSyntax.Task
 import wdlTools.types.WdlTypes._
 import dx.util.{FileSourceResolver, Logger}
 
+import scala.collection.immutable.TreeSeqMap
+
 class GraphTest extends AnyFlatSpec with Matchers {
   private val fileResolver = FileSourceResolver.create(
       Vector(Paths.get(getClass.getResource("/types/graph").getPath))
@@ -83,34 +85,34 @@ class GraphTest extends AnyFlatSpec with Matchers {
   it should "build a type graph" in {
     val struct1 = T_Struct(
         "Foo",
-        Map(
+        TreeSeqMap(
             "bar" -> T_Int,
             "baz" -> T_String
         )
     )
     val struct2 = T_Struct(
         "Bork",
-        Map(
+        TreeSeqMap(
             "bink" -> struct1,
             "bonk" -> T_Float
         )
     )
     val struct3 = T_Struct(
         "Bloke",
-        Map(
+        TreeSeqMap(
             "boop" -> T_Array(struct1),
             "bip" -> T_Optional(struct2)
         )
     )
     val struct4 = T_Struct(
         "Boom",
-        Map(
+        TreeSeqMap(
             "bop" -> T_Map(struct2, struct3)
         )
     )
     val struct5 = T_Struct(
         "Bump",
-        Map(
+        TreeSeqMap(
             "bap" -> T_String
         )
     )
@@ -129,14 +131,14 @@ class GraphTest extends AnyFlatSpec with Matchers {
     // now use some aliases
     val struct3withAliases = T_Struct(
         "Bloke",
-        Map(
+        TreeSeqMap(
             "boop" -> T_Array(struct1),
             "bip" -> T_Optional(struct2.copy(name = "alias2"))
         )
     )
     val struct4withAliases = T_Struct(
         "Boom",
-        Map(
+        TreeSeqMap(
             "bop" -> T_Map(struct2.copy(name = "alias2"), struct3.copy(name = "alias3"))
         )
     )

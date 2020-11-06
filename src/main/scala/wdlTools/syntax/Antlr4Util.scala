@@ -16,6 +16,8 @@ import scala.jdk.CollectionConverters._
 import wdlTools.syntax
 import dx.util.{FileNode, Logger}
 
+import scala.collection.immutable.TreeMap
+
 object Antlr4Util {
   private var parserTrace: Boolean = false
 
@@ -88,7 +90,7 @@ object Antlr4Util {
                                      tokenStream: BufferedTokenStream,
                                      channelIndex: Int)
       extends AllParseTreeListener {
-    private var comments: Map[Int, Comment] = Map.empty
+    private var comments: TreeMap[Int, Comment] = TreeMap.empty
 
     def getComments: CommentMap = CommentMap(comments)
 

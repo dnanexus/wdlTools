@@ -1,5 +1,10 @@
 # Change log
 
+## v0.10.2 (2020-11-06)
+
+* Change all map-types attributes of typed AST classes to be `SortedMap`s - mainly to preserve insert order for the code formatter
+* Updated to dxCommon 0.2.1, which fixes a bug with idential AST/TST objects not comparing as equal/generating identical hash codes
+
 ## v0.10.1 (2020-11-05)
 
 * Add support for struct literals in the code generator
