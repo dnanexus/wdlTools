@@ -245,17 +245,18 @@ case class Eval(paths: EvalPaths,
           // In practice, this can be used by a runtime engine to simplify call inputs/outputs - e.g.
           // if task Bar refers to the output of task Foo (say Foo.result), rather than having to make
           // the Foo call object (or some serialized version thereof) avaialble to Bar, it can just
-          // expose an output parameter "Bar.result".
+          // expose an output parameter "Foo.result".
           val fqnResolutionAllowed = TypeUtils.unwrapOptional(idType) match {
             case _: WdlTypes.T_Pair if Set("left", "right").contains(fieldName) => true
             case WdlTypes.T_Struct(_, members) if members.contains(fieldName)   => true
-            case WdlTypes.T_Object                                              => true
-            case WdlTypes.T_Any                                                 => true
             case WdlTypes.T_Call(_, output) if output.contains(fieldName)       => true
-            case _                                                              => false
+            // there's no way to guarantee the resolution is valid for these types:
+            case WdlTypes.T_Object => true
+            case WdlTypes.T_Any    => true
+            case _                 => false
           }
           if (fqnResolutionAllowed) {
-            nestedCtx.bindings(s"$id.$fieldName")
+            nestedCtx.bindings(s"${id}.${fieldName}")
           } else {
             throw new EvalException(
                 s"""'${id}.${fieldName}' is present in the evaluation context, but fully-qualified name 
