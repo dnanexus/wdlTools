@@ -1,23 +1,57 @@
 package wdlTools.eval
 
+import java.nio.file.{Files, Path}
+
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.types.WdlTypes
-import dx.util.Bindings
+import wdlTools.types.{WdlTypeSerde, WdlTypes}
+import dx.util.{Bindings, SysUtils}
 
-// an error that occurs during (de)serialization of JSON
-final class JsonSerializationException(message: String) extends Exception(message)
+object Archive {
+  val ManifestFile: String = "manifest.json"
+  val OutputsDir: String = "outputs"
+}
 
 /**
-  * The mapping of JSON type to WDL type is:
-  * JSON Type 	WDL Type
-  * object 	Map[String, ?]
-  * array 	Array[?]
-  * number 	Int or Float
-  * string 	String
-  * boolean 	Boolean
-  * null 	null
+  * An Archive is a TAR file (possibly compressed) that contains
+  * 1) a JSON file (called manifest.json) with the serialized
+  * representation of a complex value, along with its serialized
+  * type information, and 2) the files referenced by all of the
+  * V_File values nested within the complex value.
+  *
+  * TODO: currently this is implemented using system calls, but we
+  *  could also use a Java library (e.g. Apache commons).
   */
+case class Archive(path: Path, typeAliases: Map[String, WdlTypes.T]) {
+  lazy val (wdlType: WdlTypes.T, wdlValue: WdlValues.V) = {
+    val options = if (!Files.exists(path)) {
+      throw new Exception(s"${path} does not exist")
+    } else if (Files.isDirectory(path)) {
+      throw new Exception(s"${path} is not a file")
+    } else if (path.getFileName.endsWith(".tar.gz") || path.getFileName.endsWith(".tgz")) {
+      "-z"
+    } else if (path.getFileName.endsWith(".tar")) {
+      ""
+    } else {
+      throw new Exception(s"${path} does not look like tar file")
+    }
+    try {
+      val (_, stdout, _) =
+        SysUtils.execCommand(s"tar -xO ${options} -f ${path.toString} ${Archive.ManifestFile}")
+      val fields = stdout.parseJson.asJsObject.fields
+      val wdlType = WdlTypeSerde.deserializeType(fields("type"), typeAliases)
+      val wdlValue = WdlValueSerde.deserialize(fields("value"), wdlType)
+      (wdlType, wdlValue)
+    } catch {
+      case ex: Throwable =>
+        throw new Exception(s"invalid WDL value archive ${path}", ex)
+    }
+  }
+}
+
+// an error that occurs during (de)serialization of JSON
+final class WdlValueSerializationException(message: String) extends Exception(message)
+
 object WdlValueSerde {
   def serialize(value: V, handler: Option[V => Option[JsValue]] = None): JsValue = {
     def inner(innerValue: V): JsValue = {
@@ -33,6 +67,7 @@ object WdlValueSerde {
         case V_String(value)    => JsString(value)
         case V_File(value)      => JsString(value)
         case V_Directory(value) => JsString(value)
+        case V_Archive(path)    => JsString(path)
 
         // compound values
         case V_Optional(v) =>
@@ -47,7 +82,7 @@ object WdlValueSerde {
               val key = inner(k) match {
                 case JsString(value) => value
                 case other =>
-                  throw new JsonSerializationException(
+                  throw new WdlValueSerializationException(
                       s"Cannot serialize non-string map key ${other}"
                   )
               }
@@ -58,7 +93,7 @@ object WdlValueSerde {
         case V_Struct(_, members) =>
           JsObject(members.map { case (k, v) => k -> inner(v) })
 
-        case other => throw new JsonSerializationException(s"value ${other} not supported")
+        case other => throw new WdlValueSerializationException(s"value ${other} not supported")
       }
     }
     inner(value)
@@ -165,8 +200,13 @@ object WdlValueSerde {
             }
           V_Struct(structName, m)
 
+        case (_: WdlTypes.T_Collection, JsString(path)) =>
+          // a complex value may be stored in Archive format, which is serialized
+          // as a path to the archive file
+          V_Archive(path)
+
         case _ =>
-          throw new JsonSerializationException(
+          throw new WdlValueSerializationException(
               s"Unsupported value ${innerValue.prettyPrint} for input ${innerName} with type ${innerType}"
           )
       }

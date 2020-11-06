@@ -230,7 +230,7 @@ object TypeUtils {
     * @param t the type
     * @return
     */
-  def serializeType(t: T): String = {
+  def toWdl(t: T): String = {
     t match {
       // Base case: primitive types.
       case T_Any       => "Any"
@@ -243,18 +243,18 @@ object TypeUtils {
 
       // compound types
       case T_Array(memberType, _) =>
-        val inner = serializeType(memberType)
+        val inner = toWdl(memberType)
         s"Array[${inner}]"
       case T_Map(keyType, valueType) =>
-        val k = serializeType(keyType)
-        val v = serializeType(valueType)
+        val k = toWdl(keyType)
+        val v = toWdl(valueType)
         s"Map[$k, $v]"
       case T_Optional(memberType) =>
-        val inner = serializeType(memberType)
+        val inner = toWdl(memberType)
         s"$inner?"
       case T_Pair(lType, rType) =>
-        val ls = serializeType(lType)
-        val rs = serializeType(rType)
+        val ls = toWdl(lType)
+        val rs = toWdl(rType)
         s"Pair[$ls, $rs]"
 
       // structs

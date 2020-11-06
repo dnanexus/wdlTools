@@ -733,7 +733,7 @@ case class Stdlib(paths: EvalPaths,
     try {
       WdlValueSerde.deserialize(content.parseJson)
     } catch {
-      case e: JsonSerializationException =>
+      case e: WdlValueSerializationException =>
         throw new EvalException(e.getMessage, ctx.loc)
     }
   }
@@ -934,7 +934,7 @@ case class Stdlib(paths: EvalPaths,
       try {
         WdlValueSerde.serialize(ctx.getOneArg)
       } catch {
-        case e: JsonSerializationException =>
+        case e: WdlValueSerializationException =>
           throw new EvalException(e.getMessage, ctx.loc)
       }
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".json")
