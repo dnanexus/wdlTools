@@ -162,9 +162,10 @@ case class Eval(paths: EvalPaths,
                 .to(TreeSeqMap)
           )
 
-        case TAT.ExprIdentifier(id, _, _) =>
-          // accessing a variable
+        case TAT.ExprIdentifier(id, _, _) if nestedCtx.bindings.contains(id) =>
           nestedCtx.bindings(id)
+        case TAT.ExprIdentifier(id, _, _) =>
+          throw new EvalException(s"identifier ${id} not found")
 
         // interpolation
         case TAT.ExprCompoundString(value, _, _) =>
