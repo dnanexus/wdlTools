@@ -1,39 +1,94 @@
 package wdlTools.eval
 
+import java.io.{BufferedInputStream, FileInputStream}
 import java.nio.file.{Files, Path}
 
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.types.{WdlTypeSerde, WdlTypes}
-import dx.util.{Bindings, SysUtils}
+import dx.util.{AddressableFileNode, Bindings, SysUtils}
+import org.apache.commons.compress.archivers.ArchiveStreamFactory
+
+/**
+  * An Archive is a TAR file that contains 1) a JSON file (called manifest.json)
+  * with the serialized representation of a complex value, along with its serialized
+  * type information, and 2) the files referenced by all of the V_File values nested
+  * within the complex value.
+  * TODO: add option to support compressing the TAR
+  * TODO: currently this is implemented using system calls, but we
+  *  could also use a Java library (e.g. Apache commons).
+  */
+case class Archive(path: Path,
+                   wdlType: WdlTypes.T,
+                   wdlValue: WdlValues.V,
+                   localized: Boolean = false) {
+
+  def listDirs: Vector[Path] = {
+    val inputStream = new FileInputStream(path.toFile)
+    val archiveStream = new ArchiveStreamFactory().createArchiveInputStream(
+        if (inputStream.markSupported()) {
+          inputStream
+        } else {
+          new BufferedInputStream(inputStream)
+        }
+    )
+    archiveStream.
+  }
+
+  private def localizePaths(v: V, parentDir: Path): (V, Vector[Path]) = {
+    v match {
+      case V_File(s) =>
+        val absPath = parentDir.resolve(s)
+      case V_Optional(value) =>
+        extractFiles(value)
+      case V_Array(value) =>
+        value.flatMap(extractFiles)
+      case V_Map(m) =>
+        m.flatMap {
+          case (k, v) => extractFiles(k) ++ extractFiles(v)
+        }.toVector
+      case V_Pair(lf, rt) =>
+        extractFiles(lf) ++ extractFiles(rt)
+      case V_Object(m) =>
+        m.values.flatMap(extractFiles).toVector
+      case V_Struct(_, m) =>
+        m.values.flatMap(extractFiles).toVector
+      case _ =>
+        Vector.empty
+    }
+  }
+
+  /**
+    * Unpacks the files in the archive relative to the given parent dir, and updates
+    * the paths within `wdlValue` and returns a new Archive object.
+    * @param parentDir the directory in which to localize files
+    * @return the updated Archive object and a Vector of localized paths
+    */
+  def localize(parentDir: Path): (Archive, Vector[Path]) = {
+    assert(!localized)
+  }
+}
 
 object Archive {
   val ManifestFile: String = "manifest.json"
   val OutputsDir: String = "outputs"
-}
 
-/**
-  * An Archive is a TAR file (possibly compressed) that contains
-  * 1) a JSON file (called manifest.json) with the serialized
-  * representation of a complex value, along with its serialized
-  * type information, and 2) the files referenced by all of the
-  * V_File values nested within the complex value.
-  *
-  * TODO: currently this is implemented using system calls, but we
-  *  could also use a Java library (e.g. Apache commons).
-  */
-case class Archive(path: Path, typeAliases: Map[String, WdlTypes.T]) {
-  lazy val (wdlType: WdlTypes.T, wdlValue: WdlValues.V) = {
+  /**
+    * Creates an Archive from an existing TAR with a serialized value.
+    * @param path path to the serialized value TAR
+    * @param typeAliases type aliases to use when resolving the type of
+    *                    the serialized value
+    * @return
+    */
+  def apply(path: Path, typeAliases: Map[String, WdlTypes.T]): Archive = {
     val options = if (!Files.exists(path)) {
       throw new Exception(s"${path} does not exist")
     } else if (Files.isDirectory(path)) {
       throw new Exception(s"${path} is not a file")
-    } else if (path.getFileName.endsWith(".tar.gz") || path.getFileName.endsWith(".tgz")) {
-      "-z"
     } else if (path.getFileName.endsWith(".tar")) {
       ""
     } else {
-      throw new Exception(s"${path} does not look like tar file")
+      throw new Exception(s"${path} does not look like a tar file")
     }
     try {
       val (_, stdout, _) =
@@ -41,7 +96,7 @@ case class Archive(path: Path, typeAliases: Map[String, WdlTypes.T]) {
       val fields = stdout.parseJson.asJsObject.fields
       val wdlType = WdlTypeSerde.deserializeType(fields("type"), typeAliases)
       val wdlValue = WdlValueSerde.deserialize(fields("value"), wdlType)
-      (wdlType, wdlValue)
+      Archive(path, wdlType, wdlValue)
     } catch {
       case ex: Throwable =>
         throw new Exception(s"invalid WDL value archive ${path}", ex)
