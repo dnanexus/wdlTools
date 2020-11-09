@@ -95,7 +95,7 @@ val commonsCompressVersion = "1.20"
 val scalatestVersion = "3.1.1"
 
 libraryDependencies ++= Seq(
-    "com.dnanexus" % "dxCommon" % dxCommonVersion,
+    "com.dnanexus" % "dxcommon" % dxCommonVersion,
     // configuration
     "com.typesafe" % "config" % typesafeVersion,
     // antlr4 lexer + parser
