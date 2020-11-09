@@ -2,7 +2,8 @@
 
 ## v0.10.3 (2020-11-09)
 
-* bugfixes
+* Throw exception when there are key collisions in `as_map` function
+* Other bugfixes
 
 ## v0.10.2 (2020-11-06)
 
