@@ -1072,8 +1072,14 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: V2
   private def as_map(ctx: FunctionContext): V_Map = {
-    val vec = getWdlVector(ctx.getOneArg, ctx.loc)
-    V_Map(vec.map(item => getWdlPair(item, ctx.loc)).toMap)
+    V_Map(getWdlVector(ctx.getOneArg, ctx.loc).foldLeft(Map.empty[V, V]) {
+      case (accu, item) =>
+        val (key, value) = getWdlPair(item, ctx.loc)
+        if (accu.contains(key)) {
+          throw new EvalException(s"map key collision: ${key}", ctx.loc)
+        }
+        accu + (key -> value)
+    })
   }
 
   // Array[X] keys(Map[X,Y])

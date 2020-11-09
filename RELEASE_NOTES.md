@@ -1,5 +1,10 @@
 # Change log
 
+## v0.10.3 (2020-11-09)
+
+* Throw exception when there are key collisions in `as_map` function
+* Other bugfixes
+
 ## v0.10.2 (2020-11-06)
 
 * Change all map-types attributes of typed AST classes to be `SortedMap`s - mainly to preserve insert order for the code formatter
