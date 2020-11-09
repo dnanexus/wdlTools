@@ -94,7 +94,7 @@ val scalatestVersion = "3.1.1"
 val re2jVersion = "1.5"
 
 libraryDependencies ++= Seq(
-    "com.dnanexus" % "dxCommon" % dxCommonVersion,
+    "com.dnanexus" % "dxcommon" % dxCommonVersion,
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
     // command line parser
