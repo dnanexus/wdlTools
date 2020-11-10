@@ -80,6 +80,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_Optional(l), T_Optional(r)) => inner(l, r, minPriority)
 
         // complex types
+        case (T_Array(_, lNonEmpty), T_Array(_, rNonEmpty)) if lNonEmpty && !rNonEmpty =>
+          None
         case (T_Array(l, _), T_Array(r, _)) =>
           inner(l, r, minPriority)
         case (T_Map(kTo, vTo), T_Map(kFrom, vFrom)) =>
