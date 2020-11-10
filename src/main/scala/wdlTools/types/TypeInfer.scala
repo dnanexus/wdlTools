@@ -326,8 +326,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   val msg =
                     s"""|Expression ${prettyFormatExpr(valueExpr)} has type 
                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to 
-                        |${prettyFormatType(defaultExpr.wdlType)}
-                        |""".stripMargin.replaceAll("\n", " ")
+                        |${prettyFormatType(defaultExpr.wdlType)}""".stripMargin
+                      .replaceAll("\n", " ")
                   handleError(msg, nestedExpr.loc)
                   valueExpr.wdlType
               }
