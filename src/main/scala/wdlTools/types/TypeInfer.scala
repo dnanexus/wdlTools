@@ -219,7 +219,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val wdlTypes = elementTypes.map(_.wdlType)
               val t =
                 try {
-                  T_Array(unify.apply(wdlTypes, unifyCtx))
+                  // this is a non-empty array literal, so we can set nonEmpty = true
+                  T_Array(unify.apply(wdlTypes, unifyCtx), nonEmpty = true)
                 } catch {
                   case _: TypeUnificationException =>
                     handleError(
@@ -439,16 +440,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   private def typeFromAst(t: AST.Type, loc: SourceLocation, ctx: TypeContext): T = {
     t match {
-      case _: AST.TypeBoolean     => T_Boolean
-      case _: AST.TypeInt         => T_Int
-      case _: AST.TypeFloat       => T_Float
-      case _: AST.TypeString      => T_String
-      case _: AST.TypeFile        => T_File
-      case _: AST.TypeDirectory   => T_Directory
-      case AST.TypeOptional(t, _) => T_Optional(typeFromAst(t, loc, ctx))
-      case AST.TypeArray(t, _, _) => T_Array(typeFromAst(t, loc, ctx))
-      case AST.TypeMap(k, v, _)   => T_Map(typeFromAst(k, loc, ctx), typeFromAst(v, loc, ctx))
-      case AST.TypePair(l, r, _)  => T_Pair(typeFromAst(l, loc, ctx), typeFromAst(r, loc, ctx))
+      case _: AST.TypeBoolean            => T_Boolean
+      case _: AST.TypeInt                => T_Int
+      case _: AST.TypeFloat              => T_Float
+      case _: AST.TypeString             => T_String
+      case _: AST.TypeFile               => T_File
+      case _: AST.TypeDirectory          => T_Directory
+      case AST.TypeOptional(t, _)        => T_Optional(typeFromAst(t, loc, ctx))
+      case AST.TypeArray(t, nonEmpty, _) => T_Array(typeFromAst(t, loc, ctx), nonEmpty = nonEmpty)
+      case AST.TypeMap(k, v, _)          => T_Map(typeFromAst(k, loc, ctx), typeFromAst(v, loc, ctx))
+      case AST.TypePair(l, r, _)         => T_Pair(typeFromAst(l, loc, ctx), typeFromAst(r, loc, ctx))
       case AST.TypeIdentifier(id, _) =>
         ctx.aliases.get(id) match {
           case None =>
@@ -933,13 +934,14 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // A's members are arrays.
   private def applyScatter(scatter: AST.Scatter,
                            ctx: TypeContext): (TAT.Scatter, WdlTypeBindings) = {
-    val eCollection = applyExpr(scatter.expr, ctx)
-    val elementType = eCollection.wdlType match {
-      case T_Array(elementType, _) => elementType
+    val collection = applyExpr(scatter.expr, ctx)
+    val (elementType, nonEmpty) = collection.wdlType match {
+      case T_Array(elementType, nonEmpty) => (elementType, nonEmpty)
       case other =>
         handleError(s"Scatter collection ${scatter.expr} is not an array type", scatter.loc)
-        other
+        (other, false)
     }
+
     // add a binding for the iteration variable
     //
     // The iterator identifier is not exported outside the scatter
@@ -955,19 +957,22 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val (tBody, bindings) = applyWorkflowElements(scatter.body, bodyCtx)
     assert(!bindings.contains(scatter.identifier))
 
+    val tScatter = TAT.Scatter(scatter.identifier, collection, tBody, scatter.loc)
+
     // Add an array type to all variables defined in the scatter body
+    // if the scatter collection is non-empty, then we know the output
+    // arrays also have to be non-empty
     val gatherBindings =
       bindings.toMap.map {
         case (callName, callType: T_Call) =>
           val callOutput = callType.output.map {
-            case (name, t) => name -> T_Array(t)
+            case (name, t) => name -> T_Array(t, nonEmpty = nonEmpty)
           }
           callName -> T_Call(callType.name, callOutput)
-        case (varName, typ: T) =>
-          varName -> T_Array(typ)
+        case (varName, varType: T) =>
+          varName -> T_Array(varType, nonEmpty = nonEmpty)
       }
 
-    val tScatter = TAT.Scatter(scatter.identifier, eCollection, tBody, scatter.loc)
     (tScatter, WdlTypeBindings(gatherBindings))
   }
 

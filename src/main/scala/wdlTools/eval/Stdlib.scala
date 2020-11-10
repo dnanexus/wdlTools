@@ -807,8 +807,10 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   private def write_lines(ctx: FunctionContext): V_File = {
-    val array: V_Array =
-      Coercion.coerceTo(T_Array(T_String), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
+    val array: V_Array = Coercion.coerceTo(T_Array(T_String), ctx.getOneArg, ctx.loc) match {
+      case a: V_Array => a
+      case _          => throw new RuntimeException("failed coercion to Array[String]")
+    }
     val strRepr: String = array.value
       .map {
         case V_String(x) => x
@@ -826,12 +828,15 @@ case class Stdlib(paths: EvalPaths,
   //
   // since: draft-1
   private def write_tsv(ctx: FunctionContext): V_File = {
-    val arAr: V_Array =
-      Coercion.coerceTo(T_Array(T_Array(T_String)), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
+    val matrix: V_Array =
+      Coercion.coerceTo(T_Array(T_Array(T_String)), ctx.getOneArg, ctx.loc) match {
+        case a: V_Array => a
+        case _          => throw new RuntimeException("failed coercion to Array[String]")
+      }
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
-      arAr.value
+      matrix.value
         .foreach {
           case V_Array(a) =>
             val row = a.map {
@@ -854,7 +859,10 @@ case class Stdlib(paths: EvalPaths,
   // since: draft-1
   private def write_map(ctx: FunctionContext): V_File = {
     val m: V_Map =
-      Coercion.coerceTo(T_Map(T_String, T_String), ctx.getOneArg, ctx.loc).asInstanceOf[V_Map]
+      Coercion.coerceTo(T_Map(T_String, T_String), ctx.getOneArg, ctx.loc) match {
+        case m: V_Map => m
+        case _        => throw new RuntimeException("failed coercion to Map[String, String]")
+      }
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[(String, String)](tsvConf)
     try {
@@ -872,7 +880,10 @@ case class Stdlib(paths: EvalPaths,
 
   private def lineFromObject(obj: V_Object, loc: SourceLocation): Vector[String] = {
     obj.members.values.map { vw =>
-      Coercion.coerceTo(T_String, vw, loc).asInstanceOf[V_String].value
+      Coercion.coerceTo(T_String, vw, loc) match {
+        case V_String(value) => value
+        case _               => throw new RuntimeException("failed coercion to String")
+      }
     }.toVector
   }
 
@@ -881,7 +892,10 @@ case class Stdlib(paths: EvalPaths,
   // since: draft-1
   // deprecation: removed in Version 2
   private def write_object(ctx: FunctionContext): V_File = {
-    val obj = Coercion.coerceTo(T_Object, ctx.getOneArg, ctx.loc).asInstanceOf[V_Object]
+    val obj = Coercion.coerceTo(T_Object, ctx.getOneArg, ctx.loc) match {
+      case obj: V_Object => obj
+      case _             => throw new RuntimeException("failed coercion to object")
+    }
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
@@ -898,8 +912,15 @@ case class Stdlib(paths: EvalPaths,
   // since: draft-1
   // deprecation: removed in Version 2
   private def write_objects(ctx: FunctionContext): V_File = {
-    val objs = Coercion.coerceTo(T_Array(T_Object), ctx.getOneArg, ctx.loc).asInstanceOf[V_Array]
-    val objArray = objs.value.asInstanceOf[Vector[V_Object]]
+    val objArray = Coercion.coerceTo(T_Array(T_Object), ctx.getOneArg, ctx.loc) match {
+      case V_Array(array) =>
+        array.map {
+          case obj: V_Object => obj
+          case _ =>
+            throw new RuntimeException("failed coercion to Array[object]")
+        }
+      case _ => throw new RuntimeException("failed coercion to Array[object]")
+    }
     if (objArray.isEmpty) {
       throw new EvalException("write_objects: empty input array", ctx.loc)
     }

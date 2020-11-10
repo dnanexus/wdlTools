@@ -1,5 +1,9 @@
 # Change log
 
+## v0.10.4 (2020-11-10)
+
+* Fix sevaral issues with the handling of non-empty arrays
+
 ## v0.10.3 (2020-11-09)
 
 * Throw exception when there are key collisions in `as_map` function
