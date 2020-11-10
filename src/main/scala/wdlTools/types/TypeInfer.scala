@@ -296,8 +296,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               if (!unify.isCoercibleTo(T_Boolean, valueExpr.wdlType, unifyCtx)) {
                 val msg =
                   s"""Condition ${prettyFormatExpr(valueExpr)} has type 
-                     |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean
-                     |""".stripMargin.replaceAll("\n", " ")
+                     |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean""".stripMargin
+                    .replaceAll("\n", " ")
                 handleError(msg, nestedExpr.loc)
               }
               val wdlType = if (trueType == falseType) {
@@ -343,8 +343,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 case other =>
                   val msg =
                     s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(other)},
-                       |which is not coercible to Array[String]
-                       |""".stripMargin.replaceAll("\n", " ")
+                       |which is not coercible to Array[String]""".stripMargin
+                      .replaceAll("\n", " ")
                   handleError(msg, valueExpr.loc)
                   other
               }
@@ -488,8 +488,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         } else {
           val msg =
             s"""|${decl.name} value ${prettyFormatExpr(e)} of type ${prettyFormatType(rhsType)}
-                |is not coercible to ${prettyFormatType(lhsType)}
-                |""".stripMargin.replaceAll("\n", " ")
+                |is not coercible to ${prettyFormatType(lhsType)}""".stripMargin
+              .replaceAll("\n", " ")
           handleError(msg, decl.loc)
           lhsType
         }
