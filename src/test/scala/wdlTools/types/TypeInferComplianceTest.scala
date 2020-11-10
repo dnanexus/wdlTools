@@ -59,6 +59,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       ("command_string.wdl", TResult(correct = true)),
       ("comparisons.wdl", TResult(correct = true)),
       ("library.wdl", TResult(correct = true)),
+      ("nonempty_array_coercion.wdl", TResult(correct = true)),
       // has a string -> int conversion that is allowed under
       // lenient type checking but disallowed under >= moderate
       ("simple.wdl", TResult(correct = true, Some(TypeCheckingRegime.Lenient))),
@@ -72,6 +73,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       ("comparison4.wdl", TResult(correct = false, Some(TypeCheckingRegime.Lenient))),
       ("declaration_shadowing.wdl", TResult(correct = false)),
       ("simple.wdl", TResult(correct = false)),
+      ("empty_array_coercion.wdl", TResult(correct = false)),
       // expressions
       ("expressions.wdl", TResult(correct = true)),
       ("expressions_bad.wdl", TResult(correct = false)),

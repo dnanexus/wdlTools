@@ -80,6 +80,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_Optional(l), T_Optional(r)) => inner(l, r, minPriority)
 
         // complex types
+        case (T_Array(_, lNonEmpty), T_Array(_, rNonEmpty)) if lNonEmpty && !rNonEmpty =>
+          None
         case (T_Array(l, _), T_Array(r, _)) =>
           inner(l, r, minPriority)
         case (T_Map(kTo, vTo), T_Map(kFrom, vFrom)) =>
@@ -273,9 +275,9 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           val (t, newVarTypes, newPriority) =
             inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
           (T_Optional(t), newVarTypes, newPriority)
-        case (T_Array(l, _), T_Array(r, _)) =>
+        case (T_Array(l, lNonEmpty), T_Array(r, rNonEmpty)) =>
           val (t, newVarTypes, newPriority) = inner(l, r, vt, minPriority)
-          (T_Array(t), newVarTypes, newPriority)
+          (T_Array(t, nonEmpty = lNonEmpty && rNonEmpty), newVarTypes, newPriority)
         case (T_Map(k1, v1), T_Map(k2, v2)) =>
           val (keyType, kVarTypes, keyPriority) = inner(k1, k2, vt, minPriority)
           val (valueType, kvVarTypes, valuePriority) = inner(v1, v2, kVarTypes, minPriority)
@@ -362,14 +364,14 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           throw new SubstitutionException(
               s"type variable ${prettyFormatType(a)} does not have a binding"
           )
-        case T_Var(index, _) => varTypes(index)
-        case T_Pair(l, r)    => T_Pair(inner(l), inner(r))
-        case T_Array(t, _)   => T_Array(inner(t))
-        case T_Map(k, v)     => T_Map(inner(k), inner(v))
-        case x: T_Struct     => x
-        case T_Object        => T_Object
-        case T_Optional(t1)  => T_Optional(inner(t1))
-        case T_Any           => T_Any
+        case T_Var(index, _)      => varTypes(index)
+        case T_Pair(l, r)         => T_Pair(inner(l), inner(r))
+        case T_Array(t, nonEmpty) => T_Array(inner(t), nonEmpty = nonEmpty)
+        case T_Map(k, v)          => T_Map(inner(k), inner(v))
+        case x: T_Struct          => x
+        case T_Object             => T_Object
+        case T_Optional(t1)       => T_Optional(inner(t1))
+        case T_Any                => T_Any
         case other =>
           throw new SubstitutionException(
               s"Type ${prettyFormatType(other)} should not appear in this context"

@@ -6,6 +6,8 @@ import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import dx.util.{Logger, TraceLevel}
 
+// TODO: for the prototypes with array inputs and outputs (transpose, zip, cross, flatten, prefix),
+//  the non-empty value of the result arrays should match the values of the input arrays
 case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logger = Logger.get) {
   private val unify = Unification(regime)
 

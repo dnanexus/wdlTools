@@ -141,6 +141,8 @@ object TypeUtils {
       case T_Object         => "Object"
       case T_Pair(l, r) =>
         s"Pair[${prettyFormatType(l)}, ${prettyFormatType(r)}]"
+      case T_Array(t, nonEmpty) if nonEmpty =>
+        s"Array[${prettyFormatType(t)}]+"
       case T_Array(t, _) =>
         s"Array[${prettyFormatType(t)}]"
       case T_Map(k, v) =>
