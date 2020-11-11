@@ -1042,10 +1042,15 @@ task_input
 	: Identifier EQUAL expr
 	; */
   override def visitCall_input(ctx: WdlV2Parser.Call_inputContext): CallInput = {
-    val expr = visitExpr(ctx.expr())
-    CallInput(getIdentifierText(ctx.Identifier(), ctx),
-              expr,
-              getSourceLocation(grammar.docSource, ctx))
+    val id = getIdentifierText(ctx.Identifier(), ctx)
+    val loc = getSourceLocation(grammar.docSource, ctx)
+    val expr = if (ctx.expr() == null) {
+      // pass-through
+      ExprIdentifier(id, loc)
+    } else {
+      visitExpr(ctx.expr())
+    }
+    CallInput(id, expr, loc)
   }
 
   /* call_inputs
