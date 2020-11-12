@@ -4,6 +4,8 @@ import wdlTools.syntax.AbstractSyntax.Document
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
+case class NoSuchParserException(msg: String) extends Exception
+
 case class Parsers(
     followImports: Boolean = false,
     fileResolver: FileSourceResolver = FileSourceResolver.get,
@@ -35,7 +37,7 @@ case class Parsers(
         case (wdlVersion, parser) if parser.canParse(fileSource) => wdlVersion
       }
       .getOrElse(
-          throw new Exception(s"No parser is able to parse document ${fileSource}")
+          throw NoSuchParserException(s"No parser is able to parse document ${fileSource}")
       )
   }
 
@@ -44,14 +46,16 @@ case class Parsers(
       case parser if parser.canParse(fileSource) => parser
     } match {
       case Some(parser) => parser
-      case _            => throw new Exception(s"No parser is able to parse document ${fileSource}")
+      case _ =>
+        throw NoSuchParserException(s"No parser is able to parse document ${fileSource}")
     }
   }
 
   def getParser(wdlVersion: WdlVersion): WdlParser = {
     parsers.get(wdlVersion) match {
       case Some(parser) => parser
-      case _            => throw new Exception(s"No parser defined for WdlVersion ${wdlVersion}")
+      case _ =>
+        throw NoSuchParserException(s"No parser defined for WdlVersion ${wdlVersion}")
     }
   }
 
