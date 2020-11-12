@@ -1,5 +1,9 @@
 # Change log
 
+## v0.10.5 (2020-11-12)
+
+* Throw `NoSuchParserException` when a document is not detected to be parsable
+
 ## v0.10.4 (2020-11-10)
 
 * Fix sevaral issues with the handling of non-empty arrays
