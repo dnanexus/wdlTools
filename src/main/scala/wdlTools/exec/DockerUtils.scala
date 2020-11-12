@@ -105,13 +105,21 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
     }
   }
 
-  // If `nameOrUrl` is a URL, the Docker image tarball is downloaded using the fileReSovler,
+  private val imageRegexp = "(?:(.+)://)?(.+)".r
+
+  // If `nameOrUri` is a URI, the Docker image tarball is downloaded using the fileResovler,
   // and loaded using `docker load`. The image name is preferentially taken from the tar
   // manifest, but the output of `docker load` is used as a fallback. Otherwise, it is assumed
   // to be an image name and is pulled with `pullImage`. Requires Docker client to be installed.
   // TODO: I'm not sure that the manifest should take priority over the output of 'docker load'
-  def getImage(nameOrUrl: String, loc: SourceLocation): String = {
-    if (nameOrUrl.contains("://")) {
+  def getImage(nameOrUri: String, loc: SourceLocation): String = {
+    val (protocol, name) = nameOrUri match {
+      case imageRegexp(protocol, name) if protocol == null => (None, name)
+      case imageRegexp(protocol, name)                     => (Some(protocol), name)
+      case _ =>
+        throw new Exception(s"invalid image name or URL ${nameOrUri}")
+    }
+    if (protocol.exists(fileResolver.canResolve)) {
       // a tarball created with "docker save".
       // 1. download it
       // 2. open the tar archive
@@ -120,7 +128,7 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
       logger.traceLimited(s"downloading docker tarball to ${DOCKER_TARBALLS_DIR}")
       val localTarSrc =
         try {
-          fileResolver.resolve(nameOrUrl)
+          fileResolver.resolve(nameOrUri)
         } catch {
           case e: NoSuchProtocolException =>
             throw new EvalException(e.getMessage, loc)
@@ -157,8 +165,10 @@ case class DockerUtils(fileResolver: FileSourceResolver = FileSourceResolver.get
           }
         case Some(r) => r
       }
+    } else if (protocol.forall(_ == "docker")) {
+      pullImage(name, loc)
     } else {
-      pullImage(nameOrUrl, loc)
+      throw new Exception(s"Only docker images are currently supported; cannot pull ${nameOrUri}")
     }
   }
 
