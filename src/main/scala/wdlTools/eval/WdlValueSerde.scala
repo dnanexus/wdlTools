@@ -23,7 +23,6 @@ object WdlValueSerde {
         case V_String(value)    => JsString(value)
         case V_File(value)      => JsString(value)
         case V_Directory(value) => JsString(value)
-        case V_Archive(path)    => JsString(path)
 
         // compound values
         case V_Optional(v) =>
@@ -155,11 +154,6 @@ object WdlValueSerde {
                 key -> elem
             }
           V_Struct(structName, m)
-
-        case (_: T_Collection, JsString(path)) =>
-          // a complex value may be stored in Archive format, which is serialized
-          // as a path to the archive file
-          V_Archive(path)
 
         case _ =>
           throw new WdlValueSerializationException(

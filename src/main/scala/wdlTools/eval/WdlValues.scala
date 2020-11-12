@@ -41,15 +41,6 @@ object WdlValues {
   // optional type
   case class V_Optional(value: V) extends V
 
-  /**
-    * A special type of value that represents a TAR archive that contains
-    * a serialized complex value, along with any nested files contained
-    * by the value. V_Archives should only be used as top-level values,
-    * i.e. they should not be nested within compound values.
-    * @param path path of the archive file
-    */
-  case class V_Archive(path: String) extends V
-
   // results from calling a task or workflow
   case class V_Call(name: String, members: Map[String, V]) extends V
 }
