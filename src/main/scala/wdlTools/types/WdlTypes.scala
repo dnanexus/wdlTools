@@ -8,21 +8,35 @@ object WdlTypes {
 
   // primitive types
   case object T_Boolean extends T
+  case object T_String extends T
+
   sealed trait T_Numeric extends T
   case object T_Int extends T_Numeric
   case object T_Float extends T_Numeric
-  case object T_String extends T
+
   sealed trait T_Path extends T
   case object T_File extends T_Path
   case object T_Directory extends T_Path
 
-  // There are cases where we don't know the type. For example, an empty array, or an empty map.
-  // While evaluating the right hand side we don't know the type.
+  // wrapper for another type indicating it may be associated with a null value
+  case class T_Optional(t: T) extends T
+
+  // There are cases where we don't know the type.
+  // For example, an empty array, or an empty map - when evaluating the
+  // right-hand side we don't know the type:
   //
-  // Array[Int] names = []
-  // Map[String, File] locations = {}
-  //
+  //  Array[Int] names = []
+  //  Map[String, File] locations = {}
   case object T_Any extends T
+
+  // collection types
+  sealed trait T_Collection extends T
+  case class T_Pair(l: T, r: T) extends T_Collection
+  case class T_Array(t: T, nonEmpty: Boolean = false) extends T_Collection
+  case class T_Map(k: T, v: T) extends T_Collection
+  case object T_Object extends T_Collection
+  // a user-defined structure
+  case class T_Struct(name: String, members: SeqMap[String, T]) extends T_Collection
 
   /**
     * A polymorphic function can accept multiple parameter types and there is covariance of multiple
@@ -44,16 +58,6 @@ object WdlTypes {
 
   // a user defined struct name
   case class T_Identifier(id: String) extends T
-
-  // compound types
-  case class T_Pair(l: T, r: T) extends T
-  case class T_Array(t: T, nonEmpty: Boolean = false) extends T
-  case class T_Map(k: T, v: T) extends T
-  case object T_Object extends T
-  case class T_Optional(t: T) extends T
-
-  // a user defined structure
-  case class T_Struct(name: String, members: SeqMap[String, T]) extends T
 
   // Anything that can be called. Tasks and workflows implement this trait.
   // The inputs are decorated by whether they are optional.

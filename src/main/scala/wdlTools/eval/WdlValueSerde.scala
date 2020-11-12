@@ -2,22 +2,12 @@ package wdlTools.eval
 
 import spray.json._
 import wdlTools.eval.WdlValues._
-import wdlTools.types.WdlTypes
+import wdlTools.types.WdlTypes._
 import dx.util.Bindings
 
 // an error that occurs during (de)serialization of JSON
-final class JsonSerializationException(message: String) extends Exception(message)
+final class WdlValueSerializationException(message: String) extends Exception(message)
 
-/**
-  * The mapping of JSON type to WDL type is:
-  * JSON Type 	WDL Type
-  * object 	Map[String, ?]
-  * array 	Array[?]
-  * number 	Int or Float
-  * string 	String
-  * boolean 	Boolean
-  * null 	null
-  */
 object WdlValueSerde {
   def serialize(value: V, handler: Option[V => Option[JsValue]] = None): JsValue = {
     def inner(innerValue: V): JsValue = {
@@ -47,7 +37,7 @@ object WdlValueSerde {
               val key = inner(k) match {
                 case JsString(value) => value
                 case other =>
-                  throw new JsonSerializationException(
+                  throw new WdlValueSerializationException(
                       s"Cannot serialize non-string map key ${other}"
                   )
               }
@@ -58,7 +48,7 @@ object WdlValueSerde {
         case V_Struct(_, members) =>
           JsObject(members.map { case (k, v) => k -> inner(v) })
 
-        case other => throw new JsonSerializationException(s"value ${other} not supported")
+        case other => throw new WdlValueSerializationException(s"value ${other} not supported")
       }
     }
     inner(value)
@@ -100,21 +90,21 @@ object WdlValueSerde {
     */
   def deserialize(
       jsValue: JsValue,
-      wdlType: WdlTypes.T,
+      wdlType: T,
       name: String = ""
   ): V = {
-    def inner(innerValue: JsValue, innerType: WdlTypes.T, innerName: String): V = {
+    def inner(innerValue: JsValue, innerType: T, innerName: String): V = {
       (innerType, innerValue) match {
         // primitive types
-        case (WdlTypes.T_Boolean, JsBoolean(b))  => V_Boolean(b.booleanValue)
-        case (WdlTypes.T_Int, JsNumber(i))       => V_Int(i.longValue)
-        case (WdlTypes.T_Float, JsNumber(f))     => V_Float(f.doubleValue)
-        case (WdlTypes.T_String, JsString(s))    => V_String(s)
-        case (WdlTypes.T_File, JsString(s))      => V_File(s)
-        case (WdlTypes.T_Directory, JsString(s)) => V_Directory(s)
+        case (T_Boolean, JsBoolean(b))  => V_Boolean(b.booleanValue)
+        case (T_Int, JsNumber(i))       => V_Int(i.longValue)
+        case (T_Float, JsNumber(f))     => V_Float(f.doubleValue)
+        case (T_String, JsString(s))    => V_String(s)
+        case (T_File, JsString(s))      => V_File(s)
+        case (T_Directory, JsString(s)) => V_Directory(s)
 
         // maps
-        case (WdlTypes.T_Map(keyType, valueType), JsObject(fields)) =>
+        case (T_Map(keyType, valueType), JsObject(fields)) =>
           val m = fields.map {
             case (k: String, v: JsValue) =>
               val kWdl = inner(JsString(k), keyType, s"${innerName}.${k}")
@@ -124,22 +114,22 @@ object WdlValueSerde {
           V_Map(m)
 
         // two ways of writing a pair: an object, or an array
-        case (WdlTypes.T_Pair(lType, rType), JsObject(fields))
+        case (T_Pair(lType, rType), JsObject(fields))
             if Vector("left", "right").forall(fields.contains) =>
           val left = inner(fields("left"), lType, s"${innerName}.left")
           val right = inner(fields("right"), rType, s"${innerName}.right")
           V_Pair(left, right)
-        case (WdlTypes.T_Pair(lType, rType), JsArray(Vector(l, r))) =>
+        case (T_Pair(lType, rType), JsArray(Vector(l, r))) =>
           val left = inner(l, lType, s"${innerName}.left")
           val right = inner(r, rType, s"${innerName}.right")
           V_Pair(left, right)
 
         // empty array
-        case (WdlTypes.T_Array(_, _), JsNull) =>
+        case (T_Array(_, _), JsNull) =>
           V_Array(Vector.empty)
 
         // array
-        case (WdlTypes.T_Array(t, _), JsArray(vec)) =>
+        case (T_Array(t, _), JsArray(vec)) =>
           val wVec: Vector[V] = vec.zipWithIndex.map {
             case (elem: JsValue, index) =>
               inner(elem, t, s"${innerName}[${index}]")
@@ -147,26 +137,26 @@ object WdlValueSerde {
           V_Array(wVec)
 
         // optionals
-        case (WdlTypes.T_Optional(_), JsNull) =>
+        case (T_Optional(_), JsNull) =>
           V_Null
-        case (WdlTypes.T_Optional(t), jsv) =>
+        case (T_Optional(t), jsv) =>
           val value = inner(jsv, t, innerName)
           V_Optional(value)
 
         // structs
-        case (WdlTypes.T_Struct(structName, typeMap), JsObject(fields)) =>
+        case (T_Struct(structName, typeMap), JsObject(fields)) =>
           // convert each field
           val m = fields
             .map {
               case (key, value) =>
-                val t: WdlTypes.T = typeMap(key)
+                val t: T = typeMap(key)
                 val elem: V = inner(value, t, s"${innerName}.${key}")
                 key -> elem
             }
           V_Struct(structName, m)
 
         case _ =>
-          throw new JsonSerializationException(
+          throw new WdlValueSerializationException(
               s"Unsupported value ${innerValue.prettyPrint} for input ${innerName} with type ${innerType}"
           )
       }

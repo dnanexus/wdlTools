@@ -6,7 +6,7 @@ import spray.json._
 import wdlTools.eval.{
   Eval,
   EvalException,
-  JsonSerializationException,
+  WdlValueSerializationException,
   WdlValueBindings,
   WdlValueSerde,
   WdlValues,
@@ -126,7 +126,7 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
           try {
             WdlValueSerde.serialize(wdlValue)
           } catch {
-            case e: JsonSerializationException =>
+            case e: WdlValueSerializationException =>
               throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",
                                       e,
                                       out.loc)
@@ -157,7 +157,7 @@ object TaskInputOutput {
         try {
           Some(WdlValueSerde.deserialize(jsValue, inputDef.wdlType, name))
         } catch {
-          case jse: JsonSerializationException =>
+          case jse: WdlValueSerializationException =>
             throw new ExecException(jse.getMessage, inputDef.loc)
         }
     }

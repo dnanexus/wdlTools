@@ -1,5 +1,9 @@
 # Change log
 
+## v0.10.6 (dev)
+
+* Add support for URI-formatted image names (e.g. 'docker://myimg')
+
 ## v0.10.5 (2020-11-12)
 
 * Throw `NoSuchParserException` when a document is not detected to be parsable

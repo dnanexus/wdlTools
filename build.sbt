@@ -86,22 +86,24 @@ val antlr4Version = "4.8"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.6"
+//val beardVersion = "0.3.1"
 val sprayVersion = "1.3.5"
 val katanVersion = "0.6.1"
+val re2jVersion = "1.5"
 val graphVersion = "1.13.2"
 val scalatestVersion = "3.1.1"
-//val beardVersion = "0.3.1"
-val re2jVersion = "1.5"
 
 libraryDependencies ++= Seq(
     "com.dnanexus" % "dxcommon" % dxCommonVersion,
+    // configuration
+    "com.typesafe" % "config" % typesafeVersion,
     // antlr4 lexer + parser
     "org.antlr" % "antlr4" % antlr4Version,
     // command line parser
     "org.rogach" %% "scallop" % scallopVersion,
     // template engine
     "org.scalatra.scalate" %% "scalate-core" % scalateVersion,
-    // "de.zalando" %% "beard" % beardVersion,
+    // TODO: switch to "de.zalando" %% "beard" % beardVersion,
     "io.spray" %% "spray-json" % sprayVersion,
     // csv parser
     "com.nrinaudo" %% "kantan.csv" % katanVersion,
@@ -109,8 +111,6 @@ libraryDependencies ++= Seq(
     "com.google.re2j" % "re2j" % re2jVersion,
     // graph library
     "org.scala-graph" %% "graph-core" % graphVersion,
-    // configuration
-    "com.typesafe" % "config" % typesafeVersion,
     //---------- Test libraries -------------------//
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )
