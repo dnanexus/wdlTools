@@ -91,7 +91,6 @@ val sprayVersion = "1.3.5"
 val katanVersion = "0.6.1"
 val re2jVersion = "1.5"
 val graphVersion = "1.13.2"
-val commonsCompressVersion = "1.20"
 val scalatestVersion = "3.1.1"
 
 libraryDependencies ++= Seq(
@@ -112,8 +111,6 @@ libraryDependencies ++= Seq(
     "com.google.re2j" % "re2j" % re2jVersion,
     // graph library
     "org.scala-graph" %% "graph-core" % graphVersion,
-    // library for TAR archiving/unarchiving
-    "org.apache.commons" % "commons-compress" % commonsCompressVersion,
     //---------- Test libraries -------------------//
     "org.scalatest" % "scalatest_2.13" % scalatestVersion % "test"
 )
