@@ -1,8 +1,9 @@
 # Change log
 
-## v0.10.6 (dev)
+## v0.10.6 (2020-11-14)
 
 * Add support for URI-formatted image names (e.g. 'docker://myimg')
+* Add functions for serialization and deserialization of WdlTypes
 
 ## v0.10.5 (2020-11-12)
 
