@@ -1,9 +1,11 @@
 # Change log
 
+
 ## v0.10.7 (2020-11-16)
 
 * Relax type-checking of arrays - ignore nonEmpty, which is only a runtime check
 * Fix code generator/formatter to only use object literal syntax in WDL 2+
+* Add option `LocalizationDisambiguator` to always create new localization dir for each source dir
 
 ## v0.10.6 (2020-11-14)
 
