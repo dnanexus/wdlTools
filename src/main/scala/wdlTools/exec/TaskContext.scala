@@ -1,98 +1,10 @@
 package wdlTools.exec
 
-import java.nio.file.{FileAlreadyExistsException, Files, Path}
-
 import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import dx.util.{AddressableFileSource, Bindings, FileSourceResolver, Logger}
-
-trait LocalizationDisambiguator {
-  def getLocalPath(fileSource: AddressableFileSource): Path
-}
-
-/**
-  * Localizes a file according to the rules in the spec:
-  * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#task-input-localization.
-  * * two input files with the same name must be located separately, to avoid name collision
-  * * two input files that originated in the same storage directory must also be localized into
-  *   the same directory for task execution
-  * We use the general strategy of creating randomly named directories under root. We use a single
-  * directory if possible, but create additional directories to avoid name collision.
-  * @param rootDir the root dir - files are localize to subdirectories under this directory
-  * @param existingPaths optional Set of paths that should be assumed to already exist locally
-  * @param subdirPrefix prefix to add to localization dirs
-  * @param disambiguationDirLimit max number of disambiguation subdirs that can be created
-  */
-case class SafeLocalizationDisambiguator(rootDir: Path,
-                                         existingPaths: Set[Path] = Set.empty,
-                                         subdirPrefix: String = "input",
-                                         disambiguationDirLimit: Int = 200)
-    extends LocalizationDisambiguator {
-  private lazy val primaryDir = Files.createTempDirectory(rootDir, subdirPrefix)
-  // mapping from source file parent directories to local directories - this
-  // ensures that files that were originally from the same directory are
-  // localized to the same target directory
-  private var sourceToTarget: Map[String, Path] = Map.empty
-  // keep track of which disambiguation dirs we've created
-  private var disambiguationDirs: Set[Path] = Set(primaryDir)
-  // keep track of which Paths we've returned so we can detect collisions
-  private var localizedPaths: Set[Path] = existingPaths
-
-  def getLocalizedPaths: Set[Path] = localizedPaths
-
-  private def exists(path: Path): Boolean = {
-    if (localizedPaths.contains(path)) {
-      true
-    } else if (Files.exists(path)) {
-      localizedPaths += path
-      true
-    } else {
-      false
-    }
-  }
-
-  override def getLocalPath(source: AddressableFileSource): Path = {
-    val sourceFolder = source.folder
-    val localPath = sourceToTarget.get(sourceFolder) match {
-      // if we already saw another file from the same source folder as `source`, try to
-      // put `source` in that same target directory
-      case Some(parent) if exists(parent.resolve(source.name)) =>
-        throw new FileAlreadyExistsException(
-            s"Trying to localize ${source} to ${parent} but the file already exists in that directory"
-        )
-      case Some(parent) =>
-        parent.resolve(source.name)
-      case None =>
-        val primaryPath = primaryDir.resolve(source.name)
-        if (!exists(primaryPath)) {
-          sourceToTarget += (sourceFolder -> primaryDir)
-          primaryPath
-        } else if (disambiguationDirs.size >= disambiguationDirLimit) {
-          throw new Exception(
-              s"""|Tried to localize ${source} to local filesystem at ${rootDir}/*/${source.name}, 
-                  |but there was a name collision and there are already the maximum number of 
-                  |disambiguation directories (${disambiguationDirLimit}).""".stripMargin
-                .replaceAll("\n", " ")
-          )
-        } else {
-          // there is a name collision in primaryDir - create a new dir
-          val newDir = Files.createTempDirectory(rootDir, "input")
-          // we should never get a collision according to the guarantees of
-          // Files.createTempDirectory, but we check anyway
-          if (disambiguationDirs.contains(newDir)) {
-            throw new Exception(s"collision with existing dir ${newDir}")
-          }
-          disambiguationDirs += newDir
-          sourceToTarget += (sourceFolder -> newDir)
-          newDir.resolve(source.name)
-        }
-    }
-    localizedPaths += localPath
-    localPath
-  }
-}
+import dx.util.{Bindings, FileSourceResolver, Logger}
 
 case class TaskContext(task: Task,
                        inputBindings: Bindings[String, V],
