@@ -1,7 +1,8 @@
 version 1.0
 
-# should fail to type-check because i can be 0,
-# resulting in an empty array
+# i can be 0, so it is possible for k to be an empty array;
+# however, the WDL spec says that nonEmpty is only a runtime
+# check, so it should be allowed to pass static type checking
 workflow empty_array_coercion {
   input {
     Int i
