@@ -601,8 +601,10 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         )
       case ExprObject(value, wdlType, _) =>
         val name = wdlType match {
-          case T_Object          => Symbols.Object
-          case T_Struct(name, _) => name
+          case T_Struct(name, _) if targetVersion.exists(_ >= WdlVersion.V2) =>
+            name
+          case T_Object =>
+            Symbols.Object
           case _ =>
             throw new Exception(s"unexpected object wdlType ${wdlType}")
         }

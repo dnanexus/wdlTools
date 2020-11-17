@@ -997,6 +997,11 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             continue = false
         )
       case ExprStruct(name, members, loc) =>
+        val literalPrefix = if (targetVersion.exists(_ >= WdlVersion.V2)) {
+          name
+        } else {
+          Symbols.Object
+        }
         BoundedContainer(
             members.map {
               case ExprMember(ValueString(k, loc), v, memberText) =>
@@ -1006,7 +1011,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             },
             Some(
                 SpanSequence(
-                    Literal.chainFromStart(Vector(name, Symbols.ObjectOpen), loc),
+                    Literal.chainFromStart(Vector(literalPrefix, Symbols.ObjectOpen), loc),
                     spacing = Spacing.On
                 ),
                 Literal.fromEnd(Symbols.ObjectClose, loc)
