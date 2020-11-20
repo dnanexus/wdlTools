@@ -7,9 +7,11 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.syntax.Parsers
+import wdlTools.types.WdlTypes.T_Function1
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 
 import scala.collection.Map
+import scala.collection.immutable.SeqMap
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
@@ -19,9 +21,16 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val v2StructsDir =
     Paths.get(getClass.getResource("/types/v2/structs").getPath)
 
-  private def check(dir: Path, file: String): TAT.Document = {
+  private def check(dir: Path,
+                    file: String,
+                    udfs: Vector[UserDefinedFunctionPrototype] = Vector.empty,
+                    substituteFunctionsForTasks: Boolean = false): TAT.Document = {
     val fileResolver = FileSourceResolver.create(Vector(dir))
-    val checker = TypeInfer(fileResolver = fileResolver, logger = logger)
+    val checker =
+      TypeInfer(userDefinedFunctions = udfs,
+                substituteFunctionsForTasks = substituteFunctionsForTasks,
+                fileResolver = fileResolver,
+                logger = logger)
     val sourceFile = fileResolver.fromPath(dir.resolve(file))
     val doc = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
       .parseDocument(sourceFile)
@@ -91,5 +100,66 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     }
     subTasks.size shouldBe 1
     topTasks.head shouldBe subTasks.head
+  }
+
+  it should "allow UDFs" in {
+    // should fail to type-check if the function is not defined
+    assertThrows[TypeException] {
+      check(v1Dir, "udfs.wdl")
+    }
+
+    object SayHelloFunction extends UserDefinedFunctionPrototype {
+
+      private lazy val proto: T_Function1 =
+        WdlTypes.T_Function1("say_hello", WdlTypes.T_String, WdlTypes.T_String)
+
+      /**
+        * Returns a prototype for a user-defined function matching
+        * the given name and input types, or None if this UDF doesn't
+        * match the signature.
+        *
+        * @param funcName   function name
+        * @param inputTypes input types
+        * @return
+        */
+      override def getPrototype(funcName: String,
+                                inputTypes: Vector[WdlTypes.T]): Option[WdlTypes.T_Function] = {
+        (funcName, inputTypes) match {
+          case ("say_hello", Vector(WdlTypes.T_String)) => Some(proto)
+          case _                                        => None
+        }
+      }
+
+      /**
+        * Returns a prototype for a user-defined function that can
+        * substitute for a task.
+        *
+        * @param taskName task name
+        * @param input    mapping of task input name to (type, optional)
+        * @param output   mapping of task output name to type
+        * @return
+        */
+      override def getTaskProxyFunction(
+          taskName: String,
+          input: SeqMap[String, (WdlTypes.T, Boolean)],
+          output: SeqMap[String, WdlTypes.T]
+      ): Option[(WdlTypes.T_Function, Vector[String])] = {
+        (taskName, input.values.toVector, output.values.toVector) match {
+          case ("say_hello", Vector((WdlTypes.T_String, false)), Vector(WdlTypes.T_String)) =>
+            Some((proto, Vector(input.head._1)))
+          case _ => None
+        }
+      }
+    }
+    val tDoc =
+      check(v1Dir, "udfs.wdl", Vector(SayHelloFunction), substituteFunctionsForTasks = true)
+    val say_hello_task = tDoc.elements
+      .collectFirst {
+        case task: TAT.Task if task.name == "say_hello" => task
+      }
+      .getOrElse(throw new Exception("missing task say_hello"))
+    say_hello_task.wdlType.function shouldBe Some(
+        (WdlTypes.T_Function1("say_hello", WdlTypes.T_String, WdlTypes.T_String), Vector("name"))
+    )
   }
 }

@@ -26,11 +26,13 @@ trait UserDefinedFunctionPrototype {
     * @param taskName task name
     * @param input mapping of task input name to (type, optional)
     * @param output mapping of task output name to type
-    * @return
+    * @return (function, argument order), where argument order is a Vector of
+    *         the task input names in the order they must be passed to the
+    *         function
     */
   def getTaskProxyFunction(taskName: String,
                            input: SeqMap[String, (T, Boolean)],
-                           output: SeqMap[String, T]): Option[T_Function]
+                           output: SeqMap[String, T]): Option[(WdlTypes.T_Function, Vector[String])]
 }
 
 // TODO: for the prototypes with array inputs and outputs (transpose, zip, cross, flatten, prefix),

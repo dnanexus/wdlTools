@@ -74,12 +74,14 @@ object WdlTypes {
     * @param output mapping of output name to type
     * @param function optional native function that implements this
     *                 task - if defined, calls to this task are replaced
-    *                 with calls to the function
+    *                 with calls to the function; also requires a Vector
+    *                 of task inputs names in the order they must be passed
+    *                 to the function.
     */
   case class T_Task(name: String,
                     input: SeqMap[String, (T, Boolean)],
                     output: SeqMap[String, T],
-                    function: Option[T_Function])
+                    function: Option[(T_Function, Vector[String])])
       extends T_Callable
 
   // The type of a workflow.

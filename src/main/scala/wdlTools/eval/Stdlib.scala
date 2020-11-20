@@ -51,6 +51,14 @@ case class FunctionContext(args: Vector[WdlValues.V], exprState: ExprState, loc:
 }
 
 trait UserDefinedFunctionImplFactory {
+
+  /**
+    * Returns the implementation of this UDF for the given function name and arguments,
+    * or None if this UDF cannot evaluate the arguments.
+    * @param funcName function name
+    * @param args function arguments
+    * @return
+    */
   def getImpl(funcName: String, args: Vector[V]): Option[FunctionContext => V]
 }
 
