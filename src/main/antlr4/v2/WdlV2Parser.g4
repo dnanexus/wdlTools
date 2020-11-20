@@ -277,7 +277,7 @@ call_alias
   ;
 
 call_input
-  : Identifier EQUAL expr
+  : Identifier (EQUAL expr)?
   ;
 
 call_inputs

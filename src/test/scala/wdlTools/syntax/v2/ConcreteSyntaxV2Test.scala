@@ -50,4 +50,16 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   it should "parse a task with complex hints" in {
     getDocument(getSource("complex_hint_values.wdl"))
   }
+
+  it should "handle passthrough syntax for call inputs" in {
+    val doc = getDocument(getSource("passthrough.wdl"))
+    doc.workflow.get.body match {
+      case Vector(Call(_, _, _, Some(inputs), _)) =>
+        inputs.value.size shouldBe 1
+        inputs.value.head.expr should matchPattern {
+          case ExprIdentifier("s", _) =>
+        }
+      case _ => throw new Exception("unexpected inputs")
+    }
+  }
 }
