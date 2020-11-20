@@ -1,5 +1,10 @@
 # Change log
 
+## v0.11.0 (2020-11-20)
+
+* Implement new syntax in development for pass-through of call arguments 
+* Fix bug with struct-typed objects in v1
+* Add hooks for user-defined functions
 
 ## v0.10.7 (2020-11-16)
 
