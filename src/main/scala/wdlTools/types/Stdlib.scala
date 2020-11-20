@@ -6,9 +6,39 @@ import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import dx.util.{Logger, TraceLevel}
 
+import scala.collection.immutable.SeqMap
+
+trait UserDefinedFunctionPrototype {
+
+  /**
+    * Returns a prototype for a user-defined function matching
+    * the given name and input types, or None if this UDF doesn't
+    * match the signature.
+    * @param funcName function name
+    * @param inputTypes input types
+    * @return
+    */
+  def getPrototype(funcName: String, inputTypes: Vector[T]): Option[T_Function]
+
+  /**
+    * Returns a prototype for a user-defined function that can
+    * substitute for a task.
+    * @param taskName task name
+    * @param input mapping of task input name to (type, optional)
+    * @param output mapping of task output name to type
+    * @return
+    */
+  def getTaskProxyFunction(taskName: String,
+                           input: SeqMap[String, (T, Boolean)],
+                           output: SeqMap[String, T]): Option[T_Function]
+}
+
 // TODO: for the prototypes with array inputs and outputs (transpose, zip, cross, flatten, prefix),
 //  the non-empty value of the result arrays should match the values of the input arrays
-case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logger = Logger.get) {
+case class Stdlib(regime: TypeCheckingRegime,
+                  version: WdlVersion,
+                  userDefinedFunctions: Vector[UserDefinedFunctionPrototype],
+                  logger: Logger = Logger.get) {
   private val unify = Unification(regime)
 
   // Some functions are overloaded and can take several kinds of arguments.
@@ -511,12 +541,20 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
             inputTypes: Vector[T],
             exprState: ExprState,
             section: Section.Section = Section.Other): (T, T_Function) = {
-    val candidates: Vector[T_Function] = funcProtoMap(exprState).get(funcName) match {
-      case None =>
-        throw new StdlibFunctionException(s"No function named ${funcName} in the standard library")
-      case Some(protoVec) =>
-        protoVec
-    }
+    val candidates: Vector[T_Function] = funcProtoMap(exprState).getOrElse(
+        funcName, {
+          userDefinedFunctions.iterator
+            .map(udf => udf.getPrototype(funcName, inputTypes))
+            .collectFirst {
+              case proto if proto.isDefined => Vector(proto.get)
+            }
+            .getOrElse(
+                throw new StdlibFunctionException(
+                    s"No function named ${funcName} in the standard library"
+                )
+            )
+        }
+    )
     val ctx = UnificationContext(section, inPlaceholder = exprState >= ExprState.InPlaceholder)
     // The function may be overloaded, taking several types of inputs. Try to match all
     // prototypes against the input, preferring the one with exactly matching inputs (if any)
@@ -545,9 +583,7 @@ case class Stdlib(regime: TypeCheckingRegime, version: WdlVersion, logger: Logge
           val msg =
             s"""|Invoking stdlib function ${funcName} with badly typed arguments
                 |${candidatesStr}
-
                 |inputs: ${inputsStr}
-
                 |""".stripMargin
           throw new StdlibFunctionException(msg)
         })

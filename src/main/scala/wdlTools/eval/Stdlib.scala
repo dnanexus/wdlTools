@@ -16,49 +16,53 @@ import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
 
 import scala.io.Source
 
-case class Stdlib(paths: EvalPaths,
-                  version: WdlVersion,
-                  fileResolver: FileSourceResolver = FileSourceResolver.get,
-                  logger: Logger = Logger.get) {
-  private case class FunctionContext(args: Vector[WdlValues.V],
-                                     exprState: ExprState,
-                                     loc: SourceLocation) {
-    def assertNoArgs(): Unit = {
-      if (args.nonEmpty) {
-        throw new EvalException(s"Invalid arguments ${args}, expected none", loc)
-      }
-    }
-
-    def getOneArg: V = {
-      args match {
-        case Vector(arg) => arg
-        case _ =>
-          throw new EvalException(s"Invalid arguments ${args}, expected exactly one", loc)
-      }
-    }
-
-    def getTwoArgs: (V, V) = {
-      args match {
-        case Vector(arg1, arg2) =>
-          (arg1, arg2)
-        case _ =>
-          throw new EvalException(s"Invalid arguments ${args}, expected exactly two", loc)
-      }
-    }
-
-    def getThreeArgs: (V, V, V) = {
-      args match {
-        case Vector(arg1, arg2, arg3) =>
-          (arg1, arg2, arg3)
-        case _ =>
-          throw new EvalException(s"Invalid arguments ${args}, expected exactly three", loc)
-      }
+case class FunctionContext(args: Vector[WdlValues.V], exprState: ExprState, loc: SourceLocation) {
+  def assertNoArgs(): Unit = {
+    if (args.nonEmpty) {
+      throw new EvalException(s"Invalid arguments ${args}, expected none", loc)
     }
   }
 
-  private type FunctionImpl = FunctionContext => V
+  def getOneArg: V = {
+    args match {
+      case Vector(arg) => arg
+      case _ =>
+        throw new EvalException(s"Invalid arguments ${args}, expected exactly one", loc)
+    }
+  }
+
+  def getTwoArgs: (V, V) = {
+    args match {
+      case Vector(arg1, arg2) =>
+        (arg1, arg2)
+      case _ =>
+        throw new EvalException(s"Invalid arguments ${args}, expected exactly two", loc)
+    }
+  }
+
+  def getThreeArgs: (V, V, V) = {
+    args match {
+      case Vector(arg1, arg2, arg3) =>
+        (arg1, arg2, arg3)
+      case _ =>
+        throw new EvalException(s"Invalid arguments ${args}, expected exactly three", loc)
+    }
+  }
+}
+
+trait UserDefinedFunctionImplFactory {
+  def getImpl(funcName: String, args: Vector[V]): Option[FunctionContext => V]
+}
+
+case class Stdlib(paths: EvalPaths,
+                  version: WdlVersion,
+                  userDefinedFunctions: Vector[UserDefinedFunctionImplFactory] = Vector.empty,
+                  fileResolver: FileSourceResolver = FileSourceResolver.get,
+                  logger: Logger = Logger.get) {
 
   private val ioSupport: IoSupport = IoSupport(paths, fileResolver, logger)
+
+  private type FunctionImpl = FunctionContext => V
 
   // built-in operators
   private val builtinFuncTable: Map[String, FunctionImpl] = Map(
@@ -244,11 +248,17 @@ case class Stdlib(paths: EvalPaths,
            args: Vector[V],
            loc: SourceLocation,
            exprState: ExprState = ExprState.Start): V = {
-    if (!funcTable.contains(funcName)) {
-      throw new EvalException(s"stdlib function ${funcName} not implemented", loc)
-    }
+    val impl = funcTable.getOrElse(
+        funcName, {
+          userDefinedFunctions.iterator
+            .map(udf => udf.getImpl(funcName, args))
+            .collectFirst {
+              case impl if impl.isDefined => impl.get
+            }
+            .getOrElse(throw new EvalException(s"stdlib function ${funcName} not implemented", loc))
+        }
+    )
     val ctx = FunctionContext(args, exprState, loc)
-    val impl = funcTable(funcName)
     try {
       impl(ctx)
     } catch {

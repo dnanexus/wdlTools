@@ -153,7 +153,7 @@ object TypeUtils {
       // a user defined structure
       case T_Struct(name, _) => s"Struct($name)"
 
-      case T_Task(name, input, output) =>
+      case T_Task(name, input, output, _) =>
         val inputs = input
           .map {
             case (name, (t, _)) =>

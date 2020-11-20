@@ -23,6 +23,8 @@ import scala.collection.immutable.{SeqMap, TreeSeqMap}
   * Type inference
   * @param regime Type checking rules. Are we lenient or strict in checking coercions?
   * @param allowNonWorkflowInputs whether task inputs can be specified externally
+  * @param userDefinedFunctions non-stdlib functions to support
+  * @param substituteFunctionsForTasks whether to allow UDFs to be substituted for matching tasks
   * @param errorHandler optional error handler function. If defined, it is called every time a type-checking
   *                     error is encountered. If it returns false, type inference will proceed even if it
   *                     results in an invalid AST. If errorHandler is not defined or when it returns false,
@@ -30,6 +32,8 @@ import scala.collection.immutable.{SeqMap, TreeSeqMap}
   */
 case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      allowNonWorkflowInputs: Boolean = true,
+                     userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
+                     substituteFunctionsForTasks: Boolean = false,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
                      errorHandler: Option[Vector[TypeError] => Boolean] = None,
                      logger: Logger = Logger.get) {
@@ -776,10 +780,20 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tParamMeta = task.parameterMeta.map(applyParamMeta(_, outputCtx))
 
     // calculate the type signature of the task
+    val taskName = task.name
     val (inputType, outputType) = calcSignature(inputDefs, outputDefs)
-    val taskType = T_Task(task.name, inputType, outputType)
+    val function = if (allowNonWorkflowInputs) {
+      userDefinedFunctions.iterator
+        .map(udf => udf.getTaskProxyFunction(taskName, inputType, outputType))
+        .collectFirst {
+          case proto if proto.isDefined => proto.get
+        }
+    } else {
+      None
+    }
+    val taskType = T_Task(taskName, inputType, outputType, function)
     TAT.Task(
-        name = task.name,
+        name = taskName,
         wdlType = taskType,
         inputs = inputDefs,
         outputs = outputDefs,
@@ -816,7 +830,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val callee: T_Callable = ctx.callables.get(call.name) match {
       case None =>
         handleError(s"called task/workflow ${call.name} is not defined", call.loc)
-        WdlTypes.T_Task(call.name, SeqMap.empty, SeqMap.empty)
+        WdlTypes.T_Task(call.name, SeqMap.empty, SeqMap.empty, None)
       case Some(x: T_Callable) => x
     }
 
@@ -1087,7 +1101,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, TypeContext) = {
-    val emptyCtx = TypeContext.create(doc, regime, logger)
+    val emptyCtx = TypeContext.create(doc, regime, userDefinedFunctions, logger)
 
     // translate each of the elements in the document
     val (elements, elementCtx) =

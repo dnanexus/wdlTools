@@ -67,11 +67,19 @@ object WdlTypes {
     val output: SeqMap[String, T]
   }
 
-  // The type of a task.
-  //
-  // It takes typed-inputs and returns typed-outputs. The boolean flag denotes
-  // if input is optional
-  case class T_Task(name: String, input: SeqMap[String, (T, Boolean)], output: SeqMap[String, T])
+  /**
+    * A Task type.
+    * @param name task name
+    * @param input mapping of input name to (type, optional)
+    * @param output mapping of output name to type
+    * @param function optional native function that implements this
+    *                 task - if defined, calls to this task are replaced
+    *                 with calls to the function
+    */
+  case class T_Task(name: String,
+                    input: SeqMap[String, (T, Boolean)],
+                    output: SeqMap[String, T],
+                    function: Option[T_Function])
       extends T_Callable
 
   // The type of a workflow.

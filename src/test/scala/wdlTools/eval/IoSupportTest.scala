@@ -61,7 +61,7 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
       val docSrc = StringFileNode(buf)
       docSrc.localize(p, overwrite = true)
       val (evalPaths, fileResolver) = setup()
-      val stdlib = Stdlib(evalPaths, WdlVersion.V1, fileResolver, logger)
+      val stdlib = Stdlib(evalPaths, WdlVersion.V1, Vector.empty, fileResolver, logger)
       val retval =
         stdlib.call("size", Vector(WdlValues.V_String(p.toString)), placeholderSourceLocation)
       inside(retval) {

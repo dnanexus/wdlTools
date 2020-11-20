@@ -166,11 +166,14 @@ case class TypeContext(
 }
 
 object TypeContext {
-  def create(doc: AST.Document, regime: TypeCheckingRegime, logger: Logger): TypeContext = {
+  def create(doc: AST.Document,
+             regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
+             userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
+             logger: Logger = Logger.get): TypeContext = {
     val wdlVersion = doc.version.value
     TypeContext(
         version = wdlVersion,
-        stdlib = Stdlib(regime, wdlVersion, logger),
+        stdlib = Stdlib(regime, wdlVersion, userDefinedFunctions, logger),
         docSource = doc.source
     )
   }
