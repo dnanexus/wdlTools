@@ -1,4 +1,4 @@
-version 1.0
+version development
 
 struct Name {
   String first
@@ -20,7 +20,7 @@ task foo {
     Int m = n + 3
     Array[String] quality_scores = read_lines("${sample_id}.scores.txt")
     File tranches = "${sample_id}"
-    Name p = object {
+    Name p = Name {
       first: "Joe",
       last: "Blow"
     }

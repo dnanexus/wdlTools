@@ -87,9 +87,10 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       ("runtime_section_bad.wdl", TResult(correct = false))
   )
 
-//  private val v2ControlTable: Vector[(String, TResult)] = Vector(
+  private val v2ControlTable: Vector[(String, TResult)] = Vector(
 //      ("v2comparison.wdl", TResult(correct = false))
-//  )
+      ("output_section.wdl", TResult(correct = true))
+  )
 
   // test to include/exclude
   private val includeList: Option[Set[String]] = None
@@ -174,26 +175,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
     complianceTest(v1ControlTable, "/types/v1")
   }
 
-//  "v2 compliance test" should {
-//    val testFiles: Vector[(FileSource, TResult)] = {
-//      val testFiles = getWdlSourceFiles(
-//          Paths.get(getClass.getResource("/types/v2").getPath)
-//      ).map(p => p.getFileName.toString -> p).toMap
-//      // filter out files that do not appear in the control table
-//      v2ControlTable.collect {
-//        case (fileName, result) if testFiles.contains(fileName) && includeExcludeCheck(fileName) =>
-//          (fileResolver.fromPath(testFiles(fileName)), result)
-//      }
-//    }
-//    testFiles.foreach {
-//      case (testFile, TResult(true, flag)) =>
-//        s"type check valid WDL at ${testFile.fileName}" in {
-//          checkCorrect(testFile, flag)
-//        }
-//      case (testFile, TResult(false, flag)) =>
-//        s"fail to type check invalid WDL at ${testFile.fileName}" in {
-//          checkIncorrect(testFile, flag)
-//        }
-//    }
-//  }
+  "v2 compliance test" should {
+    complianceTest(v2ControlTable, "/types/v2")
+  }
 }

@@ -35,6 +35,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val evaluator =
       Eval(evalPaths,
            Some(wdlTools.syntax.WdlVersion.V1),
+           Vector.empty,
            evalFileResolver,
            Logger.Quiet,
            allowNonstandardCoercions)
@@ -236,7 +237,11 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val file = srcDir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
-      Eval(evalPaths, Some(wdlTools.syntax.WdlVersion.V1), evalFileResolver, Logger.Quiet)
+      Eval(evalPaths,
+           Some(wdlTools.syntax.WdlVersion.V1),
+           Vector.empty,
+           evalFileResolver,
+           Logger.Quiet)
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]

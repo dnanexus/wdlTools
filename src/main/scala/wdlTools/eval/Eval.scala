@@ -9,7 +9,8 @@ import dx.util.{Bindings, EvalPaths, FileSource, FileSourceResolver, LocalFileSo
 import scala.collection.immutable.TreeSeqMap
 
 object Eval {
-  lazy val empty: Eval = Eval(DefaultEvalPaths.empty, None, FileSourceResolver.get, Logger.get)
+  lazy val empty: Eval =
+    Eval(DefaultEvalPaths.empty, None, Vector.empty, FileSourceResolver.get, Logger.get)
 
   def createBindingsFromEnv(env: Map[String, (WdlTypes.T, V)]): Bindings[String, V] = {
     WdlValueBindings(env.map { case (name, (_, v)) => name -> v })
@@ -18,6 +19,7 @@ object Eval {
 
 case class Eval(paths: EvalPaths,
                 wdlVersion: Option[WdlVersion],
+                userDefinedFunctions: Vector[UserDefinedFunctionImplFactory] = Vector.empty,
                 fileResovler: FileSourceResolver = FileSourceResolver.get,
                 logger: Logger = Logger.get,
                 allowNonstandardCoercions: Boolean = false) {
@@ -28,7 +30,7 @@ case class Eval(paths: EvalPaths,
         throw new RuntimeException(
             "cannot evaluate standard library functions without a WDL version"
         )
-      case Some(ver) => Stdlib(paths, ver, fileResovler, logger)
+      case Some(ver) => Stdlib(paths, ver, userDefinedFunctions, fileResovler, logger)
     }
   }
 
