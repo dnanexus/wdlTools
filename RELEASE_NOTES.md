@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.1 (2020-11-20)
+
+* Add `EvalPaths` to `FunctionContext`
+
 ## v0.11.0 (2020-11-20)
 
 * Implement new syntax in development for pass-through of call arguments 

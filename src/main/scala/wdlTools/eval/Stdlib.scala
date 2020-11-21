@@ -11,12 +11,14 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{Builtins, Operator, SourceLocation, WdlVersion}
 import wdlTools.types.ExprState
-import wdlTools.types.ExprState.ExprState
-import wdlTools.types.WdlTypes.{T_Boolean, T_File, T_Int, _}
+import wdlTools.types.WdlTypes._
 
 import scala.io.Source
 
-case class FunctionContext(args: Vector[WdlValues.V], exprState: ExprState, loc: SourceLocation) {
+case class FunctionContext(args: Vector[WdlValues.V],
+                           exprState: ExprState.ExprState,
+                           paths: EvalPaths,
+                           loc: SourceLocation) {
   def assertNoArgs(): Unit = {
     if (args.nonEmpty) {
       throw new EvalException(s"Invalid arguments ${args}, expected none", loc)
@@ -255,7 +257,7 @@ case class Stdlib(paths: EvalPaths,
   def call(funcName: String,
            args: Vector[V],
            loc: SourceLocation,
-           exprState: ExprState = ExprState.Start): V = {
+           exprState: ExprState.ExprState = ExprState.Start): V = {
     val impl = funcTable.getOrElse(
         funcName, {
           userDefinedFunctions.iterator
@@ -266,7 +268,7 @@ case class Stdlib(paths: EvalPaths,
             .getOrElse(throw new EvalException(s"stdlib function ${funcName} not implemented", loc))
         }
     )
-    val ctx = FunctionContext(args, exprState, loc)
+    val ctx = FunctionContext(args, exprState, paths, loc)
     try {
       impl(ctx)
     } catch {
