@@ -160,6 +160,7 @@ MetaWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaBody;
 
+MetaBodyComment: '#' ~[\r\n]* -> channel(COMMENTS);
 MetaIdentifier: Identifier;
 MetaColon: ':' -> pushMode(MetaValue);
 EndMeta: '}' -> popMode, mode(DEFAULT_MODE);

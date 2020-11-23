@@ -61,7 +61,7 @@ trait UserDefinedFunctionImplFactory {
     * @param args function arguments
     * @return
     */
-  def getImpl(funcName: String, args: Vector[V]): Option[FunctionContext => V]
+  def getImpl(funcName: String, args: Vector[V], loc: SourceLocation): Option[FunctionContext => V]
 }
 
 case class Stdlib(paths: EvalPaths,
@@ -261,7 +261,7 @@ case class Stdlib(paths: EvalPaths,
     val impl = funcTable.getOrElse(
         funcName, {
           userDefinedFunctions.iterator
-            .map(udf => udf.getImpl(funcName, args))
+            .map(udf => udf.getImpl(funcName, args, loc))
             .collectFirst {
               case impl if impl.isDefined => impl.get
             }

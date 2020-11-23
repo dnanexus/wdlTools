@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.2 (dev)
+
+* Add `SourceLocation` to `UserDefinedFunctionImplFactory.getImpl` signature
+
 ## v0.11.1 (2020-11-20)
 
 * Add `EvalPaths` to `FunctionContext`

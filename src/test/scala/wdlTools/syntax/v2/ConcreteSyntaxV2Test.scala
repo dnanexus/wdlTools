@@ -4,9 +4,9 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.WdlVersion
+import wdlTools.syntax.{Antlr4Util, Comment, SourceLocation, WdlVersion}
 import wdlTools.syntax.v2.ConcreteSyntax._
-import dx.util.{FileNode, Logger, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver, Logger}
 
 class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v2").getPath)
@@ -18,6 +18,7 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(FileSource: FileNode): Document = {
+    Antlr4Util.setParserTrace(true)
     ParseTop(WdlV2Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 
@@ -61,5 +62,10 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
         }
       case _ => throw new Exception("unexpected inputs")
     }
+  }
+
+  it should "handle comments in meta sections" in {
+    val doc = getDocument(getSource("parameter_meta_comment.wdl"))
+    doc.comments(10) shouldBe Comment("#foo", SourceLocation(doc.source, 10, 4, 10, 8))
   }
 }

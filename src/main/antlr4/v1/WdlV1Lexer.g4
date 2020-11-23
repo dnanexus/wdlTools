@@ -3,7 +3,7 @@ lexer grammar WdlV1Lexer;
 channels { COMMENTS }
 
 // Comments
-LINE_COMMENT: '#' ~[\r\n]* -> channel(COMMENTS);
+LINE_COMMENT: '#' ~[\r\n]*  -> channel(COMMENTS);
 
 // Keywords
 VERSION: 'version' -> pushMode(Version);
