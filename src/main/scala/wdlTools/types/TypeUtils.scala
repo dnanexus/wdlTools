@@ -19,32 +19,102 @@ case class DocumentElements(doc: TAT.Document) {
   }
 }
 
-case class WorkflowScatter(scatter: TAT.Scatter) {
+sealed trait WorkflowBlock {
+  def inputs: Map[String, WdlTypes.T]
+  def outputs: Map[String, WdlTypes.T]
+}
+
+case class WorkflowScatter(scatter: TAT.Scatter, scatterVars: Set[String]) extends WorkflowBlock {
   val identifier: String = scatter.identifier
   val expr: TypedAbstractSyntax.Expr = scatter.expr
-  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(scatter.body)
+  val bodyElements: WorkflowBodyElements =
+    WorkflowBodyElements(scatter.body, scatterVars ++ Set(identifier))
+
+  override def inputs: Map[String, T] = {
+    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
+  }
+
+  override def outputs: Map[String, T] = {
+    // scatter outputs are always arrays; if expr is non-empty than the
+    // output arrays will also be non-empty
+    val nonEmpty = expr.wdlType match {
+      case WdlTypes.T_Array(_, nonEmpty) => nonEmpty
+      case _ =>
+        throw new Exception(s"invalid scatter expression type ${expr.wdlType}")
+    }
+    bodyElements.outputs.map {
+      case (name, wdlType) => name -> WdlTypes.T_Array(wdlType, nonEmpty)
+    }
+  }
 }
 
-case class WorkflowConditional(conditional: TAT.Conditional) {
+case class WorkflowConditional(conditional: TAT.Conditional, scatterVars: Set[String])
+    extends WorkflowBlock {
   val expr: TypedAbstractSyntax.Expr = conditional.expr
-  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body)
+  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body, scatterVars)
+
+  override lazy val inputs: Map[String, T] = {
+    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
+  }
+
+  override lazy val outputs: Map[String, T] = {
+    // conditional outputs are always optionals
+    bodyElements.outputs.map {
+      case (name, wdlType) => name -> TypeUtils.ensureOptional(wdlType)
+    }
+  }
 }
 
-case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement]) {
+case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement],
+                                scatterVars: Set[String] = Set.empty)
+    extends WorkflowBlock {
   val (privateVariables, calls, scatters, conditionals) = body.foldLeft(
-      (Vector.empty[TAT.PrivateVariable],
-       Vector.empty[TAT.Call],
+      (Map.empty[String, TAT.PrivateVariable],
+       Map.empty[String, TAT.Call],
        Vector.empty[WorkflowScatter],
        Vector.empty[WorkflowConditional])
   ) {
-    case ((declarations, calls, scatters, conditionals), decl: TAT.PrivateVariable) =>
-      (declarations :+ decl, calls, scatters, conditionals)
-    case ((declarations, calls, scatters, conditionals), call: TAT.Call) =>
-      (declarations, calls :+ call, scatters, conditionals)
+    case ((declarations, calls, scatters, conditionals), decl: TAT.PrivateVariable)
+        if !declarations.contains(decl.name) =>
+      (declarations + (decl.name -> decl), calls, scatters, conditionals)
+    case ((declarations, calls, scatters, conditionals), call: TAT.Call)
+        if !calls.contains(call.actualName) =>
+      (declarations, calls + (call.actualName -> call), scatters, conditionals)
     case ((declarations, calls, scatters, conditionals), scatter: TAT.Scatter) =>
-      (declarations, calls, scatters :+ WorkflowScatter(scatter), conditionals)
+      (declarations, calls, scatters :+ WorkflowScatter(scatter, scatterVars), conditionals)
     case ((declarations, calls, scatters, conditionals), cond: TAT.Conditional) =>
-      (declarations, calls, scatters, conditionals :+ WorkflowConditional(cond))
+      (declarations, calls, scatters, conditionals :+ WorkflowConditional(cond, scatterVars))
+  }
+
+  lazy val outputs: Map[String, WdlTypes.T] = {
+    val privateVariableOutputs = privateVariables.map {
+      case (name, v) => name -> v.wdlType
+    }
+    val callOutputs = calls.flatMap {
+      case (callName, c) =>
+        Map(callName -> c.wdlType) ++ c.callee.output.map {
+          case (fieldName, wdlType) =>
+            s"${callName}.${fieldName}" -> wdlType
+        }
+    }
+    val scatterOutputs = scatters.flatMap(_.outputs).toMap
+    val conditionalOutputs = conditionals.flatMap(_.outputs).toMap
+    privateVariableOutputs ++ callOutputs ++ scatterOutputs ++ conditionalOutputs
+  }
+
+  lazy val inputs: Map[String, WdlTypes.T] = {
+    val privateVariableInputs =
+      privateVariables.values.flatMap(v => TypeUtils.exprDependencies(v.expr))
+    val callInputs =
+      calls.values.flatMap(c => c.inputs.values.flatMap(TypeUtils.exprDependencies))
+    val scatterInputs = scatters.flatMap(_.inputs)
+    val conditionalInputs = conditionals.flatMap(_.inputs)
+    // any outputs provided by this block (including those provided by
+    // nested blocks and by scatter variables of enclosing blocks) are
+    // accessible and thus not required as inputs
+    (privateVariableInputs ++ callInputs ++ scatterInputs ++ conditionalInputs).filterNot {
+      case (name, _) => scatterVars.contains(name) || outputs.contains(name)
+    }.toMap
   }
 }
 
@@ -61,7 +131,6 @@ object WdlTypeBindings {
 }
 
 object TypeUtils {
-  // TODO: what about T_Any?
   val PrimitiveTypes: Set[T] = Set(T_String, T_File, T_Directory, T_Boolean, T_Int, T_Float)
 
   /**

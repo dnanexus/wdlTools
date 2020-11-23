@@ -449,14 +449,12 @@ object ExprGraph {
 
     private def createBodyInfos(bodyElements: WorkflowBodyElements,
                                 scatterPath: Vector[Int] = Vector.empty): Map[String, VarInfo] = {
-      val decls: Map[String, DeclInfo] = bodyElements.privateVariables.map { decl =>
-        decl.name -> DeclInfo(decl,
-                              referenced = false,
-                              expr = Some(decl.expr),
-                              kind = VarKind.Private)
-      }.toMap
-      val calls = bodyElements.calls.map { call =>
-        call.actualName -> CallInfo(call)
+      val decls: Map[String, DeclInfo] = bodyElements.privateVariables.map {
+        case (name, decl) =>
+          name -> DeclInfo(decl, referenced = false, expr = Some(decl.expr), kind = VarKind.Private)
+      }
+      val calls = bodyElements.calls.map {
+        case (actualName, call) => actualName -> CallInfo(call)
       }
       val conditionals = bodyElements.conditionals.flatMap { cond =>
         createBodyInfos(cond.bodyElements, scatterPath)
@@ -480,7 +478,7 @@ object ExprGraph {
                                graph: Graph[String, DiEdge],
                                scatterPath: Vector[Int] = Vector.empty): Graph[String, DiEdge] = {
       // add top-level dependencies
-      val callDeps: Vector[String] = bodyElements.calls.flatMap { call =>
+      val callDeps: Vector[String] = bodyElements.calls.values.flatMap { call =>
         val inputDeps = call.inputs.values.flatMap { expr =>
           TypeUtils.exprDependencies(expr).keySet.map { dep =>
             resolveDependency("command", dep, Some(expr), scatterPath)
@@ -488,7 +486,7 @@ object ExprGraph {
         }
         val afterDeps = call.afters.map(_.name)
         inputDeps ++ afterDeps
-      }
+      }.toVector
       val blockExprDeps =
         (bodyElements.conditionals.map(_.expr) ++ bodyElements.scatters.map(_.expr)).flatMap {
           expr =>
@@ -548,6 +546,24 @@ object ExprGraph {
   def buildFrom(wf: Workflow): ExprGraph = {
     WorkflowExprGraphBuilder(wf.inputs, wf.outputs, wf.body).build
   }
+}
+
+object WorkflowElementGraphBuilder {
+
+//  /**
+//    * Builds a WorkflowElementGraph, which groups WorkflowElements
+//    * together in dependency order.
+//    * @param elements workflow elements
+//    * @param inputs names of outside inputs
+//    * @param outputs names of required outputs
+//    */
+//  def build(elements: Vector[WorkflowElement],
+//            inputs: Set[String] = Set.empty,
+//            outputs: Set[String] = Set.empty): Unit = {
+//    val bodyElements = WorkflowBodyElements(elements)
+//    val unsatisfiedOutputs = outputs.diff(inputs)
+//
+//  }
 }
 
 object GraphUtils {
