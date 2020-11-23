@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.3 (dev)
+
+* Add base class for "generic" user-defined functions
+
 ## v0.11.2 (2020-11-23)
 
 * Add `SourceLocation` to `UserDefinedFunctionImplFactory.getImpl` signature
