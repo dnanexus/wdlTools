@@ -4,7 +4,7 @@ import java.nio.file.Paths
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import wdlTools.syntax.{Antlr4Util, Comment, SourceLocation, WdlVersion}
+import wdlTools.syntax.{Comment, SourceLocation, WdlVersion}
 import wdlTools.syntax.v2.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
@@ -18,7 +18,6 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   }
 
   private def getDocument(FileSource: FileNode): Document = {
-    Antlr4Util.setParserTrace(true)
     ParseTop(WdlV2Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
   }
 
