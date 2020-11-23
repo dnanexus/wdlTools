@@ -275,10 +275,9 @@ case class Stdlib(paths: EvalPaths,
       case e: EvalException =>
         throw e
       case e: Throwable =>
-        val msg = s"""|calling stdlib function ${funcName} with arguments ${args}
-                      |${e.getMessage}
-                      |""".stripMargin
-        throw new EvalException(msg, loc)
+        throw new EvalException(s"calling stdlib function ${funcName} with arguments ${args}",
+                                loc,
+                                e)
     }
   }
 

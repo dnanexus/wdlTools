@@ -92,6 +92,11 @@ final class EvalException(message: String) extends Exception(message) {
   def this(msg: String, loc: SourceLocation) = {
     this(EvalException.formatMessage(msg, loc))
   }
+
+  def this(msg: String, loc: SourceLocation, cause: Throwable) = {
+    this(EvalException.formatMessage(msg, loc))
+    initCause(cause)
+  }
 }
 
 object EvalException {
