@@ -1,6 +1,6 @@
 # Change log
 
-## v0.11.3 (dev)
+## v0.11.3 (2020-11-23)
 
 * Add base class for "generic" user-defined functions
 
