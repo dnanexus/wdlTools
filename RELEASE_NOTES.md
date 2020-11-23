@@ -1,8 +1,9 @@
 # Change log
 
-## v0.11.2 (dev)
+## v0.11.2 (2020-11-23)
 
 * Add `SourceLocation` to `UserDefinedFunctionImplFactory.getImpl` signature
+* Fix parsing of comments in *meta sections in WDL v2
 
 ## v0.11.1 (2020-11-20)
 
