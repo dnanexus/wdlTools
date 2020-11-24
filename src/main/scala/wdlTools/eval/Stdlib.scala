@@ -594,8 +594,8 @@ case class Stdlib(paths: EvalPaths,
     V_Boolean(result)
   }
 
-  private def addition(ctx: FunctionContext): V = {
-    ctx.getTwoArgs match {
+  private def add2(a: V, b: V, exprState: ExprState.ExprState, loc: SourceLocation): V = {
+    (a, b) match {
       case (V_Int(n1), V_Int(n2))     => V_Int(n1 + n2)
       case (V_Float(x1), V_Int(n2))   => V_Float(x1 + n2)
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 + x2)
@@ -613,23 +613,32 @@ case class Stdlib(paths: EvalPaths,
       case (V_Boolean(b1), V_String(s2)) => V_String(b1.toString + s2)
       case (V_String(s1), V_File(s2))    => V_String(s1 + s2)
       // Addition of arguments with optional types is allowed within interpolations
-      case (V_Null, _) if ctx.exprState >= ExprState.InPlaceholder =>
+      case (V_Null, _) if exprState >= ExprState.InPlaceholder =>
         V_Null
-      case (_, V_Null) if ctx.exprState >= ExprState.InPlaceholder =>
+      case (_, V_Null) if exprState >= ExprState.InPlaceholder =>
         V_Null
-      case (V_Optional(v1), V_Optional(v2)) if ctx.exprState >= ExprState.InPlaceholder =>
-        V_Optional(addition(ctx.copy(Vector(v1, v2))))
-      case (V_Optional(v1), v2) if ctx.exprState >= ExprState.InPlaceholder =>
-        V_Optional(addition(ctx.copy(Vector(v1, v2))))
-      case (v1, V_Optional(v2)) if ctx.exprState >= ExprState.InPlaceholder =>
-        V_Optional(addition(ctx.copy(Vector(v1, v2))))
+      case (V_Optional(v1), V_Optional(v2)) if exprState >= ExprState.InPlaceholder =>
+        V_Optional(add2(v1, v2, exprState, loc))
+      case (V_Optional(v1), v2) if exprState >= ExprState.InPlaceholder =>
+        V_Optional(add2(v1, v2, exprState, loc))
+      case (v1, V_Optional(v2)) if exprState >= ExprState.InPlaceholder =>
+        V_Optional(add2(v1, v2, exprState, loc))
       case other =>
-        throw new EvalException(s"cannot add values ${other}", ctx.loc)
+        throw new EvalException(s"cannot add values ${other}", loc)
     }
   }
 
-  private def subtraction(ctx: FunctionContext): V = {
-    ctx.getTwoArgs match {
+  private def addition(ctx: FunctionContext): V = {
+    ctx.getOneArg match {
+      case V_Array(args) if args.size >= 2 =>
+        args.reduce((a, b) => add2(a, b, ctx.exprState, ctx.loc))
+      case _ =>
+        throw new EvalException(s"illegal addition args ${ctx.args}", ctx.loc)
+    }
+  }
+
+  private def sub2(a: V, b: V, loc: SourceLocation): V = {
+    (a, b) match {
       case (V_Int(n1), V_Int(n2))     => V_Int(n1 - n2)
       case (V_Float(x1), V_Int(n2))   => V_Float(x1 - n2)
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 - x2)
@@ -637,13 +646,21 @@ case class Stdlib(paths: EvalPaths,
       case other =>
         throw new EvalException(
             s"cannot subtract values ${other}; arguments must be integers or floats",
-            ctx.loc
+            loc
         )
     }
   }
 
-  private def multiplication(ctx: FunctionContext): V = {
-    ctx.getTwoArgs match {
+  private def subtraction(ctx: FunctionContext): V = {
+    ctx.getOneArg match {
+      case V_Array(args) if args.size >= 2 => args.reduce((a, b) => sub2(a, b, ctx.loc))
+      case _ =>
+        throw new EvalException(s"illegal subtraction args ${ctx.args}", ctx.loc)
+    }
+  }
+
+  private def mul2(a: V, b: V, loc: SourceLocation): V = {
+    (a, b) match {
       case (V_Int(n1), V_Int(n2))     => V_Int(n1 * n2)
       case (V_Float(x1), V_Int(n2))   => V_Float(x1 * n2)
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 * x2)
@@ -651,15 +668,23 @@ case class Stdlib(paths: EvalPaths,
       case other =>
         throw new EvalException(
             s"cannot multiply values ${other}; arguments must be integers or floats",
-            ctx.loc
+            loc
         )
     }
   }
 
-  private def division(ctx: FunctionContext): V = {
-    ctx.getTwoArgs match {
+  private def multiplication(ctx: FunctionContext): V = {
+    ctx.getOneArg match {
+      case V_Array(args) if args.size >= 2 => args.reduce((a, b) => mul2(a, b, ctx.loc))
+      case _ =>
+        throw new EvalException(s"illegal multiplication args ${ctx.args}", ctx.loc)
+    }
+  }
+
+  private def div2(a: V, b: V, loc: SourceLocation): V = {
+    (a, b) match {
       case (_, denominator: V_Numeric) if denominator.floatValue == 0 =>
-        throw new EvalException("DivisionByZero", ctx.loc)
+        throw new EvalException("DivisionByZero", loc)
       case (V_Int(n1), V_Int(n2))     => V_Int(n1 / n2)
       case (V_Float(x1), V_Int(n2))   => V_Float(x1 / n2)
       case (V_Int(n1), V_Float(x2))   => V_Float(n1 / x2)
@@ -667,8 +692,16 @@ case class Stdlib(paths: EvalPaths,
       case other =>
         throw new EvalException(
             s"cannot divide values ${other}; arguments must be integers or floats",
-            ctx.loc
+            loc
         )
+    }
+  }
+
+  private def division(ctx: FunctionContext): V = {
+    ctx.getOneArg match {
+      case V_Array(args) if args.size >= 2 => args.reduce((a, b) => div2(a, b, ctx.loc))
+      case _ =>
+        throw new EvalException(s"illegal division args ${ctx.args}", ctx.loc)
     }
   }
 

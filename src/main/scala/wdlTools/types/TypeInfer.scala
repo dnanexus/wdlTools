@@ -1,6 +1,12 @@
 package wdlTools.types
 
-import wdlTools.syntax.{SourceLocation, WdlVersion, AbstractSyntax => AST, SyntaxUtils => SUtil}
+import wdlTools.syntax.{
+  Operator,
+  SourceLocation,
+  WdlVersion,
+  AbstractSyntax => AST,
+  SyntaxUtils => SUtil
+}
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatExpr, prettyFormatType}
@@ -145,6 +151,73 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                         bindings: Bindings[String, T] = WdlTypeBindings.empty,
                         exprState: ExprState = ExprState.Start,
                         section: Section = Section.Other): TAT.Expr = {
+
+    val vectorizableOperators: Map[String, Operator] = Set(
+        Operator.Addition,
+        Operator.Subtraction,
+        Operator.Multiplication,
+        Operator.Division
+    ).map(o => o.name -> o).toMap
+
+    def canVectorize(applyExpr: AST.ExprApply): Boolean = {
+      vectorizableOperators.contains(applyExpr.funcName) && (applyExpr.elements match {
+        case Vector(_: AST.ExprArray) => false
+        case _                        => true
+      })
+    }
+
+    /**
+      * Unwraps nested pairwise mathematical operations (+, -, *, /) and
+      * turns them into a vector of arguments to vectorized functions,
+      * e.g. an add(Vector[expr]) function.
+      * @return
+      */
+    def vectorize(applyExpr: AST.ExprApply): AST.ExprApply = {
+      def getExpr(exprs: Vector[AST.Expr],
+                  oper: Option[Operator],
+                  loc: SourceLocation): AST.Expr = {
+        if (oper.isDefined) {
+          AST.ExprApply(oper.get.name,
+                        Vector(AST.ExprArray(exprs, SourceLocation.merge(exprs.map(_.loc)))),
+                        loc)
+        } else if (exprs.size == 1) {
+          exprs.head
+        } else {
+          throw new TypeException(s"cannot vectorize ${oper} ${exprs}", loc)
+        }
+      }
+      def inner(expr: AST.Expr): (Vector[AST.Expr], Option[Operator], SourceLocation) = {
+        val (oper, lhs, rhs, loc) = expr match {
+          case AST.ExprApply(funcName, Vector(lhs, rhs), loc) =>
+            vectorizableOperators.get(funcName) match {
+              case Some(oper) => (oper, lhs, rhs, loc)
+              case _          => return (Vector(expr), None, loc)
+            }
+          case _ => return (Vector(expr), None, expr.loc)
+        }
+        val (lhsExprs, lhsOper, lhsLoc) = inner(lhs)
+        val (rhsExprs, rhsOper, rhsLoc) = inner(rhs)
+        (lhsOper, rhsOper) match {
+          case (Some(l), Some(r)) if l == r => (lhsExprs ++ rhsExprs, lhsOper, loc)
+          case (Some(_), Some(_)) =>
+            val e = getExpr(
+                Vector(getExpr(lhsExprs, lhsOper, lhsLoc), getExpr(rhsExprs, rhsOper, rhsLoc)),
+                Some(oper),
+                loc
+            )
+            (Vector(e), None, loc)
+          case (Some(_), None) => (lhsExprs ++ rhsExprs, lhsOper, loc)
+          case (None, Some(_)) => (lhsExprs ++ rhsExprs, rhsOper, loc)
+          case (None, None)    => (lhsExprs ++ rhsExprs, Some(oper), loc)
+        }
+      }
+      val (expr, oper, loc) = inner(applyExpr)
+      getExpr(expr, oper, loc) match {
+        case a: AST.ExprApply => a
+        case other =>
+          throw new Exception(s"expected result to be an AST.ExprApply, not ${other}")
+      }
+    }
 
     def nestedStringExpr(expr: AST.Expr,
                          nestedState: ExprState.ExprState,
@@ -423,14 +496,17 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val t = typeEvalExprGetName(e, id, ctx)
               TAT.ExprGetName(e, id, t, loc)
 
-            case AST.ExprApply(funcName: String, elements: Vector[AST.Expr], loc) =>
+            // vectorize any mathematical operations
+            case applyExpr: AST.ExprApply if canVectorize(applyExpr) =>
+              nested(vectorize(applyExpr), nestedState)
+            case AST.ExprApply(funcName, elements, loc) =>
               // Apply a standard library function to arguments. For example:
               //   read_int("4")
-              val eElements = elements.map(e => nested(e, nextState))
+              val tElements = elements.map(e => nested(e, nextState))
               try {
                 val (outputType, funcSig) =
-                  ctx.stdlib.apply(funcName, eElements.map(_.wdlType), nextState)
-                TAT.ExprApply(funcName, funcSig, eElements, outputType, loc)
+                  ctx.stdlib.apply(funcName, tElements.map(_.wdlType), nextState)
+                TAT.ExprApply(funcName, funcSig, tElements, outputType, loc)
               } catch {
                 case e: StdlibFunctionException =>
                   handleError(e.getMessage, nestedExpr.loc)

@@ -54,6 +54,10 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     check(v2Dir, "add_int_and_string.wdl")
   }
 
+  it should "handle concatenation of optional types in string the command block" in {
+    check(v2Dir, "concat_optional_types_in_command.wdl")
+  }
+
   it should "handle string interpolation in runtime" in {
     check(v2Dir, "runtime_interpolation.wdl")
   }

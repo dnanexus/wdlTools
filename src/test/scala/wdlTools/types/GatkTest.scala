@@ -18,7 +18,7 @@ class GatkTest extends AnyWordSpec with Matchers {
   private val sources = Vector(
       // broad removed the terra version - the main version doesn't work because it's import statement uses
       // a relative local path path instead of a URL
-      //"https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl",
+      //"https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/JointGenotyping.wdl",
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
       // Uses the keyword "version "
       //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"

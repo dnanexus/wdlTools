@@ -96,6 +96,19 @@ object SourceLocation {
         stop.endCol
     )
   }
+
+  def merge(locs: Vector[SourceLocation]): SourceLocation = {
+    val sorted = locs.sortWith(_ < _)
+    val start = sorted.headOption.getOrElse(throw new Exception("cannot merge empty Vector"))
+    val stop = locs.last
+    SourceLocation(
+        start.source,
+        start.line,
+        start.col,
+        stop.endLine,
+        stop.endCol
+    )
+  }
 }
 
 // A syntax error that occured when parsing a document. It is generated

@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.4 (2020-11-24)
+
+* Vectorize mathematical functions - successive `+`, `-`, `*`, and `/` operations are transformed from nested pairwise function calls to a single function call on a Vector of arguments 
+
 ## v0.11.3 (2020-11-23)
 
 * Add base class for "generic" user-defined functions

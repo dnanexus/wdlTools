@@ -78,6 +78,7 @@ case class Stdlib(regime: TypeCheckingRegime,
         T_Function2(funcName, T_Float, T_Int, T_Boolean)
     )
   }
+
   private def binaryNumericPrototypes(funcName: String): Vector[T_Function] = {
     Vector(
         T_Function2(funcName, T_Int, T_Int, T_Int),
@@ -86,20 +87,12 @@ case class Stdlib(regime: TypeCheckingRegime,
         T_Function2(funcName, T_Float, T_Int, T_Float)
     )
   }
-  // The + operator is overloaded for string arguments. If both arguments are non-optional,
-  // then the return type is non-optional. Within an interpolation, if either argument type
-  // is optional, then the return type is optional
-  private def optionalStringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
+
+  private def vectorNumericPrototypes(funcName: String): Vector[T_Function] = {
     Vector(
-        T_Function2(Operator.Addition.name, T_Optional(a), b, T_Optional(result)),
-        T_Function2(Operator.Addition.name, a, T_Optional(b), T_Optional(result)),
-        T_Function2(Operator.Addition.name, T_Optional(a), T_Optional(b), T_Optional(result))
+        T_Function1(funcName, T_Array(T_Int), T_Int),
+        T_Function1(funcName, T_Array(T_Float), T_Float)
     )
-  }
-  private def stringAdditionPrototypes(a: T, b: T, result: T): Vector[T_Function] = {
-    Vector(
-        T_Function2(Operator.Addition.name, a, b, result)
-    ) ++ optionalStringAdditionPrototypes(a, b, result)
   }
 
   private lazy val draft2Prototypes: Vector[T_Function] = Vector(
@@ -136,23 +129,20 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
           T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
-      // the + function is overloaded for string expressions
-      // it is omitted from the spec, but we allow String + Boolean as well
-      stringAdditionPrototypes(T_File, T_File, T_File),
-      stringAdditionPrototypes(T_File, T_String, T_File),
-      stringAdditionPrototypes(T_String, T_File, T_File),
-      stringAdditionPrototypes(T_String, T_String, T_String),
-      stringAdditionPrototypes(T_Int, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Int, T_String),
-      stringAdditionPrototypes(T_Float, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Float, T_String),
-      stringAdditionPrototypes(T_String, T_Boolean, T_String),
-      stringAdditionPrototypes(T_Boolean, T_String, T_String),
+      // The + operator is overloaded for string arguments. If all arguments are non-optional,
+      // then the return type is non-optional. Within an interpolation, if either argument type
+      // is optional, then the return type is optional.
+      Vector(
+          T_Function1(Operator.Addition.name, T_Array(T_File), T_File),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
+          T_Function1(Operator.Addition.name, T_Array(T_String), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+      ),
       // binary numeric operators
-      binaryNumericPrototypes(Operator.Addition.name),
-      binaryNumericPrototypes(Operator.Subtraction.name),
-      binaryNumericPrototypes(Operator.Multiplication.name),
-      binaryNumericPrototypes(Operator.Division.name),
+      vectorNumericPrototypes(Operator.Addition.name),
+      vectorNumericPrototypes(Operator.Subtraction.name),
+      vectorNumericPrototypes(Operator.Multiplication.name),
+      vectorNumericPrototypes(Operator.Division.name),
       binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
@@ -246,23 +236,20 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
           T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
-      // the + function is overloaded for string expressions
-      // it is omitted from the spec, but we allow String + Boolean as well
-      stringAdditionPrototypes(T_File, T_File, T_File),
-      stringAdditionPrototypes(T_File, T_String, T_File),
-      stringAdditionPrototypes(T_String, T_File, T_File),
-      stringAdditionPrototypes(T_String, T_String, T_String),
-      stringAdditionPrototypes(T_Int, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Int, T_String),
-      stringAdditionPrototypes(T_Float, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Float, T_String),
-      stringAdditionPrototypes(T_String, T_Boolean, T_String),
-      stringAdditionPrototypes(T_Boolean, T_String, T_String),
+      // The + operator is overloaded for string arguments. If all arguments are non-optional,
+      // then the return type is non-optional. Within an interpolation, if either argument type
+      // is optional, then the return type is optional.
+      Vector(
+          T_Function1(Operator.Addition.name, T_Array(T_File), T_File),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
+          T_Function1(Operator.Addition.name, T_Array(T_String), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+      ),
       // binary numeric operators
-      binaryNumericPrototypes(Operator.Addition.name),
-      binaryNumericPrototypes(Operator.Subtraction.name),
-      binaryNumericPrototypes(Operator.Multiplication.name),
-      binaryNumericPrototypes(Operator.Division.name),
+      vectorNumericPrototypes(Operator.Addition.name),
+      vectorNumericPrototypes(Operator.Subtraction.name),
+      vectorNumericPrototypes(Operator.Multiplication.name),
+      vectorNumericPrototypes(Operator.Division.name),
       binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
@@ -360,22 +347,19 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
           T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
       ),
-      // the + function is overloaded for string expressions
-      // even worse, it has different semantics within an interpolation vs elsewhere
+      // The + operator is overloaded for string arguments. If all arguments are non-optional,
+      // then the return type is non-optional. Within an interpolation, if either argument type
+      // is optional, then the return type is optional.
       // https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#interpolating-and-concatenating-optional-strings
       Vector(
-          // if both arguments are non-optional, then the return type is non-optional
-          // v2 inverts the argument order of File/String concatenation - we allow
-          // both in all versions
-          T_Function2(Operator.Addition.name, T_File, T_String, T_File),
-          T_Function2(Operator.Addition.name, T_String, T_File, T_File),
-          T_Function2(Operator.Addition.name, T_String, T_String, T_String)
+          T_Function1(Operator.Addition.name, T_Array(T_File), T_File),
+          T_Function1(Operator.Addition.name, T_Array(T_String), T_String)
       ),
       // binary numeric operators
-      binaryNumericPrototypes(Operator.Addition.name),
-      binaryNumericPrototypes(Operator.Subtraction.name),
-      binaryNumericPrototypes(Operator.Multiplication.name),
-      binaryNumericPrototypes(Operator.Division.name),
+      vectorNumericPrototypes(Operator.Addition.name),
+      vectorNumericPrototypes(Operator.Subtraction.name),
+      vectorNumericPrototypes(Operator.Multiplication.name),
+      vectorNumericPrototypes(Operator.Division.name),
       binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
@@ -460,19 +444,12 @@ case class Stdlib(regime: TypeCheckingRegime,
   ).flatten
 
   private lazy val v2PlaceholderPrototypes: Vector[T_Function] = Vector(
-      optionalStringAdditionPrototypes(T_File, T_String, T_File),
-      optionalStringAdditionPrototypes(T_String, T_File, T_File),
-      optionalStringAdditionPrototypes(T_String, T_String, T_String),
-      // these concatenations are no longer allowed generally, but
+      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
+      // string + non-string concatenations are no longer allowed generally, but
       // I believe they should be allowed within placeholders - there
       // is an open discussion https://github.com/openwdl/wdl/issues/391
-      stringAdditionPrototypes(T_Int, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Int, T_String),
-      stringAdditionPrototypes(T_Float, T_String, T_String),
-      stringAdditionPrototypes(T_String, T_Float, T_String),
-      stringAdditionPrototypes(T_String, T_Boolean, T_String),
-      stringAdditionPrototypes(T_Boolean, T_String, T_String)
-  ).flatten
+      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+  )
 
   // choose the standard library prototypes according to the WDL version
   private def protoTable(exprState: ExprState): Vector[T_Function] = version match {

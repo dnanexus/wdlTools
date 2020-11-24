@@ -514,7 +514,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
   it should "have real world GATK tasks" in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/tasks/JointGenotypingTasks.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/tasks/JointGenotypingTasks.wdl"
     val FileSource = fileResolver.resolve(url)
     val doc = getDocument(FileSource)
 
@@ -524,7 +524,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
   it should "be able to handle GATK workflow" in {
     val url =
-      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/JointGenotyping.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/JointGenotyping.wdl"
     val FileSource = fileResolver.resolve(url)
     val doc = getDocument(FileSource)
 
