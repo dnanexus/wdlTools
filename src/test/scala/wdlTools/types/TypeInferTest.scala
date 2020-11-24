@@ -16,6 +16,7 @@ import scala.collection.immutable.SeqMap
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
   private val v1Dir = Paths.get(getClass.getResource("/types/v1").getPath)
+  private val v2Dir = Paths.get(getClass.getResource("/types/v2").getPath)
   private val v1StructsDir =
     Paths.get(getClass.getResource("/types/v1/structs").getPath)
   private val v2StructsDir =
@@ -43,6 +44,18 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
 
   it should "handle struct aliases" in {
     check(v2StructsDir, "parent_workflow.wdl")
+  }
+
+  it should "handle reserved words as struct members" in {
+    check(v2StructsDir, "keyword_in_struct.wdl")
+  }
+
+  it should "handle concatenation of different types in string interpolation" in {
+    check(v2Dir, "add_int_and_string.wdl")
+  }
+
+  it should "handle string interpolation in runtime" in {
+    check(v2Dir, "runtime_interpolation.wdl")
   }
 
   it should "handle struct literals" in {

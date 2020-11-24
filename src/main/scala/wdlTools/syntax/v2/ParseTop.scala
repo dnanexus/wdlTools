@@ -750,25 +750,24 @@ any_decls
     HintsSection(kvs, getSourceLocation(grammar.docSource, ctx))
   }
 
+  private val legalRuntimeKeys = Set(
+      "cpu",
+      "container",
+      "memory",
+      "gpu",
+      "disks",
+      "maxRetries",
+      "returnCodes"
+  )
+
   /* task_runtime_kv
    : Identifier COLON expr
    ; */
   override def visitTask_runtime_kv(ctx: WdlV2Parser.Task_runtime_kvContext): RuntimeKV = {
-    val id: String = Vector(
-        ctx.RUNTIMECONTAINER(),
-        ctx.RUNTIMECPU(),
-        ctx.RUNTIMEDISKS(),
-        ctx.RUNTIMEGPU(),
-        ctx.RUNTIMEMAXRETRIES(),
-        ctx.RUNTIMEMEMORY(),
-        ctx.RUNTIMERETURNCODES()
-    ).collectFirst {
-      case tn if tn != null => tn.getText
-    } match {
-      case Some(id) => id
-      case _ =>
-        throw new SyntaxException(s"invalid runtime keyword",
-                                  getSourceLocation(grammar.docSource, ctx))
+    val id: String = getIdentifierText(ctx.Identifier(), ctx)
+    if (!legalRuntimeKeys.contains(id)) {
+      throw new SyntaxException(s"invalid runtime keyword ${id}",
+                                getSourceLocation(grammar.docSource, ctx))
     }
     val expr: Expr = visitExpr(ctx.expr())
     RuntimeKV(id, expr, getSourceLocation(grammar.docSource, ctx))

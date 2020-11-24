@@ -207,14 +207,12 @@ meta
   :	META BeginMeta meta_kv* EndMeta
   ;
 
+// note: only specific keys are allowed in runtime, but enuerating
+// them here means they can't be used as identifiers elsewhere, so
+// we instead validate that the identifier is from among the allowed
+// set in the parser
 task_runtime_kv
-  : RUNTIMECPU COLON expr
-  | RUNTIMECONTAINER COLON expr
-  | RUNTIMEMEMORY COLON expr
-  | RUNTIMEGPU COLON expr
-  | RUNTIMEDISKS COLON expr
-  | RUNTIMEMAXRETRIES COLON expr
-  | RUNTIMERETURNCODES COLON expr
+  : Identifier COLON expr
   ;
 
 task_runtime

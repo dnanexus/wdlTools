@@ -6,12 +6,12 @@
 
 The `wdlTools.syntax` package implements an [abstract syntax tree (AST)](src/main/scala/wdlTools/syntax/AbstractSyntax.scala) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee.
 
-Currently, WDL draft-2 and 1.0 are fully supported, and development/2.0 is partially supported.
+Currently, WDL draft-2 and 1.0, and development/2.0 are fully supported (with some [limitations](#limitations)).
 
 ```scala
 import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.Parsers
-import wdlTools.util.{FileNode, FileSourceResolver}
+import dx.util.{FileNode, FileSourceResolver}
 val parsers = Parsers(followImports = true)
 val wdl: FileNode = FileSourceResolver.get.resolve("file:///path/to/my/wdl")
 val doc: Document = parsers.parseDocument(wdl)
@@ -40,6 +40,13 @@ The following commands are currently available. They should be considered "alpha
 * [printTree](doc/Commands/PrintTree.md): print the Abstract Syntax Tree for a WDL document
 * [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxWDL](https://github.com/dnanexus/dxWDL)
 * [upgrade](doc/Commands/Upgrade.md): upgrade a WDL file to a newer version; currently only draft-2 -> 1.0 is supported
+
+
+## Limitations
+
+* Forward references are not yet supported, i.e. a variable must be declared before it is referenced
+* Incomplete linter rules
+* Runtime and hint attributes cannot be [overriden at runtime](https://github.com/openwdl/wdl/pull/315/files#diff-7ab1be25d3b4d9ecf4f763e14d464681R3029) in the task runner
 
 ## Building
 

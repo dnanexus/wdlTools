@@ -374,4 +374,15 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       case other => throw new Exception(s"unexpected decl ${other}")
     }
   }
+
+  it should "evaluate concatenation of different types within placeholders" in {
+    val (evaluator, decls) =
+      parseAndTypeCheckAndGetDeclarations(srcDir.resolve("add_int_and_string.wdl"))
+    val results = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(Map("subset_n" -> V_Int(2), "subset_total" -> V_Int(5)))
+    )
+    results("subset_param1") shouldBe V_String("-q 2/5")
+    results("subset_param2") shouldBe V_String("-q 2/5")
+  }
 }

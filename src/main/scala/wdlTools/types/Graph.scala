@@ -6,8 +6,7 @@ import scalax.collection.GraphPredef._
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.ExprGraph.VarInfo
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.WdlTypes.T_Pair
-import wdlTools.types.WdlTypes.{T, T_Array, T_Map, T_Optional, T_Struct}
+import wdlTools.types.WdlTypes._
 
 case class ElementNode(element: Element)
 
@@ -311,8 +310,6 @@ object ExprGraph {
           }
       }
     }
-
-    def build: ExprGraph
   }
 
   case class TaskExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
@@ -509,12 +506,13 @@ object ExprGraph {
       graphWithScatters
     }
 
-    override def build: ExprGraph = {
+    lazy val build: (ExprGraph, WorkflowBodyElements) = {
       // we have to build graph for the nested blocks separately because we need
       // to augment each scatter block with the scatter variable
       val initialNodes = inputs.filter(_._2.referenced).keySet | outputs.keySet
       val initialGraph = addDependencies(initialNodes, Graph.empty[String, DiEdge])
-      val graph = buildBodyGraph(WorkflowBodyElements(body), initialGraph)
+      val bodyElements = WorkflowBodyElements(body)
+      val graph = buildBodyGraph(bodyElements, initialGraph)
 
       // update referenced status of variables
       val updatedVars = allVars.map {
@@ -522,7 +520,35 @@ object ExprGraph {
           name -> info.setReferenced(graph.contains(name))
       }
 
-      ExprGraph(graph, updatedVars)
+      (ExprGraph(graph, updatedVars), bodyElements)
+    }
+
+    /**
+      * Builds the graph and then uses it to break the workflow into blocks
+      * of elements that are optimized for parallel execution, using the
+      * following rules. Blocks are returned in dependency order.
+      * - calls can be grouped together if
+      *   - they are independent OR
+      *    - they only depend on each other and/or on closure inputs AND
+      *   - `groupCalls` is not `Never` AND
+      *     - they are all marked as "shortTask" OR
+      *     - `groupCalls` is `Always` OR
+      *     - `groupCalls` is `Dependent` and the calls are inter-dependent
+      * - conditionals can be grouped with calls and/or with each other, so long as
+      *   they only contain calls that follow the same rules as above
+      *   - a conditional that contains a nested scatter is in a block by itself
+      * - each scatter is a block by itself
+      * - a variable that is only referenced by one block is added to that block
+      * - variables referenced by no other blocks, or by 2 or more other blocks
+      *   are grouped such that they do not depend on any of the blocks that
+      *   depend on them (i.e. there is no circular reference)
+      */
+    def buildBlocks(): Unit = {}
+  }
+
+  object WorkflowExprGraphBuilder {
+    def apply(wf: Workflow): WorkflowExprGraphBuilder = {
+      WorkflowExprGraphBuilder(wf.inputs, wf.outputs, wf.body)
     }
   }
 
@@ -543,27 +569,9 @@ object ExprGraph {
     * @param wf the workflow
     * @return
     */
-  def buildFrom(wf: Workflow): ExprGraph = {
-    WorkflowExprGraphBuilder(wf.inputs, wf.outputs, wf.body).build
+  def buildFrom(wf: Workflow): (ExprGraph, WorkflowBodyElements) = {
+    WorkflowExprGraphBuilder(wf).build
   }
-}
-
-object WorkflowElementGraphBuilder {
-
-//  /**
-//    * Builds a WorkflowElementGraph, which groups WorkflowElements
-//    * together in dependency order.
-//    * @param elements workflow elements
-//    * @param inputs names of outside inputs
-//    * @param outputs names of required outputs
-//    */
-//  def build(elements: Vector[WorkflowElement],
-//            inputs: Set[String] = Set.empty,
-//            outputs: Set[String] = Set.empty): Unit = {
-//    val bodyElements = WorkflowBodyElements(elements)
-//    val unsatisfiedOutputs = outputs.diff(inputs)
-//
-//  }
 }
 
 object GraphUtils {
