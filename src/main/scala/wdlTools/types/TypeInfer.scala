@@ -166,12 +166,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       })
     }
 
-    /**
-      * Unwraps nested pairwise mathematical operations (+, -, *, /) and
-      * turns them into a vector of arguments to vectorized functions,
-      * e.g. an add(Vector[expr]) function.
-      * @return
-      */
+    /*
+     * Unwraps nested pairwise mathematical operations (+, -, *, /) and
+     * turns them into a vector of arguments to vectorized functions,
+     * e.g. an add(Vector[expr]) function.
+     */
     def vectorize(applyExpr: AST.ExprApply): AST.ExprApply = {
       def getExpr(exprs: Vector[AST.Expr],
                   oper: Option[Operator],
