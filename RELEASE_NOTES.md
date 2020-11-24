@@ -3,6 +3,7 @@
 ## v0.11.4 (2020-11-24)
 
 * Vectorize mathematical functions - successive `+`, `-`, `*`, and `/` operations are transformed from nested pairwise function calls to a single function call on a Vector of arguments 
+* Fixed parser issue in development where runtime keys (e.g. `cpu`, `container`) could not be used as variable names
 
 ## v0.11.3 (2020-11-23)
 
