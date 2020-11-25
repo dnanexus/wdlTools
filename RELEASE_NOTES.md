@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.6 (2020-11-25)
+
+* Fix more code generator/formatter bugs, add tests
+
 ## v0.11.5 (2020-11-25)
 
 * Fix code generator/formatter for vectorized operators

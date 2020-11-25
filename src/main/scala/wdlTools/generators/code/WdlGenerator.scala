@@ -687,8 +687,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                     fSized
                 )
             )
-          case ExprApply(oper, _, args, _, _) if Operator.Vectorizable.contains(oper) =>
-            val symbol = Operator.All(oper).symbol
+          case ExprApply(oper, _, Vector(ExprArray(args, _, _)), _, _)
+              if Operator.Vectorizable.contains(oper) =>
+            val symbol = Operator.Vectorizable(oper).symbol
             val operands = args.map(
                 nested(_,
                        inPlaceholder = inStringOrCommand,

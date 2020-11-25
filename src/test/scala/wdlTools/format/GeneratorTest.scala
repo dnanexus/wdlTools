@@ -56,6 +56,10 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     (beforeSrc, tDoc, gLines, gtDoc)
   }
 
+  it should "regenerate a simple WDL" in {
+    generate("simple.wdl")
+  }
+
   it should "handle deep nesting" in {
     generate("deep_nesting.wdl")
   }
