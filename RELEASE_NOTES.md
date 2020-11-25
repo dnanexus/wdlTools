@@ -1,5 +1,10 @@
 # Change log
 
+## v0.11.5 (2020-11-25)
+
+* Fix code generator/formatter for vectorized operators
+* Move LocalizationDisambiguation to dxCommon
+
 ## v0.11.4 (2020-11-24)
 
 * Vectorize mathematical functions - successive `+`, `-`, `*`, and `/` operations are transformed from nested pairwise function calls to a single function call on a Vector of arguments 

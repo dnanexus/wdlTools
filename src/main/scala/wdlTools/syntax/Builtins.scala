@@ -110,4 +110,11 @@ object Operator {
       Division,
       Remainder
   ).map(o => o.name -> o).toMap
+
+  val Vectorizable: Map[String, Operator] = Set(
+      Operator.Addition,
+      Operator.Subtraction,
+      Operator.Multiplication,
+      Operator.Division
+  ).map(o => o.name -> o).toMap
 }

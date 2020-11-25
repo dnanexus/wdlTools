@@ -152,15 +152,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                         exprState: ExprState = ExprState.Start,
                         section: Section = Section.Other): TAT.Expr = {
 
-    val vectorizableOperators: Map[String, Operator] = Set(
-        Operator.Addition,
-        Operator.Subtraction,
-        Operator.Multiplication,
-        Operator.Division
-    ).map(o => o.name -> o).toMap
-
     def canVectorize(applyExpr: AST.ExprApply): Boolean = {
-      vectorizableOperators.contains(applyExpr.funcName) && (applyExpr.elements match {
+      Operator.Vectorizable.contains(applyExpr.funcName) && (applyExpr.elements match {
         case Vector(_: AST.ExprArray) => false
         case _                        => true
       })
@@ -188,7 +181,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       def inner(expr: AST.Expr): (Vector[AST.Expr], Option[Operator], SourceLocation) = {
         val (oper, lhs, rhs, loc) = expr match {
           case AST.ExprApply(funcName, Vector(lhs, rhs), loc) =>
-            vectorizableOperators.get(funcName) match {
+            Operator.Vectorizable.get(funcName) match {
               case Some(oper) => (oper, lhs, rhs, loc)
               case _          => return (Vector(expr), None, loc)
             }

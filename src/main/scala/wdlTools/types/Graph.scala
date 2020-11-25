@@ -527,17 +527,18 @@ object ExprGraph {
       * Builds the graph and then uses it to break the workflow into blocks
       * of elements that are optimized for parallel execution, using the
       * following rules. Blocks are returned in dependency order.
+      *
       * - calls can be grouped together if
       *   - they are independent OR
-      *    - they only depend on each other and/or on closure inputs AND
+      *   - they only depend on each other and/or on closure inputs AND
       *   - `groupCalls` is not `Never` AND
       *     - they are all marked as "shortTask" OR
       *     - `groupCalls` is `Always` OR
       *     - `groupCalls` is `Dependent` and the calls are inter-dependent
       * - conditionals can be grouped with calls and/or with each other, so long as
       *   they only contain calls that follow the same rules as above
-      *   - a conditional that contains a nested scatter is in a block by itself
       * - each scatter is a block by itself
+      * - a conditional that contains a nested scatter is in a block by itself
       * - a variable that is only referenced by one block is added to that block
       * - variables referenced by no other blocks, or by 2 or more other blocks
       *   are grouped such that they do not depend on any of the blocks that

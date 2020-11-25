@@ -528,6 +528,19 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       }
     }
 
+    def interleave(value: String,
+                   items: Vector[Span],
+                   quoting: Boolean = false,
+                   preferPrev: Boolean = false): Vector[Literal] = {
+      items
+        .sliding(2)
+        .map {
+          case Vector(prev, next) => between(value, prev, next, quoting, preferPrev)
+          case _                  => throw new RuntimeException()
+        }
+        .toVector
+    }
+
     def chainFromStart(values: Vector[Any], start: SourceLocation): Vector[Literal] = {
       var prev = Literal.fromStart(values.head, start)
       Vector(prev) ++ values.tail.map { v =>
@@ -822,8 +835,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class Operation(oper: String,
-                               lhs: Span,
-                               rhs: Span,
+                               operands: Vector[Span],
                                grouped: Boolean = false,
                                inString: Boolean,
                                override val bounds: SourceLocation)
@@ -836,8 +848,11 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       with BoundedComposite {
 
     override lazy val body: Option[Composite] = {
-      val operLiteral = Literal.between(oper, lhs, rhs)
-      Some(SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
+      val operLiterals = Literal.interleave(oper, operands)
+      val seq = operands.head +: operLiterals
+        .zip(operands.tail)
+        .flatten { case (a, b) => Vector(a, b) }
+      Some(SpanSequence(seq, wrapping = wrapping, spacing = Spacing.On))
     }
   }
 
@@ -1083,6 +1098,19 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                 wrapping = Wrapping.AsNeeded,
                 bounds = loc
             )
+          case ExprApply(oper, args, loc) if Operator.Vectorizable.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            val operands = args.map(
+                nested(_,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper))
+            )
+            Operation(symbol,
+                      operands,
+                      grouped = inOperation && !parentOperation.contains(oper),
+                      inString = inStringOrCommand,
+                      loc)
           case ExprApply(oper, Vector(value), loc) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             val operSpan = Literal.fromStart(symbol, loc)
@@ -1091,14 +1119,16 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             val symbol = Operator.All(oper).symbol
             Operation(
                 symbol,
-                nested(lhs,
-                       inPlaceholder = inStringOrCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
-                nested(rhs,
-                       inPlaceholder = inStringOrCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
+                Vector(
+                    nested(lhs,
+                           inPlaceholder = inStringOrCommand,
+                           inOperation = true,
+                           parentOperation = Some(oper)),
+                    nested(rhs,
+                           inPlaceholder = inStringOrCommand,
+                           inOperation = true,
+                           parentOperation = Some(oper))
+                ),
                 grouped = inOperation && !parentOperation.contains(oper),
                 inString = inStringOrCommand,
                 loc

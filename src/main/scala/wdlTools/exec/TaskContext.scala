@@ -4,7 +4,7 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import dx.util.{Bindings, FileSourceResolver, Logger}
+import dx.util.{Bindings, FileSourceResolver, Logger, SafeLocalizationDisambiguator}
 
 case class TaskContext(task: Task,
                        inputBindings: Bindings[String, V],

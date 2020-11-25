@@ -452,8 +452,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   }
 
   private case class Operation(oper: String,
-                               lhs: Sized,
-                               rhs: Sized,
+                               operands: Vector[Sized],
                                grouped: Boolean = false,
                                inString: Boolean)
       extends Group(ends = if (grouped) {
@@ -465,7 +464,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
     override lazy val body: Option[Composite] = {
       val operLiteral = Literal(oper)
-      Some(Sequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
+      val seq: Vector[Sized] = operands.head +: Iterator
+        .continually(operLiteral)
+        .zip(operands.tail)
+        .flatten { case (a, b) => Vector(a, b) }
+        .toVector
+      Some(Sequence(seq, wrapping = wrapping, spacing = Spacing.On))
     }
   }
 
@@ -683,6 +687,18 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                     fSized
                 )
             )
+          case ExprApply(oper, _, args, _, _) if Operator.Vectorizable.contains(oper) =>
+            val symbol = Operator.All(oper).symbol
+            val operands = args.map(
+                nested(_,
+                       inPlaceholder = inStringOrCommand,
+                       inOperation = true,
+                       parentOperation = Some(oper))
+            )
+            Operation(symbol,
+                      operands,
+                      grouped = inOperation && !parentOperation.contains(oper),
+                      inString = inStringOrCommand)
           case ExprApply(oper, _, Vector(value), _, _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             Sequence(Vector(Literal(symbol), nested(value, inOperation = true)))
@@ -690,14 +706,16 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             val symbol = Operator.All(oper).symbol
             Operation(
                 symbol,
-                nested(lhs,
-                       inPlaceholder = inStringOrCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
-                nested(rhs,
-                       inPlaceholder = inStringOrCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
+                Vector(
+                    nested(lhs,
+                           inPlaceholder = inStringOrCommand,
+                           inOperation = true,
+                           parentOperation = Some(oper)),
+                    nested(rhs,
+                           inPlaceholder = inStringOrCommand,
+                           inOperation = true,
+                           parentOperation = Some(oper))
+                ),
                 grouped = inOperation && !parentOperation.contains(oper),
                 inString = inStringOrCommand
             )
