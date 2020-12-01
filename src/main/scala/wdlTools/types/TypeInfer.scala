@@ -278,29 +278,29 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val r2 = nested(r, nextState)
               val t = T_Pair(l2.wdlType, r2.wdlType)
               TAT.ExprPair(l2, r2, t, loc)
-            case AST.ExprArray(vec, loc) if vec.isEmpty =>
+            case AST.ExprArray(items, loc) if items.isEmpty =>
               // The array is empty, we can't tell what the array type is.
               TAT.ExprArray(Vector.empty, T_Array(T_Any), loc)
-            case AST.ExprArray(vec, loc) =>
-              val elementTypes = vec.map(e => nested(e, nextState))
+            case AST.ExprArray(items, loc) =>
+              val tItems = items.map(e => nested(e, nextState))
               val unifyCtx =
                 UnificationContext(section, inPlaceholder = nextState >= ExprState.InPlaceholder)
-              val wdlTypes = elementTypes.map(_.wdlType)
-              val t =
+              val wdlTypes = tItems.map(_.wdlType)
+              val itemType =
                 try {
                   // this is a non-empty array literal, so we can set nonEmpty = true
                   T_Array(unify.apply(wdlTypes, unifyCtx), nonEmpty = true)
                 } catch {
                   case _: TypeUnificationException =>
                     handleError(
-                        s"""array ${vec} contains multiple incompatible data types 
+                        s"""array ${items} contains multiple incompatible data types 
                            |${wdlTypes.toSet.mkString(",")}""".stripMargin
                           .replaceAll("\n", " "),
                         nestedExpr.loc
                     )
-                    elementTypes.head.wdlType
+                    tItems.head.wdlType
                 }
-              TAT.ExprArray(elementTypes, t, loc)
+              TAT.ExprArray(tItems, itemType, loc)
             case AST.ExprObject(members, loc) =>
               val tMembers = members
                 .map {
@@ -327,11 +327,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   T_Object
               }
               TAT.ExprObject(tMembers, wdlType, loc)
-            case AST.ExprMap(m, loc) if m.isEmpty =>
+            case AST.ExprMap(members, loc) if members.isEmpty =>
               // The key and value types are unknown.
               TAT.ExprMap(SeqMap.empty, T_Map(T_Any, T_Any), loc)
-            case AST.ExprMap(value, loc) =>
-              val m = value
+            case AST.ExprMap(members, loc) =>
+              val tMembers = members
                 .map { item: AST.ExprMember =>
                   val k = nested(item.key, nextState)
                   val v = nested(item.value, nextState)
@@ -340,10 +340,15 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 .to(TreeSeqMap)
               // unify the key/value types
               val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
-              val (keys, values) = m.unzip
-              val tk = unifyTypes(keys.map(_.wdlType), "map keys", loc, unifyCtx)
-              val tv = unifyTypes(values.map(_.wdlType), "map values", loc, unifyCtx)
-              TAT.ExprMap(m, T_Map(tk, tv), loc)
+              val (keys, values) = tMembers.unzip
+              val keyType = unifyTypes(keys.map(_.wdlType), "map keys", loc, unifyCtx) match {
+                case t: T_Primitive => t
+                case t =>
+                  handleError(s"Map key type ${t} is not primitive", nestedExpr.loc)
+                  t
+              }
+              val valueType = unifyTypes(values.map(_.wdlType), "map values", loc, unifyCtx)
+              TAT.ExprMap(tMembers, T_Map(keyType, valueType), loc)
 
             case AST.ExprIdentifier(id, loc) =>
               // an identifier has to be bound to a known type. Lookup the the type,

@@ -7,14 +7,15 @@ object WdlTypes {
   sealed trait T
 
   // primitive types
-  case object T_Boolean extends T
-  case object T_String extends T
+  sealed trait T_Primitive extends T
+  case object T_Boolean extends T_Primitive
+  case object T_String extends T_Primitive
 
-  sealed trait T_Numeric extends T
+  sealed trait T_Numeric extends T_Primitive
   case object T_Int extends T_Numeric
   case object T_Float extends T_Numeric
 
-  sealed trait T_Path extends T
+  sealed trait T_Path extends T_Primitive
   case object T_File extends T_Path
   case object T_Directory extends T_Path
 

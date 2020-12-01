@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.7 (dev)
+
+* Throw type error when map keys are non-primitive
+
 ## v0.11.6 (2020-11-25)
 
 * Fix more code generator/formatter bugs, add tests
