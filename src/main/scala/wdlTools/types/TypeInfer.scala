@@ -179,7 +179,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         }
       }
       def inner(expr: AST.Expr): (Vector[AST.Expr], Option[Operator], SourceLocation) = {
-        val (oper, lhs, rhs, loc) = expr match {
+        val (outerOper, lhs, rhs, loc) = expr match {
           case AST.ExprApply(funcName, Vector(lhs, rhs), loc) =>
             Operator.Vectorizable.get(funcName) match {
               case Some(oper) => (oper, lhs, rhs, loc)
@@ -187,24 +187,20 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             }
           case _ => return (Vector(expr), None, expr.loc)
         }
-        val (lhsExprs, lhsOper, lhsLoc) = inner(lhs)
-        val (rhsExprs, rhsOper, rhsLoc) = inner(rhs)
-        (lhsOper, rhsOper) match {
-          case (Some(l), Some(r)) if l == r => (lhsExprs ++ rhsExprs, lhsOper, loc)
-          case (Some(_), Some(_)) =>
-            val e = getExpr(
-                Vector(getExpr(lhsExprs, lhsOper, lhsLoc), getExpr(rhsExprs, rhsOper, rhsLoc)),
-                Some(oper),
-                loc
-            )
-            (Vector(e), None, loc)
-          case (Some(_), None) => (lhsExprs ++ rhsExprs, lhsOper, loc)
-          case (None, Some(_)) => (lhsExprs ++ rhsExprs, rhsOper, loc)
-          case (None, None)    => (lhsExprs ++ rhsExprs, Some(oper), loc)
+        // TODO: it is possible to also combine addition and multiplication
+        //  operations where the RHS operator matches the outer operator, e.g
+        //  1 + (2 + 3) == 1 + 2 + 3
+        //  (1 * 2) * (3 * 4) == 1 * 2 * 3 * 4
+        val (lhsExprs, lhsOper, _) = inner(lhs)
+        lhsOper match {
+          case Some(l) if outerOper == l =>
+            (lhsExprs :+ rhs, Some(outerOper), loc)
+          case _ =>
+            (Vector(lhs, rhs), Some(outerOper), loc)
         }
       }
-      val (expr, oper, loc) = inner(applyExpr)
-      getExpr(expr, oper, loc) match {
+      val (exprs, oper, loc) = inner(applyExpr)
+      getExpr(exprs, oper, loc) match {
         case a: AST.ExprApply => a
         case other =>
           throw new Exception(s"expected result to be an AST.ExprApply, not ${other}")

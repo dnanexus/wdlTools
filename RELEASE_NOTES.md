@@ -1,8 +1,9 @@
 # Change log
 
-## v0.11.7 (dev)
+## v0.11.7 (2020-12-01)
 
 * Throw type error when map keys are non-primitive
+* Fix bug with vectorization of subtraction and division operations
 
 ## v0.11.6 (2020-11-25)
 

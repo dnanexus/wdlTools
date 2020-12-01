@@ -699,7 +699,8 @@ case class Stdlib(paths: EvalPaths,
 
   private def division(ctx: FunctionContext): V = {
     ctx.getOneArg match {
-      case V_Array(args) if args.size >= 2 => args.reduce((a, b) => div2(a, b, ctx.loc))
+      case V_Array(args) if args.size >= 2 =>
+        args.reduce((a, b) => div2(a, b, ctx.loc))
       case _ =>
         throw new EvalException(s"illegal division args ${ctx.args}", ctx.loc)
     }

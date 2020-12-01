@@ -33,8 +33,8 @@ workflow foo {
   Int i3 = 3 % 4
   Int i4 = 3 * 4
   Int i5 = 3 / 4
+  Float i6 = (0.4 + 0.8) / 2
 
-  # array access
   Array[String] letters = ["a", "b", "c"]
   String l0 = letters[0]
 

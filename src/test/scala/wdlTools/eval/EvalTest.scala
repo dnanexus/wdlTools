@@ -69,6 +69,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i3") shouldBe V_Int(3 % 4)
     bindings("i4") shouldBe V_Int(3 * 4)
     bindings("i5") shouldBe V_Int(3 / 4)
+    bindings("i6") shouldBe V_Float((0.4 + 0.8) / 2)
 
     bindings("l0") shouldBe V_String("a")
     bindings("l1") shouldBe V_String("b")
