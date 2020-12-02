@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.8 (2020-12-01)
+
+* Fix unification of arrays
+
 ## v0.11.7 (2020-12-01)
 
 * Throw type error when map keys are non-primitive

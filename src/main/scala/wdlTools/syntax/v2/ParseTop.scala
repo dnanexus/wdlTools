@@ -915,7 +915,7 @@ task_input
         val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
         val text = decl.loc
         Logger.get.warning(
-            s"Warning: '${varName}' appears in both input and output sections at ${text} in ${grammar.docSource}"
+            s"'${varName}' appears in both input and output sections at ${text} in ${grammar.docSource}"
         )
       }
     }

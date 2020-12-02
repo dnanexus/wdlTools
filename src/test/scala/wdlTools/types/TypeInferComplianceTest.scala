@@ -34,7 +34,8 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
   private case class TResult(correct: Boolean, flags: Option[TypeCheckingRegime.Value] = None)
 
   private val draft2ControlTable: Vector[(String, TResult)] = Vector(
-      ("call_with_defaults.wdl", TResult(correct = true))
+      ("call_with_defaults.wdl", TResult(correct = true)),
+      ("population.wdl", TResult(correct = true))
   )
 
   private val v1ControlTable: Vector[(String, TResult)] = Vector(

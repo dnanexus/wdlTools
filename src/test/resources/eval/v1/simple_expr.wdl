@@ -9,6 +9,7 @@ struct Person {
 workflow foo {
   input {
     String? city
+    Float x
   }
 
   # unary
@@ -34,6 +35,7 @@ workflow foo {
   Int i4 = 3 * 4
   Int i5 = 3 / 4
   Float i6 = (0.4 + 0.8) / 2
+  Float i7 = x * (1 - x) * x
 
   Array[String] letters = ["a", "b", "c"]
   String l0 = letters[0]

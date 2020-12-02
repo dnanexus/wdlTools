@@ -50,7 +50,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle simple expressions" in {
     val file = srcDir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
+    val bindings =
+      evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("x" -> V_Float(1.0))))
+
     bindings("k0") shouldBe V_Int(-1)
     bindings("k1") shouldBe V_Int(1)
 
@@ -70,6 +72,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i4") shouldBe V_Int(3 * 4)
     bindings("i5") shouldBe V_Int(3 / 4)
     bindings("i6") shouldBe V_Float((0.4 + 0.8) / 2)
+    bindings("i7") shouldBe V_Float(0.0)
 
     bindings("l0") shouldBe V_String("a")
     bindings("l1") shouldBe V_String("b")

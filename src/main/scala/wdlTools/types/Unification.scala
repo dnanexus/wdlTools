@@ -199,10 +199,14 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
 
   /**
     * Determines the least type that [t1] and [t2] are coercible to.
-    * @param t1 first type to unify
-    * @param t2 second type to unify
+    * @param t1 first type to unify; when `reversible` is false, this is
+    *           the left-hand-side type
+    * @param t2 second type to unify; wheN `reversible` is false, this is
+    *           the right-hand side type
     * @param ctx UnificationContext
     * @param varTypes initial VarTypeBindings
+    * @param reversible if true, unification is tried in both directions
+    *                   and the one with the lowest priority is returned
     * @return (unifiedType, varTypes, priority), where unifiedType is the
     *         the least type that [t1] and [t2] are coercible to, varTypes
     *         is the updated type map for polymorphic placeholders, and
@@ -227,7 +231,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
       t1: T,
       t2: T,
       ctx: UnificationContext,
-      varTypes: Bindings[Int, T] = VarTypeBindings.empty
+      varTypes: Bindings[Int, T] = VarTypeBindings.empty,
+      reversible: Boolean
   ): (T, Bindings[Int, T], Priority.Priority) = {
     def inner(
         x: T,
@@ -247,12 +252,10 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         }
       }
       (x, y) match {
-        case (T_Any, T_Any) =>
-          (T_Any, vt, Priority.AnyMatch)
-        case (x, T_Any) =>
-          (x, vt, Priority.AnyMatch)
-        case (T_Any, x) =>
-          (x, vt, Priority.AnyMatch)
+        case (T_Any, t) =>
+          (t, vt, Priority.AnyMatch)
+        case (t, T_Any) =>
+          (t, vt, Priority.AnyMatch)
         case (T_Object, _: T_Struct) =>
           (T_Object, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
         case (T_Optional(l), T_Optional(r)) =>
@@ -340,11 +343,48 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           )
       }
     }
-    inner(t1, t2, varTypes, Priority.Exact)
+    if (reversible) {
+      val rtol =
+        try {
+          Some(inner(t1, t2, varTypes, Priority.Exact))
+        } catch {
+          case _: TypeUnificationException => None
+        }
+      val ltor =
+        try {
+          Some(inner(t2, t1, varTypes, Priority.Exact))
+        } catch {
+          case _: TypeUnificationException => None
+        }
+      (rtol, ltor) match {
+        case (Some((u1, vt1, p1)), Some((u2, _, _))) if u1 == u2 =>
+          (u1, vt1, p1)
+        case (Some((u1, vt1, p1)), Some((_, _, p2))) if p1 == p2 =>
+          // Non-equal unified types have equal coercion priority in either
+          // direction. This can happen e.g. when unifying a mixed array of
+          // String and File arguments to the addition (+) function. We
+          // arbitrarily choose the left-hand-side as the least common type.
+          (u1, vt1, p1)
+        case (Some((u1, vt1, p1)), Some((_, _, p2))) if p1 < p2 =>
+          (u1, vt1, p1)
+        case (Some((_, _, p1)), Some((u2, vt2, p2))) if p1 > p2 =>
+          (u2, vt2, p2)
+        case (Some((u1, vt1, p1)), None) =>
+          (u1, vt1, p1)
+        case (None, Some((u2, vt2, p2))) =>
+          (u2, vt2, p2)
+        case _ =>
+          throw new TypeUnificationException(
+              s"There is no common type to which $t1 and $t2 are coercible"
+          )
+      }
+    } else {
+      inner(t1, t2, varTypes, Priority.Exact)
+    }
   }
 
-  def apply(t1: T, t2: T, ctx: UnificationContext): T = {
-    unify(t1, t2, ctx)._1
+  def apply(t1: T, t2: T, ctx: UnificationContext, reversible: Boolean = true): T = {
+    unify(t1, t2, ctx, reversible = reversible)._1
   }
 
   /**
@@ -383,8 +423,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
   /**
     * Unifies two function signatures and returns the output type.
     * For polymorphic functions, the best signature is the one with the lowest priority.
-    * @param args1 first set of function parameter types
-    * @param args2 second set of function parameter types
+    * @param to target function parameter types
+    * @param from input function parameter types
     * @param ctx UnificationContext
     * @return (unifiedTypes, varTypes, priority), where types is a Vector of
     *         the unified type for each argument, varTypes is the updated type
@@ -408,20 +448,20 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     *    T_Var(1) -> T_String
     */
   def apply(
-      args1: Vector[T],
-      args2: Vector[T],
+      to: Vector[T],
+      from: Vector[T],
       output: T,
       ctx: UnificationContext
   ): (T, Priority.Priority) = {
-    assert(args1.size == args2.size)
-    if (args1.isEmpty) {
+    assert(to.size == from.size)
+    if (to.isEmpty) {
       (output, Priority.Exact)
     }
     val init: Bindings[Int, T] = VarTypeBindings.empty
     val (priority, newVarTypes) =
-      args1.zip(args2).foldLeft((Priority.Exact, init)) {
+      to.zip(from).foldLeft((Priority.Exact, init)) {
         case ((priority, vt), (lt, rt)) =>
-          val (_, vt2, priority2) = unify(lt, rt, ctx, vt)
+          val (_, vt2, priority2) = unify(lt, rt, ctx, vt, reversible = false)
           (Enum.max(priority, priority2), vt2)
       }
     val unifiedType = substitute(output, newVarTypes)
@@ -437,12 +477,16 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     */
   def apply(types: Iterable[T], ctx: UnificationContext): T = {
     assert(types.nonEmpty)
-    val init: Bindings[Int, T] = VarTypeBindings.empty
-    val (unifiedType, _) = types.tail.foldLeft((types.head, init)) {
-      case ((t, vt), t2) =>
-        val (tUnified, ctxNew, _) = unify(t, t2, ctx, vt)
-        (tUnified, ctxNew)
+    if (types.size == 1) {
+      types.head
+    } else {
+      val init: Bindings[Int, T] = VarTypeBindings.empty
+      val (unifiedType, _) = types.tail.foldLeft((types.head, init)) {
+        case ((t1, varTypes), t2) =>
+          val (tUnified, ctxNew, _) = unify(t1, t2, ctx, varTypes, reversible = true)
+          (tUnified, ctxNew)
+      }
+      unifiedType
     }
-    unifiedType
   }
 }
