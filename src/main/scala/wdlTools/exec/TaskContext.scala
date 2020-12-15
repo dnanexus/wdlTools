@@ -4,7 +4,7 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import dx.util.{Bindings, FileSourceResolver, Logger, SafeLocalizationDisambiguator}
+import dx.util.{Bindings, DockerUtils, FileSourceResolver, Logger, SafeLocalizationDisambiguator}
 
 case class TaskContext(task: Task,
                        inputBindings: Bindings[String, V],
@@ -81,7 +81,14 @@ case class TaskContext(task: Task,
     runtime.container match {
       case v if v.isEmpty => None
       case v =>
-        Some(dockerUtils.getImage(v, runtime.getSourceLocation(Runtime.ContainerKey)))
+        try {
+          Some(dockerUtils.getImage(v))
+        } catch {
+          case ex: Throwable =>
+            throw new ExecException(s"Error resolving container image ${v}",
+                                    ex,
+                                    runtime.getSourceLocation(Runtime.ContainerKey))
+        }
     }
   }
 

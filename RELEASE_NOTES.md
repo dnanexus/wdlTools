@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.9 (dev)
+
+* Move DockerUtils to dxCommon
+
 ## v0.11.8 (2020-12-01)
 
 * Fix unification of arrays

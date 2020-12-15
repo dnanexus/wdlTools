@@ -173,7 +173,7 @@ object ExprGraph {
     *   depends on the command block being evaluated
     */
   object VarKind extends Enumeration {
-    val Input, Output, Private, PostCommand, Scatter = Value
+    val Input, Output, Private, Scatter = Value
   }
 
   trait VarInfo {
@@ -355,7 +355,9 @@ object ExprGraph {
             if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
               VarKind.Private
             } else {
-              VarKind.PostCommand
+              throw new Exception(
+                  s"private declaration ${decl} depends on the outputs of the command section, which is not allowed"
+              )
             }
           }
           name -> decl.copy(referenced = true, kind = newKind)
