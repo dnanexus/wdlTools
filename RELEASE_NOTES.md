@@ -1,6 +1,10 @@
 # Change log
 
-## v0.11.9 (dev)
+## v0.11.10 (2020-12-16)
+
+* Bugfixes
+
+## v0.11.9 (2020-12-15)
 
 * Move DockerUtils to dxCommon
 

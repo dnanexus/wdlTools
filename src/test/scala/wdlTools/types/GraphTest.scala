@@ -73,7 +73,7 @@ class GraphTest extends AnyFlatSpec with Matchers {
         info.kind shouldBe VarKind.Private
       case ("dout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.PostCommand
+        info.kind shouldBe VarKind.Private
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
         info.kind shouldBe VarKind.Output
