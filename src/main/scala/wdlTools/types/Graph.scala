@@ -346,25 +346,9 @@ object ExprGraph {
       val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
 
       // Update referenced = true for all vars in the graph.
-      // Also update VarKind for decls based on whether they
-      // are depended on by any non-output expressions.
       val updatedVars = allVars.map {
-        case (name, decl: DeclInfo) if decl.kind == VarKind.Private && graph.contains(name) =>
-          val dependentNodes = graph.get(name).outgoing.map(_.to.value)
-          val newKind = {
-            if (dependentNodes.isEmpty || dependentNodes.exists(n => !outputs.contains(n))) {
-              VarKind.Private
-            } else {
-              throw new Exception(
-                  s"private declaration ${decl} depends on the outputs of the command section, which is not allowed"
-              )
-            }
-          }
-          name -> decl.copy(referenced = true, kind = newKind)
-        case (name, info) if graph.contains(name) =>
-          name -> info.setReferenced()
-        case other =>
-          other
+        case (name, info) if graph.contains(name) => name -> info.setReferenced()
+        case other                                => other
       }
 
       ExprGraph(graph, updatedVars)
