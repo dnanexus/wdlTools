@@ -927,21 +927,12 @@ case class Stdlib(paths: EvalPaths,
 
   // String read_string(String|File)
   //
-  // The read_string() function takes a file path which is expected to
-  // contain 1 line with 1 string on it. This function returns that
-  // string.
-  //
   // since: draft-1
   // deprecation: beginning in draft-2, URI parameter is not supported
   private def read_string(ctx: FunctionContext): V_String = {
     val file = getWdlFile(ctx.getOneArg, ctx.loc)
     val content = ioSupport.readFile(file.value, ctx.loc)
-    Source.fromString(content).getLines.toVector match {
-      case Vector()     => V_String("")
-      case Vector(line) => V_String(line)
-      case _ =>
-        throw new EvalException(s"file ${file} contains more than one line")
-    }
+    V_String(content.stripLineEnd)
   }
 
   // Int read_int(String|File)
