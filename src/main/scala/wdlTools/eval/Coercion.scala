@@ -4,6 +4,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 
+import scala.collection.immutable.TreeSeqMap
 import scala.util.{Success, Try}
 
 object Coercion {
@@ -151,10 +152,14 @@ object Coercion {
         case (WdlTypes.T_Int, V_Float(f)) if allowNonstandardCoercions && f.isWhole =>
           V_Int(f.toLong)
         case (WdlTypes.T_Map(k, v), V_Array(array)) if allowNonstandardCoercions =>
-          V_Map(array.map {
-            case V_Pair(l, r) => (inner(k, l), inner(v, r))
-            case _            => throw new EvalException(s"Cannot coerce array ${array} to Map", loc)
-          }.toMap)
+          V_Map(
+              array
+                .map {
+                  case V_Pair(l, r) => (inner(k, l), inner(v, r))
+                  case _            => throw new EvalException(s"Cannot coerce array ${array} to Map", loc)
+                }
+                .to(TreeSeqMap)
+          )
         case (WdlTypes.T_Array(WdlTypes.T_Pair(l, r), _), V_Map(map))
             if allowNonstandardCoercions =>
           V_Array(map.map {

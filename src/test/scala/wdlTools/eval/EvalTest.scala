@@ -1,7 +1,6 @@
 package wdlTools.eval
 
 import java.nio.file.{Path, Paths}
-
 import dx.util.{EvalPaths, FileSourceResolver, Logger, FileUtils => UUtil}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
@@ -10,6 +9,8 @@ import wdlTools.Edge
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
+
+import scala.collection.immutable.TreeSeqMap
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
@@ -113,7 +114,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         )
     )
     bindings("m2") shouldBe V_Map(
-        Map(V_String("name") -> V_String("hawk"), V_String("kind") -> V_String("bird"))
+        TreeSeqMap(V_String("name") -> V_String("hawk"), V_String("kind") -> V_String("bird"))
     )
 
     // sub
@@ -337,8 +338,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         ),
         "m1" -> Some(
             WdlValues.V_Map(
-                Map(WdlValues.V_String("X") -> WdlValues.V_Int(1),
-                    WdlValues.V_String("Y") -> WdlValues.V_Int(10))
+                TreeSeqMap(WdlValues.V_String("X") -> WdlValues.V_Int(1),
+                           WdlValues.V_String("Y") -> WdlValues.V_Int(10))
             )
         ),
         "p" -> Some(WdlValues.V_Pair(WdlValues.V_Int(1), WdlValues.V_Int(12))),

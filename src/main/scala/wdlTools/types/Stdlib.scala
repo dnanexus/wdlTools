@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import WdlTypes.{T_Function2, T_Var, _}
+import WdlTypes.{T_Function2, T_Function3, T_Var, _}
 import wdlTools.syntax.{Operator, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
@@ -68,12 +68,23 @@ case class Stdlib(regime: TypeCheckingRegime,
         T_Function1(funcName, T_Float, T_Float)
     )
   }
+
+  private def equalityPrototypes(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function2(funcName, T_Int, T_Int, T_Boolean),
+        T_Function2(funcName, T_Int, T_Float, T_Boolean),
+        T_Function2(funcName, T_Float, T_Int, T_Boolean),
+        T_Function2(funcName, T_File, T_String, T_Boolean),
+        T_Function2(funcName, T_Var(0), T_Var(0), T_Boolean)
+    )
+  }
+
   private def comparisonPrototypes(funcName: String): Vector[T_Function] = {
     Vector(
+        T_Function2(funcName, T_String, T_String, T_Boolean),
         T_Function2(funcName, T_Boolean, T_Boolean, T_Boolean),
         T_Function2(funcName, T_Int, T_Int, T_Boolean),
         T_Function2(funcName, T_Float, T_Float, T_Boolean),
-        T_Function2(funcName, T_String, T_String, T_Boolean),
         T_Function2(funcName, T_Int, T_Float, T_Boolean),
         T_Function2(funcName, T_Float, T_Int, T_Boolean)
     )
@@ -106,29 +117,17 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
-      // equal/not-equal comparisons are allowed for all primitive types
       // prior to V2 Booleans and Strings could be compared by >/<; it is
       // not explicitly stated in the spec, we assume
       // * true > false
       // * Strings are ordered lexicographically using Unicode code point number
       //   for comparison of individual characters
-      comparisonPrototypes(Operator.Equality.name),
-      comparisonPrototypes(Operator.Inequality.name),
+      equalityPrototypes(Operator.Equality.name),
+      equalityPrototypes(Operator.Inequality.name),
       comparisonPrototypes(Operator.LessThan.name),
       comparisonPrototypes(Operator.LessThanOrEqual.name),
       comparisonPrototypes(Operator.GreaterThan.name),
       comparisonPrototypes(Operator.GreaterThanOrEqual.name),
-      // equal/not-equal is allowed for File-String
-      // also, it is not explicitly stated in the spec, but we allow
-      // comparisons for any operands of the same type
-      Vector(
-          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Equality.name, T_File, T_String, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_File, T_String, T_Boolean),
-          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
-      ),
       // The + operator is overloaded for string arguments. If all arguments are non-optional,
       // then the return type is non-optional. Within an interpolation, if either argument type
       // is optional, then the return type is optional.
@@ -213,29 +212,17 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
-      // equal/not-equal comparisons are allowed for all primitive types
       // prior to V2 Booleans and Strings could be compared by >/<; it is
       // not explicitly stated in the spec, we assume
       // * true > false
       // * Strings are ordered lexicographically using Unicode code point number
       //   for comparison of individual characters
-      comparisonPrototypes(Operator.Equality.name),
-      comparisonPrototypes(Operator.Inequality.name),
+      equalityPrototypes(Operator.Equality.name),
+      equalityPrototypes(Operator.Inequality.name),
       comparisonPrototypes(Operator.LessThan.name),
       comparisonPrototypes(Operator.LessThanOrEqual.name),
       comparisonPrototypes(Operator.GreaterThan.name),
       comparisonPrototypes(Operator.GreaterThanOrEqual.name),
-      // equal/not-equal is allowed for File-String
-      // also, it is not explicitly stated in the spec, but we allow
-      // comparisons for any operands of the same type
-      Vector(
-          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Equality.name, T_File, T_String, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_File, T_String, T_Boolean),
-          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
-      ),
       // The + operator is overloaded for string arguments. If all arguments are non-optional,
       // then the return type is non-optional. Within an interpolation, if either argument type
       // is optional, then the return type is optional.
@@ -311,16 +298,6 @@ case class Stdlib(regime: TypeCheckingRegime,
       )
   ).flatten
 
-  private def comparisonPrototypesV2(funcName: String): Vector[T_Function] = {
-    Vector(
-        T_Function2(funcName, T_Int, T_Int, T_Boolean),
-        T_Function2(funcName, T_Int, T_Float, T_Boolean),
-        T_Function2(funcName, T_Float, T_Float, T_Boolean),
-        T_Function2(funcName, T_Float, T_Int, T_Boolean),
-        T_Function2(funcName, T_String, T_String, T_Boolean)
-    )
-  }
-
   private lazy val v2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
       unaryNumericPrototypes(Operator.UnaryMinus.name),
@@ -331,22 +308,12 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
       ),
       // comparison operators
-      comparisonPrototypesV2(Operator.Equality.name),
-      comparisonPrototypesV2(Operator.Inequality.name),
-      comparisonPrototypesV2(Operator.LessThan.name),
-      comparisonPrototypesV2(Operator.LessThanOrEqual.name),
-      comparisonPrototypesV2(Operator.GreaterThan.name),
-      comparisonPrototypesV2(Operator.GreaterThanOrEqual.name),
-      // it is not explicitly stated in the spec, but we allow equal/not-equal
-      // comparisons for any operands of the same type
-      Vector(
-          T_Function2(Operator.Equality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Equality.name, T_Directory, T_Directory, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_File, T_File, T_Boolean),
-          T_Function2(Operator.Inequality.name, T_Directory, T_Directory, T_Boolean),
-          T_Function2(Operator.Equality.name, T_Var(0), T_Var(0), T_Boolean),
-          T_Function2(Operator.Inequality.name, T_Var(0), T_Var(0), T_Boolean)
-      ),
+      equalityPrototypes(Operator.Equality.name),
+      equalityPrototypes(Operator.Inequality.name),
+      comparisonPrototypes(Operator.LessThan.name),
+      comparisonPrototypes(Operator.LessThanOrEqual.name),
+      comparisonPrototypes(Operator.GreaterThan.name),
+      comparisonPrototypes(Operator.GreaterThanOrEqual.name),
       // The + operator is overloaded for string arguments. If all arguments are non-optional,
       // then the return type is non-optional. Within an interpolation, if either argument type
       // is optional, then the return type is optional.
@@ -363,14 +330,29 @@ case class Stdlib(regime: TypeCheckingRegime,
       binaryNumericPrototypes(Operator.Remainder.name),
       // standard library functions
       Vector(
+          T_Function1("floor", T_Float, T_Int),
+          T_Function1("ceil", T_Float, T_Int),
+          T_Function1("round", T_Float, T_Int),
+          T_Function2("min", T_Int, T_Int, T_Int),
+          T_Function2("min", T_Int, T_Float, T_Float),
+          T_Function2("min", T_Float, T_Int, T_Float),
+          T_Function2("min", T_Float, T_Float, T_Float),
+          T_Function2("max", T_Int, T_Int, T_Int),
+          T_Function2("max", T_Int, T_Float, T_Float),
+          T_Function2("max", T_Float, T_Int, T_Float),
+          T_Function2("max", T_Float, T_Float, T_Float),
+          T_Function3("sub", T_String, T_String, T_String, T_String),
           T_Function0("stdout", T_File),
           T_Function0("stderr", T_File),
+          T_Function1("glob", T_String, T_Array(T_File)),
+          T_Function1("basename", T_String, T_String),
+          T_Function2("basename", T_String, T_String, T_String),
           T_Function1("read_lines", T_File, T_Array(T_String)),
           T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
           T_Function1("read_map", T_File, T_Map(T_String, T_String)),
           T_Function1("read_json", T_File, T_Any),
-          T_Function1("read_int", T_File, T_Int),
           T_Function1("read_string", T_File, T_String),
+          T_Function1("read_int", T_File, T_Int),
           T_Function1("read_float", T_File, T_Float),
           T_Function1("read_boolean", T_File, T_Boolean),
           T_Function1("write_lines", T_Array(T_String), T_File),
@@ -378,37 +360,20 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function1("write_map", T_Map(T_String, T_String), T_File),
           T_Function1("write_json", T_Any, T_File),
           T_Function1("size", T_Optional(T_File), T_Float),
-          T_Function1("size", T_Array(T_File), T_Float),
-          // Size takes an optional units parameter (KB, KiB, MB, GiB, ...)
+          T_Function1("size", T_Array(T_Optional(T_File)), T_Float),
           T_Function2("size", T_Optional(T_File), T_String, T_Float),
-          T_Function2("size", T_Array(T_File), T_String, T_Float),
-          T_Function3("sub", T_String, T_String, T_String, T_String),
+          T_Function2("size", T_Array(T_Optional(T_File)), T_String, T_Float),
+          T_Function1("length", T_Array(T_Var(0)), T_Int), // TODO: can the type be T_Any?
           T_Function1("range", T_Int, T_Array(T_Int)),
-          // Array[Array[X]] transpose(Array[Array[X]])
           T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
-          // Array[Pair(X,Y)] zip(Array[X], Array[Y])
           T_Function2("zip",
                       T_Array(T_Var(0)),
                       T_Array(T_Var(1)),
                       T_Array(T_Pair(T_Var(0), T_Var(1)))),
-          // Array[Pair(X,Y)] cross(Array[X], Array[Y])
           T_Function2("cross",
                       T_Array(T_Var(0)),
                       T_Array(T_Var(1)),
                       T_Array(T_Pair(T_Var(0), T_Var(1)))),
-          // Array[Pair[X,Y]] as_pairs(Map[X,Y])
-          T_Function1("as_pairs", T_Map(T_Var(0), T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
-          // Map[X,Y] as_map(Array[Pair[X,Y]])
-          T_Function1("as_map", T_Array(T_Pair(T_Var(0), T_Var(1))), T_Map(T_Var(0), T_Var(1))),
-          // // Array[X] keys(Map[X,Y])
-          T_Function1("keys", T_Map(T_Var(0), T_Any), T_Array(T_Var(0))),
-          // Map[X,Array[Y]] collect_by_key(Array[Pair[X,Y]])
-          T_Function1("collect_by_keys",
-                      T_Array(T_Pair(T_Var(0), T_Var(1))),
-                      T_Map(T_Var(0), T_Array(T_Var(1)))),
-          // Integer length(Array[X])
-          T_Function1("length", T_Array(T_Var(0)), T_Int),
-          // Array[X] flatten(Array[Array[X]])
           T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
           T_Function2("prefix",
                       T_String,
@@ -420,26 +385,16 @@ case class Stdlib(regime: TypeCheckingRegime,
                       T_Array(T_String)),
           T_Function1("quote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
           T_Function1("squote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
-          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
-          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0))),
-          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
-          T_Function1("basename", T_String, T_String),
-          T_Function2("basename", T_String, T_String, T_String),
-          T_Function1("floor", T_Float, T_Int),
-          T_Function1("ceil", T_Float, T_Int),
-          T_Function1("round", T_Float, T_Int),
           T_Function2("sep", T_String, T_Array(T_String), T_String),
-          // mentioned in the specification but not formally defined
-          T_Function1("glob", T_String, T_Array(T_File)),
-          // https://github.com/openwdl/wdl/pull/304
-          T_Function2("min", T_Int, T_Int, T_Int),
-          T_Function2("min", T_Int, T_Float, T_Float),
-          T_Function2("min", T_Float, T_Int, T_Float),
-          T_Function2("min", T_Float, T_Float, T_Float),
-          T_Function2("max", T_Int, T_Int, T_Int),
-          T_Function2("max", T_Int, T_Float, T_Float),
-          T_Function2("max", T_Float, T_Int, T_Float),
-          T_Function2("max", T_Float, T_Float, T_Float)
+          T_Function1("as_pairs", T_Map(T_Var(0), T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          T_Function1("as_map", T_Array(T_Pair(T_Var(0), T_Var(1))), T_Map(T_Var(0), T_Var(1))),
+          T_Function1("keys", T_Map(T_Var(0), T_Any), T_Array(T_Var(0))),
+          T_Function1("collect_by_keys",
+                      T_Array(T_Pair(T_Var(0), T_Var(1))),
+                      T_Map(T_Var(0), T_Array(T_Var(1)))),
+          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
+          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
+          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0)))
       )
   ).flatten
 

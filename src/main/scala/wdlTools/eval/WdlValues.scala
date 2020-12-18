@@ -1,5 +1,7 @@
 package wdlTools.eval
 
+import scala.collection.immutable.SeqMap
+
 // This is the WDL typesystem
 object WdlValues {
   // any WDL value
@@ -33,7 +35,7 @@ object WdlValues {
   sealed trait V_Collection extends V
   case class V_Pair(l: V, r: V) extends V_Collection
   case class V_Array(value: Vector[V]) extends V_Collection
-  case class V_Map(value: Map[V, V]) extends V_Collection
+  case class V_Map(value: SeqMap[V, V]) extends V_Collection
   case class V_Struct(name: String, members: Map[String, V]) extends V_Collection
   case class V_Object(members: Map[String, V]) extends V_Collection
 

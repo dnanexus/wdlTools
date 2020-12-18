@@ -5,6 +5,8 @@ import wdlTools.eval.WdlValues._
 import wdlTools.types.WdlTypes._
 import dx.util.Bindings
 
+import scala.collection.immutable.TreeSeqMap
+
 // an error that occurs during (de)serialization of JSON
 final class WdlValueSerializationException(message: String) extends Exception(message)
 
@@ -71,9 +73,7 @@ object WdlValueSerde {
       case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
       case JsNumber(value)                      => V_Float(value.toDouble)
       case JsString(value)                      => V_String(value)
-      // compound values
-      case JsArray(vec) =>
-        V_Array(vec.map(deserialize))
+      case JsArray(vec)                         => V_Array(vec.map(deserialize))
       case JsObject(fields) =>
         V_Object(fields.map { case (k, v) => k -> deserialize(v) })
     }
@@ -105,12 +105,14 @@ object WdlValueSerde {
 
         // maps
         case (T_Map(keyType, valueType), JsObject(fields)) =>
-          val m = fields.map {
-            case (k: String, v: JsValue) =>
-              val kWdl = inner(JsString(k), keyType, s"${innerName}.${k}")
-              val vWdl = inner(v, valueType, s"${innerName}.${k}")
-              kWdl -> vWdl
-          }
+          val m = fields
+            .map {
+              case (k: String, v: JsValue) =>
+                val kWdl = inner(JsString(k), keyType, s"${innerName}.${k}")
+                val vWdl = inner(v, valueType, s"${innerName}.${k}")
+                kWdl -> vWdl
+            }
+            .to(TreeSeqMap)
           V_Map(m)
 
         // two ways of writing a pair: an object, or an array

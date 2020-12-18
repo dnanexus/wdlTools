@@ -1,14 +1,13 @@
 package wdlTools.exec
 
 import java.nio.file.Files
-
 import spray.json._
 import wdlTools.eval.{
   Eval,
   EvalException,
-  WdlValueSerializationException,
   WdlValueBindings,
   WdlValueSerde,
+  WdlValueSerializationException,
   WdlValues,
   EvalUtils => WdlValueUtils
 }
@@ -16,6 +15,8 @@ import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
+
+import scala.collection.immutable.TreeSeqMap
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
   protected lazy val callableInputs: Map[String, InputParameter] =
@@ -234,7 +235,7 @@ object TaskInputOutput {
       case (WdlTypes.T_Array(_, false), None | Some(WdlValues.V_Null)) =>
         WdlValues.V_Array(Vector.empty)
       case (WdlTypes.T_Map(_, _), None | Some(WdlValues.V_Null)) =>
-        WdlValues.V_Map(Map.empty)
+        WdlValues.V_Map(TreeSeqMap.empty)
       case (WdlTypes.T_Object, None | Some(WdlValues.V_Null)) =>
         WdlValues.V_Object(Map.empty)
       case (WdlTypes.T_Struct(name, memberTypes), None | Some(WdlValues.V_Null))
