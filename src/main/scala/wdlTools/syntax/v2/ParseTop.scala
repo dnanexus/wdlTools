@@ -9,6 +9,7 @@ import wdlTools.syntax.Antlr4Util.getSourceLocation
 import wdlTools.syntax.v2.ConcreteSyntax._
 import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException, WdlVersion}
 import dx.util.Logger
+import org.openwdl.wdl.parser.v2.WdlV2Parser.ExprContext
 
 import scala.jdk.CollectionConverters._
 
@@ -354,27 +355,14 @@ string
     ExprMapLiteral(m, getSourceLocation(grammar.docSource, ctx))
   }
 
-  override def visitObject_literal_key(ctx: WdlV2Parser.Object_literal_keyContext): Expr = {
-    if (ctx.Identifier() != null) {
-      val idNode = ctx.Identifier()
-      ExprString(getIdentifierText(idNode, ctx), getSourceLocation(grammar.docSource, idNode))
-    } else if (ctx.string() != null) {
-      visitString(ctx.string())
-    } else {
-      throw new RuntimeException(s"Invalid object literal key ${ctx}")
+  private def getMembers(members: Vector[WdlV2Parser.MemberContext],
+                         values: Vector[ExprContext],
+                         ctx: ParserRuleContext): Vector[ExprMember] = {
+    val ids: Vector[Expr] = members.map { m =>
+      ExprString(getIdentifierText(m.Identifier(), ctx), getSourceLocation(grammar.docSource, m))
     }
-  }
-
-  // | object_or_struct LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
-  override def visitObject_literal(ctx: WdlV2Parser.Object_literalContext): Expr = {
-    val ids: Vector[Expr] = ctx.object_literal_key.asScala.toVector
-      .map(visitObject_literal_key)
-    val elements: Vector[Expr] = ctx
-      .expr()
-      .asScala
-      .map(x => visitExpr(x))
-      .toVector
-    val members = ids.zip(elements).map { pair =>
+    val elements: Vector[Expr] = values.map(x => visitExpr(x))
+    ids.zip(elements).map { pair =>
       val id = pair._1
       val expr = pair._2
       val textSource =
@@ -385,13 +373,19 @@ string
                        expr.loc.endCol)
       ExprMember(id, expr, textSource)
     }
-    ctx.object_or_struct() match {
-      case ctx: WdlV2Parser.StructnameContext =>
-        val name = ctx.Identifier().toString
-        ExprStructLiteral(name, members, getSourceLocation(grammar.docSource, ctx))
-      case ctx: WdlV2Parser.ObjectContext =>
-        ExprObjectLiteral(members, getSourceLocation(grammar.docSource, ctx))
-    }
+  }
+
+  // | OBJECTLITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
+  override def visitObject_literal(ctx: WdlV2Parser.Object_literalContext): Expr = {
+    val members = getMembers(ctx.member().asScala.toVector, ctx.expr().asScala.toVector, ctx)
+    ExprObjectLiteral(members, getSourceLocation(grammar.docSource, ctx))
+  }
+
+  // | Identifier LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)* COMMA?)* RBRACE #struct_literal
+  override def visitStruct_literal(ctx: WdlV2Parser.Struct_literalContext): Expr = {
+    val name = ctx.Identifier().toString
+    val members = getMembers(ctx.member().asScala.toVector, ctx.expr().asScala.toVector, ctx)
+    ExprStructLiteral(name, members, getSourceLocation(grammar.docSource, ctx))
   }
 
   // | NOT expr #negate
@@ -572,6 +566,7 @@ string
       case pair_literal: WdlV2Parser.Pair_literalContext     => visitPair_literal(pair_literal)
       case map_literal: WdlV2Parser.Map_literalContext       => visitMap_literal(map_literal)
       case object_literal: WdlV2Parser.Object_literalContext => visitObject_literal(object_literal)
+      case struct_literal: WdlV2Parser.Struct_literalContext => visitStruct_literal(struct_literal)
       case negate: WdlV2Parser.NegateContext                 => visitNegate(negate)
       case unarysigned: WdlV2Parser.UnarysignedContext       => visitUnarysigned(unarysigned)
       case at: WdlV2Parser.AtContext                         => visitAt(at)

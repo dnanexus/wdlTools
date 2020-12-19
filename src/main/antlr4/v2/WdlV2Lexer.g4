@@ -33,7 +33,7 @@ FILE: 'File';
 DIRECTORY: 'Directory';
 ARRAY: 'Array';
 MAP: 'Map';
-OBJECTLITERAL: 'Object';
+OBJECTLITERAL: 'object';
 PAIR: 'Pair';
 AFTER: 'after';
 COMMAND: 'command'-> mode(Command);
