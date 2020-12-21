@@ -298,6 +298,114 @@ case class Stdlib(regime: TypeCheckingRegime,
       )
   ).flatten
 
+  private lazy val v1_1Prototypes: Vector[T_Function] = Vector(
+      // unary numeric operators
+      unaryNumericPrototypes(Operator.UnaryMinus.name),
+      // logical operators
+      Vector(
+          T_Function1(Operator.LogicalNot.name, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalOr.name, T_Boolean, T_Boolean, T_Boolean),
+          T_Function2(Operator.LogicalAnd.name, T_Boolean, T_Boolean, T_Boolean)
+      ),
+      // comparison operators
+      equalityPrototypes(Operator.Equality.name),
+      equalityPrototypes(Operator.Inequality.name),
+      comparisonPrototypes(Operator.LessThan.name),
+      comparisonPrototypes(Operator.LessThanOrEqual.name),
+      comparisonPrototypes(Operator.GreaterThan.name),
+      comparisonPrototypes(Operator.GreaterThanOrEqual.name),
+      // The + operator is overloaded for string arguments. If all arguments are non-optional,
+      // then the return type is non-optional. Within an interpolation, if either argument type
+      // is optional, then the return type is optional.
+      // https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#interpolating-and-concatenating-optional-strings
+      Vector(
+          T_Function1(Operator.Addition.name, T_Array(T_File), T_File),
+          T_Function1(Operator.Addition.name, T_Array(T_String), T_String)
+      ),
+      // binary numeric operators
+      vectorNumericPrototypes(Operator.Addition.name),
+      vectorNumericPrototypes(Operator.Subtraction.name),
+      vectorNumericPrototypes(Operator.Multiplication.name),
+      vectorNumericPrototypes(Operator.Division.name),
+      binaryNumericPrototypes(Operator.Remainder.name),
+      // standard library functions
+      Vector(
+          T_Function1("floor", T_Float, T_Int),
+          T_Function1("ceil", T_Float, T_Int),
+          T_Function1("round", T_Float, T_Int),
+          T_Function2("min", T_Int, T_Int, T_Int),
+          T_Function2("min", T_Int, T_Float, T_Float),
+          T_Function2("min", T_Float, T_Int, T_Float),
+          T_Function2("min", T_Float, T_Float, T_Float),
+          T_Function2("max", T_Int, T_Int, T_Int),
+          T_Function2("max", T_Int, T_Float, T_Float),
+          T_Function2("max", T_Float, T_Int, T_Float),
+          T_Function2("max", T_Float, T_Float, T_Float),
+          T_Function3("sub", T_String, T_String, T_String, T_String),
+          T_Function0("stdout", T_File),
+          T_Function0("stderr", T_File),
+          T_Function1("glob", T_String, T_Array(T_File)),
+          T_Function1("basename", T_String, T_String),
+          T_Function2("basename", T_String, T_String, T_String),
+          T_Function1("read_lines", T_File, T_Array(T_String)),
+          T_Function1("read_tsv", T_File, T_Array(T_Array(T_String))),
+          T_Function1("read_map", T_File, T_Map(T_String, T_String)),
+          T_Function1("read_json", T_File, T_Any),
+          T_Function1("read_string", T_File, T_String),
+          T_Function1("read_int", T_File, T_Int),
+          T_Function1("read_float", T_File, T_Float),
+          T_Function1("read_boolean", T_File, T_Boolean),
+          T_Function1("write_lines", T_Array(T_String), T_File),
+          T_Function1("write_tsv", T_Array(T_Array(T_String)), T_File),
+          T_Function1("write_map", T_Map(T_String, T_String), T_File),
+          T_Function1("write_json", T_Any, T_File),
+          T_Function1("size", T_Optional(T_File), T_Float),
+          T_Function1("size", T_Array(T_Optional(T_File)), T_Float),
+          T_Function2("size", T_Optional(T_File), T_String, T_Float),
+          T_Function2("size", T_Array(T_Optional(T_File)), T_String, T_Float),
+          T_Function1("length", T_Array(T_Var(0)), T_Int), // TODO: can the type be T_Any?
+          T_Function1("range", T_Int, T_Array(T_Int)),
+          T_Function1("transpose", T_Array(T_Array(T_Var(0))), T_Array(T_Array(T_Var(0)))),
+          T_Function2("zip",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          T_Function2("cross",
+                      T_Array(T_Var(0)),
+                      T_Array(T_Var(1)),
+                      T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          T_Function1("flatten", T_Array(T_Array(T_Var(0))), T_Array(T_Var(0))),
+          T_Function2("prefix",
+                      T_String,
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function2("suffix",
+                      T_String,
+                      T_Array(T_Var(0, TypeUtils.PrimitiveTypes)),
+                      T_Array(T_String)),
+          T_Function1("quote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function1("squote", T_Array(T_Var(0, TypeUtils.PrimitiveTypes)), T_Array(T_String)),
+          T_Function2("sep", T_String, T_Array(T_String), T_String),
+          T_Function1("as_pairs", T_Map(T_Var(0), T_Var(1)), T_Array(T_Pair(T_Var(0), T_Var(1)))),
+          T_Function1("as_map", T_Array(T_Pair(T_Var(0), T_Var(1))), T_Map(T_Var(0), T_Var(1))),
+          T_Function1("keys", T_Map(T_Var(0), T_Any), T_Array(T_Var(0))),
+          T_Function1("collect_by_keys",
+                      T_Array(T_Pair(T_Var(0), T_Var(1))),
+                      T_Map(T_Var(0), T_Array(T_Var(1)))),
+          T_Function1("defined", T_Optional(T_Var(0)), T_Boolean),
+          T_Function1("select_first", T_Array(T_Optional(T_Var(0))), T_Var(0)),
+          T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0)))
+      )
+  ).flatten
+
+  private lazy val v1_1PlaceholderPrototypes: Vector[T_Function] = Vector(
+      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
+      // string + non-string concatenations are no longer allowed generally, but
+      // I believe they should be allowed within placeholders - there
+      // is an open discussion https://github.com/openwdl/wdl/issues/391
+      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+  )
+
   private lazy val v2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
       unaryNumericPrototypes(Operator.UnaryMinus.name),
@@ -408,16 +516,17 @@ case class Stdlib(regime: TypeCheckingRegime,
 
   // choose the standard library prototypes according to the WDL version
   private def protoTable(exprState: ExprState): Vector[T_Function] = version match {
-    case WdlVersion.Draft_2 =>
-      draft2Prototypes
-    case WdlVersion.V1 =>
-      v1Prototypes
+    case WdlVersion.Draft_2 => draft2Prototypes
+    case WdlVersion.V1      => v1Prototypes
+    case WdlVersion.V1_1
+        if exprState >= ExprState.InPlaceholder || regime <= TypeCheckingRegime.Lenient =>
+      v1_1Prototypes ++ v1_1PlaceholderPrototypes
+    case WdlVersion.V1_1 => v1_1Prototypes
     case WdlVersion.V2
         if exprState >= ExprState.InPlaceholder || regime <= TypeCheckingRegime.Lenient =>
       v2Prototypes ++ v2PlaceholderPrototypes
-    case WdlVersion.V2 =>
-      v2Prototypes
-    case other => throw new RuntimeException(s"Unsupported WDL version ${other}")
+    case WdlVersion.V2 => v2Prototypes
+    case other         => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
 
   // build a mapping from a function name to all of its prototypes.

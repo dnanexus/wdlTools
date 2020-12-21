@@ -259,6 +259,58 @@ case class Stdlib(paths: EvalPaths,
       Builtins.Glob -> glob
   )
 
+  private lazy val v1_1FuncTable: Map[String, FunctionImpl] = Map(
+      // numeric
+      Builtins.Floor -> floor,
+      Builtins.Ceil -> ceil,
+      Builtins.Round -> round,
+      Builtins.Min -> min,
+      Builtins.Max -> max,
+      // string
+      Builtins.Sub -> sub,
+      // file
+      Builtins.Stdout -> stdout,
+      Builtins.Stderr -> stderr,
+      Builtins.Glob -> glob,
+      Builtins.Basename -> basename,
+      // read from a file
+      Builtins.ReadLines -> read_lines,
+      Builtins.ReadTsv -> read_tsv,
+      Builtins.ReadMap -> read_map,
+      Builtins.ReadJson -> read_json,
+      Builtins.ReadString -> read_string,
+      Builtins.ReadInt -> read_int,
+      Builtins.ReadFloat -> read_float,
+      Builtins.ReadBoolean -> read_boolean,
+      // write to a file
+      Builtins.WriteLines -> write_lines,
+      Builtins.WriteTsv -> write_tsv,
+      Builtins.WriteMap -> write_map,
+      Builtins.WriteJson -> write_json,
+      Builtins.Size -> size,
+      // array
+      Builtins.Length -> length,
+      Builtins.Range -> range,
+      Builtins.Transpose -> transpose,
+      Builtins.Zip -> zip,
+      Builtins.Cross -> cross,
+      Builtins.Flatten -> flatten,
+      Builtins.Prefix -> prefix,
+      Builtins.Suffix -> suffix,
+      Builtins.Quote -> quote,
+      Builtins.Squote -> squote,
+      Builtins.Sep -> sep,
+      // map
+      Builtins.AsPairs -> as_pairs,
+      Builtins.AsMap -> as_map,
+      Builtins.Keys -> keys,
+      Builtins.CollectByKey -> collect_by_key,
+      // optional
+      Builtins.SelectFirst -> select_first,
+      Builtins.SelectAll -> select_all,
+      Builtins.Defined -> defined
+  )
+
   private lazy val v2FuncTable: Map[String, FunctionImpl] = Map(
       // numeric
       Builtins.Floor -> floor,
@@ -315,6 +367,7 @@ case class Stdlib(paths: EvalPaths,
   private val funcTable: Map[String, FunctionImpl] = version match {
     case WdlVersion.Draft_2 => builtinFuncTable ++ draft2FuncTable
     case WdlVersion.V1      => builtinFuncTable ++ v1FuncTable
+    case WdlVersion.V1_1    => builtinFuncTable ++ v1_1FuncTable
     case WdlVersion.V2      => builtinFuncTable ++ v2FuncTable
     case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }

@@ -4,11 +4,13 @@ import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, TerminalNode}
 import org.openwdl.wdl.parser.draft_2.{WdlDraft2Parser, WdlDraft2ParserListener}
 import org.openwdl.wdl.parser.v1.{WdlV1Parser, WdlV1ParserListener}
+import org.openwdl.wdl.parser.v1_1.{WdlV1_1Parser, WdlV1_1ParserListener}
 import org.openwdl.wdl.parser.v2.{WdlV2Parser, WdlV2ParserListener}
 
 class AllParseTreeListener
     extends WdlDraft2ParserListener
     with WdlV1ParserListener
+    with WdlV1_1ParserListener
     with WdlV2ParserListener {
   // when a document is parsed via `Grammar`'s `parseXXX` methods, the `enter()` method
   // is guaranteed to be called before all others
@@ -1396,6 +1398,609 @@ class AllParseTreeListener
     enterExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
   override def exitExpr_document(ctx: WdlV1Parser.Expr_documentContext): Unit = {
+    exitExpr_document(ctx.asInstanceOf[ParserRuleContext])
+  }
+
+  // V1.1
+
+  override def enterMap_type(ctx: WdlV1_1Parser.Map_typeContext): Unit = {
+    enterMap_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMap_type(ctx: WdlV1_1Parser.Map_typeContext): Unit = {
+    exitMap_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterArray_type(ctx: WdlV1_1Parser.Array_typeContext): Unit = {
+    enterArray_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitArray_type(ctx: WdlV1_1Parser.Array_typeContext): Unit = {
+    exitArray_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterPair_type(ctx: WdlV1_1Parser.Pair_typeContext): Unit = {
+    enterPair_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitPair_type(ctx: WdlV1_1Parser.Pair_typeContext): Unit = {
+    exitPair_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterType_base(ctx: WdlV1_1Parser.Type_baseContext): Unit = {
+    enterType_base(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitType_base(ctx: WdlV1_1Parser.Type_baseContext): Unit = {
+    exitType_base(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterWdl_type(ctx: WdlV1_1Parser.Wdl_typeContext): Unit = {
+    enterWdl_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitWdl_type(ctx: WdlV1_1Parser.Wdl_typeContext): Unit = {
+    exitWdl_type(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterUnbound_decls(ctx: WdlV1_1Parser.Unbound_declsContext): Unit = {
+    enterUnbound_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitUnbound_decls(ctx: WdlV1_1Parser.Unbound_declsContext): Unit = {
+    exitUnbound_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterBound_decls(ctx: WdlV1_1Parser.Bound_declsContext): Unit = {
+    enterBound_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitBound_decls(ctx: WdlV1_1Parser.Bound_declsContext): Unit = {
+    exitBound_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterAny_decls(ctx: WdlV1_1Parser.Any_declsContext): Unit = {
+    enterAny_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitAny_decls(ctx: WdlV1_1Parser.Any_declsContext): Unit = {
+    exitAny_decls(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterNumber(ctx: WdlV1_1Parser.NumberContext): Unit = {
+    enterNumber(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitNumber(ctx: WdlV1_1Parser.NumberContext): Unit = {
+    exitNumber(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterString_part(ctx: WdlV1_1Parser.String_partContext): Unit = {
+    enterString_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString_part(ctx: WdlV1_1Parser.String_partContext): Unit = {
+    exitString_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterString_expr_part(ctx: WdlV1_1Parser.String_expr_partContext): Unit = {
+    enterString_expr_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString_expr_part(ctx: WdlV1_1Parser.String_expr_partContext): Unit = {
+    exitString_expr_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterString_expr_with_string_part(
+      ctx: WdlV1_1Parser.String_expr_with_string_partContext
+  ): Unit = {
+    enterString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString_expr_with_string_part(
+      ctx: WdlV1_1Parser.String_expr_with_string_partContext
+  ): Unit = {
+    exitString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterString(ctx: WdlV1_1Parser.StringContext): Unit = {
+    enterString(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString(ctx: WdlV1_1Parser.StringContext): Unit = {
+    exitString(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterPrimitive_literal(ctx: WdlV1_1Parser.Primitive_literalContext): Unit = {
+    enterPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitPrimitive_literal(ctx: WdlV1_1Parser.Primitive_literalContext): Unit = {
+    exitPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr(ctx: WdlV1_1Parser.ExprContext): Unit = {
+    enterExpr(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr(ctx: WdlV1_1Parser.ExprContext): Unit = {
+    exitExpr(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix0(ctx: WdlV1_1Parser.Infix0Context): Unit = {
+    enterInfix0(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix0(ctx: WdlV1_1Parser.Infix0Context): Unit = {
+    exitInfix0(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix1(ctx: WdlV1_1Parser.Infix1Context): Unit = {
+    enterInfix1(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix1(ctx: WdlV1_1Parser.Infix1Context): Unit = {
+    exitInfix1(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterLor(ctx: WdlV1_1Parser.LorContext): Unit = {
+    enterLor(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitLor(ctx: WdlV1_1Parser.LorContext): Unit = {
+    exitLor(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix2(ctx: WdlV1_1Parser.Infix2Context): Unit = {
+    enterInfix2(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix2(ctx: WdlV1_1Parser.Infix2Context): Unit = {
+    exitInfix2(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterLand(ctx: WdlV1_1Parser.LandContext): Unit = {
+    enterLand(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitLand(ctx: WdlV1_1Parser.LandContext): Unit = {
+    exitLand(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterEqeq(ctx: WdlV1_1Parser.EqeqContext): Unit = {
+    enterEqeq(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitEqeq(ctx: WdlV1_1Parser.EqeqContext): Unit = {
+    exitEqeq(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterLt(ctx: WdlV1_1Parser.LtContext): Unit = {
+    enterLt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitLt(ctx: WdlV1_1Parser.LtContext): Unit = {
+    exitLt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix3(ctx: WdlV1_1Parser.Infix3Context): Unit = {
+    enterInfix3(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix3(ctx: WdlV1_1Parser.Infix3Context): Unit = {
+    exitInfix3(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterGte(ctx: WdlV1_1Parser.GteContext): Unit = {
+    enterGte(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitGte(ctx: WdlV1_1Parser.GteContext): Unit = {
+    exitGte(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterNeq(ctx: WdlV1_1Parser.NeqContext): Unit = {
+    enterNeq(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitNeq(ctx: WdlV1_1Parser.NeqContext): Unit = {
+    exitNeq(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterLte(ctx: WdlV1_1Parser.LteContext): Unit = {
+    enterLte(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitLte(ctx: WdlV1_1Parser.LteContext): Unit = {
+    exitLte(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterGt(ctx: WdlV1_1Parser.GtContext): Unit = {
+    enterGt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitGt(ctx: WdlV1_1Parser.GtContext): Unit = {
+    exitGt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterAdd(ctx: WdlV1_1Parser.AddContext): Unit = {
+    enterAdd(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitAdd(ctx: WdlV1_1Parser.AddContext): Unit = {
+    exitAdd(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterSub(ctx: WdlV1_1Parser.SubContext): Unit = {
+    enterSub(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitSub(ctx: WdlV1_1Parser.SubContext): Unit = {
+    exitSub(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix4(ctx: WdlV1_1Parser.Infix4Context): Unit = {
+    enterInfix4(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix4(ctx: WdlV1_1Parser.Infix4Context): Unit = {
+    exitInfix4(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMod(ctx: WdlV1_1Parser.ModContext): Unit = {
+    enterMod(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMod(ctx: WdlV1_1Parser.ModContext): Unit = {
+    exitMod(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMul(ctx: WdlV1_1Parser.MulContext): Unit = {
+    enterMul(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMul(ctx: WdlV1_1Parser.MulContext): Unit = {
+    exitMul(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterDivide(ctx: WdlV1_1Parser.DivideContext): Unit = {
+    enterDivide(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitDivide(ctx: WdlV1_1Parser.DivideContext): Unit = {
+    exitDivide(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInfix5(ctx: WdlV1_1Parser.Infix5Context): Unit = {
+    enterInfix5(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInfix5(ctx: WdlV1_1Parser.Infix5Context): Unit = {
+    exitInfix5(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Unit = {
+    enterExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Unit = {
+    exitExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMember(ctx: WdlV1_1Parser.MemberContext): Unit = {
+    enterMember(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMember(ctx: WdlV1_1Parser.MemberContext): Unit = {
+    exitMember(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterPair_literal(ctx: WdlV1_1Parser.Pair_literalContext): Unit = {
+    enterPair_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitPair_literal(ctx: WdlV1_1Parser.Pair_literalContext): Unit = {
+    exitPair_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterUnarysigned(ctx: WdlV1_1Parser.UnarysignedContext): Unit = {
+    enterUnarysigned(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitUnarysigned(ctx: WdlV1_1Parser.UnarysignedContext): Unit = {
+    exitUnarysigned(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterApply(ctx: WdlV1_1Parser.ApplyContext): Unit = {
+    enterApply(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitApply(ctx: WdlV1_1Parser.ApplyContext): Unit = {
+    exitApply(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpression_group(ctx: WdlV1_1Parser.Expression_groupContext): Unit = {
+    enterExpression_group(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpression_group(ctx: WdlV1_1Parser.Expression_groupContext): Unit = {
+    exitExpression_group(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterPrimitives(ctx: WdlV1_1Parser.PrimitivesContext): Unit = {
+    enterPrimitives(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitPrimitives(ctx: WdlV1_1Parser.PrimitivesContext): Unit = {
+    exitPrimitives(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterLeft_name(ctx: WdlV1_1Parser.Left_nameContext): Unit = {
+    enterLeft_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitLeft_name(ctx: WdlV1_1Parser.Left_nameContext): Unit = {
+    exitLeft_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterAt(ctx: WdlV1_1Parser.AtContext): Unit = {
+    enterAt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitAt(ctx: WdlV1_1Parser.AtContext): Unit = {
+    exitAt(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterNegate(ctx: WdlV1_1Parser.NegateContext): Unit = {
+    enterNegate(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitNegate(ctx: WdlV1_1Parser.NegateContext): Unit = {
+    exitNegate(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMap_literal(ctx: WdlV1_1Parser.Map_literalContext): Unit = {
+    enterMap_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMap_literal(ctx: WdlV1_1Parser.Map_literalContext): Unit = {
+    exitMap_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterIfthenelse(ctx: WdlV1_1Parser.IfthenelseContext): Unit = {
+    enterIfthenelse(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitIfthenelse(ctx: WdlV1_1Parser.IfthenelseContext): Unit = {
+    exitIfthenelse(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterGet_name(ctx: WdlV1_1Parser.Get_nameContext): Unit = {
+    enterGet_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitGet_name(ctx: WdlV1_1Parser.Get_nameContext): Unit = {
+    exitGet_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterObject_literal(ctx: WdlV1_1Parser.Object_literalContext): Unit = {
+    enterObject_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitObject_literal(ctx: WdlV1_1Parser.Object_literalContext): Unit = {
+    exitObject_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterArray_literal(ctx: WdlV1_1Parser.Array_literalContext): Unit = {
+    enterArray_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitArray_literal(ctx: WdlV1_1Parser.Array_literalContext): Unit = {
+    exitArray_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterStruct_literal(ctx: WdlV1_1Parser.Struct_literalContext): Unit = {
+    enterStruct_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitStruct_literal(ctx: WdlV1_1Parser.Struct_literalContext): Unit = {
+    exitStruct_literal(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterVersion(ctx: WdlV1_1Parser.VersionContext): Unit = {
+    enterVersion(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitVersion(ctx: WdlV1_1Parser.VersionContext): Unit = {
+    exitVersion(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterImport_alias(ctx: WdlV1_1Parser.Import_aliasContext): Unit = {
+    enterImport_alias(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitImport_alias(ctx: WdlV1_1Parser.Import_aliasContext): Unit = {
+    exitImport_alias(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterImport_as(ctx: WdlV1_1Parser.Import_asContext): Unit = {
+    enterImport_as(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitImport_as(ctx: WdlV1_1Parser.Import_asContext): Unit = {
+    exitImport_as(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterImport_doc(ctx: WdlV1_1Parser.Import_docContext): Unit = {
+    enterImport_doc(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitImport_doc(ctx: WdlV1_1Parser.Import_docContext): Unit = {
+    exitImport_doc(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterStruct(ctx: WdlV1_1Parser.StructContext): Unit = {
+    enterStruct(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitStruct(ctx: WdlV1_1Parser.StructContext): Unit = {
+    exitStruct(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_value(ctx: WdlV1_1Parser.Meta_valueContext): Unit = {
+    enterMeta_value(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_value(ctx: WdlV1_1Parser.Meta_valueContext): Unit = {
+    exitMeta_value(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_string_part(ctx: WdlV1_1Parser.Meta_string_partContext): Unit = {
+    enterMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_string_part(ctx: WdlV1_1Parser.Meta_string_partContext): Unit = {
+    exitMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_string(ctx: WdlV1_1Parser.Meta_stringContext): Unit = {
+    enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_string(ctx: WdlV1_1Parser.Meta_stringContext): Unit = {
+    exitMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_array(ctx: WdlV1_1Parser.Meta_arrayContext): Unit = {
+    enterMeta_array(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_array(ctx: WdlV1_1Parser.Meta_arrayContext): Unit = {
+    exitMeta_array(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_object(ctx: WdlV1_1Parser.Meta_objectContext): Unit = {
+    enterMeta_object(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_object(ctx: WdlV1_1Parser.Meta_objectContext): Unit = {
+    exitMeta_object(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_object_kv(ctx: WdlV1_1Parser.Meta_object_kvContext): Unit = {
+    enterMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_object_kv(ctx: WdlV1_1Parser.Meta_object_kvContext): Unit = {
+    exitMeta_object_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_kv(ctx: WdlV1_1Parser.Meta_kvContext): Unit = {
+    enterMeta_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_kv(ctx: WdlV1_1Parser.Meta_kvContext): Unit = {
+    exitMeta_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterParameter_meta(ctx: WdlV1_1Parser.Parameter_metaContext): Unit = {
+    enterParameter_meta(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitParameter_meta(ctx: WdlV1_1Parser.Parameter_metaContext): Unit = {
+    exitParameter_meta(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta(ctx: WdlV1_1Parser.MetaContext): Unit = {
+    enterMeta(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta(ctx: WdlV1_1Parser.MetaContext): Unit = {
+    exitMeta(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_runtime_kv(ctx: WdlV1_1Parser.Task_runtime_kvContext): Unit = {
+    enterTask_runtime_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_runtime_kv(ctx: WdlV1_1Parser.Task_runtime_kvContext): Unit = {
+    exitTask_runtime_kv(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_runtime(ctx: WdlV1_1Parser.Task_runtimeContext): Unit = {
+    enterTask_runtime(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_runtime(ctx: WdlV1_1Parser.Task_runtimeContext): Unit = {
+    exitTask_runtime(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_input(ctx: WdlV1_1Parser.Task_inputContext): Unit = {
+    enterTask_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_input(ctx: WdlV1_1Parser.Task_inputContext): Unit = {
+    exitTask_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_output(ctx: WdlV1_1Parser.Task_outputContext): Unit = {
+    enterTask_output(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_output(ctx: WdlV1_1Parser.Task_outputContext): Unit = {
+    exitTask_output(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_command(ctx: WdlV1_1Parser.Task_commandContext): Unit = {
+    enterTask_command(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_command(ctx: WdlV1_1Parser.Task_commandContext): Unit = {
+    exitTask_command(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_command_string_part(
+      ctx: WdlV1_1Parser.Task_command_string_partContext
+  ): Unit = {
+    enterTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_command_string_part(
+      ctx: WdlV1_1Parser.Task_command_string_partContext
+  ): Unit = {
+    exitTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_command_expr_part(
+      ctx: WdlV1_1Parser.Task_command_expr_partContext
+  ): Unit = {
+    enterTask_command_expr_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_command_expr_part(
+      ctx: WdlV1_1Parser.Task_command_expr_partContext
+  ): Unit = {
+    exitTask_command_expr_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_command_expr_with_string(
+      ctx: WdlV1_1Parser.Task_command_expr_with_stringContext
+  ): Unit = {
+    enterTask_command_expr_with_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_command_expr_with_string(
+      ctx: WdlV1_1Parser.Task_command_expr_with_stringContext
+  ): Unit = {
+    exitTask_command_expr_with_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_element(ctx: WdlV1_1Parser.Task_elementContext): Unit = {
+    enterTask_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_element(ctx: WdlV1_1Parser.Task_elementContext): Unit = {
+    exitTask_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask(ctx: WdlV1_1Parser.TaskContext): Unit = {
+    enterTask(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask(ctx: WdlV1_1Parser.TaskContext): Unit = {
+    exitTask(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInner_workflow_element(
+      ctx: WdlV1_1Parser.Inner_workflow_elementContext
+  ): Unit = {
+    enterInner_workflow_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInner_workflow_element(
+      ctx: WdlV1_1Parser.Inner_workflow_elementContext
+  ): Unit = {
+    exitInner_workflow_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_alias(ctx: WdlV1_1Parser.Call_aliasContext): Unit = {
+    enterCall_alias(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_alias(ctx: WdlV1_1Parser.Call_aliasContext): Unit = {
+    exitCall_alias(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_input(ctx: WdlV1_1Parser.Call_inputContext): Unit = {
+    enterCall_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_input(ctx: WdlV1_1Parser.Call_inputContext): Unit = {
+    exitCall_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_inputs(ctx: WdlV1_1Parser.Call_inputsContext): Unit = {
+    enterCall_inputs(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_inputs(ctx: WdlV1_1Parser.Call_inputsContext): Unit = {
+    exitCall_inputs(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_body(ctx: WdlV1_1Parser.Call_bodyContext): Unit = {
+    enterCall_body(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_body(ctx: WdlV1_1Parser.Call_bodyContext): Unit = {
+    exitCall_body(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_after(ctx: WdlV1_1Parser.Call_afterContext): Unit = {
+    enterCall_after(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_after(ctx: WdlV1_1Parser.Call_afterContext): Unit = {
+    exitCall_after(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall_name(ctx: WdlV1_1Parser.Call_nameContext): Unit = {
+    enterCall_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall_name(ctx: WdlV1_1Parser.Call_nameContext): Unit = {
+    exitCall_name(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterCall(ctx: WdlV1_1Parser.CallContext): Unit = {
+    enterCall(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitCall(ctx: WdlV1_1Parser.CallContext): Unit = {
+    exitCall(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterScatter(ctx: WdlV1_1Parser.ScatterContext): Unit = {
+    enterScatter(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitScatter(ctx: WdlV1_1Parser.ScatterContext): Unit = {
+    exitScatter(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterConditional(ctx: WdlV1_1Parser.ConditionalContext): Unit = {
+    enterConditional(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitConditional(ctx: WdlV1_1Parser.ConditionalContext): Unit = {
+    exitConditional(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterWorkflow_input(ctx: WdlV1_1Parser.Workflow_inputContext): Unit = {
+    enterWorkflow_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitWorkflow_input(ctx: WdlV1_1Parser.Workflow_inputContext): Unit = {
+    exitWorkflow_input(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterWorkflow_output(ctx: WdlV1_1Parser.Workflow_outputContext): Unit = {
+    enterWorkflow_output(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitWorkflow_output(ctx: WdlV1_1Parser.Workflow_outputContext): Unit = {
+    exitWorkflow_output(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInput(ctx: WdlV1_1Parser.InputContext): Unit = {
+    enterInput(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInput(ctx: WdlV1_1Parser.InputContext): Unit = {
+    exitInput(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterOutput(ctx: WdlV1_1Parser.OutputContext): Unit = {
+    enterOutput(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitOutput(ctx: WdlV1_1Parser.OutputContext): Unit = {
+    exitOutput(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterInner_element(ctx: WdlV1_1Parser.Inner_elementContext): Unit = {
+    enterInner_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitInner_element(ctx: WdlV1_1Parser.Inner_elementContext): Unit = {
+    exitInner_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterParameter_meta_element(
+      ctx: WdlV1_1Parser.Parameter_meta_elementContext
+  ): Unit = {
+    enterParameter_meta_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitParameter_meta_element(
+      ctx: WdlV1_1Parser.Parameter_meta_elementContext
+  ): Unit = {
+    exitParameter_meta_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_element(ctx: WdlV1_1Parser.Meta_elementContext): Unit = {
+    enterMeta_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_element(ctx: WdlV1_1Parser.Meta_elementContext): Unit = {
+    exitMeta_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterWorkflow(ctx: WdlV1_1Parser.WorkflowContext): Unit = {
+    enterWorkflow(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitWorkflow(ctx: WdlV1_1Parser.WorkflowContext): Unit = {
+    exitWorkflow(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterDocument_element(ctx: WdlV1_1Parser.Document_elementContext): Unit = {
+    enterDocument_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitDocument_element(ctx: WdlV1_1Parser.Document_elementContext): Unit = {
+    exitDocument_element(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterDocument(ctx: WdlV1_1Parser.DocumentContext): Unit = {
+    enterDocument(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitDocument(ctx: WdlV1_1Parser.DocumentContext): Unit = {
+    exitDocument(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterType_document(ctx: WdlV1_1Parser.Type_documentContext): Unit = {
+    enterType_document(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitType_document(ctx: WdlV1_1Parser.Type_documentContext): Unit = {
+    exitType_document(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_document(ctx: WdlV1_1Parser.Expr_documentContext): Unit = {
+    enterExpr_document(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_document(ctx: WdlV1_1Parser.Expr_documentContext): Unit = {
     exitExpr_document(ctx.asInstanceOf[ParserRuleContext])
   }
 
