@@ -1,6 +1,6 @@
 # Change log
 
-## v0.11.11 (dev)
+## v0.11.11 (2021-01-05)
 
 * Fix several small issues that have recently been clarified in the spec
 
