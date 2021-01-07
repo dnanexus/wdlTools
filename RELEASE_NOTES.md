@@ -1,5 +1,9 @@
 # Change log
 
+## v0.11.12 (dev)
+
+* Revert change to `Stdlib.size` - don't use `isExactDobule`
+
 ## v0.11.11 (2020-01-05)
 
 * Fix several small issues that have recently been clarified in the spec

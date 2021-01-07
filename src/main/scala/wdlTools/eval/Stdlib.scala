@@ -1184,12 +1184,7 @@ case class Stdlib(paths: EvalPaths,
     } else {
       nBytes
     }
-    if (result.isExactDouble) {
-      V_Float(result.toDouble)
-    } else {
-      throw new EvalException(s"size: overflow error - cannot represent size ${result} as a float",
-                              ctx.loc)
-    }
+    V_Float(result.toDouble)
   }
 
   // Integer length(Array[X])
