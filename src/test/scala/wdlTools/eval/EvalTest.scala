@@ -7,8 +7,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.Parsers
+import wdlTools.syntax.{Parsers, SourceLocation}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
+import wdlTools.types.WdlTypes._
 
 import scala.collection.immutable.TreeSeqMap
 
@@ -28,18 +29,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     tDoc
   }
 
+  def createEvaluator(allowNonstandardCoercions: Boolean = false): Eval = {
+    Eval(evalPaths,
+         Some(wdlTools.syntax.WdlVersion.V1),
+         Vector.empty,
+         evalFileResolver,
+         Logger.Quiet,
+         allowNonstandardCoercions)
+  }
+
   def parseAndTypeCheckAndGetDeclarations(
       file: Path,
       allowNonstandardCoercions: Boolean = false
   ): (Eval, Vector[TAT.PrivateVariable]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(evalPaths,
-           Some(wdlTools.syntax.WdlVersion.V1),
-           Vector.empty,
-           evalFileResolver,
-           Logger.Quiet,
-           allowNonstandardCoercions)
+    val evaluator = createEvaluator(allowNonstandardCoercions)
     tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
     val decls: Vector[TAT.PrivateVariable] = wf.body.collect {
@@ -389,5 +393,25 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     )
     results("subset_param1") shouldBe V_String("-q 2/5")
     results("subset_param2") shouldBe V_String("-q 2/5")
+  }
+
+  it should "evaluate select_first with None argument" in {
+    val expr = TAT.ExprApply(
+        "select_first",
+        T_Function1("select_first", T_Array(T_Int, true), T_Int),
+        Vector(
+            TAT.ExprArray(
+                Vector(TAT.ExprIdentifier("x", T_Optional(T_Int), SourceLocation.empty),
+                       TAT.ValueInt(5, T_Int, SourceLocation.empty)),
+                T_Array(T_Optional(T_Int), true),
+                SourceLocation.empty
+            )
+        ),
+        T_Int,
+        SourceLocation.empty
+    )
+    val evaluator = createEvaluator()
+    val result = evaluator.applyExpr(expr, WdlValueBindings(Map("x" -> V_Null)))
+    result shouldBe V_Int(5)
   }
 }
