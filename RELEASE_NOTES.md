@@ -1,6 +1,10 @@
 # Change log
 
-## v0.11.12 (dev)
+## 0.11.13 (dev)
+
+* Bump ANTLR version to 4.9
+
+## v0.11.12 (2020-01-05)
 
 * Revert change to `Stdlib.size` - don't use `isExactDobule`
 

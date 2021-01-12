@@ -1,7 +1,7 @@
 package wdlTools.eval
 
 import java.nio.file.{Path, Paths}
-import dx.util.{EvalPaths, FileSourceResolver, Logger, FileUtils => UUtil}
+import dx.util.{EvalPaths, FileSourceResolver, FileUtils, Logger}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -24,7 +24,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getWorkDir()))
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
-    val doc = parsers.parseDocument(fileResolver.fromPath(UUtil.absolutePath(file)))
+    val doc = parsers.parseDocument(fileResolver.fromPath(FileUtils.absolutePath(file)))
     val (tDoc, _) = typeInfer.apply(doc)
     tDoc
   }
@@ -398,12 +398,12 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "evaluate select_first with None argument" in {
     val expr = TAT.ExprApply(
         "select_first",
-        T_Function1("select_first", T_Array(T_Int, true), T_Int),
+        T_Function1("select_first", T_Array(T_Int, nonEmpty = true), T_Int),
         Vector(
             TAT.ExprArray(
                 Vector(TAT.ExprIdentifier("x", T_Optional(T_Int), SourceLocation.empty),
                        TAT.ValueInt(5, T_Int, SourceLocation.empty)),
-                T_Array(T_Optional(T_Int), true),
+                T_Array(T_Optional(T_Int), nonEmpty = true),
                 SourceLocation.empty
             )
         ),
@@ -413,5 +413,36 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val evaluator = createEvaluator()
     val result = evaluator.applyExpr(expr, WdlValueBindings(Map("x" -> V_Null)))
     result shouldBe V_Int(5)
+  }
+
+  it should "evaluate a task with an nunset optional input" in {
+    val tDoc = parseAndTypeCheck(srcDir.resolve("bwa_mem.wdl"))
+    val task = tDoc.elements match {
+      case Vector(task: TAT.Task) => task
+      case _                      => throw new AssertionError("expected task")
+    }
+    val evaluator = createEvaluator()
+    val fastq1 = evalPaths.getRootDir(ensureExists = true).resolve("fastq1.gz")
+    FileUtils.writeFileContent(fastq1, "fastq1")
+    val fastq2 = evalPaths.getRootDir(ensureExists = true).resolve("fastq2.gz")
+    FileUtils.writeFileContent(fastq2, "fastq2")
+    val index = evalPaths.getRootDir(ensureExists = true).resolve("genome_index.tar.gz")
+    FileUtils.writeFileContent(index, "index")
+    val inputs: Map[String, V] = Map(
+        "sample_name" -> V_String("sample"),
+        "fastq1_gz" -> V_File(fastq1.toString),
+        "fastq2_gz" -> V_File(fastq2.toString),
+        "genome_index_tgz" -> V_File(index.toString),
+        "read_group" -> V_Null,
+        "disk_gb" -> V_Null
+    )
+    val env: Map[String, V] =
+      task.privateVariables.foldLeft(inputs) {
+        case (env, TAT.PrivateVariable(name, wdlType, expr, _)) =>
+          val wdlValue =
+            evaluator.applyExprAndCoerce(expr, wdlType, WdlValueBindings(env))
+          env + (name -> wdlValue)
+      }
+    env("actual_disk_gb") shouldBe V_Int(1)
   }
 }
