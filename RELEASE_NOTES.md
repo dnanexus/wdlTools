@@ -2,7 +2,8 @@
 
 ## 0.11.15 (dev)
 
-* Allow any compound type to be aliased.
+* Allow any compound type to be aliased
+* Enable recursive deserialization of types
 
 ## 0.11.14 (2020-01-13)
 

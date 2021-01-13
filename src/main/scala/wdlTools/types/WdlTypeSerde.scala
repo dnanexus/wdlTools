@@ -4,6 +4,8 @@ import dx.util.JsUtils
 import spray.json._
 import wdlTools.types.WdlTypes._
 
+import scala.collection.immutable.TreeSeqMap
+
 case class UnknownTypeException(message: String) extends Exception(message)
 
 object WdlTypeSerde {
@@ -79,51 +81,75 @@ object WdlTypeSerde {
     }
   }
 
-  def deserializeType(jsValue: JsValue, typeAliases: Map[String, WdlTypes.T]): WdlTypes.T = {
-    def resolveType(name: String): WdlTypes.T = {
-      try {
-        simpleFromString(name)
-      } catch {
-        case _: UnknownTypeException if typeAliases.contains(name) =>
-          typeAliases(name)
-      }
+  def deserializeType(
+      jsValue: JsValue,
+      typeAliases: Map[String, T] = Map.empty,
+      jsSchemas: Map[String, JsValue] = Map.empty,
+      structName: Option[String] = None
+  ): (WdlTypes.T, Map[String, WdlTypes.T]) = {
+    jsValue match {
+      case JsString(typeName) if typeAliases.contains(typeName) =>
+        (typeAliases(typeName), typeAliases)
+      case JsString(typeName) if jsSchemas.contains(typeName) =>
+        deserializeType(jsSchemas(typeName), typeAliases, jsSchemas)
+      case JsString(typeName) =>
+        (simpleFromString(typeName), typeAliases)
+      case JsObject(fields) if fields.contains("type") =>
+        val (wdlType, newAliases) = fields("type") match {
+          case JsString("Array") =>
+            val (arrayType, newAliases) = deserializeType(fields("items"), typeAliases, jsSchemas)
+            val nonEmpty = fields.get("nonEmpty").exists(JsUtils.getBoolean(_))
+            (T_Array(arrayType, nonEmpty), newAliases)
+          case JsString("Map") =>
+            val (keyType, newAliases1) = deserializeType(fields("keys"), typeAliases, jsSchemas)
+            val (valueType, newAliases2) =
+              deserializeType(fields("values"), newAliases1, jsSchemas)
+            (T_Map(keyType, valueType), newAliases2)
+          case JsString("Pair") =>
+            val (lType, newAliases1) = deserializeType(fields("left"), typeAliases, jsSchemas)
+            val (rType, newAliases2) = deserializeType(fields("right"), newAliases1, jsSchemas)
+            (T_Pair(lType, rType), newAliases2)
+          case JsString("Struct") =>
+            val name = fields
+              .get("name")
+              .map {
+                case JsString(name) => name
+                case other          => throw new Exception(s"invalid struct name ${other}")
+              }
+              .orElse(structName)
+              .getOrElse(
+                  throw new Exception(s"cannot determine name for struct ${fields}")
+              )
+            val (members, newAliases) = fields("members").asJsObject.fields
+              .foldLeft(TreeSeqMap.empty[String, WdlTypes.T], typeAliases) {
+                case ((memberAccu, aliasAccu2), (memberName, memberValue)) =>
+                  val (memberType, newAliases) =
+                    deserializeType(memberValue, aliasAccu2, jsSchemas)
+                  (memberAccu + (memberName -> memberType), newAliases)
+              }
+            (T_Struct(name, members), newAliases)
+          case other =>
+            deserializeType(other, typeAliases, jsSchemas)
+        }
+        if (fields.get("optional").exists(JsUtils.getBoolean(_))) {
+          (T_Optional(wdlType), newAliases)
+        } else {
+          (wdlType, newAliases)
+        }
+      case _ =>
+        throw new Exception(s"unhandled type value ${jsValue}")
     }
-    def inner(innerValue: JsValue): WdlTypes.T = {
-      innerValue match {
-        case JsString(name) => resolveType(name)
-        case JsObject(fields) =>
-          val t = if (fields.contains("name")) {
-            val JsString(name) = fields("name")
-            resolveType(name)
-          } else {
-            fields("type") match {
-              case JsString("Array") =>
-                val arrayType = inner(fields("items"))
-                val nonEmpty = fields.get("nonEmpty").exists(JsUtils.getBoolean(_))
-                T_Array(arrayType, nonEmpty)
-              case JsString("Map") =>
-                val keyType = inner(fields("keys"))
-                val valueType = inner(fields("values"))
-                T_Map(keyType, valueType)
-              case JsString("Pair") =>
-                val lType = inner(fields("left"))
-                val rType = inner(fields("right"))
-                T_Pair(lType, rType)
-              case JsString(name) =>
-                resolveType(name)
-              case _ =>
-                throw new Exception(s"unhandled type value ${innerValue}")
-            }
-          }
-          if (fields.get("optional").exists(JsUtils.getBoolean(_))) {
-            T_Optional(t)
-          } else {
-            t
-          }
-        case other =>
-          throw new Exception(s"unexpected type value ${other}")
-      }
+  }
+
+  def deserializeTypes(
+      jsValues: Map[String, JsValue],
+      jsSchemas: Map[String, JsValue] = Map.empty,
+      typeAliases: Map[String, WdlTypes.T] = Map.empty
+  ): (Map[String, WdlTypes.T], Map[String, WdlTypes.T]) = {
+    jsValues.foldLeft(TreeSeqMap.empty[String, WdlTypes.T], typeAliases) {
+      case ((typeAccu, aliasAccu), (name, jsValue)) =>
+        val (wdlType, newAliases) = deserializeType(jsValue, aliasAccu, jsSchemas)
+        (typeAccu + (name -> wdlType), newAliases)
     }
-    inner(jsValue)
   }
 }
