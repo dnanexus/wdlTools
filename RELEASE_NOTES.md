@@ -1,8 +1,17 @@
 # Change log
 
+## 0.11.15 (dev)
+
+* Allow any compound type to be aliased.
+
 ## 0.11.14 (2020-01-13)
 
 * Handle special case of null values for non-optional compound inputs in `wdlTools.exec.InputOutput`
+* The JSON serialization format was updated for compound types:
+    * "name" -> "type"
+    * For Array, "itemType" -> "items"  
+    * For Map, "keyType" -> "keys" and "valueType" -> "values"
+    * For Pair, "leftType" -> "left" and "rightType" -> "right"
 
 ## 0.11.13 (2020-01-12)
 

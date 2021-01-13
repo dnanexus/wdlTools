@@ -92,23 +92,28 @@ object WdlTypeSerde {
       innerValue match {
         case JsString(name) => resolveType(name)
         case JsObject(fields) =>
-          val t = fields("type") match {
-            case JsString("Array") =>
-              val arrayType = inner(fields("items"))
-              val nonEmpty = fields.get("nonEmpty").exists(JsUtils.getBoolean(_))
-              T_Array(arrayType, nonEmpty)
-            case JsString("Map") =>
-              val keyType = inner(fields("keys"))
-              val valueType = inner(fields("values"))
-              T_Map(keyType, valueType)
-            case JsString("Pair") =>
-              val lType = inner(fields("left"))
-              val rType = inner(fields("right"))
-              T_Pair(lType, rType)
-            case JsString(name) =>
-              resolveType(name)
-            case _ =>
-              throw new Exception(s"unhandled type value ${innerValue}")
+          val t = if (fields.contains("name")) {
+            val JsString(name) = fields("name")
+            resolveType(name)
+          } else {
+            fields("type") match {
+              case JsString("Array") =>
+                val arrayType = inner(fields("items"))
+                val nonEmpty = fields.get("nonEmpty").exists(JsUtils.getBoolean(_))
+                T_Array(arrayType, nonEmpty)
+              case JsString("Map") =>
+                val keyType = inner(fields("keys"))
+                val valueType = inner(fields("values"))
+                T_Map(keyType, valueType)
+              case JsString("Pair") =>
+                val lType = inner(fields("left"))
+                val rType = inner(fields("right"))
+                T_Pair(lType, rType)
+              case JsString(name) =>
+                resolveType(name)
+              case _ =>
+                throw new Exception(s"unhandled type value ${innerValue}")
+            }
           }
           if (fields.get("optional").exists(JsUtils.getBoolean(_))) {
             T_Optional(t)
