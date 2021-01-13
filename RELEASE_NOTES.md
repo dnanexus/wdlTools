@@ -1,5 +1,9 @@
 # Change log
 
+## 0.11.14 (2020-01-13)
+
+* Handle special case of null values for non-optional compound inputs in `wdlTools.exec.InputOutput`
+
 ## 0.11.13 (2020-01-12)
 
 * Bump ANTLR version to 4.9
