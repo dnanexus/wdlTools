@@ -21,31 +21,31 @@ object WdlTypeSerde {
       case T_Array(memberType, nonEmpty) =>
         JsObject(
             Map(
-                "name" -> JsString("Array"),
-                "type" -> serializeType(memberType),
+                "type" -> JsString("Array"),
+                "items" -> serializeType(memberType),
                 "nonEmpty" -> JsBoolean(nonEmpty)
             )
         )
       case T_Pair(lType, rType) =>
         JsObject(
             Map(
-                "name" -> JsString("Pair"),
-                "leftType" -> serializeType(lType),
-                "rightType" -> serializeType(rType)
+                "type" -> JsString("Pair"),
+                "left" -> serializeType(lType),
+                "right" -> serializeType(rType)
             )
         )
       case T_Map(keyType, valueType) =>
         JsObject(
             Map(
-                "name" -> JsString("Map"),
-                "keyType" -> serializeType(keyType),
-                "valueType" -> serializeType(valueType)
+                "type" -> JsString("Map"),
+                "keys" -> serializeType(keyType),
+                "values" -> serializeType(valueType)
             )
         )
       case T_Optional(inner) =>
         serializeType(inner) match {
           case name: JsString =>
-            JsObject(Map("name" -> name, "optional" -> JsBoolean(true)))
+            JsObject(Map("type" -> name, "optional" -> JsBoolean(true)))
           case JsObject(fields) =>
             JsObject(fields + ("optional" -> JsBoolean(true)))
           case other =>
@@ -92,18 +92,18 @@ object WdlTypeSerde {
       innerValue match {
         case JsString(name) => resolveType(name)
         case JsObject(fields) =>
-          val t = fields("name") match {
+          val t = fields("type") match {
             case JsString("Array") =>
-              val arrayType = inner(fields("type"))
+              val arrayType = inner(fields("items"))
               val nonEmpty = fields.get("nonEmpty").exists(JsUtils.getBoolean(_))
               T_Array(arrayType, nonEmpty)
             case JsString("Map") =>
-              val keyType = inner(fields("keyType"))
-              val valueType = inner(fields("valueType"))
+              val keyType = inner(fields("keys"))
+              val valueType = inner(fields("values"))
               T_Map(keyType, valueType)
             case JsString("Pair") =>
-              val lType = inner(fields("leftType"))
-              val rType = inner(fields("rightType"))
+              val lType = inner(fields("left"))
+              val rType = inner(fields("right"))
               T_Pair(lType, rType)
             case JsString(name) =>
               resolveType(name)

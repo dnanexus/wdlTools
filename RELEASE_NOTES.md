@@ -1,6 +1,6 @@
 # Change log
 
-## 0.11.13 (dev)
+## 0.11.13 (2020-01-12)
 
 * Bump ANTLR version to 4.9
 
