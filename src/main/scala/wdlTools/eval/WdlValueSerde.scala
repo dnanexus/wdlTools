@@ -66,17 +66,24 @@ object WdlValueSerde {
     serializeMap(bindings.toMap, handler)
   }
 
-  def deserialize(jsValue: JsValue): V = {
-    jsValue match {
-      case JsNull                               => V_Null
-      case JsBoolean(value)                     => V_Boolean(value)
-      case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
-      case JsNumber(value)                      => V_Float(value.toDouble)
-      case JsString(value)                      => V_String(value)
-      case JsArray(vec)                         => V_Array(vec.map(deserialize))
-      case JsObject(fields) =>
-        V_Object(fields.map { case (k, v) => k -> deserialize(v) })
+  def deserialize(jsValue: JsValue, handler: Option[JsValue => Option[V]] = None): V = {
+    def inner(innerValue: JsValue): V = {
+      val v = handler.flatMap(_(innerValue))
+      if (v.isDefined) {
+        return v.get
+      }
+      innerValue match {
+        case JsNull                               => V_Null
+        case JsBoolean(value)                     => V_Boolean(value)
+        case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
+        case JsNumber(value)                      => V_Float(value.toDouble)
+        case JsString(value)                      => V_String(value)
+        case JsArray(vec)                         => V_Array(vec.map(deserialize))
+        case JsObject(fields) =>
+          V_Object(fields.map { case (k, v) => k -> deserialize(v) })
+      }
     }
+    inner(jsValue)
   }
 
   /**
@@ -91,9 +98,14 @@ object WdlValueSerde {
   def deserialize(
       jsValue: JsValue,
       wdlType: T,
-      name: String = ""
+      name: String = "",
+      handler: Option[(JsValue, T) => Option[V]] = None
   ): V = {
     def inner(innerValue: JsValue, innerType: T, innerName: String): V = {
+      val v = handler.flatMap(_(innerValue, innerType))
+      if (v.isDefined) {
+        return v.get
+      }
       (innerType, innerValue) match {
         // primitive types
         case (T_Boolean, JsBoolean(b))  => V_Boolean(b.booleanValue)

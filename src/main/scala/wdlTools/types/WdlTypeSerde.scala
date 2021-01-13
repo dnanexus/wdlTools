@@ -143,8 +143,8 @@ object WdlTypeSerde {
 
   def deserializeTypes(
       jsValues: Map[String, JsValue],
-      jsSchemas: Map[String, JsValue] = Map.empty,
-      typeAliases: Map[String, WdlTypes.T] = Map.empty
+      typeAliases: Map[String, WdlTypes.T] = Map.empty,
+      jsSchemas: Map[String, JsValue] = Map.empty
   ): (Map[String, WdlTypes.T], Map[String, WdlTypes.T]) = {
     jsValues.foldLeft(TreeSeqMap.empty[String, WdlTypes.T], typeAliases) {
       case ((typeAccu, aliasAccu), (name, jsValue)) =>
