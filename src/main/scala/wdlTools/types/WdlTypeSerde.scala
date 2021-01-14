@@ -121,12 +121,13 @@ object WdlTypeSerde {
       structName: Option[String] = None
   ): (WdlTypes.T, Map[String, WdlTypes.T]) = {
     def inner(innerValue: JsValue,
-              innerAliases: Map[String, T]): (WdlTypes.T, Map[String, WdlTypes.T]) = {
+              innerAliases: Map[String, T],
+              innerStructName: Option[String] = None): (WdlTypes.T, Map[String, WdlTypes.T]) = {
       innerValue match {
         case JsString(typeName) if innerAliases.contains(typeName) =>
           (innerAliases(typeName), innerAliases)
         case JsString(typeName) if jsSchemas.contains(typeName) =>
-          inner(jsSchemas(typeName), innerAliases)
+          inner(jsSchemas(typeName), innerAliases, Some(typeName))
         case JsString(typeName) =>
           (simpleFromString(typeName), innerAliases)
         case JsObject(fields) if fields.contains("type") =>
@@ -151,7 +152,7 @@ object WdlTypeSerde {
                   case JsString(name) => name
                   case other          => throw new Exception(s"invalid struct name ${other}")
                 }
-                .orElse(structName)
+                .orElse(innerStructName)
                 .getOrElse(
                     throw new Exception(s"cannot determine name for struct ${fields}")
                 )
@@ -175,7 +176,7 @@ object WdlTypeSerde {
           throw new Exception(s"unhandled type value ${jsValue}")
       }
     }
-    inner(jsValue, typeAliases)
+    inner(jsValue, typeAliases, structName)
   }
 
   def deserializeTypes(
