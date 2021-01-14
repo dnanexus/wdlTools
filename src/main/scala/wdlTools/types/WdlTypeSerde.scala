@@ -127,7 +127,8 @@ object WdlTypeSerde {
         case JsString(typeName) if innerAliases.contains(typeName) =>
           (innerAliases(typeName), innerAliases)
         case JsString(typeName) if jsSchemas.contains(typeName) =>
-          inner(jsSchemas(typeName), innerAliases, Some(typeName))
+          val (structType, newAliases) = inner(jsSchemas(typeName), innerAliases, Some(typeName))
+          (structType, newAliases + (typeName -> structType))
         case JsString(typeName) =>
           (simpleFromString(typeName), innerAliases)
         case JsObject(fields) if fields.contains("type") =>
