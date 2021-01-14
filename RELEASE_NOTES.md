@@ -4,6 +4,7 @@
 
 * Allow any compound type to be aliased
 * Enable recursive deserialization of types
+* Support use of type aliases for WDL type (de)serialization
 
 ## 0.11.14 (2020-01-13)
 
