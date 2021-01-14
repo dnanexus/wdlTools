@@ -515,4 +515,27 @@ object TypeUtils {
         exprDependencies(expr)
     }
   }
+
+  def collectStructs(wdlTypes: Vector[WdlTypes.T]): Map[String, WdlTypes.T_Struct] = {
+    def inner(wdlType: WdlTypes.T,
+              structs: Map[String, WdlTypes.T_Struct]): Map[String, WdlTypes.T_Struct] = {
+      wdlType match {
+        case struct: WdlTypes.T_Struct if !structs.contains(struct.name) =>
+          struct.members.values.foldLeft(structs + (struct.name -> struct)) {
+            case (accu, memberType) => inner(memberType, accu)
+          }
+        case WdlTypes.T_Optional(c: WdlTypes.T_Collection) => inner(c, structs)
+        case WdlTypes.T_Array(c: WdlTypes.T_Collection, _) => inner(c, structs)
+        case WdlTypes.T_Map(_, c: WdlTypes.T_Collection)   => inner(c, structs)
+        case WdlTypes.T_Pair(l: WdlTypes.T_Collection, r: WdlTypes.T_Collection) =>
+          inner(r, inner(l, structs))
+        case WdlTypes.T_Pair(l: WdlTypes.T_Collection, _) => inner(l, structs)
+        case WdlTypes.T_Pair(_, r: WdlTypes.T_Collection) => inner(r, structs)
+        case _                                            => structs
+      }
+    }
+    wdlTypes.foldLeft(Map.empty[String, WdlTypes.T_Struct]) {
+      case (accu, wdlType) => inner(wdlType, accu)
+    }
+  }
 }
