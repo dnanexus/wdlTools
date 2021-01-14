@@ -78,9 +78,9 @@ object WdlValueSerde {
         case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
         case JsNumber(value)                      => V_Float(value.toDouble)
         case JsString(value)                      => V_String(value)
-        case JsArray(vec)                         => V_Array(vec.map(deserialize))
+        case JsArray(vec)                         => V_Array(vec.map(inner))
         case JsObject(fields) =>
-          V_Object(fields.map { case (k, v) => k -> deserialize(v) })
+          V_Object(fields.map { case (k, v) => k -> inner(v) })
       }
     }
     inner(jsValue)
@@ -95,7 +95,7 @@ object WdlValueSerde {
     * @param jsValue: the JSON value
     * @return the WDL value
     */
-  def deserialize(
+  def deserializeWithType(
       jsValue: JsValue,
       wdlType: T,
       name: String = "",

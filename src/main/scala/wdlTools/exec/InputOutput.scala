@@ -169,7 +169,7 @@ object TaskInputOutput {
         None
       case _ =>
         try {
-          Some(WdlValueSerde.deserialize(jsValue, inputDef.wdlType, name))
+          Some(WdlValueSerde.deserializeWithType(jsValue, inputDef.wdlType, name))
         } catch {
           case jse: WdlValueSerializationException =>
             throw new ExecException(jse.getMessage, inputDef.loc)

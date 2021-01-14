@@ -56,7 +56,7 @@ case class Exec(conf: WdlToolsConf) extends Command {
           JsUtils
             .getFields(JsUtils.jsFromFile(path))
             .view
-            .mapValues(WdlValueSerde.deserialize)
+            .mapValues(WdlValueSerde.deserialize(_))
             .toMap
       )
     }
