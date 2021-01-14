@@ -4,7 +4,7 @@ import dx.util.JsUtils
 import spray.json._
 import wdlTools.types.WdlTypes._
 
-import scala.collection.immutable.TreeSeqMap
+import scala.collection.immutable.{SortedMap, TreeSeqMap}
 
 case class UnknownTypeException(message: String) extends Exception(message)
 
@@ -12,9 +12,9 @@ object WdlTypeSerde {
 
   def serializeStruct(structType: T_Struct,
                       typeAliases: Map[String, JsValue] = Map.empty,
-                      withName: Boolean = true): (JsObject, Map[String, JsValue]) = {
+                      withName: Boolean = true): (JsObject, SortedMap[String, JsValue]) = {
     val (membersJs, newTypeAliases) =
-      structType.members.foldLeft(Map.empty[String, JsValue], typeAliases) {
+      structType.members.foldLeft(SortedMap.empty[String, JsValue], typeAliases.to(SortedMap)) {
         case ((memberAccu, aliasAccu), (memberName, memberType)) =>
           val (memberTypeJs, newTypeAliases) = serializeType(memberType, aliasAccu)
           (memberAccu + (memberName -> memberTypeJs), newTypeAliases)
@@ -29,12 +29,12 @@ object WdlTypeSerde {
   def serializeType(
       wdlType: WdlTypes.T,
       typeAliases: Map[String, JsValue] = Map.empty
-  ): (JsValue, Map[String, JsValue]) = {
+  ): (JsValue, SortedMap[String, JsValue]) = {
     val newTypeAliases = wdlType match {
       case structType: T_Struct if !typeAliases.contains(structType.name) =>
         val (structJs, newTypeAliases) = serializeStruct(structType, typeAliases, withName = false)
         newTypeAliases + (structType.name -> structJs)
-      case _ => typeAliases
+      case _ => typeAliases.to(SortedMap)
     }
     wdlType match {
       case p: T_Primitive =>
@@ -79,9 +79,9 @@ object WdlTypeSerde {
         val (typeJs, newTypeAliases2) = serializeType(t, newTypeAliases)
         val optJs = typeJs match {
           case name: JsString =>
-            JsObject(Map("type" -> name, "optional" -> JsBoolean(true)))
+            JsObject("type" -> name, "optional" -> JsBoolean(true))
           case JsObject(fields) =>
-            JsObject(fields + ("optional" -> JsBoolean(true)))
+            JsObject(fields.to(SortedMap) + ("optional" -> JsBoolean(true)))
           case other =>
             throw new Exception(s"unhandled inner type ${other}")
         }
