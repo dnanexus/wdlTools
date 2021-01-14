@@ -1,6 +1,33 @@
 # Change log
 
-## v0.11.11 (2021-01-05)
+## v0.12.0 (2021-01-05)
+
+* Adds support for WDL 1.1
+
+## 0.11.15 (dev)
+
+* Allow any compound type to be aliased
+* Enable recursive deserialization of types
+* Support use of type aliases for WDL type (de)serialization
+
+## 0.11.14 (2020-01-13)
+
+* Handle special case of null values for non-optional compound inputs in `wdlTools.exec.InputOutput`
+* The JSON serialization format was updated for compound types:
+    * "name" -> "type"
+    * For Array, "itemType" -> "items"  
+    * For Map, "keyType" -> "keys" and "valueType" -> "values"
+    * For Pair, "leftType" -> "left" and "rightType" -> "right"
+
+## 0.11.13 (2020-01-12)
+
+* Bump ANTLR version to 4.9
+
+## v0.11.12 (2020-01-05)
+
+* Revert change to `Stdlib.size` - don't use `isExactDobule`
+
+## v0.11.11 (2020-01-05)
 
 * Fix several small issues that have recently been clarified in the spec
 

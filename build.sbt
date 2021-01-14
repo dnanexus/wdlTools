@@ -82,7 +82,7 @@ logLevel in assembly := Level.Info
 //)
 
 val dxCommonVersion = "0.2.4"
-val antlr4Version = "4.8"
+val antlr4Version = "4.9"
 val scallopVersion = "3.4.0"
 val typesafeVersion = "1.3.3"
 val scalateVersion = "1.9.6"

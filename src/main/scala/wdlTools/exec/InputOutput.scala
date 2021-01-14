@@ -15,8 +15,9 @@ import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
+import wdlTools.eval.WdlValues.{V_Array, V_Map, V_Object}
 
-import scala.collection.immutable.TreeSeqMap
+import scala.collection.immutable.{SeqMap, TreeSeqMap}
 
 abstract class InputOutput(callable: Callable, logger: Logger) {
   protected lazy val callableInputs: Map[String, InputParameter] =
@@ -30,7 +31,8 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
 
   def inputsFromValues(inputValues: Map[String, WdlValues.V],
                        evaluator: Eval,
-                       strict: Boolean = false): Bindings[String, WdlValues.V] = {
+                       ignoreDefaultEvalError: Boolean = true,
+                       nullCollectionAsEmpty: Boolean = false): Bindings[String, WdlValues.V] = {
     // resolve default values for any missing inputs
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
     inputOrder.foldLeft(init) {
@@ -39,6 +41,17 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
           case _: RequiredInputParameter if inputValues.contains(declName) =>
             // ensure the required value is not T_Optional
             WdlValueUtils.unwrapOptional(inputValues(declName))
+          case RequiredInputParameter(_, WdlTypes.T_Array(_, false), _) if nullCollectionAsEmpty =>
+            // Special handling for required input Arrays that are non-optional but
+            // allowed to be empty and do not have a value specified - set the value
+            // to the empty array rather than throwing an exception.
+            V_Array(Vector.empty)
+          case RequiredInputParameter(_, _: WdlTypes.T_Map, _) if nullCollectionAsEmpty =>
+            // Special handling for required input Maps that are non-optional
+            V_Map(SeqMap.empty)
+          case RequiredInputParameter(_, WdlTypes.T_Object, _) if nullCollectionAsEmpty =>
+            // Special handling for required input Objects that are non-optional
+            V_Object(Map.empty)
           case inp: RequiredInputParameter =>
             throw new ExecException(s"Missing required input ${declName} to task ${callable.name}",
                                     inp.loc)
@@ -53,7 +66,7 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
             try {
               evaluator.applyExprAndCoerce(defaultExpr, wdlType, ctx)
             } catch {
-              case e: EvalException if !strict =>
+              case e: EvalException if ignoreDefaultEvalError =>
                 logger.trace(
                     s"Could not evaluate default value expression for input parameter ${declName}",
                     exception = Some(e)
@@ -156,7 +169,7 @@ object TaskInputOutput {
         None
       case _ =>
         try {
-          Some(WdlValueSerde.deserialize(jsValue, inputDef.wdlType, name))
+          Some(WdlValueSerde.deserializeWithType(jsValue, inputDef.wdlType, name))
         } catch {
           case jse: WdlValueSerializationException =>
             throw new ExecException(jse.getMessage, inputDef.loc)

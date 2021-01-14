@@ -15,7 +15,7 @@ object WdlVersion {
   case object V1_1 extends WdlVersion("1.1", 2, Set.empty)
   case object V2 extends WdlVersion("2.0", 3, aliases = Set("development"))
 
-  val All: Vector[WdlVersion] = Vector(V2, V1_1, V1, Draft_2).sortWith(_ < _)
+  val All: Vector[WdlVersion] = Vector(V2, V1, Draft_2).sortWith(_ < _)
 
   def withName(name: String): WdlVersion = {
     All

@@ -27,8 +27,11 @@ object EvalUtils {
     * @return
     */
   def getSizeMultiplier(sizeUnit: String, loc: SourceLocation): Double = {
-    SizeUnits.getOrElse(sizeUnit.toLowerCase,
-                        throw new EvalException(s"Unknown unit ${sizeUnit}", loc))
+    val key = sizeUnit.toLowerCase match {
+      case k if !k.endsWith("b") => s"${k}b"
+      case k                     => k
+    }
+    SizeUnits.getOrElse(key, throw new EvalException(s"Unknown unit ${sizeUnit}", loc))
   }
 
   private val stringSizeRegexp = "([\\d.]+)(?:\\s*(.+))?".r
