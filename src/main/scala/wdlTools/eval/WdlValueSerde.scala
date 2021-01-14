@@ -5,7 +5,7 @@ import wdlTools.eval.WdlValues._
 import wdlTools.types.WdlTypes._
 import dx.util.Bindings
 
-import scala.collection.immutable.TreeSeqMap
+import scala.collection.immutable.{SortedMap, TreeSeqMap}
 
 // an error that occurs during (de)serialization of JSON
 final class WdlValueSerializationException(message: String) extends Exception(message)
@@ -32,23 +32,27 @@ object WdlValueSerde {
         case V_Array(vec) =>
           JsArray(vec.map(inner))
         case V_Pair(l, r) =>
-          JsObject(Map("left" -> inner(l), "right" -> inner(r)))
+          JsObject("left" -> inner(l), "right" -> inner(r))
         case V_Map(members) =>
-          JsObject(members.map {
-            case (k, v) =>
-              val key = inner(k) match {
-                case JsString(value) => value
-                case other =>
-                  throw new WdlValueSerializationException(
-                      s"Cannot serialize non-string map key ${other}"
-                  )
-              }
-              key -> inner(v)
-          })
+          JsObject(
+              members
+                .map {
+                  case (k, v) =>
+                    val key = inner(k) match {
+                      case JsString(value) => value
+                      case other =>
+                        throw new WdlValueSerializationException(
+                            s"Cannot serialize non-string map key ${other}"
+                        )
+                    }
+                    key -> inner(v)
+                }
+                .to(SortedMap)
+          )
         case V_Object(members) =>
-          JsObject(members.map { case (k, v) => k -> inner(v) })
+          JsObject(members.map { case (k, v) => k -> inner(v) }.to(SortedMap))
         case V_Struct(_, members) =>
-          JsObject(members.map { case (k, v) => k -> inner(v) })
+          JsObject(members.map { case (k, v) => k -> inner(v) }.to(SortedMap))
 
         case other => throw new WdlValueSerializationException(s"value ${other} not supported")
       }
@@ -58,7 +62,7 @@ object WdlValueSerde {
 
   def serializeMap(wdlValues: Map[String, V],
                    handler: Option[V => Option[JsValue]] = None): Map[String, JsValue] = {
-    wdlValues.view.mapValues(v => serialize(v, handler)).toMap
+    wdlValues.view.mapValues(v => serialize(v, handler)).to(SortedMap)
   }
 
   def serializeBindings(bindings: Bindings[String, V],
