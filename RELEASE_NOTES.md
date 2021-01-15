@@ -4,11 +4,12 @@
 
 * Adds support for WDL 1.1
 
-## 0.11.15 (dev)
+## 0.11.15 (2020-01-14)
 
 * Allow any compound type to be aliased
 * Enable recursive deserialization of types
 * Support use of type aliases for WDL type (de)serialization
+* Use `SortedMap`s when serializing to JSON to the results are consistent
 
 ## 0.11.14 (2020-01-13)
 
