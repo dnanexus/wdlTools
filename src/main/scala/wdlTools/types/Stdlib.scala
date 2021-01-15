@@ -298,6 +298,16 @@ case class Stdlib(regime: TypeCheckingRegime,
       )
   ).flatten
 
+  private def v2comparisonPrototypes(funcName: String): Vector[T_Function] = {
+    Vector(
+        T_Function2(funcName, T_String, T_String, T_Boolean),
+        T_Function2(funcName, T_Int, T_Int, T_Boolean),
+        T_Function2(funcName, T_Float, T_Float, T_Boolean),
+        T_Function2(funcName, T_Int, T_Float, T_Boolean),
+        T_Function2(funcName, T_Float, T_Int, T_Boolean)
+    )
+  }
+
   private lazy val v2Prototypes: Vector[T_Function] = Vector(
       // unary numeric operators
       unaryNumericPrototypes(Operator.UnaryMinus.name),
@@ -310,10 +320,10 @@ case class Stdlib(regime: TypeCheckingRegime,
       // comparison operators
       equalityPrototypes(Operator.Equality.name),
       equalityPrototypes(Operator.Inequality.name),
-      comparisonPrototypes(Operator.LessThan.name),
-      comparisonPrototypes(Operator.LessThanOrEqual.name),
-      comparisonPrototypes(Operator.GreaterThan.name),
-      comparisonPrototypes(Operator.GreaterThanOrEqual.name),
+      v2comparisonPrototypes(Operator.LessThan.name),
+      v2comparisonPrototypes(Operator.LessThanOrEqual.name),
+      v2comparisonPrototypes(Operator.GreaterThan.name),
+      v2comparisonPrototypes(Operator.GreaterThanOrEqual.name),
       // The + operator is overloaded for string arguments. If all arguments are non-optional,
       // then the return type is non-optional. Within an interpolation, if either argument type
       // is optional, then the return type is optional.
