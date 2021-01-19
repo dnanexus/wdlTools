@@ -137,6 +137,13 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function1(Operator.Addition.name, T_Array(T_String), T_String),
           T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
       ),
+      // Prior to 2.0, the + operator is overloaded for string + numeric concatenation
+      Vector(
+          T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
+          T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
+      ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),
       vectorNumericPrototypes(Operator.Subtraction.name),
@@ -231,6 +238,13 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
           T_Function1(Operator.Addition.name, T_Array(T_String), T_String),
           T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+      ),
+      // Prior to 2.0, the + operator is overloaded for string + numeric concatenation
+      Vector(
+          T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
+          T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
       ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),

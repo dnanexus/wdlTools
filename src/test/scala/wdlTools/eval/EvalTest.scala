@@ -14,8 +14,9 @@ import wdlTools.types.WdlTypes._
 import scala.collection.immutable.TreeSeqMap
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
-  private val srcDir = Paths.get(getClass.getResource("/eval/v1").getPath)
-  private val fileResolver = FileSourceResolver.create(Vector(srcDir))
+  private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
+  private val v2Dir = Paths.get(getClass.getResource("/eval/v2").getPath)
+  private val fileResolver = FileSourceResolver.create(Vector(v1Dir))
   private val logger = Logger.Normal
   private val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
@@ -53,7 +54,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "handle simple expressions" in {
-    val file = srcDir.resolve("simple_expr.wdl")
+    val file = v1Dir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val bindings =
       evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("x" -> V_Float(1.0))))
@@ -97,7 +98,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "call stdlib" in {
-    val file = srcDir.resolve("stdlib.wdl")
+    val file = v1Dir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctx = WdlValueBindings(Map("empty_string" -> V_Null))
     val bindings = evaluator.applyPrivateVariables(decls, ctx)
@@ -213,7 +214,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "perform coercions" in {
-    val file = srcDir.resolve("coercions.wdl")
+    val file = v1Dir.resolve("coercions.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
 
@@ -234,7 +235,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "perform non-standard coercions" in {
-    val file = srcDir.resolve("non_standard_coercions.wdl")
+    val file = v1Dir.resolve("non_standard_coercions.wdl")
     val (evaluator, decls) =
       parseAndTypeCheckAndGetDeclarations(file, allowNonstandardCoercions = true)
     val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
@@ -243,7 +244,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   private def evalCommand(wdlSourceFileName: String): String = {
-    val file = srcDir.resolve(wdlSourceFileName)
+    val file = v1Dir.resolve(wdlSourceFileName)
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -304,7 +305,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "bad coercion" in {
-    val file = srcDir.resolve("bad_coercion.wdl")
+    val file = v1Dir.resolve("bad_coercion.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     assertThrows[EvalException] {
       val _ = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
@@ -312,20 +313,20 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "handle null and optionals" taggedAs Edge in {
-    val file = srcDir.resolve("conditionals3.wdl")
+    val file = v1Dir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val bd = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
     bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
   }
 
   it should "handle accessing pair values" in {
-    val file = srcDir.resolve("pair.wdl")
+    val file = v1Dir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
   }
 
   it should "handle empty stdout/stderr" in {
-    val file = srcDir.resolve("empty_stdout.wdl")
+    val file = v1Dir.resolve("empty_stdout.wdl")
     parseAndTypeCheck(file)
   }
 
@@ -354,7 +355,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "file2" -> None
     )
 
-    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("constants.wdl"))
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(v1Dir.resolve("constants.wdl"))
 
     decls.foreach {
       case TAT.PrivateVariable(id, wdlType, expr, _) =>
@@ -374,7 +375,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "not be able to access unsupported file protocols" in {
-    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(srcDir.resolve("bad_protocol.wdl"))
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(v1Dir.resolve("bad_protocol.wdl"))
     decls match {
       case Vector(TAT.PrivateVariable(_, wdlType, expr, _)) =>
         assertThrows[EvalException] {
@@ -384,9 +385,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
   }
 
-  it should "evaluate concatenation of different types within placeholders" in {
+  it should "evaluate concatenation of different types v1" in {
     val (evaluator, decls) =
-      parseAndTypeCheckAndGetDeclarations(srcDir.resolve("add_int_and_string.wdl"))
+      parseAndTypeCheckAndGetDeclarations(v1Dir.resolve("add_int_and_string.wdl"))
+    val results = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(Map("subset_n" -> V_Int(2), "subset_total" -> V_Int(5)))
+    )
+    results("subset_param1") shouldBe V_String("-q 2/5")
+    results("subset_param2") shouldBe V_String("-q 2/5")
+    results("subset_param3") shouldBe V_String("-q 2/5")
+  }
+
+  it should "evaluate concatenation of different types v2" in {
+    val (evaluator, decls) =
+      parseAndTypeCheckAndGetDeclarations(v2Dir.resolve("add_int_and_string.wdl"))
     val results = evaluator.applyPrivateVariables(
         decls,
         WdlValueBindings(Map("subset_n" -> V_Int(2), "subset_total" -> V_Int(5)))
@@ -416,7 +429,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "evaluate a task with an nunset optional input" in {
-    val tDoc = parseAndTypeCheck(srcDir.resolve("bwa_mem.wdl"))
+    val tDoc = parseAndTypeCheck(v1Dir.resolve("bwa_mem.wdl"))
     val task = tDoc.elements match {
       case Vector(task: TAT.Task) => task
       case _                      => throw new AssertionError("expected task")
