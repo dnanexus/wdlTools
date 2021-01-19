@@ -648,11 +648,18 @@ case class Stdlib(paths: EvalPaths,
           throw new EvalException(s"cannot add values ${other}", loc)
       }
     }
-    ctx.getOneArg match {
-      case V_Array(args) if args.size >= 2 =>
-        args.reduce((a, b) => add2(a, b, ctx.exprState, ctx.loc))
-      case _ =>
-        throw new EvalException(s"illegal addition args ${ctx.args}", ctx.loc)
+    if (ctx.args.length == 1) {
+      ctx.getOneArg match {
+        case V_Array(args) if args.size >= 2 =>
+          args.reduce((a, b) => add2(a, b, ctx.exprState, ctx.loc))
+        case _ =>
+          throw new EvalException(s"illegal addition args ${ctx.args}", ctx.loc)
+      }
+    } else if (ctx.args.length == 2) {
+      val (a, b) = ctx.getTwoArgs
+      add2(a, b, ctx.exprState, ctx.loc)
+    } else {
+      throw new EvalException(s"illegal addition args ${ctx.args}", ctx.loc)
     }
   }
 
