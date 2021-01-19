@@ -331,10 +331,18 @@ case class Stdlib(regime: TypeCheckingRegime,
       // The + operator is overloaded for string arguments. If all arguments are non-optional,
       // then the return type is non-optional. Within an interpolation, if either argument type
       // is optional, then the return type is optional.
-      // https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#interpolating-and-concatenating-optional-strings
       Vector(
           T_Function1(Operator.Addition.name, T_Array(T_File), T_File),
-          T_Function1(Operator.Addition.name, T_Array(T_String), T_String)
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
+          T_Function1(Operator.Addition.name, T_Array(T_String), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
+      ),
+      // Prior to 2.0, the + operator is overloaded for string + numeric concatenation
+      Vector(
+          T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
+          T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
       ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),
@@ -414,14 +422,6 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function1("select_all", T_Array(T_Optional(T_Var(0))), T_Array(T_Var(0)))
       )
   ).flatten
-
-  private lazy val v1_1PlaceholderPrototypes: Vector[T_Function] = Vector(
-      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
-      // string + non-string concatenations are no longer allowed generally, but
-      // I believe they should be allowed within placeholders - there
-      // is an open discussion https://github.com/openwdl/wdl/issues/391
-      T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
-  )
 
   private def v2comparisonPrototypes(funcName: String): Vector[T_Function] = {
     Vector(
@@ -538,9 +538,6 @@ case class Stdlib(regime: TypeCheckingRegime,
 
   private lazy val v2PlaceholderPrototypes: Vector[T_Function] = Vector(
       T_Function1(Operator.Addition.name, T_Array(T_Optional(T_File)), T_Optional(T_File)),
-      // string + non-string concatenations are no longer allowed generally, but
-      // I believe they should be allowed within placeholders - there
-      // is an open discussion https://github.com/openwdl/wdl/issues/391
       T_Function1(Operator.Addition.name, T_Array(T_Optional(T_String)), T_Optional(T_String))
   )
 
@@ -548,10 +545,7 @@ case class Stdlib(regime: TypeCheckingRegime,
   private def protoTable(exprState: ExprState): Vector[T_Function] = version match {
     case WdlVersion.Draft_2 => draft2Prototypes
     case WdlVersion.V1      => v1Prototypes
-    case WdlVersion.V1_1
-        if exprState >= ExprState.InPlaceholder || regime <= TypeCheckingRegime.Lenient =>
-      v1_1Prototypes ++ v1_1PlaceholderPrototypes
-    case WdlVersion.V1_1 => v1_1Prototypes
+    case WdlVersion.V1_1    => v1_1Prototypes
     case WdlVersion.V2
         if exprState >= ExprState.InPlaceholder || regime <= TypeCheckingRegime.Lenient =>
       v2Prototypes ++ v2PlaceholderPrototypes
