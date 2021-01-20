@@ -1,5 +1,12 @@
 # Change log
 
+## 0.11.16 (2020-01-20)
+
+* Revert change that disallowed String + non-String concatenation and Boolean-Boolean comparisons pre-2.0
+* Fix some places where `SortedMap` wasn't being used when serializing
+* Use `SeqMap` for compound values (`Struct` and `Object`)
+* Use consistent terminology for compound types (Array and Map *items*; Struct and Object *fields*)
+
 ## 0.11.15 (2020-01-14)
 
 * Allow any compound type to be aliased
