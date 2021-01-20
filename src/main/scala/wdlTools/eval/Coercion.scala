@@ -4,26 +4,25 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
 
-import scala.collection.immutable.TreeSeqMap
+import scala.collection.immutable.{SeqMap, TreeSeqMap}
 import scala.util.{Success, Try}
 
 object Coercion {
   private def coerceToStruct(structName: String,
-                             memberDefs: Map[String, WdlTypes.T],
-                             members: Map[String, V],
+                             fieldTypes: SeqMap[String, WdlTypes.T],
+                             fieldValues: SeqMap[String, V],
                              loc: SourceLocation): V_Struct = {
-    if (memberDefs.keys.toSet != members.keys.toSet) {
+    if (fieldTypes.keys.toSet != fieldValues.keys.toSet) {
       throw new EvalException(s"struct ${structName} has wrong fields", loc)
     }
 
     // coerce each member to the struct type
-    val memValues: Map[String, V] = memberDefs.map {
-      case (key, t) =>
-        val memVal = coerceTo(t, members(key), loc)
-        key -> memVal
+    val coercedValues = fieldTypes.map {
+      case (name, t) =>
+        name -> coerceTo(t, fieldValues(name), loc)
     }
 
-    V_Struct(structName, memValues)
+    V_Struct(structName, coercedValues)
   }
 
   def coerceTo(wdlType: WdlTypes.T,
@@ -110,12 +109,12 @@ object Coercion {
           V_Struct(name1, members2.map {
             case (key, value) => key -> inner(members1(key), value)
           })
-        case (WdlTypes.T_Struct(name, memberDefs), V_Object(members)) =>
-          coerceToStruct(name, memberDefs, members, loc)
-        case (WdlTypes.T_Struct(name, memberDefs), V_Map(members)) =>
+        case (WdlTypes.T_Struct(name, fieldTypes), V_Object(fields)) =>
+          coerceToStruct(name, fieldTypes, fields, loc)
+        case (WdlTypes.T_Struct(name, fieldTypes), V_Map(fields)) =>
           // this should probably be considered non-standard
           // convert into a mapping from string to WdlValue
-          val members2: Map[String, V] = members.map {
+          val fields2 = fields.map {
             case (V_String(k), v) => k -> v
             case (other, _) =>
               throw new EvalException(
@@ -123,7 +122,7 @@ object Coercion {
                   loc
               )
           }
-          coerceToStruct(name, memberDefs, members2, loc)
+          coerceToStruct(name, fieldTypes, fields2, loc)
 
         // non-standard coercions
         case (WdlTypes.T_String, V_Directory(s)) => V_String(s)

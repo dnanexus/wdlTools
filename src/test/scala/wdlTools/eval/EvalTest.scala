@@ -89,7 +89,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // structs
     bindings("pr1") shouldBe V_Struct("Person",
-                                      Map(
+                                      TreeSeqMap(
                                           "name" -> V_String("Jay"),
                                           "city" -> V_String("SF"),
                                           "age" -> V_Int(31)
@@ -195,21 +195,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // read/write object
     val obj1 = V_Object(
-        Map("author" -> V_String("Benjamin"),
-            "year" -> V_String("1973"),
-            "title" -> V_String("Color the sky green"))
+        TreeSeqMap("author" -> V_String("Benjamin"),
+                   "year" -> V_String("1973"),
+                   "title" -> V_String("Color the sky green"))
     )
     val obj2 = V_Object(
-        Map("author" -> V_String("Primo Levy"),
-            "year" -> V_String("1975"),
-            "title" -> V_String("The Periodic Table"))
+        TreeSeqMap("author" -> V_String("Primo Levy"),
+                   "year" -> V_String("1975"),
+                   "title" -> V_String("The Periodic Table"))
     )
     bindings("o2") shouldBe obj1
     bindings("arObj") shouldBe V_Array(Vector(obj1, obj2))
     bindings("houseObj") shouldBe V_Object(
-        Map("city" -> V_String("Seattle"),
-            "team" -> V_String("Trail Blazers"),
-            "zipcode" -> V_Int(98109))
+        TreeSeqMap("city" -> V_String("Seattle"),
+                   "team" -> V_String("Trail Blazers"),
+                   "zipcode" -> V_Int(98109))
     )
   }
 
