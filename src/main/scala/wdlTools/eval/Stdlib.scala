@@ -844,14 +844,12 @@ case class Stdlib(paths: EvalPaths,
     val filename = Paths.get(filePath).getFileName.toString
     if (ctx.args.size == 2) {
       // make sure the pattern only matches at the end of the filename
-      val suffixPattern = getWdlString(ctx.args(1), ctx.loc) match {
-        case s if s.endsWith("$") => s
-        case s                    => s"${s}$$"
-      }
-      val re2Pattern = Pattern.compile(suffixPattern, 0)
-      val re2Matcher = re2Pattern.matcher(filename)
-      val result = re2Matcher.replaceFirst("")
-      V_String(result)
+      val suffix = getWdlString(ctx.args(1), ctx.loc)
+      V_String(if (filename.endsWith(suffix)) {
+        filename.dropRight(suffix.length)
+      } else {
+        filename
+      })
     } else {
       V_String(filename)
     }
