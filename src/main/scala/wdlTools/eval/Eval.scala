@@ -46,13 +46,14 @@ case class Eval(paths: EvalPaths,
     }
 
     def advanceState(condition: Option[ExprState] = None): Context = {
-      if (condition.exists(exprState >= _)) {
-        throw new Exception(s"Context in an invalid state ${exprState} >= ${condition.get}")
-      }
       val newState = exprState match {
-        case ExprState.Start    => ExprState.InString
-        case ExprState.InString => ExprState.InPlaceholder
-        case _                  => throw new Exception(s"Cannot advance state from ${exprState}")
+        case ExprState.Start         => ExprState.InString
+        case ExprState.InString      => ExprState.InPlaceholder
+        case ExprState.InPlaceholder => ExprState.InString // nested string
+        case _                       => throw new Exception(s"Cannot advance state from ${exprState}")
+      }
+      if (condition.exists(_ < newState)) {
+        throw new Exception(s"Context in an invalid state ${newState} >= ${condition.get}")
       }
       copy(exprState = newState)
     }
@@ -124,6 +125,14 @@ case class Eval(paths: EvalPaths,
                     ctx: Context,
                     validate: (V, SourceLocation) => Unit = validateDefault): V = {
     def inner(nestedExpr: TAT.Expr, nestedCtx: Context): V = {
+      val updatedCtx = nestedExpr match {
+        case _: TAT.ValueString                             => nestedCtx
+        case _ if nestedCtx.exprState == ExprState.InString =>
+          // if we're in a string and the current expression is anything
+          // other than ValueString, that means we're in a placeholder
+          nestedCtx.advanceState()
+        case _ => nestedCtx
+      }
       val v = nestedExpr match {
         case _: TAT.ValueNull      => V_Null
         case _: TAT.ValueNone      => V_Null
@@ -136,14 +145,14 @@ case class Eval(paths: EvalPaths,
 
         // complex types
         case TAT.ExprPair(left, right, _, _) =>
-          V_Pair(inner(left, nestedCtx), inner(right, nestedCtx))
+          V_Pair(inner(left, updatedCtx), inner(right, updatedCtx))
         case TAT.ExprArray(value, _, _) =>
           V_Array(value.map { x =>
-            inner(x, nestedCtx)
+            inner(x, updatedCtx)
           })
         case TAT.ExprMap(value, _, _) =>
           V_Map(value.map {
-            case (k, v) => inner(k, nestedCtx) -> inner(v, nestedCtx)
+            case (k, v) => inner(k, updatedCtx) -> inner(v, updatedCtx)
           })
         case TAT.ExprObject(value, _, _) =>
           V_Object(
@@ -151,7 +160,7 @@ case class Eval(paths: EvalPaths,
                 .map {
                   case (k, v) =>
                     // an object literal key can be a string or identifier
-                    val key = inner(k, nestedCtx) match {
+                    val key = inner(k, updatedCtx) match {
                       case V_String(s) => s
                       case _ =>
                         throw new EvalException(
@@ -159,13 +168,13 @@ case class Eval(paths: EvalPaths,
                             expr.loc
                         )
                     }
-                    key -> inner(v, nestedCtx)
+                    key -> inner(v, updatedCtx)
                 }
                 .to(TreeSeqMap)
           )
 
-        case TAT.ExprIdentifier(id, _, _) if nestedCtx.bindings.contains(id) =>
-          nestedCtx.bindings(id)
+        case TAT.ExprIdentifier(id, _, _) if updatedCtx.bindings.contains(id) =>
+          updatedCtx.bindings(id)
         case TAT.ExprIdentifier(id, _, _) =>
           throw new EvalException(s"identifier ${id} not found")
 
@@ -173,17 +182,17 @@ case class Eval(paths: EvalPaths,
         case TAT.ExprCompoundString(value, _, _) =>
           // concatenate an array of strings inside an expression/command block
           val strArray: Vector[String] = value.map { expr =>
-            val v = inner(expr, nestedCtx.advanceState(Some(ExprState.InString)))
+            val v = inner(expr, updatedCtx.advanceState(Some(ExprState.InString)))
             interpolationValueToString(v, expr.loc)
           }
           V_String(strArray.mkString(""))
         case TAT.ExprPlaceholderCondition(t, f, boolExpr, _, _) =>
           // ~{true="--yes" false="--no" boolean_value}
-          inner(boolExpr, nestedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
+          inner(boolExpr, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
             case V_Boolean(true) =>
-              inner(t, nestedCtx.advanceState(Some(ExprState.InPlaceholder)))
+              inner(t, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
             case V_Boolean(false) =>
-              inner(f, nestedCtx.advanceState(Some(ExprState.InPlaceholder)))
+              inner(f, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
             case other =>
               throw new EvalException(
                   s"invalid boolean value ${other}, should be a boolean",
@@ -192,17 +201,17 @@ case class Eval(paths: EvalPaths,
           }
         case TAT.ExprPlaceholderDefault(defaultVal, optVal, _, _) =>
           // ~{default="foo" optional_value}
-          inner(optVal, nestedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
-            case V_Null => inner(defaultVal, nestedCtx.advanceState(Some(ExprState.InPlaceholder)))
+          inner(optVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
+            case V_Null => inner(defaultVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
             case other  => other
           }
         case TAT.ExprPlaceholderSep(sep: TAT.Expr, arrayVal: TAT.Expr, _, _) =>
           // ~{sep=", " array_value}
           val sepString = interpolationValueToString(
-              inner(sep, nestedCtx.advanceState(Some(ExprState.InPlaceholder))),
+              inner(sep, updatedCtx.advanceState(Some(ExprState.InPlaceholder))),
               sep.loc
           )
-          inner(arrayVal, nestedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
+          inner(arrayVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
             case V_Array(array) =>
               val elements: Vector[String] = array.map(interpolationValueToString(_, expr.loc))
               V_String(elements.mkString(sepString))
@@ -212,17 +221,17 @@ case class Eval(paths: EvalPaths,
 
         case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, loc) =>
           // if (x == 1) then "Sunday" else "Weekday"
-          inner(cond, nestedCtx) match {
-            case V_Boolean(true)  => inner(tBranch, nestedCtx)
-            case V_Boolean(false) => inner(fBranch, nestedCtx)
+          inner(cond, updatedCtx) match {
+            case V_Boolean(true)  => inner(tBranch, updatedCtx)
+            case V_Boolean(false) => inner(fBranch, updatedCtx)
             case _ =>
               throw new EvalException(s"condition is not boolean", loc)
           }
 
         case TAT.ExprAt(collection, index, _, loc) =>
           // Access an array element at [index: Int] or map value at [key: K]
-          val collectionVal = inner(collection, nestedCtx)
-          val indexVal = inner(index, nestedCtx)
+          val collectionVal = inner(collection, updatedCtx)
+          val indexVal = inner(index, updatedCtx)
           (collectionVal, indexVal) match {
             case (V_Array(av), V_Int(n)) if n < av.size =>
               av(n.toInt)
@@ -252,7 +261,7 @@ case class Eval(paths: EvalPaths,
           }
 
         case TAT.ExprGetName(TAT.ExprIdentifier(id, idType, _), fieldName, _, _)
-            if nestedCtx.bindings.contains(s"${id}.${fieldName}") =>
+            if updatedCtx.bindings.contains(s"${id}.${fieldName}") =>
           // These cases are a bit of a hack - they enable resolution of a fully-qualified name
           // when the LHS is an identifier, rather than having to first evaluate the LHS expression.
           // In practice, this can be used by a runtime engine to simplify call inputs/outputs - e.g.
@@ -269,7 +278,7 @@ case class Eval(paths: EvalPaths,
             case _                 => false
           }
           if (fqnResolutionAllowed) {
-            nestedCtx.bindings(s"${id}.${fieldName}")
+            updatedCtx.bindings(s"${id}.${fieldName}")
           } else {
             throw new EvalException(
                 s"""'${id}.${fieldName}' is present in the evaluation context, but fully-qualified name 
@@ -280,7 +289,7 @@ case class Eval(paths: EvalPaths,
 
         case TAT.ExprGetName(e: TAT.Expr, fieldName, _, loc) =>
           // Evaluate the expression, then access the field
-          val ev = inner(e, nestedCtx)
+          val ev = inner(e, updatedCtx)
           exprGetName(ev, fieldName, loc)
 
         case TAT.ExprApply(funcName, _, elements, _, loc) =>
@@ -288,8 +297,8 @@ case class Eval(paths: EvalPaths,
           // to arguments. For example:
           //   1 + 1
           //   read_int("4")
-          val funcArgs = elements.map(e => inner(e, nestedCtx))
-          standardLibrary.call(funcName, funcArgs, loc, nestedCtx.exprState)
+          val funcArgs = elements.map(e => inner(e, updatedCtx))
+          standardLibrary.call(funcName, funcArgs, loc, updatedCtx.exprState)
 
         case other =>
           throw new Exception(s"sanity: expression ${other} not implemented")

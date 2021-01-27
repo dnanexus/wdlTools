@@ -643,6 +643,10 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     getDocument(getTaskSource("suggestions_meta.wdl"))
   }
 
+  it should "parse nested placeholders" in {
+    getDocument(getTaskSource("nested_placeholders.wdl"))
+  }
+
   it should "parse workflow with empty call input" in {
     getDocument(getWorkflowSource("empty_call_input.wdl"))
   }

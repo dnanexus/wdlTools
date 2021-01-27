@@ -330,6 +330,18 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     parseAndTypeCheck(file)
   }
 
+  it should "evaluate nested placeholders" in {
+    val file = v1Dir.resolve("nested_placeholders.wdl")
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
+    val nullResults = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("s" -> V_Null)))
+    nullResults.get("result") shouldBe Some(V_String("null"))
+    val arrayResults = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(Map("s" -> V_Array(Vector(V_String("hello"), V_String("world")))))
+    )
+    arrayResults.get("result") shouldBe Some(V_String("hello world"))
+  }
+
   it should "evalConst" in {
     val allExpectedResults = Map(
         "flag" -> Some(WdlValues.V_Boolean(true)),

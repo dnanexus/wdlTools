@@ -1,5 +1,9 @@
 # Change log
 
+## 0.11.17 (dev)
+
+* Fix bug in evaluation of nested placeholders
+
 ## 0.11.16 (2020-01-20)
 
 * Revert change that disallowed String + non-String concatenation and Boolean-Boolean comparisons pre-2.0
