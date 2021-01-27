@@ -1,6 +1,6 @@
 # Change log
 
-## 0.11.17 (dev)
+## 0.11.17 (2020-01-27)
 
 * Fix bug in evaluation of nested placeholders
 
