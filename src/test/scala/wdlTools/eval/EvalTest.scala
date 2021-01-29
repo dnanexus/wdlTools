@@ -315,14 +315,27 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle null and optionals" taggedAs Edge in {
     val file = v1Dir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bd = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
-    bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
+    val results = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    results("powers10") shouldBe V_Array(
+        Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100)))
+    )
   }
 
   it should "handle accessing pair values" in {
     val file = v1Dir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    val results = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(
+            Map(
+                "p1.right" -> V_Pair(V_Int(1), V_Int(2)),
+                "p2.right.left" -> V_Int(3)
+            )
+        )
+    )
+    results("i") shouldBe V_Int(1)
+    results("j") shouldBe V_Int(3)
+    results("k") shouldBe V_Int(5)
   }
 
   it should "handle empty stdout/stderr" in {

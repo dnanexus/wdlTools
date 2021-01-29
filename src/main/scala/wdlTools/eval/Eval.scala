@@ -1,10 +1,11 @@
 package wdlTools.eval
 
+import dx.util.{Bindings, EvalPaths, FileSource, FileSourceResolver, LocalFileSource, Logger}
+import dx.util.CollectionUtils.IterableOnceExtensions
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.{ExprState, TypeUtils, WdlTypes, TypedAbstractSyntax => TAT}
-import dx.util.{Bindings, EvalPaths, FileSource, FileSourceResolver, LocalFileSource, Logger}
 
 import scala.collection.immutable.TreeSeqMap
 
@@ -34,8 +35,23 @@ case class Eval(paths: EvalPaths,
     }
   }
 
+  /**
+    * The context contains variable bindings that can be referenced when evaluating an
+    * expression, and also an expression state, which determies which evaluation rules
+    * apply.
+    *
+    * Bindings may contain fully-qualified variable names, such as `a.b.c`, where
+    * `a` is a Call, Pair, or Struct. In practice, this can be used by a runtime engine
+    * to simplify call inputs/outputs - e.g. if task `bar` refers to the output of task `foo`
+    * (say `foo.result`), rather than having to make the `foo` call object (or some serialized
+    * version thereof) avaialble to `bar`, it can just  expose an output parameter `foo.result`.
+    * @param bindings variable bindings
+    * @param exprState current expression state
+    */
   private case class Context(bindings: Bindings[String, V] = WdlValueBindings.empty,
                              exprState: ExprState = ExprState.Start) {
+
+    lazy val hasFullyQualifiedBindings: Boolean = bindings.keySet.exists(_.contains("."))
 
     def apply(name: String): V = {
       bindings
@@ -96,6 +112,83 @@ case class Eval(paths: EvalPaths,
 
       case _ =>
         throw new EvalException(s"member access (${id}) in expression is illegal", loc)
+    }
+  }
+
+  /**
+    * Resolves a fully-qualified identifier.
+    * @param expr the LHS expression to resolve
+    * @param fieldName the RHS field name
+    * @param ctx the Context
+    * @return if the expression resolves to a fully-qualfied name and that name
+    *         is in `ctx`, returns the bound value, otherwise None
+    * @example
+    * Given a declaration:
+    *   `Pair[Pair[String, Int], File] foo`
+    * and an expression:
+    *   `foo.left.right`
+    * there are two possible scenarios:
+    *   1. The context contains binding `foo -> V_Pair(...)`,
+    *      in which case the expression is resolved recursively by `apply`,
+    *   2. The context contains binding `foo.left.right -> V_Int(...)`,
+    *      in which case the entire expression needs to be resolved at once
+    *      to derive the fully-qualified name to look up in the context.
+    */
+  private def resolveFullyQualifedIdentifier(expr: TAT.Expr,
+                                             fieldName: String,
+                                             ctx: Context): Option[V] = {
+    // tests whether the given field name is legal for the given type
+    def canResolveField(t: WdlTypes.T, field: String): Boolean = {
+      TypeUtils.unwrapOptional(t) match {
+        case _: WdlTypes.T_Pair if Set("left", "right").contains(field) => true
+        case WdlTypes.T_Struct(_, fields) if fields.contains(field)     => true
+        case WdlTypes.T_Call(_, outputs) if outputs.contains(field)     => true
+        // there's no way to guarantee the resolution is valid for these types:
+        case WdlTypes.T_Object => true
+        case WdlTypes.T_Any    => true
+        case _                 => false
+      }
+    }
+
+    // builds a Vector of name components
+    def inner(innerExpr: TAT.Expr, innerFieldName: String): Option[Vector[String]] = {
+      innerExpr match {
+        case TAT.ExprIdentifier(id, wdlType, _) if canResolveField(wdlType, innerFieldName) =>
+          Some(Vector(id, innerFieldName))
+        case TAT.ExprGetName(e, fieldName, _, _) =>
+          inner(e, fieldName).map(v => v :+ innerFieldName)
+        case _ => None
+      }
+    }
+
+    // Given a Vector of name components, moving from right to left, split the
+    // Vector at each index - the left-side will (when concatenated with '.'
+    // separator) give a fully-qualified name that we look up in the context. If
+    // it resolves to a value, then we recursively apply the field names in the
+    // right side to get the final value.
+    //
+    // For example, say that the context contains `a.b -> Pair("x", "y")`. If we
+    // try to resolve `a.b.left`, it is not in the context, so then we go to `a.b`,
+    // get the value, and use it to resolve `left`, with the final result being "x".
+    inner(expr, fieldName).flatMap { v =>
+      v.size
+        .to(1, -1)
+        .iterator
+        .map(v.splitAt)
+        .collectFirstDefined {
+          case (path, fields) =>
+            ctx.bindings.get(path.mkString(".")).flatMap { value =>
+              fields.foldLeft(Option(value)) {
+                case (Some(v), name) =>
+                  try {
+                    Some(exprGetName(v, name, expr.loc))
+                  } catch {
+                    case _: Throwable => None
+                  }
+                case _ => None
+              }
+            }
+        }
     }
   }
 
@@ -260,37 +353,20 @@ case class Eval(paths: EvalPaths,
               )
           }
 
-        case TAT.ExprGetName(TAT.ExprIdentifier(id, idType, _), fieldName, _, _)
-            if updatedCtx.bindings.contains(s"${id}.${fieldName}") =>
-          // These cases are a bit of a hack - they enable resolution of a fully-qualified name
-          // when the LHS is an identifier, rather than having to first evaluate the LHS expression.
-          // In practice, this can be used by a runtime engine to simplify call inputs/outputs - e.g.
-          // if task Bar refers to the output of task Foo (say Foo.result), rather than having to make
-          // the Foo call object (or some serialized version thereof) avaialble to Bar, it can just
-          // expose an output parameter "Foo.result".
-          val fqnResolutionAllowed = TypeUtils.unwrapOptional(idType) match {
-            case _: WdlTypes.T_Pair if Set("left", "right").contains(fieldName) => true
-            case WdlTypes.T_Struct(_, members) if members.contains(fieldName)   => true
-            case WdlTypes.T_Call(_, output) if output.contains(fieldName)       => true
-            // there's no way to guarantee the resolution is valid for these types:
-            case WdlTypes.T_Object => true
-            case WdlTypes.T_Any    => true
-            case _                 => false
-          }
-          if (fqnResolutionAllowed) {
-            updatedCtx.bindings(s"${id}.${fieldName}")
-          } else {
-            throw new EvalException(
-                s"""'${id}.${fieldName}' is present in the evaluation context, but fully-qualified name 
-                   |resolution is not allowed for identifier of type ${idType}""".stripMargin
-                  .replaceAll("\n", " ")
-            )
-          }
-
         case TAT.ExprGetName(e: TAT.Expr, fieldName, _, loc) =>
-          // Evaluate the expression, then access the field
-          val ev = inner(e, updatedCtx)
-          exprGetName(ev, fieldName, loc)
+          Option
+            .when(updatedCtx.hasFullyQualifiedBindings) {
+              // if the context has fully-qualified identifiers, try to
+              // resolve the expression as a identifier with chained
+              // field accesses
+              resolveFullyQualifedIdentifier(e, fieldName, updatedCtx)
+            }
+            .flatten
+            .getOrElse {
+              // evaluate the LHS expression, then access the RHS field
+              val ev = inner(e, updatedCtx)
+              exprGetName(ev, fieldName, loc)
+            }
 
         case TAT.ExprApply(funcName, _, elements, _, loc) =>
           // Apply a standard library function (including built-in operators)

@@ -1,27 +1,15 @@
-workflow multiple_imports {
+version 1.0
+
+workflow pair {
+  input {
+    Pair[String, Pair[Int, Int]] p1
+    Pair[String, Pair[Int, Int]] p2
+  }
+
   # accessing members of a pair structure
-  Pair[Int, Int] p = (5, 8)
+  Pair[String, Pair[Int, Int]] p3 = ("Joe", (5, 8))
 
-  call mul {
-    input: a=p.left, b=p.right
-  }
-
-  output {
-    Int x = mul.x
-  }
-}
-
-task mul {
-  Int a
-  Int b
-
-  command {}
-
-  output {
-    Int x = a * b
-  }
-
-  runtime {
-    docker: "ubuntu"
-  }
+  Int i = p1.right.left
+  Int j = p2.right.left
+  Int k = p3.right.left
 }
