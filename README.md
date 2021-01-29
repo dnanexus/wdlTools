@@ -6,7 +6,7 @@
 
 The `wdlTools.syntax` package implements an [abstract syntax tree (AST)](src/main/scala/wdlTools/syntax/AbstractSyntax.scala) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee.
 
-Currently, WDL draft-2 and 1.0, and development/2.0 are fully supported (with some [limitations](#limitations)).
+Currently, WDL draft-2, 1.0, 1.1, and development/2.0 are fully supported (with some [limitations](#limitations)).
 
 ```scala
 import wdlTools.syntax.AbstractSyntax._
