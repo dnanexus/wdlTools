@@ -923,7 +923,7 @@ case class Stdlib(paths: EvalPaths,
           loc
       )
     }
-    V_Object(keys.zip(values.map(V_String)).toMap)
+    V_Object(keys.zip(values.map(V_String)).to(TreeSeqMap))
   }
 
   // Object read_object(String|File)
@@ -1058,7 +1058,7 @@ case class Stdlib(paths: EvalPaths,
       case _          => throw new RuntimeException("failed coercion to Array[String]")
     }
     // ensure every line ends with a newline ("\n")
-    val strRepr: String = array.value
+    val strRepr: String = array.items
       .map {
         case V_String(x) if !x.endsWith("\n") => s"${x}\n"
         case V_String(x)                      => x
@@ -1083,7 +1083,7 @@ case class Stdlib(paths: EvalPaths,
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
-      matrix.value
+      matrix.items
         .foreach {
           case V_Array(a) =>
             val row = a.map {
@@ -1113,7 +1113,7 @@ case class Stdlib(paths: EvalPaths,
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[(String, String)](tsvConf)
     try {
-      m.value
+      m.items
         .foreach {
           case (V_String(key), V_String(value)) => writer.write((key, value))
           case (k, v) =>
@@ -1129,7 +1129,7 @@ case class Stdlib(paths: EvalPaths,
                              keys: Vector[String],
                              loc: SourceLocation): Vector[String] = {
     keys.map { key =>
-      Coercion.coerceTo(T_String, obj.members(key), loc) match {
+      Coercion.coerceTo(T_String, obj.fields(key), loc) match {
         case V_String(value) => value
         case _               => throw new RuntimeException("failed coercion to String")
       }
@@ -1150,7 +1150,7 @@ case class Stdlib(paths: EvalPaths,
     val tmpFile: Path = ioSupport.mkTempFile(suffix = ".txt")
     val writer = tmpFile.asCsvWriter[Vector[String]](tsvConf)
     try {
-      val keys = obj.members.keys.toVector
+      val keys = obj.fields.keys.toVector
       writer.write(keys)
       writer.write(lineFromObject(obj, keys, ctx.loc))
     } finally {
@@ -1177,9 +1177,9 @@ case class Stdlib(paths: EvalPaths,
       throw new EvalException("write_objects: empty input array", ctx.loc)
     }
     // check that all objects have the same keys
-    val keys = objArray.head.members.keySet
+    val keys = objArray.head.fields.keySet
     objArray.tail.foreach { obj =>
-      if (obj.members.keySet != keys)
+      if (obj.fields.keySet != keys)
         throw new EvalException(
             "write_objects: member names must be the same for all objects in the array",
             ctx.loc

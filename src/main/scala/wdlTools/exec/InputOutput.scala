@@ -51,7 +51,7 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
             V_Map(SeqMap.empty)
           case RequiredInputParameter(_, WdlTypes.T_Object, _) if nullCollectionAsEmpty =>
             // Special handling for required input Objects that are non-optional
-            V_Object(Map.empty)
+            V_Object(SeqMap.empty)
           case inp: RequiredInputParameter =>
             throw new ExecException(s"Missing required input ${declName} to task ${callable.name}",
                                     inp.loc)
@@ -250,13 +250,13 @@ object TaskInputOutput {
       case (WdlTypes.T_Map(_, _), None | Some(WdlValues.V_Null)) =>
         WdlValues.V_Map(TreeSeqMap.empty)
       case (WdlTypes.T_Object, None | Some(WdlValues.V_Null)) =>
-        WdlValues.V_Object(Map.empty)
+        WdlValues.V_Object(SeqMap.empty)
       case (WdlTypes.T_Struct(name, memberTypes), None | Some(WdlValues.V_Null))
           if memberTypes.values.forall {
             case WdlTypes.T_Optional(_) => true
             case _                      => false
           } =>
-        WdlValues.V_Struct(name, Map.empty)
+        WdlValues.V_Struct(name, SeqMap.empty)
 
       // None/null not allowed for any other cases
       case (_, None | Some(WdlValues.V_Null)) =>

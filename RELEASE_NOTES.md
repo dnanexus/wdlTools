@@ -1,8 +1,24 @@
 # Change log
 
-## v0.12.0 (2021-01-05)
+## v0.12.0 (2021-01-29)
 
 * Adds support for WDL 1.1
+
+## 0.11.18 (2020-01-29)
+
+* Better handling of fully-qualified names in evaluation context
+
+## 0.11.17 (2020-01-27)
+
+* Fix bug in evaluation of nested placeholders
+
+## 0.11.16 (2020-01-20)
+
+* Revert change that disallowed String + non-String concatenation and Boolean-Boolean comparisons pre-2.0
+* Fix some places where `SortedMap` wasn't being used when serializing
+* Use `SeqMap` for compound values (`Struct` and `Object`)
+* Use consistent terminology for compound types (Array and Map *items*; Struct and Object *fields*)
+>>>>>>> main
 
 ## 0.11.15 (2020-01-14)
 

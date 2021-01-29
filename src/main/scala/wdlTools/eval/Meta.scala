@@ -4,6 +4,8 @@ import wdlTools.eval.WdlValues._
 import wdlTools.syntax.WdlVersion
 import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
 
+import scala.collection.immutable.SeqMap
+
 class MetaMap(values: Map[String, TAT.MetaValue]) {
   protected def applyKv(id: String,
                         value: TAT.MetaValue,
@@ -97,8 +99,8 @@ case class Hints(hints: Option[TAT.MetaSection], userDefaultValues: Option[VBind
   override val defaults: Map[String, WdlValues.V] = Map(
       Hints.ShortTaskKey -> V_Boolean(false),
       Hints.LocalizationOptionalKey -> V_Boolean(false),
-      Hints.InputsKey -> V_Object(Map.empty),
-      Hints.OutputsKey -> V_Object(Map.empty)
+      Hints.InputsKey -> V_Object(SeqMap.empty),
+      Hints.OutputsKey -> V_Object(SeqMap.empty)
   )
 
   override protected def applyKv(id: String,

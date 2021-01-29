@@ -19,11 +19,16 @@ object WdlTypeSerde {
           val (memberTypeJs, newTypeAliases) = serializeType(memberType, aliasAccu)
           (memberAccu + (memberName -> memberTypeJs), newTypeAliases)
       }
-    val jsValue = JsObject(
+    val fields = SortedMap(
         "type" -> JsString("Struct"),
         "members" -> JsObject(membersJs)
     )
-    (jsValue, newTypeAliases)
+    val nameFields = if (withName) {
+      SortedMap("name" -> JsString(structType.name))
+    } else {
+      SortedMap.empty[String, JsValue]
+    }
+    (JsObject(fields ++ nameFields), newTypeAliases)
   }
 
   def serializeType(

@@ -89,7 +89,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // structs
     bindings("pr1") shouldBe V_Struct("Person",
-                                      Map(
+                                      TreeSeqMap(
                                           "name" -> V_String("Jay"),
                                           "city" -> V_String("SF"),
                                           "age" -> V_Int(31)
@@ -195,21 +195,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // read/write object
     val obj1 = V_Object(
-        Map("author" -> V_String("Benjamin"),
-            "year" -> V_String("1973"),
-            "title" -> V_String("Color the sky green"))
+        TreeSeqMap("author" -> V_String("Benjamin"),
+                   "year" -> V_String("1973"),
+                   "title" -> V_String("Color the sky green"))
     )
     val obj2 = V_Object(
-        Map("author" -> V_String("Primo Levy"),
-            "year" -> V_String("1975"),
-            "title" -> V_String("The Periodic Table"))
+        TreeSeqMap("author" -> V_String("Primo Levy"),
+                   "year" -> V_String("1975"),
+                   "title" -> V_String("The Periodic Table"))
     )
     bindings("o2") shouldBe obj1
     bindings("arObj") shouldBe V_Array(Vector(obj1, obj2))
     bindings("houseObj") shouldBe V_Object(
-        Map("city" -> V_String("Seattle"),
-            "team" -> V_String("Trail Blazers"),
-            "zipcode" -> V_Int(98109))
+        TreeSeqMap("city" -> V_String("Seattle"),
+                   "team" -> V_String("Trail Blazers"),
+                   "zipcode" -> V_Int(98109))
     )
   }
 
@@ -315,19 +315,44 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "handle null and optionals" taggedAs Edge in {
     val file = v1Dir.resolve("conditionals3.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bd = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
-    bd("powers10") shouldBe V_Array(Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100))))
+    val results = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    results("powers10") shouldBe V_Array(
+        Vector(V_Optional(V_Int(1)), V_Null, V_Optional(V_Int(100)))
+    )
   }
 
   it should "handle accessing pair values" in {
     val file = v1Dir.resolve("pair.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("i2" -> V_Null)))
+    val results = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(
+            Map(
+                "p1.right" -> V_Pair(V_Int(1), V_Int(2)),
+                "p2.right.left" -> V_Int(3)
+            )
+        )
+    )
+    results("i") shouldBe V_Int(1)
+    results("j") shouldBe V_Int(3)
+    results("k") shouldBe V_Int(5)
   }
 
   it should "handle empty stdout/stderr" in {
     val file = v1Dir.resolve("empty_stdout.wdl")
     parseAndTypeCheck(file)
+  }
+
+  it should "evaluate nested placeholders" in {
+    val file = v1Dir.resolve("nested_placeholders.wdl")
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
+    val nullResults = evaluator.applyPrivateVariables(decls, WdlValueBindings(Map("s" -> V_Null)))
+    nullResults.get("result") shouldBe Some(V_String("null"))
+    val arrayResults = evaluator.applyPrivateVariables(
+        decls,
+        WdlValueBindings(Map("s" -> V_Array(Vector(V_String("hello"), V_String("world")))))
+    )
+    arrayResults.get("result") shouldBe Some(V_String("hello world"))
   }
 
   it should "evalConst" in {

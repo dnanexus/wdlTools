@@ -82,9 +82,9 @@ object WdlValueSerde {
         case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
         case JsNumber(value)                      => V_Float(value.toDouble)
         case JsString(value)                      => V_String(value)
-        case JsArray(vec)                         => V_Array(vec.map(inner))
+        case JsArray(items)                       => V_Array(items.map(inner))
         case JsObject(fields) =>
-          V_Object(fields.map { case (k, v) => k -> inner(v) })
+          V_Object(fields.map { case (k, v) => k -> inner(v) }.to(TreeSeqMap))
       }
     }
     inner(jsValue)
@@ -164,12 +164,10 @@ object WdlValueSerde {
         // structs
         case (T_Struct(structName, typeMap), JsObject(fields)) =>
           // convert each field
-          val m = fields
-            .map {
-              case (key, value) =>
-                val t: T = typeMap(key)
-                val elem: V = inner(value, t, s"${innerName}.${key}")
-                key -> elem
+          val m = typeMap
+            .collect {
+              case (name, t) if fields.contains(name) =>
+                name -> inner(fields(name), t, s"${innerName}.${name}")
             }
           V_Struct(structName, m)
 
