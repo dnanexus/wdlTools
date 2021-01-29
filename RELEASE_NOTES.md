@@ -1,6 +1,6 @@
 # Change log
 
-## 0.11.18 (dev)
+## 0.11.18 (2020-01-29)
 
 * Better handling of fully-qualified names in evaluation context
 
