@@ -1,4 +1,4 @@
-lexer grammar WdlV2Lexer;
+lexer grammar WdlV1_1Lexer;
 
 channels { COMMENTS }
 
@@ -23,16 +23,15 @@ INPUT: 'input';
 OUTPUT: 'output';
 PARAMETERMETA: 'parameter_meta' -> mode(Meta);
 META: 'meta' -> mode(Meta);
-HINTS: 'hints' -> mode(Meta);
 RUNTIME: 'runtime';
 BOOLEAN: 'Boolean';
 INT: 'Int';
 FLOAT: 'Float';
 STRING: 'String';
 FILE: 'File';
-DIRECTORY: 'Directory';
 ARRAY: 'Array';
 MAP: 'Map';
+OBJECT: 'Object';
 OBJECTLITERAL: 'object';
 PAIR: 'Pair';
 AFTER: 'after';

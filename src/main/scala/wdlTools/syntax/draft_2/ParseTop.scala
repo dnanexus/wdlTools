@@ -425,19 +425,15 @@ string
     ExprMapLiteral(m, getSourceLocation(grammar.docSource, ctx))
   }
 
-  override def visitObject_literal_key(ctx: WdlDraft2Parser.Object_literal_keyContext): Expr = {
-    if (ctx.Identifier() != null) {
-      val idNode = ctx.Identifier()
-      ExprString(getIdentifierText(idNode, ctx), getSourceLocation(grammar.docSource, idNode))
-    } else {
-      throw new RuntimeException(s"Invalid object literal key ${ctx}")
-    }
-  }
-
   // | OBJECT_LITERAL LBRACE (Identifier COLON expr (COMMA Identifier COLON expr)*)* RBRACE #object_literal
   override def visitObject_literal(ctx: WdlDraft2Parser.Object_literalContext): Expr = {
-    val ids: Vector[Expr] = ctx.object_literal_key.asScala.toVector
-      .map(visitObject_literal_key)
+    val ids: Vector[Expr] = ctx
+      .member()
+      .asScala
+      .toVector
+      .map { m =>
+        ExprString(getIdentifierText(m.Identifier(), ctx), getSourceLocation(grammar.docSource, m))
+      }
     val elements: Vector[Expr] = ctx
       .expr()
       .asScala

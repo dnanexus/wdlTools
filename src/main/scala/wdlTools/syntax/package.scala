@@ -4,16 +4,15 @@ import dx.util.{FileNode, StringFileNode}
 
 import scala.collection.immutable.TreeMap
 
-sealed abstract class WdlVersion(val name: String,
-                                 val order: Int,
-                                 val aliases: Set[String] = Set.empty)
+sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: Set[String])
     extends Ordered[WdlVersion] {
   def compare(that: WdlVersion): Int = this.order - that.order
 }
 
 object WdlVersion {
-  case object Draft_2 extends WdlVersion("draft-2", 0, aliases = Set())
+  case object Draft_2 extends WdlVersion("draft-2", 0, Set.empty)
   case object V1 extends WdlVersion("1.0", 1, aliases = Set("draft-3"))
+  case object V1_1 extends WdlVersion("1.1", 2, Set.empty)
   case object V2 extends WdlVersion("2.0", 3, aliases = Set("development"))
 
   val All: Vector[WdlVersion] = Vector(V2, V1, Draft_2).sortWith(_ < _)

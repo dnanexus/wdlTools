@@ -58,6 +58,7 @@ trait BuiltinSymbols {
   val Sub = "sub"
   val Suffix = "suffix"
   val Transpose = "transpose"
+  val Unzip = "unzip"
   val WriteJson = "write_json"
   val WriteLines = "write_lines"
   val WriteMap = "write_map"

@@ -259,6 +259,59 @@ case class Stdlib(paths: EvalPaths,
       Builtins.Glob -> glob
   )
 
+  private lazy val v1_1FuncTable: Map[String, FunctionImpl] = Map(
+      // numeric
+      Builtins.Floor -> floor,
+      Builtins.Ceil -> ceil,
+      Builtins.Round -> round,
+      Builtins.Min -> min,
+      Builtins.Max -> max,
+      // string
+      Builtins.Sub -> sub,
+      // file
+      Builtins.Stdout -> stdout,
+      Builtins.Stderr -> stderr,
+      Builtins.Glob -> glob,
+      Builtins.Basename -> basename,
+      // read from a file
+      Builtins.ReadLines -> read_lines,
+      Builtins.ReadTsv -> read_tsv,
+      Builtins.ReadMap -> read_map,
+      Builtins.ReadJson -> read_json,
+      Builtins.ReadString -> read_string,
+      Builtins.ReadInt -> read_int,
+      Builtins.ReadFloat -> read_float,
+      Builtins.ReadBoolean -> read_boolean,
+      // write to a file
+      Builtins.WriteLines -> write_lines,
+      Builtins.WriteTsv -> write_tsv,
+      Builtins.WriteMap -> write_map,
+      Builtins.WriteJson -> write_json,
+      Builtins.Size -> size,
+      // array
+      Builtins.Length -> length,
+      Builtins.Range -> range,
+      Builtins.Transpose -> transpose,
+      Builtins.Zip -> zip,
+      Builtins.Unzip -> unzip,
+      Builtins.Cross -> cross,
+      Builtins.Flatten -> flatten,
+      Builtins.Prefix -> prefix,
+      Builtins.Suffix -> suffix,
+      Builtins.Quote -> quote,
+      Builtins.Squote -> squote,
+      Builtins.Sep -> sep,
+      // map
+      Builtins.AsPairs -> as_pairs,
+      Builtins.AsMap -> as_map,
+      Builtins.Keys -> keys,
+      Builtins.CollectByKey -> collect_by_key,
+      // optional
+      Builtins.SelectFirst -> select_first,
+      Builtins.SelectAll -> select_all,
+      Builtins.Defined -> defined
+  )
+
   private lazy val v2FuncTable: Map[String, FunctionImpl] = Map(
       // numeric
       Builtins.Floor -> floor,
@@ -293,6 +346,7 @@ case class Stdlib(paths: EvalPaths,
       Builtins.Range -> range,
       Builtins.Transpose -> transpose,
       Builtins.Zip -> zip,
+      Builtins.Unzip -> unzip,
       Builtins.Cross -> cross,
       Builtins.Flatten -> flatten,
       Builtins.Prefix -> prefix,
@@ -315,6 +369,7 @@ case class Stdlib(paths: EvalPaths,
   private val funcTable: Map[String, FunctionImpl] = version match {
     case WdlVersion.Draft_2 => builtinFuncTable ++ draft2FuncTable
     case WdlVersion.V1      => builtinFuncTable ++ v1FuncTable
+    case WdlVersion.V1_1    => builtinFuncTable ++ v1_1FuncTable
     case WdlVersion.V2      => builtinFuncTable ++ v2FuncTable
     case other              => throw new RuntimeException(s"Unsupported WDL version ${other}")
   }
@@ -777,6 +832,7 @@ case class Stdlib(paths: EvalPaths,
   // This function returns the basename of a file path passed to it: basename("/path/to/file.txt") returns "file.txt".
   // Also supports an optional parameter, suffix to remove: basename("/path/to/file.txt", ".txt") returns "file".
   // since: draft-2
+  // supports regular expression for second parameter since 1.1
   private def basename(ctx: FunctionContext): V_String = {
     ctx.assertNumArgs(required = 1, optional = true)
     val filePath = ctx.args.head match {
@@ -787,7 +843,13 @@ case class Stdlib(paths: EvalPaths,
     }
     val filename = Paths.get(filePath).getFileName.toString
     if (ctx.args.size == 2) {
-      V_String(filename.stripSuffix(getWdlString(ctx.args(1), ctx.loc)))
+      // make sure the pattern only matches at the end of the filename
+      val suffix = getWdlString(ctx.args(1), ctx.loc)
+      V_String(if (filename.endsWith(suffix)) {
+        filename.dropRight(suffix.length)
+      } else {
+        filename
+      })
     } else {
       V_String(filename)
     }
@@ -1234,6 +1296,18 @@ case class Stdlib(paths: EvalPaths,
     V_Array(xArray.zip(yArray).map {
       case (x, y) => V_Pair(x, y)
     })
+  }
+
+  // Pair[Array[X], Array[Y]] unzip(Array[Pair[X, Y]])
+  //
+  // since: 1.1
+  private def unzip(ctx: FunctionContext): V_Pair = {
+    val array: Vector[V] = getWdlVector(ctx.getOneArg, ctx.loc)
+    val (x, y) = array.map {
+      case V_Pair(l, r) => (l, r)
+      case other        => throw new EvalException(s"unzip: invalid array element ${other}")
+    }.unzip
+    V_Pair(V_Array(x), V_Array(y))
   }
 
   // Array[Pair(X,Y)] cross(Array[X], Array[Y])
