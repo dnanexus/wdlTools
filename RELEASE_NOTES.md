@@ -1,6 +1,6 @@
 # Change log
 
-## v0.12.0 (2021-01-29)
+## v0.12.0 (2021-02-02)
 
 * Adds support for WDL 1.1
 
@@ -18,7 +18,6 @@
 * Fix some places where `SortedMap` wasn't being used when serializing
 * Use `SeqMap` for compound values (`Struct` and `Object`)
 * Use consistent terminology for compound types (Array and Map *items*; Struct and Object *fields*)
->>>>>>> main
 
 ## 0.11.15 (2020-01-14)
 
