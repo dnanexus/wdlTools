@@ -1,5 +1,9 @@
 # Change log
 
+## v0.12.1 (2021-02-03)
+
+* Bugfixes
+
 ## v0.12.0 (2021-02-02)
 
 * Adds support for WDL 1.1
