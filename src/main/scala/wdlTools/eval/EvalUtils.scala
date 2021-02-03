@@ -136,12 +136,10 @@ object EvalUtils {
 
   def prettyFormat(value: V): String = {
     value match {
-      case _ if isPrimitive(value) =>
-        s"${formatPrimitive(value)}"
-      case V_Pair(l, r) =>
-        s"(${prettyFormat(l)}, ${prettyFormat(r)})"
-      case V_Array(array) =>
-        s"[${array.map(prettyFormat).mkString(", ")}]"
+      case V_Optional(value)       => prettyFormat(value)
+      case _ if isPrimitive(value) => s"${formatPrimitive(value)}"
+      case V_Pair(l, r)            => s"(${prettyFormat(l)}, ${prettyFormat(r)})"
+      case V_Array(array)          => s"[${array.map(prettyFormat).mkString(", ")}]"
       case V_Map(members) =>
         val memberStr = members
           .map {
