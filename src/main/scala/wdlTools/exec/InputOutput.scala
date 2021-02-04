@@ -15,9 +15,6 @@ import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.{ExprGraph, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
-import wdlTools.eval.WdlValues.{V_Array, V_Map, V_Object}
-
-import scala.collection.immutable.{SeqMap, TreeSeqMap}
 
 object InputOutput {
   def inputsFromValues(executableName: String,
@@ -39,13 +36,13 @@ object InputOutput {
             // Special handling for required input Arrays that are non-optional but
             // allowed to be empty and do not have a value specified - set the value
             // to the empty array rather than throwing an exception.
-            V_Array(Vector.empty)
+            WdlValues.V_Array()
           case RequiredInputParameter(_, _: WdlTypes.T_Map, _) if nullCollectionAsEmpty =>
             // Special handling for required input Maps that are non-optional
-            V_Map(SeqMap.empty)
+            WdlValues.V_Map()
           case RequiredInputParameter(_, WdlTypes.T_Object, _) if nullCollectionAsEmpty =>
             // Special handling for required input Objects that are non-optional
-            V_Object(SeqMap.empty)
+            WdlValues.V_Object()
           case param: RequiredInputParameter =>
             throw new ExecException(
                 s"Missing required input ${param.name} to executable ${executableName}",
@@ -262,15 +259,15 @@ object TaskInputOutput {
       case (WdlTypes.T_Array(_, false), None | Some(WdlValues.V_Null)) =>
         WdlValues.V_Array(Vector.empty)
       case (WdlTypes.T_Map(_, _), None | Some(WdlValues.V_Null)) =>
-        WdlValues.V_Map(TreeSeqMap.empty)
+        WdlValues.V_Map()
       case (WdlTypes.T_Object, None | Some(WdlValues.V_Null)) =>
-        WdlValues.V_Object(SeqMap.empty)
+        WdlValues.V_Object()
       case (WdlTypes.T_Struct(name, memberTypes), None | Some(WdlValues.V_Null))
           if memberTypes.values.forall {
             case WdlTypes.T_Optional(_) => true
             case _                      => false
           } =>
-        WdlValues.V_Struct(name, SeqMap.empty)
+        WdlValues.V_Struct(name)
 
       // None/null not allowed for any other cases
       case (_, None | Some(WdlValues.V_Null)) =>

@@ -890,16 +890,15 @@ case class Stdlib(paths: EvalPaths,
     val file = getWdlFile(ctx.getOneArg, ctx.loc)
     val content = ioSupport.readFile(file.value, ctx.loc)
     val reader = content.asCsvReader[(String, String)](tsvConf)
-    V_Map(
-        reader
-          .map {
-            case Left(err) =>
-              throw new EvalException(s"Invalid tsv file ${file}: ${err}", ctx.loc)
-            case Right((key, value)) => V_String(key) -> V_String(value)
-          }
-          .toVector
-          .to(TreeSeqMap)
-    )
+    val items: SeqMap[V, V] = reader
+      .map {
+        case Left(err) =>
+          throw new EvalException(s"Invalid tsv file ${file}: ${err}", ctx.loc)
+        case Right((key, value)) => V_String(key) -> V_String(value)
+      }
+      .toVector
+      .to(TreeSeqMap)
+    V_Map(items)
   }
 
   private def kvToObject(funcName: String,
