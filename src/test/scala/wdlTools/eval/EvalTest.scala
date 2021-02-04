@@ -11,8 +11,6 @@ import wdlTools.syntax.{Parsers, SourceLocation}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 
-import scala.collection.immutable.TreeSeqMap
-
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val v2Dir = Paths.get(getClass.getResource("/eval/v2").getPath)
@@ -89,11 +87,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // structs
     bindings("pr1") shouldBe V_Struct("Person",
-                                      TreeSeqMap(
-                                          "name" -> V_String("Jay"),
-                                          "city" -> V_String("SF"),
-                                          "age" -> V_Int(31)
-                                      ))
+                                      "name" -> V_String("Jay"),
+                                      "city" -> V_String("SF"),
+                                      "age" -> V_Int(31))
     bindings("name") shouldBe V_String("Jay")
   }
 
@@ -108,18 +104,19 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("n2") shouldBe V_Int(2)
     bindings("n3") shouldBe V_Int(1)
     bindings("cities2") shouldBe V_Array(
-        Vector(V_String("LA"), V_String("Seattle"), V_String("San Francisco"))
+        V_String("LA"),
+        V_String("Seattle"),
+        V_String("San Francisco")
     )
 
     bindings("table2") shouldBe V_Array(
-        Vector(
-            V_Array(Vector(V_String("A"), V_String("allow"))),
-            V_Array(Vector(V_String("B"), V_String("big"))),
-            V_Array(Vector(V_String("C"), V_String("clam")))
-        )
+        V_Array(V_String("A"), V_String("allow")),
+        V_Array(V_String("B"), V_String("big")),
+        V_Array(V_String("C"), V_String("clam"))
     )
     bindings("m2") shouldBe V_Map(
-        TreeSeqMap(V_String("name") -> V_String("hawk"), V_String("kind") -> V_String("bird"))
+        V_String("name") -> V_String("hawk"),
+        V_String("kind") -> V_String("bird")
     )
 
     // sub
@@ -132,22 +129,18 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
 
     // transpose
-    bindings("ar3") shouldBe V_Array(Vector(V_Int(0), V_Int(1), V_Int(2)))
+    bindings("ar3") shouldBe V_Array(V_Int(0), V_Int(1), V_Int(2))
     bindings("ar_ar2") shouldBe V_Array(
-        Vector(
-            V_Array(Vector(V_Int(1), V_Int(4))),
-            V_Array(Vector(V_Int(2), V_Int(5))),
-            V_Array(Vector(V_Int(3), V_Int(6)))
-        )
+        V_Array(V_Int(1), V_Int(4)),
+        V_Array(V_Int(2), V_Int(5)),
+        V_Array(V_Int(3), V_Int(6))
     )
 
     // zip
     bindings("zlf") shouldBe V_Array(
-        Vector(
-            V_Pair(V_String("A"), V_Boolean(true)),
-            V_Pair(V_String("B"), V_Boolean(false)),
-            V_Pair(V_String("C"), V_Boolean(true))
-        )
+        V_Pair(V_String("A"), V_Boolean(true)),
+        V_Pair(V_String("B"), V_Boolean(false)),
+        V_Pair(V_String("C"), V_Boolean(true))
     )
 
     // cross
@@ -168,19 +161,29 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("l2") shouldBe V_Int(6)
 
     bindings("files2") shouldBe V_Array(
-        Vector(V_File("A"), V_File("B"), V_File("C"), V_File("G"), V_File("J"), V_File("K"))
+        V_File("A"),
+        V_File("B"),
+        V_File("C"),
+        V_File("G"),
+        V_File("J"),
+        V_File("K")
     )
 
     bindings("pref2") shouldBe V_Array(
-        Vector(V_String("i_1"), V_String("i_3"), V_String("i_5"), V_String("i_7"))
+        V_String("i_1"),
+        V_String("i_3"),
+        V_String("i_5"),
+        V_String("i_7")
     )
     bindings("pref3") shouldBe V_Array(
-        Vector(V_String("sub_1.0"), V_String("sub_3.4"), V_String("sub_5.1"))
+        V_String("sub_1.0"),
+        V_String("sub_3.4"),
+        V_String("sub_5.1")
     )
 
     bindings("sel1") shouldBe V_String("A")
     bindings("sel2") shouldBe V_String("Henry")
-    bindings("sel3") shouldBe V_Array(Vector(V_String("Henry"), V_String("bear"), V_String("tree")))
+    bindings("sel3") shouldBe V_Array(V_String("Henry"), V_String("bear"), V_String("tree"))
 
     bindings("d1") shouldBe V_Boolean(true)
     bindings("d2") shouldBe V_Boolean(false)
@@ -195,21 +198,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
     // read/write object
     val obj1 = V_Object(
-        TreeSeqMap("author" -> V_String("Benjamin"),
-                   "year" -> V_String("1973"),
-                   "title" -> V_String("Color the sky green"))
+        "author" -> V_String("Benjamin"),
+        "year" -> V_String("1973"),
+        "title" -> V_String("Color the sky green")
     )
     val obj2 = V_Object(
-        TreeSeqMap("author" -> V_String("Primo Levy"),
-                   "year" -> V_String("1975"),
-                   "title" -> V_String("The Periodic Table"))
+        "author" -> V_String("Primo Levy"),
+        "year" -> V_String("1975"),
+        "title" -> V_String("The Periodic Table")
     )
     bindings("o2") shouldBe obj1
-    bindings("arObj") shouldBe V_Array(Vector(obj1, obj2))
+    bindings("arObj") shouldBe V_Array(obj1, obj2)
     bindings("houseObj") shouldBe V_Object(
-        TreeSeqMap("city" -> V_String("Seattle"),
-                   "team" -> V_String("Trail Blazers"),
-                   "zipcode" -> V_Int(98109))
+        "city" -> V_String("Seattle"),
+        "team" -> V_String("Trail Blazers"),
+        "zipcode" -> V_Int(98109)
     )
   }
 
@@ -350,7 +353,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     nullResults.get("result") shouldBe Some(V_String("null"))
     val arrayResults = evaluator.applyPrivateVariables(
         decls,
-        WdlValueBindings(Map("s" -> V_Array(Vector(V_String("hello"), V_String("world")))))
+        WdlValueBindings(Map("s" -> V_Array(V_String("hello"), V_String("world"))))
     )
     arrayResults.get("result") shouldBe Some(V_String("hello world"))
   }
@@ -363,13 +366,15 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "s" -> Some(WdlValues.V_String("hello world")),
         "ar1" -> Some(
             WdlValues.V_Array(
-                Vector(WdlValues.V_String("A"), WdlValues.V_String("B"), WdlValues.V_String("C"))
+                WdlValues.V_String("A"),
+                WdlValues.V_String("B"),
+                WdlValues.V_String("C")
             )
         ),
         "m1" -> Some(
             WdlValues.V_Map(
-                TreeSeqMap(WdlValues.V_String("X") -> WdlValues.V_Int(1),
-                           WdlValues.V_String("Y") -> WdlValues.V_Int(10))
+                WdlValues.V_String("X") -> WdlValues.V_Int(1),
+                WdlValues.V_String("Y") -> WdlValues.V_Int(10)
             )
         ),
         "p" -> Some(WdlValues.V_Pair(WdlValues.V_Int(1), WdlValues.V_Int(12))),
