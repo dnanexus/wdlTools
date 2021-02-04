@@ -1,5 +1,9 @@
 # Change log
 
+## v0.12.2 (dev)
+
+* Refactor `wdlTools.exec.InputOutput`
+
 ## v0.12.1 (2021-02-03)
 
 * Bugfixes

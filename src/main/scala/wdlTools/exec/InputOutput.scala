@@ -19,28 +19,22 @@ import wdlTools.eval.WdlValues.{V_Array, V_Map, V_Object}
 
 import scala.collection.immutable.{SeqMap, TreeSeqMap}
 
-abstract class InputOutput(callable: Callable, logger: Logger) {
-  protected lazy val callableInputs: Map[String, InputParameter] =
-    callable.inputs.map(inp => inp.name -> inp).toMap
-  protected lazy val callableOutputs: Map[String, OutputParameter] =
-    callable.outputs.map(out => out.name -> out).toMap
-
-  protected def inputOrder: Vector[String]
-
-  protected def outputOrder: Vector[String]
-
-  def inputsFromValues(inputValues: Map[String, WdlValues.V],
+object InputOutput {
+  def inputsFromValues(executableName: String,
+                       inputParameters: Vector[InputParameter],
+                       inputValues: Map[String, WdlValues.V],
                        evaluator: Eval,
                        ignoreDefaultEvalError: Boolean = true,
-                       nullCollectionAsEmpty: Boolean = false): Bindings[String, WdlValues.V] = {
+                       nullCollectionAsEmpty: Boolean = false,
+                       logger: Logger = Logger.get): Bindings[String, WdlValues.V] = {
     // resolve default values for any missing inputs
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
-    inputOrder.foldLeft(init) {
-      case (ctx, declName) =>
-        val value = callableInputs(declName) match {
-          case _: RequiredInputParameter if inputValues.contains(declName) =>
+    inputParameters.foldLeft(init) {
+      case (ctx, decl) =>
+        val value = decl match {
+          case param: RequiredInputParameter if inputValues.contains(param.name) =>
             // ensure the required value is not T_Optional
-            WdlValueUtils.unwrapOptional(inputValues(declName))
+            WdlValueUtils.unwrapOptional(inputValues(decl.name))
           case RequiredInputParameter(_, WdlTypes.T_Array(_, false), _) if nullCollectionAsEmpty =>
             // Special handling for required input Arrays that are non-optional but
             // allowed to be empty and do not have a value specified - set the value
@@ -52,15 +46,17 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
           case RequiredInputParameter(_, WdlTypes.T_Object, _) if nullCollectionAsEmpty =>
             // Special handling for required input Objects that are non-optional
             V_Object(SeqMap.empty)
-          case inp: RequiredInputParameter =>
-            throw new ExecException(s"Missing required input ${declName} to task ${callable.name}",
-                                    inp.loc)
-          case _ if inputValues.contains(declName) =>
+          case param: RequiredInputParameter =>
+            throw new ExecException(
+                s"Missing required input ${param.name} to executable ${executableName}",
+                param.loc
+            )
+          case param if inputValues.contains(param.name) =>
             // ensure the optional value is T_Optional
-            WdlValueUtils.ensureOptional(inputValues(declName))
+            WdlValueUtils.ensureOptional(inputValues(param.name))
           case _: OptionalInputParameter =>
             WdlValues.V_Null
-          case OverridableInputParameterWithDefault(_, wdlType, defaultExpr, loc) =>
+          case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, loc) =>
             // An input definition that has a default value supplied.
             // Typical WDL example would be a declaration like: "Int x = 5"
             try {
@@ -68,29 +64,29 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
             } catch {
               case e: EvalException if ignoreDefaultEvalError =>
                 logger.trace(
-                    s"Could not evaluate default value expression for input parameter ${declName}",
+                    s"Could not evaluate default value expression for input parameter ${name}",
                     exception = Some(e)
                 )
                 WdlValues.V_Null
               case t: Throwable =>
                 throw new ExecException(
-                    s"Could not evaluate default value expression for input parameter ${declName}",
+                    s"Could not evaluate default value expression for input parameter ${name}",
                     t,
                     loc
                 )
             }
         }
-        ctx.add(declName, value)
+        ctx.add(decl.name, value)
     }
   }
 
-  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
+  def evaluateOutputs(outputParameters: Vector[OutputParameter],
+                      evaluator: Eval,
+                      ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
-    outputOrder.foldLeft(init) {
-      case (outCtx, declName) =>
-        val out = callableOutputs(declName)
-        outCtx.add(declName,
-                   evaluator.applyExprAndCoerce(out.expr, out.wdlType, ctx.update(outCtx)))
+    outputParameters.foldLeft(init) {
+      case (outCtx, OutputParameter(name, wdlType, expr, _)) =>
+        outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx)))
     }
   }
 }
@@ -99,55 +95,73 @@ abstract class InputOutput(callable: Callable, logger: Logger) {
   * Implemention of the JSON Input Format in the WDL specification
   * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
   */
-case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet)
-    extends InputOutput(task, logger) {
+case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
   private lazy val depOrder = ExprGraph.buildFrom(task)
+  private lazy val inputParameters: Vector[InputParameter] = {
+    val inputMap = task.inputs.map(i => i.name -> i).toMap
+    depOrder.inputOrder.map(inputMap(_))
+  }
+  private lazy val outputParameters: Vector[OutputParameter] = {
+    val outputMap = task.outputs.map(i => i.name -> i).toMap
+    depOrder.outputOrder.map(outputMap(_))
+  }
 
-  override protected def inputOrder: Vector[String] = depOrder.inputOrder
-
-  override protected def outputOrder: Vector[String] = depOrder.outputOrder
+  def inputsFromValues(inputValues: Map[String, WdlValues.V],
+                       evaluator: Eval,
+                       ignoreDefaultEvalError: Boolean = true,
+                       nullCollectionAsEmpty: Boolean = false): Bindings[String, WdlValues.V] = {
+    InputOutput.inputsFromValues(task.name,
+                                 inputParameters,
+                                 inputValues,
+                                 evaluator,
+                                 ignoreDefaultEvalError,
+                                 nullCollectionAsEmpty,
+                                 logger)
+  }
 
   def inputsFromJson(jsInputs: Map[String, JsValue],
                      evaluator: Eval,
                      strict: Boolean = false): Bindings[String, WdlValues.V] = {
-    val values = callableInputs.flatMap {
-      case (declName, inp) =>
-        // lookup by fully-qualified name first, then plain name
-        val fqn = s"${task.name}.${declName}"
-        val value = if (jsInputs.contains(fqn)) {
-          TaskInputOutput.deserialize(jsInputs(fqn), inp, fqn)
-        } else if (jsInputs.contains(declName)) {
-          TaskInputOutput.deserialize(jsInputs(declName), inp, declName)
-        } else {
-          None
-        }
-        value.map(declName -> _)
-    }
+    val values = inputParameters.flatMap { decl =>
+      // lookup by fully-qualified name first, then plain name
+      val fqn = s"${task.name}.${decl.name}"
+      val value = if (jsInputs.contains(fqn)) {
+        TaskInputOutput.deserialize(jsInputs(fqn), decl, fqn)
+      } else if (jsInputs.contains(decl.name)) {
+        TaskInputOutput.deserialize(jsInputs(decl.name), decl, decl.name)
+      } else {
+        None
+      }
+      value.map(decl.name -> _)
+    }.toMap
     inputsFromValues(values, evaluator, strict)
+  }
+
+  def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
+    InputOutput.evaluateOutputs(outputParameters, evaluator, ctx)
   }
 
   def outputValuesToJson(outputs: Map[String, WdlValues.V],
                          prefixTaskName: Boolean = true): JsObject = {
-    val fields: Map[String, JsValue] = callableOutputs.map {
-      case (declName, out) =>
-        val key = if (prefixTaskName) {
-          s"${task.name}.${declName}"
-        } else {
-          declName
+    val fields: Map[String, JsValue] = outputParameters.map { decl =>
+      val key = if (prefixTaskName) {
+        s"${task.name}.${decl.name}"
+      } else {
+        decl.name
+      }
+      val value = {
+        val wdlValue = outputs(decl.name)
+        try {
+          WdlValueSerde.serialize(wdlValue)
+        } catch {
+          case e: WdlValueSerializationException =>
+            throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",
+                                    e,
+                                    decl.loc)
         }
-        val value = {
-          val wdlValue = outputs(declName)
-          try {
-            WdlValueSerde.serialize(wdlValue)
-          } catch {
-            case e: WdlValueSerializationException =>
-              throw new ExecException(s"Error serializing value ${wdlValue} for output ${key}",
-                                      e,
-                                      out.loc)
-          }
-        }
-        key -> value
-    }
+      }
+      key -> value
+    }.toMap
     JsObject(fields)
   }
 
