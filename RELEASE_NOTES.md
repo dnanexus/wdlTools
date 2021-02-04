@@ -4,6 +4,7 @@
 
 * Refactor `wdlTools.exec.InputOutput`
 * Add convenience constructors for compound WdlValues
+* Fix issue in `WdlGenerator` when first non-whitespace in command block is a placeholder
 
 ## v0.12.1 (2021-02-03)
 
