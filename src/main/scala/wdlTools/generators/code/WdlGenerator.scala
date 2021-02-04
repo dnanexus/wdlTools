@@ -1118,8 +1118,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         // block, so we need to parse out any in-line comment. Also determine whether we should try
         // to trim off leading whitespace or just leave as-is.
         val (headExpr: Expr, indent) = command.parts.head match {
-          case ValueString(value, wdlType, text) =>
-            value match {
+          case v: ValueString =>
+            v.value match {
               case commandStartRegexp(first, rest) =>
                 first.trim match {
                   case s
@@ -1127,11 +1127,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (ValueString("", wdlType, text), None)
-                  case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
-                    // weird case, like there is a placeholder in the comment - we don't want to break
-                    // anything so we'll just format the whole block as-is
-                    (s, None)
+                    (v.copy(value = ""), None)
+                  case s if s.startsWith(Symbols.Comment) && rest.trim.isEmpty =>
+                    // weird case, like there is a placeholder in the comment -
+                    // we don't want to break anything so we'll just format the whole
+                    // block as-is
+                    (v, None)
                   case s if s.isEmpty || s.startsWith(Symbols.Comment) =>
                     // opening line was empty or a comment
                     val (ws, trimmedRest) = rest match {
@@ -1139,16 +1140,16 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                       case _                                        => (None, rest)
                     }
                     // the first line will be indented, so we need to trim the indent from `rest`
-                    (ValueString(trimmedRest, wdlType, text), ws)
+                    (v.copy(value = trimmedRest), ws)
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (ValueString(s, wdlType, text), None)
+                    (v.copy(value = s), None)
                   case s =>
                     // opening line has some real content, so just trim any leading whitespace
                     val ws = leadingWhitespaceRegexp
                       .findFirstMatchIn(rest)
                       .map(m => m.group(1))
-                    (ValueString(s"${s}\n${rest}", wdlType, text), ws)
+                    (v.copy(value = s"${s}\n${rest}"), ws)
                 }
               case other =>
                 throw new RuntimeException(s"unexpected command part ${other}")

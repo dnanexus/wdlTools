@@ -82,6 +82,8 @@ object InputOutput {
                       ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
     outputParameters.foldLeft(init) {
+      case (outCtx, OutputParameter(name, _, _, _)) if ctx.contains(name) =>
+        outCtx.add(name, ctx.bindings(name))
       case (outCtx, OutputParameter(name, wdlType, expr, _)) =>
         outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx)))
     }

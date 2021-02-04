@@ -41,6 +41,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val (tDoc, _) = TypeInfer.instance.apply(doc)
     val generator = WdlGenerator(Some(wdlVersion))
     val gLines = LinesFileNode(generator.generateDocument(tDoc))
+    println(gLines.readLines.mkString("\n"))
     if (validateContentSelf) {
       gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")
     } else if (validateContentFile) {
@@ -118,5 +119,9 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
 
   it should "handle calls inputs with function call values" in {
     generate("call_with_function.wdl", validateContentFile = true)
+  }
+
+  it should "regenerate a WDL with only a placeholder in the command" in {
+    generate("bug-382.wdl")
   }
 }
