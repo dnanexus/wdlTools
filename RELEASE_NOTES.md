@@ -1,6 +1,6 @@
 # Change log
 
-## v0.12.2 (dev)
+## v0.12.2 (2021-02-4)
 
 * Refactor `wdlTools.exec.InputOutput`
 * Add convenience constructors for compound WdlValues
