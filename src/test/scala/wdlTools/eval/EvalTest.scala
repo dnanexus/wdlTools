@@ -7,12 +7,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.{Parsers, SourceLocation}
+import wdlTools.syntax.{Parsers, SourceLocation, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
+  private val v1_1Dir = Paths.get(getClass.getResource("/eval/v1.1").getPath)
   private val v2Dir = Paths.get(getClass.getResource("/eval/v2").getPath)
   private val fileResolver = FileSourceResolver.create(Vector(v1Dir))
   private val logger = Logger.Normal
@@ -28,9 +29,10 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     tDoc
   }
 
-  def createEvaluator(allowNonstandardCoercions: Boolean = false): Eval = {
+  def createEvaluator(wdlVersion: WdlVersion = WdlVersion.V1,
+                      allowNonstandardCoercions: Boolean = false): Eval = {
     Eval(evalPaths,
-         Some(wdlTools.syntax.WdlVersion.V1),
+         Some(wdlVersion),
          Vector.empty,
          evalFileResolver,
          Logger.Quiet,
@@ -39,10 +41,11 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   def parseAndTypeCheckAndGetDeclarations(
       file: Path,
+      wdlVersion: WdlVersion = WdlVersion.V1,
       allowNonstandardCoercions: Boolean = false
   ): (Eval, Vector[TAT.PrivateVariable]) = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator = createEvaluator(allowNonstandardCoercions)
+    val evaluator = createEvaluator(wdlVersion, allowNonstandardCoercions)
     tDoc.workflow.nonEmpty shouldBe true
     val wf = tDoc.workflow.get
     val decls: Vector[TAT.PrivateVariable] = wf.body.collect {
@@ -429,7 +432,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "evaluate concatenation of different types v2" in {
     val (evaluator, decls) =
-      parseAndTypeCheckAndGetDeclarations(v2Dir.resolve("add_int_and_string.wdl"))
+      parseAndTypeCheckAndGetDeclarations(v2Dir.resolve("add_int_and_string.wdl"), WdlVersion.V2)
     val results = evaluator.applyPrivateVariables(
         decls,
         WdlValueBindings(Map("subset_n" -> V_Int(2), "subset_total" -> V_Int(5)))
@@ -487,5 +490,28 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
           env + (name -> wdlValue)
       }
     env("actual_disk_gb") shouldBe V_Int(1)
+  }
+
+  it should "evaluate functions in v1.1" in {
+    val (evaluator, decls) =
+      parseAndTypeCheckAndGetDeclarations(v1_1Dir.resolve("functions.wdl"), WdlVersion.V1_1)
+    val results = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
+    results("a") shouldBe V_Int(1)
+    results("b") shouldBe V_Int(2)
+    results("c") shouldBe V_Float(1)
+    results("d") shouldBe V_Float(2)
+    results("e") shouldBe V_Float(1.0)
+    results("punzip") shouldBe V_Pair(V_Array(V_Int(1), V_Int(3)), V_Array(V_Int(2), V_Int(4)))
+    results("pzip") shouldBe V_Array(V_Pair(V_Int(1), V_Int(2)), V_Pair(V_Int(3), V_Int(4)))
+    results("mpairs") shouldBe V_Array(V_Pair(V_String("a"), V_Int(1)),
+                                       V_Pair(V_String("b"), V_Int(2)))
+    results("mmap") shouldBe V_Map(V_String("a") -> V_Int(1), V_String("b") -> V_Int(2))
+    results("mkeys") shouldBe V_Array(V_String("a"), V_String("b"))
+    results("acollect") shouldBe V_Map(V_String("a") -> V_Array(V_Int(1), V_Int(2)),
+                                       V_String("b") -> V_Array(V_Int(3)))
+    results("suf") shouldBe V_Array(V_String("hello world"), V_String("goodbye world"))
+    results("dquoted") shouldBe V_Array(V_String("\"1\""), V_String("\"2\""))
+    results("squoted") shouldBe V_Array(V_String("'true'"), V_String("'false'"))
+    results("sepd") shouldBe V_String("1.0,2.0")
   }
 }
