@@ -1,9 +1,10 @@
 # Change log
 
-## v0.12.3 (dev)
+## v0.12.3 (2021-02-8)
 
 * Fix WDL v1.1 parsing
 * Add `TypeInfer.applyExpression` function for type.checking expressions
+* Duplicate declaration names in different task/workflow sections are now caught during type-checking
 
 ## v0.12.2 (2021-02-4)
 
