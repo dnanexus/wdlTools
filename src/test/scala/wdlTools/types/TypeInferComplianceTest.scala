@@ -50,7 +50,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       ("bad_stdlib_calls.wdl", TResult(correct = false)),
       ("scatter_II.wdl", TResult(correct = false)),
       ("scatter_I.wdl", TResult(correct = false)),
-      ("shadow_II.wdl", TResult(correct = true)),
+      ("shadow_II.wdl", TResult(correct = false)),
       ("shadow.wdl", TResult(correct = false)),
       ("polymorphic_types.wdl", TResult(correct = true)),
       ("empty_array_in_call.wdl", TResult(correct = true, Some(TypeCheckingRegime.Strict))),

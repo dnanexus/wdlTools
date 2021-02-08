@@ -15,7 +15,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val v1_1Dir = Paths.get(getClass.getResource("/eval/v1.1").getPath)
   private val v2Dir = Paths.get(getClass.getResource("/eval/v2").getPath)
-  private val fileResolver = FileSourceResolver.create(Vector(v1Dir))
+  private val execDir = Paths.get(getClass.getResource("/exec").getPath)
+  private val fileResolver = FileSourceResolver.create(Vector(v1Dir, v1_1Dir, v2Dir, execDir))
   private val logger = Logger.Normal
   private val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
@@ -513,5 +514,20 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     results("dquoted") shouldBe V_Array(V_String("\"1\""), V_String("\"2\""))
     results("squoted") shouldBe V_Array(V_String("'true'"), V_String("'false'"))
     results("sepd") shouldBe V_String("1.0,2.0")
+  }
+
+  it should "evaluate call expression" in {
+    val tDoc = parseAndTypeCheck(execDir.resolve("inputs_with_defaults.wdl"))
+    val calls = tDoc.workflow.get.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.size shouldBe 1
+    val call = calls.head
+    val evaluator = createEvaluator()
+    val env = Map(
+        "row.left" -> (T_String, V_String("str1")),
+        "RG_LB" -> (T_String, V_String("dataset_dataset_str1"))
+    )
+    evaluator.applyExprAndCoerce(call.inputs("rg"), T_String, Eval.createBindingsFromEnv(env))
   }
 }

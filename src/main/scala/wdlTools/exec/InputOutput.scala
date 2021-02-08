@@ -50,7 +50,7 @@ object InputOutput {
             )
           case param if inputValues.contains(param.name) =>
             // ensure the optional value is T_Optional
-            WdlValueUtils.ensureOptional(inputValues(param.name))
+            inputValues(param.name)
           case _: OptionalInputParameter =>
             WdlValues.V_Null
           case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, loc) =>

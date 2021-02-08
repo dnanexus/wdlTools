@@ -1,5 +1,10 @@
 # Change log
 
+## v0.12.3 (dev)
+
+* Fix WDL v1.1 parsing
+* Add `TypeInfer.applyExpression` function for type.checking expressions
+
 ## v0.12.2 (2021-02-4)
 
 * Refactor `wdlTools.exec.InputOutput`

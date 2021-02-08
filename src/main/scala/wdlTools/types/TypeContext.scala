@@ -33,24 +33,18 @@ case class TypeContext(
 ) {
   type WdlType = WdlTypes.T
 
-  def lookup(varName: String, bindings: Bindings[String, T]): Option[WdlType] = {
-    inputs.get(varName) match {
-      case None    => ()
-      case Some(t) => return Some(t)
-    }
-    declarations.get(varName) match {
-      case None    => ()
-      case Some(t) => return Some(t)
-    }
-    outputs.get(varName) match {
-      case None    => ()
-      case Some(t) => return Some(t)
-    }
-    bindings.get(varName) match {
-      case None    => ()
-      case Some(t) => return Some(t)
-    }
-    None
+  private lazy val allDecls: Set[String] = inputs.keySet ++ outputs.keySet ++ declarations.keySet
+
+  def containsDecl(name: String): Boolean = {
+    allDecls.contains(name)
+  }
+
+  def lookup(declName: String, bindings: Bindings[String, T]): Option[WdlType] = {
+    inputs
+      .get(declName)
+      .orElse(declarations.get(declName))
+      .orElse(outputs.get(declName))
+      .orElse(bindings.get(declName))
   }
 
   def bindInputSection(inputSection: Vector[TAT.InputParameter]): TypeContext = {
@@ -58,7 +52,13 @@ case class TypeContext(
     val bindings = inputSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
-    this.copy(inputs = inputs.update(bindings))
+    val existing = bindings.keySet.intersect(allDecls)
+    if (existing.nonEmpty) {
+      throw new DuplicateBindingException(
+          s"name(s) ${existing.mkString(",")} already exists in scope"
+      )
+    }
+    copy(inputs = inputs.update(bindings))
   }
 
   def bindOutputSection(oututSection: Vector[TAT.OutputParameter]): TypeContext = {
@@ -66,11 +66,20 @@ case class TypeContext(
     val bindings = oututSection.map { tDecl =>
       tDecl.name -> tDecl.wdlType
     }.toMap
-    this.copy(outputs = outputs.update(bindings))
+    val existing = bindings.keySet.intersect(allDecls)
+    if (existing.nonEmpty) {
+      throw new DuplicateBindingException(
+          s"name(s) ${existing.mkString(",")} already exists in scope"
+      )
+    }
+    copy(outputs = outputs.update(bindings))
   }
 
   def bindDeclaration(name: String, wdlType: WdlType): TypeContext = {
-    this.copy(declarations = declarations.add(name, wdlType))
+    if (containsDecl(name)) {
+      throw new DuplicateBindingException(s"name ${name} already exists in scope")
+    }
+    copy(declarations = declarations.add(name, wdlType))
   }
 
   /**
@@ -78,7 +87,13 @@ case class TypeContext(
     * @return
     */
   def bindDeclarations(bindings: Bindings[String, T]): TypeContext = {
-    this.copy(declarations = declarations.update(bindings))
+    val existing = bindings.keySet.intersect(allDecls)
+    if (existing.nonEmpty) {
+      throw new DuplicateBindingException(
+          s"name(s) ${existing.mkString(",")} already exists in scope"
+      )
+    }
+    copy(declarations = declarations.update(bindings))
   }
 
   def bindStruct(s: T_Struct): TypeContext = {
@@ -87,13 +102,13 @@ case class TypeContext(
         // The struct is defined a second time, with the exact same definition. Ignore.
         this
       case _ =>
-        this.copy(aliases = aliases.add(s.name, s))
+        copy(aliases = aliases.add(s.name, s))
     }
   }
 
   // add a callable (task/workflow)
   def bindCallable(callable: T_Callable): TypeContext = {
-    this.copy(callables = callables.add(callable.name, callable))
+    copy(callables = callables.add(callable.name, callable))
   }
 
   // When we import another document all of its definitions are prefixed with the
@@ -111,8 +126,8 @@ case class TypeContext(
   def bindImportedDoc(namespace: String,
                       importContext: TypeContext,
                       typeAliases: Vector[AST.ImportAlias]): TypeContext = {
-    if (this.namespaces.contains(namespace)) {
-      throw new DuplicateBindingException(s"namespace ${namespace} already exists")
+    if (namespaces.contains(namespace)) {
+      throw new DuplicateBindingException(s"namespace ${namespace} already exists in scope")
     }
 
     // There cannot be any collisions because this is a new namespace
@@ -159,22 +174,29 @@ case class TypeContext(
           s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way"
       )
     }
-    this.copy(aliases = aliases.update(newStructs),
-              callables = callables.update(importCallables),
-              namespaces = namespaces + namespace)
+    copy(aliases = aliases.update(newStructs),
+         callables = callables.update(importCallables),
+         namespaces = namespaces + namespace)
   }
 }
 
 object TypeContext {
-  def create(doc: AST.Document,
+  def create(wdlVersion: WdlVersion,
+             docSource: FileNode,
              regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
              userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
              logger: Logger = Logger.get): TypeContext = {
-    val wdlVersion = doc.version.value
     TypeContext(
         version = wdlVersion,
         stdlib = Stdlib(regime, wdlVersion, userDefinedFunctions, logger),
-        docSource = doc.source
+        docSource = docSource
     )
+  }
+
+  def createFromDoc(doc: AST.Document,
+                    regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
+                    userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
+                    logger: Logger = Logger.get): TypeContext = {
+    create(doc.version.value, doc.source, regime, userDefinedFunctions, logger)
   }
 }

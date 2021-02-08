@@ -17,6 +17,7 @@ import wdlTools.types.TypedAbstractSyntax.WdlType
 import dx.util.{
   Bindings,
   DuplicateBindingException,
+  FileNode,
   FileSourceResolver,
   Logger,
   TraceLevel,
@@ -1170,7 +1171,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
   // Convert from AST to TAT and maintain context
   private def applyDoc(doc: AST.Document): (TAT.Document, TypeContext) = {
-    val emptyCtx = TypeContext.create(doc, regime, userDefinedFunctions, logger)
+    val emptyCtx = TypeContext.createFromDoc(doc, regime, userDefinedFunctions, logger)
 
     // translate each of the elements in the document
     val (elements, elementCtx) =
@@ -1282,6 +1283,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       throw new TypeException(errors)
     }
     (tDoc, ctx)
+  }
+
+  def applyExpression(expr: AST.Expr,
+                      wdlVersion: WdlVersion,
+                      regime: TypeCheckingRegime,
+                      docSource: FileNode,
+                      bindings: Bindings[String, T] = WdlTypeBindings.empty,
+                      section: Section = Section.Other): TAT.Expr = {
+    val ctx = TypeContext.create(wdlVersion, docSource, regime)
+    applyExpr(expr, ctx, bindings, section = section)
   }
 }
 

@@ -267,7 +267,7 @@ case class Eval(paths: EvalPaths,
           )
 
         case TAT.ExprIdentifier(id, _, _) if updatedCtx.bindings.contains(id) =>
-          updatedCtx.bindings(id)
+          EvalUtils.unwrapOptional(updatedCtx.bindings(id))
         case TAT.ExprIdentifier(id, _, _) =>
           throw new EvalException(s"identifier ${id} not found")
 

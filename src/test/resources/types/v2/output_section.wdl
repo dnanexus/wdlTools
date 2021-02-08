@@ -19,7 +19,7 @@ task foo {
     String ab = a + "b"
     Int m = n + 3
     Array[String] quality_scores = read_lines("${sample_id}.scores.txt")
-    File tranches = "${sample_id}"
+    File tranches_out = "${sample_id}"
     Name p = Name {
       first: "Joe",
       last: "Blow"
