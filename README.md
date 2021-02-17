@@ -35,7 +35,9 @@ The following commands are currently available. They should be considered "alpha
 * [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
 * [exec](doc/Commands/Exec.md): execute a WDL task (workflow execution is not yet supported)
 * [format](doc/Commands/Format.md): reformat a WDL file
+  * Note: draft-2 is not yet supported.
 * [lint](doc/Commands/Lint.md): detect "lint" (i.e. incorrect style or potentially problematic code) in a WDL file
+  * Note: this command is not yet full-featured. You may want to also use [miniwdl](https://github.com/chanzuckerberg/miniwdl) `lint`.
 * [new](doc/Commands/New.md): generate a new WDL project
 * [printTree](doc/Commands/PrintTree.md): print the Abstract Syntax Tree for a WDL document
 * [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxWDL](https://github.com/dnanexus/dxWDL)
