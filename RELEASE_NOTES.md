@@ -1,5 +1,9 @@
 # Change log
 
+## dev
+
+* Add back placeholder support for v1.1
+
 ## v0.12.3 (2021-02-8)
 
 * Fix WDL v1.1 parsing

@@ -3,6 +3,7 @@ package wdlTools.syntax.v1_1
 import dx.util.{FileSourceResolver, Logger}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import wdlTools.syntax.Antlr4Util
 import wdlTools.syntax.v1_1.ConcreteSyntax.Document
 
 import java.nio.file.Paths
@@ -13,6 +14,7 @@ class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
   private val logger = Logger.Quiet
 
   private def getDocument(fname: String): Document = {
+    Antlr4Util.setParserTrace(true)
     ParseTop(
         WdlV1_1Grammar.newInstance(fileResolver.fromPath(sourcePath.resolve(fname)),
                                    Vector.empty,

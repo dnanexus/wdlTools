@@ -204,6 +204,13 @@ wdl_type
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
       return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
     }
+    // TODO: figure out how to have true= and false= tokens
+//    if (ctx.TRUEEQUAL() != null) {
+//      return ExprPlaceholderPartEqual(true, expr, getSourceLocation(grammar.docSource, ctx))
+//    }
+//    if (ctx.FALSEEQUAL() != null) {
+//      return ExprPlaceholderPartEqual(false, expr, getSourceLocation(grammar.docSource, ctx))
+//    }
     if (ctx.DEFAULTEQUAL() != null) {
       return ExprPlaceholderPartDefault(expr, getSourceLocation(grammar.docSource, ctx))
     }
