@@ -158,12 +158,29 @@ string
     }
   }
 
+  // These are parts of string interpolation expressions like:
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  //
+  private sealed trait PlaceHolderPart
+  // true="--yes"    false="--no"
+  private case class ExprPlaceholderPartEqual(b: Boolean, value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+  // default="foo"
+  private case class ExprPlaceholderPartDefault(value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+  // sep=", "
+  private case class ExprPlaceholderPartSep(value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+
   /* expression_placeholder_option
   : BoolLiteral EQUAL (string | number)
   | DEFAULT EQUAL (string | number)
   | SEP EQUAL (string | number)
   ; */
-  override def visitExpression_placeholder_option(
+  private def parse_placeholder_option(
       ctx: WdlDraft2Parser.Expression_placeholder_optionContext
   ): PlaceHolderPart = {
     val expr: Expr =
@@ -182,6 +199,7 @@ string
             throw new SyntaxException("Placeholder options must be strings", loc)
           }
       }
+
     if (ctx.BoolLiteral() != null) {
       val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
       return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
@@ -204,46 +222,30 @@ string
   private def parseEntirePlaceHolderExpression(placeHolders: Vector[PlaceHolderPart],
                                                expr: Expr,
                                                ctx: ParserRuleContext): Expr = {
-    if (placeHolders.isEmpty) {
-      // This is just an expression inside braces
-      // ${1}
-      // ${x + 3}
-      return expr
-    }
+
     val source = getSourceLocation(grammar.docSource, ctx)
 
-    // This is a place-holder such as
-    //   ${default="foo" optional_value}
-    //   ${sep=", " array_value}
-    if (placeHolders.size == 1) {
-      placeHolders.head match {
-        case ExprPlaceholderPartDefault(default, _) =>
-          return ExprPlaceholderDefault(default, expr, source)
-        case ExprPlaceholderPartSep(sep, _) =>
-          return ExprPlaceholderSep(sep, expr, source)
-        case _ =>
-          throw new SyntaxException("invalid place holder",
-                                    getSourceLocation(grammar.docSource, ctx))
-      }
+    placeHolders match {
+      case Vector() =>
+        // This is just an expression inside braces
+        // ${1}
+        // ${x + 3}
+        expr
+      case Vector(ExprPlaceholderPartDefault(default, _)) =>
+        // ${default="foo" optional_value}
+        ExprPlaceholderDefault(default, expr, source)
+      case Vector(ExprPlaceholderPartSep(sep, _)) =>
+        // ${sep=", " array_value}
+        ExprPlaceholderSep(sep, expr, source)
+      case Vector(ExprPlaceholderPartEqual(true, x, _), ExprPlaceholderPartEqual(false, y, _)) =>
+        // ${true="--yes" false="--no" boolean_value}
+        ExprPlaceholderEqual(x, y, expr, source)
+      case Vector(ExprPlaceholderPartEqual(false, y, _), ExprPlaceholderPartEqual(true, x, _)) =>
+        // ${false="--no" true="--yes" boolean_value}
+        ExprPlaceholderEqual(x, y, expr, source)
+      case _ =>
+        throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
     }
-
-    //   ${true="--yes" false="--no" boolean_value}
-    if (placeHolders.size == 2) {
-      (placeHolders(0), placeHolders(1)) match {
-        case (ExprPlaceholderPartEqual(true, x, _), ExprPlaceholderPartEqual(false, y, _)) =>
-          return ExprPlaceholderEqual(x, y, expr, source)
-        case (ExprPlaceholderPartEqual(false, x, _), ExprPlaceholderPartEqual(true, y, _)) =>
-          return ExprPlaceholderEqual(y, x, expr, source)
-        case (_: ExprPlaceholderPartEqual, _: ExprPlaceholderPartEqual) =>
-          throw new SyntaxException("invalid boolean place holder",
-                                    getSourceLocation(grammar.docSource, ctx))
-        case (_, _) =>
-          throw new SyntaxException("invalid place holder",
-                                    getSourceLocation(grammar.docSource, ctx))
-      }
-    }
-
-    throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
   }
 
   /* string_expr_part
@@ -253,7 +255,7 @@ string
     val pHolder: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
-      .map(visitExpression_placeholder_option)
+      .map(parse_placeholder_option)
       .toVector
     val expr = visitExpr(ctx.expr())
     parseEntirePlaceHolderExpression(pHolder, expr, ctx)
@@ -770,7 +772,7 @@ any_decls
     val placeHolders: Vector[PlaceHolderPart] = ctx
       .expression_placeholder_option()
       .asScala
-      .map(x => visitExpression_placeholder_option(x))
+      .map(x => parse_placeholder_option(x))
       .toVector
     val expr = visitExpr(ctx.expr())
     parseEntirePlaceHolderExpression(placeHolders, expr, ctx)

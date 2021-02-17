@@ -45,12 +45,18 @@ number
 
 // Literals
 
+expression_placeholder_option
+  : BoolLiteral EQUAL string
+  | DEFAULTEQUAL (string | number)
+  | SEPEQUAL string
+  ;
+
 string_part
   : StringPart*
   ;
 
 string_expr_part
-  : StringCommandStart expr RBRACE
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ;
 
 string_expr_with_string_part
@@ -221,21 +227,21 @@ task_output
   : OUTPUT LBRACE (bound_decls)* RBRACE
   ;
 
-task_command
-  : COMMAND BeginLBrace task_command_string_part task_command_expr_with_string* EndCommand
-  | COMMAND BeginHereDoc task_command_string_part task_command_expr_with_string* EndCommand
-  ;
-
 task_command_string_part
   : CommandStringPart*
   ;
 
 task_command_expr_part
-  : StringCommandStart expr RBRACE
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ;
 
 task_command_expr_with_string
   : task_command_expr_part task_command_string_part
+  ;
+
+task_command
+  : COMMAND BeginLBrace task_command_string_part task_command_expr_with_string* EndCommand
+  | COMMAND BeginHereDoc task_command_string_part task_command_expr_with_string* EndCommand
   ;
 
 task_element

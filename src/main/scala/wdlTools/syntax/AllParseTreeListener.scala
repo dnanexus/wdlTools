@@ -1457,6 +1457,16 @@ class AllParseTreeListener
   override def exitNumber(ctx: WdlV1_1Parser.NumberContext): Unit = {
     exitNumber(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterExpression_placeholder_option(
+      ctx: WdlV1_1Parser.Expression_placeholder_optionContext
+  ): Unit = {
+    enterExpression_placeholder_option(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpression_placeholder_option(
+      ctx: WdlV1_1Parser.Expression_placeholder_optionContext
+  ): Unit = {
+    exitExpression_placeholder_option(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterString_part(ctx: WdlV1_1Parser.String_partContext): Unit = {
     enterString_part(ctx.asInstanceOf[ParserRuleContext])
   }

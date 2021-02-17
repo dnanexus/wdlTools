@@ -9,7 +9,7 @@ import wdlTools.syntax.{Comment, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
-class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
+class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")

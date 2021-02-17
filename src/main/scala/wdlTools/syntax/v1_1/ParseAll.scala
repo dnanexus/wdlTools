@@ -68,6 +68,17 @@ case class ParseAll(followImports: Boolean = false,
             AST.ExprMember(translateExpr(member.key), translateExpr(member.value), member.loc)
           }, loc)
 
+        // string place holders
+        case CST.ExprPlaceholderEqual(t, f, value, srcText) =>
+          AST.ExprPlaceholderCondition(translateExpr(t),
+                                       translateExpr(f),
+                                       translateExpr(value),
+                                       srcText)
+        case CST.ExprPlaceholderDefault(default, value, srcText) =>
+          AST.ExprPlaceholderDefault(translateExpr(default), translateExpr(value), srcText)
+        case CST.ExprPlaceholderSep(sep, value, srcText) =>
+          AST.ExprPlaceholderSep(translateExpr(sep), translateExpr(value), srcText)
+
         // operators on one argument
         case CST.ExprUnaryPlus(value, loc) =>
           AST.ExprApply(Operator.UnaryPlus.name, Vector(translateExpr(value)), loc)

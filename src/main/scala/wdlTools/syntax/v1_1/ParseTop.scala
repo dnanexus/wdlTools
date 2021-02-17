@@ -158,13 +158,116 @@ wdl_type
     }
   }
 
+  // These are parts of string interpolation expressions like:
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  //
+  private sealed trait PlaceHolderPart
+  // true="--yes"    false="--no"
+  private case class ExprPlaceholderPartEqual(b: Boolean, value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+  // default="foo"
+  private case class ExprPlaceholderPartDefault(value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+  // sep=", "
+  private case class ExprPlaceholderPartSep(value: Expr, loc: SourceLocation)
+      extends PlaceHolderPart
+
+  /* expression_placeholder_option
+  : BoolLiteral EQUAL (string | number)
+  | DEFAULT EQUAL (string | number)
+  | SEP EQUAL (string | number)
+  ; */
+  private def parse_placeholder_option(
+      ctx: WdlV1_1Parser.Expression_placeholder_optionContext
+  ): PlaceHolderPart = {
+    val expr: Expr =
+      try {
+        visitString(ctx.string())
+      } catch {
+        case _: NullPointerException =>
+          val loc = getSourceLocation(grammar.docSource, ctx)
+          if (ctx.number() != null) {
+            grammar.logger.warning(
+                s"""A placeholder option at ${loc} has a numeric value;
+                   |only string values are allowed.""".stripMargin
+            )
+            visitNumber(ctx.number())
+          } else {
+            throw new SyntaxException("Placeholder options must be strings", loc)
+          }
+      }
+
+    if (ctx.BoolLiteral() != null) {
+      val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
+      return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    if (ctx.DEFAULTEQUAL() != null) {
+      return ExprPlaceholderPartDefault(expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    if (ctx.SEPEQUAL() != null) {
+      return ExprPlaceholderPartSep(expr, getSourceLocation(grammar.docSource, ctx))
+    }
+    throw new SyntaxException(s"Not one of three known variants of a placeholder",
+                              getSourceLocation(grammar.docSource, ctx))
+  }
+
+  // These are full expressions of the same kind
+  //
+  // ${true="--yes" false="--no" boolean_value}
+  // ${default="foo" optional_value}
+  // ${sep=", " array_value}
+  private def parseEntirePlaceHolderExpression(placeHolders: Vector[PlaceHolderPart],
+                                               expr: Expr,
+                                               ctx: ParserRuleContext): Expr = {
+
+    val source = getSourceLocation(grammar.docSource, ctx)
+
+    placeHolders match {
+      case Vector() =>
+        // This is just an expression inside braces
+        // ${1}
+        // ${x + 3}
+        expr
+      case Vector(ExprPlaceholderPartDefault(default, _)) =>
+        // ${default="foo" optional_value}
+        ExprPlaceholderDefault(default, expr, source)
+      case Vector(ExprPlaceholderPartSep(sep, _)) =>
+        // ${sep=", " array_value}
+        ExprPlaceholderSep(sep, expr, source)
+      case Vector(ExprPlaceholderPartEqual(true, x, _), ExprPlaceholderPartEqual(false, y, _)) =>
+        // ${true="--yes" false="--no" boolean_value}
+        ExprPlaceholderEqual(x, y, expr, source)
+      case Vector(ExprPlaceholderPartEqual(false, y, _), ExprPlaceholderPartEqual(true, x, _)) =>
+        // ${false="--no" true="--yes" boolean_value}
+        ExprPlaceholderEqual(x, y, expr, source)
+      case _ =>
+        throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
+    }
+  }
+
+  /* string_expr_part
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
+  ; */
+  override def visitString_expr_part(ctx: WdlV1_1Parser.String_expr_partContext): Expr = {
+    val pHolder: Vector[PlaceHolderPart] = ctx
+      .expression_placeholder_option()
+      .asScala
+      .map(parse_placeholder_option)
+      .toVector
+    val expr = visitExpr(ctx.expr())
+    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
+  }
+
   /* string_expr_with_string_part
   : string_expr_part string_part
   ; */
   override def visitString_expr_with_string_part(
       ctx: WdlV1_1Parser.String_expr_with_string_partContext
   ): Expr = {
-    val exprPart = visitExpr(ctx.string_expr_part().expr())
+    val exprPart = visitString_expr_part(ctx.string_expr_part())
     val stringPart = visitString_part(ctx.string_part())
     val loc = getSourceLocation(grammar.docSource, ctx)
     (exprPart, stringPart) match {
@@ -798,13 +901,28 @@ task_input
     ExprString(text, getSourceLocation(grammar.docSource, ctx))
   }
 
+  /* task_command_expr_part
+    : StringCommandStart  (expression_placeholder_option)* expr RBRACE
+    ; */
+  override def visitTask_command_expr_part(
+      ctx: WdlV1_1Parser.Task_command_expr_partContext
+  ): Expr = {
+    val placeHolders: Vector[PlaceHolderPart] = ctx
+      .expression_placeholder_option()
+      .asScala
+      .map(x => parse_placeholder_option(x))
+      .toVector
+    val expr = visitExpr(ctx.expr())
+    parseEntirePlaceHolderExpression(placeHolders, expr, ctx)
+  }
+
   /* task_command_expr_with_string
     : task_command_expr_part task_command_string_part
     ; */
   override def visitTask_command_expr_with_string(
       ctx: WdlV1_1Parser.Task_command_expr_with_stringContext
   ): Expr = {
-    val exprPart: Expr = visitExpr(ctx.task_command_expr_part().expr())
+    val exprPart: Expr = visitTask_command_expr_part(ctx.task_command_expr_part())
     val stringPart: Expr = visitTask_command_string_part(
         ctx.task_command_string_part()
     )
