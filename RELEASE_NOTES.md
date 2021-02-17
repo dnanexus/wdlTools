@@ -1,6 +1,6 @@
 # Change log
 
-## dev
+## v0.12.4 (2021-02-17)
 
 * Add back placeholder support for v1.1
 
