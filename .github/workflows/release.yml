@@ -1,0 +1,126 @@
+# TODO: update conda-forge recipe
+name: wdlTools Release
+on:
+  workflow_dispatch:
+    inputs:
+      release-version:
+        description: 'Release version'
+        required: true
+
+jobs:
+  run-release:
+    name: wdlTools Release
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v2
+
+      - name: Install java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+
+      - name: Install & build
+        run: |
+          sudo apt-get update
+
+          # install java
+          sudo apt-get install wget make openjdk-8-jdk-headless
+
+          # compile antlr4 sources
+          cd ${GITHUB_WORKSPACE}
+          make
+
+          # install sbt
+          echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+          sudo apt-get install -y sbt
+
+          # compile
+          sbt compile
+
+      - name: Unit Tests
+        run: |
+          sbt test
+
+      - name: Assembly
+        run: |
+          sbt assembly
+          mv ./target/wdlTools.jar ./wdlTools-${{ github.event.inputs.release-version }}.jar
+
+      - name: Scala formatting
+        run: |
+          sbt scalafmtCheckAll
+
+      - name: Extract release notes and set version in application.conf files
+        id: update-release
+        run: |
+          # Update the config file with the newest version
+          sed -i 's/version.*$/version = "${{ github.event.inputs.release-version }}"/' ./src/main/resources/application.conf
+
+          # Extract release notes for the release into a temporary (unpushed) file
+          # It is expected the RELEASE_NOTES.md has already an entry for the version being
+          # released. The section should start with '## <version>', e.g. ## 1.0.0 2021-01-01
+          # The file will be read by the create-release step
+          RELEASE_NOTES_PATH="./release_notes_${{ github.event.inputs.release-version }}.md"
+          sed -n '/## ${{ github.event.inputs.release-version }}/,/##/p' RELEASE_NOTES.md | sed '1d; $d' > $RELEASE_NOTES_PATH
+          echo ::set-output name=release-notes-path::$(echo "${RELEASE_NOTES_PATH}")
+
+      - name: Commit changes to application.conf files
+        uses: EndBug/add-and-commit@v7
+        with:
+          message: 'Release ${{ github.event.inputs.release-version }}'
+          add: '[
+              "./src/main/resources/application.conf"
+          ]'
+          push: false
+          tag: ${{ github.event.inputs.release-version }}
+
+      - name: Create release entry
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.release-version }}
+          release_name: dxCompiler ${{ github.event.inputs.release-version }}
+          body_path: ${{ steps.update-release.outputs.release-notes-path }}
+          draft: true
+          prerelease: false
+
+      - name: Upload assembly JAR
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the "Create release entry" step above, referencing it's ID to get its outputs object,
+          # which include a `upload_url`. See this blog post for more info:
+          # https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./wdlTools-${{ github.event.inputs.release-version }}.jar
+          asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
+          asset_content_type: application/jar
+
+      - name: Publish signed release to SonaType
+        run:
+          # write credentials to the sbt config file
+          mkdir -p ~/.sbt
+          echo 'credentials += Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", "dnanexus", "${{ secrets.SONATYPE_PW }}")' > ~/.sbt/1.0/sonatype.sbt
+          sbt sonatypeBundleRelease
+
+      - name: Push local main branch and tag to origin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin ${{ github.ref }}
+          git push origin ${{ github.event.inputs.release-version }}
+
+      - name: Rollback release if unsuccessfull
+        if: ${{ cancelled() || failure() }}
+        uses: author/action-rollback@1.0.3
+        with:
+          release_id: ${{ steps.create-release.outputs.id }}
+          delete_orphan_tag: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
