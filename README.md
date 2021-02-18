@@ -4,7 +4,7 @@
 
 ## Abstract Syntax Tree (AST)
 
-The `wdlTools.syntax` package implements an [abstract syntax tree (AST)](src/main/scala/wdlTools/syntax/AbstractSyntax.scala) for WDL. It uses [Antlr4 grammar](https://github.com/patmagee/wdl/tree/grammar-remake) developed by Patrick Magee.
+The `wdlTools.syntax` package implements an [abstract syntax tree (AST)](src/main/scala/wdlTools/syntax/AbstractSyntax.scala) for WDL. It uses the OpenWDL [Antlr4 grammar](https://github.com/openwdl/wdl/tree/main/versions/1.0/parsers/antlr4) originally created by [Patrick Magee](https://github.com/patmagee).
 
 Currently, WDL draft-2, 1.0, 1.1, and development/2.0 are fully supported (with some [limitations](#limitations)).
 
@@ -29,7 +29,7 @@ The wdlTools JAR also provides various command line tools to accelerate and simp
 $ java -jar wdlTools.jar [command] --help
 ```
 
-The following commands are currently available. They should be considered "alpha" quality - please report any bugs/enhancements using the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
+The following commands are currently available. They should be considered "beta" quality - please report any bugs/enhancements using the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
 
 * [check](doc/Commands/Check.md): type-check a WDL file
 * [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
@@ -41,7 +41,7 @@ The following commands are currently available. They should be considered "alpha
 * [new](doc/Commands/New.md): generate a new WDL project
 * [printTree](doc/Commands/PrintTree.md): print the Abstract Syntax Tree for a WDL document
 * [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxWDL](https://github.com/dnanexus/dxWDL)
-* [upgrade](doc/Commands/Upgrade.md): upgrade a WDL file to a newer version; currently only draft-2 -> 1.0 is supported
+* [upgrade](doc/Commands/Upgrade.md): upgrade a WDL file to a newer version; currently only draft-2 -> [1.0, 1.1] is supported
 
 
 ## Limitations

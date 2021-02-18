@@ -258,9 +258,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descr = "WDL version of the document being upgraded",
         default = Some(WdlVersion.V1)
     )
+    val supportedVersions: Set[WdlVersion] = Set(WdlVersion.V1, WdlVersion.V1_1)
     validateOpt(destVersion) {
-      case Some(version) if version != WdlVersion.V1 =>
-        Left("Only WDL v1.0 is supported currently")
+      case Some(version) if !supportedVersions.contains(version) =>
+        Left(
+            s"Only WDL versions ${supportedVersions.map(_.name).mkString(",")} are supported currently"
+        )
       case _ => Right(())
     }
     validateOpt(srcVersion, destVersion) {
