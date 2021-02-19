@@ -1,5 +1,9 @@
 # Change log
 
+## dev
+
+* Allow coercion of `read_lines` return value to array of any primitive type
+
 ## 0.12.5 (2021-02-19)
 
 * Preserve blank lines in command section
