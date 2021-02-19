@@ -1,6 +1,6 @@
 # Change log
 
-## 0.12.5-rc1 (2021-02-19)
+## 0.12.5 (2021-02-19)
 
 * Preserve blank lines in command section
 
