@@ -106,7 +106,7 @@ jobs:
         run: |
           base=$(basename $PWD)
           cd ..
-          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
+          tar --exclude-from=$base/.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
           mv wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
           cd $base
 
