@@ -104,7 +104,11 @@ jobs:
 
       - name: Create source tarball
         run: |
-          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz .
+          base=$(basename $PWD)
+          cd ..
+          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
+          mv wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
+          cd $base
 
       - name: Upload assembly tar.gz
         id: upload-release-tgz
@@ -136,7 +140,7 @@ jobs:
 
       - name: Rollback release if unsuccessfull
         if: ${{ cancelled() || failure() }}
-        uses: author/action-rollback@1.0.3
+        uses: author/action-rollback@stable
         with:
           release_id: ${{ steps.create-release.outputs.id }}
           delete_orphan_tag: true
