@@ -102,28 +102,6 @@ jobs:
           asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
           asset_content_type: application/jar
 
-      - name: Create source tarball
-        run: |
-          base=$(basename $PWD)
-          cd ..
-          tar --exclude-from=$base/.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
-          mv wdlTools-${{ github.event.inputs.release-version }}.tar.gz $base
-          cd $base
-
-      - name: Upload assembly tar.gz
-        id: upload-release-tgz
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # This pulls from the "Create release entry" step above, referencing it's ID to get its outputs object,
-          # which include a `upload_url`. See this blog post for more info:
-          # https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./wdlTools-${{ github.event.inputs.release-version }}.tar.gz
-          asset_name: wdlTools-${{ github.event.inputs.release-version }}.tar.gz
-          asset_content_type: application/gzip
-
       - name: Push local release branch and tag to origin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
