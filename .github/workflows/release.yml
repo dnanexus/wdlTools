@@ -89,7 +89,7 @@ jobs:
           prerelease: false
 
       - name: Upload assembly JAR
-        id: upload-release-asset
+        id: upload-release-assembly
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,25 +102,19 @@ jobs:
           asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
           asset_content_type: application/jar
 
-      - name: Publish signed release to SonaType
-        run:
-          # write credentials to the sbt config file
-          mkdir -p ~/.sbt
-          echo 'credentials += Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", "dnanexus", "${{ secrets.SONATYPE_PW }}")' > ~/.sbt/1.0/sonatype.sbt
-          sbt sonatypeBundleRelease
-
-      - name: Push local main branch and tag to origin
+      - name: Push local release branch and tag to origin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git push origin ${{ github.ref }}
-          git push origin ${{ github.event.inputs.release-version }}
+          git push origin HEAD:${{ github.ref }}
+          git push origin HEAD:${{ github.event.inputs.release-version }}
 
       - name: Rollback release if unsuccessfull
         if: ${{ cancelled() || failure() }}
-        uses: author/action-rollback@1.0.3
+        uses: author/action-rollback@stable
         with:
           release_id: ${{ steps.create-release.outputs.id }}
+          tag: ${{ github.event.inputs.release-version }}
           delete_orphan_tag: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
