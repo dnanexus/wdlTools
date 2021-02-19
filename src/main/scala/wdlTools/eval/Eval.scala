@@ -534,10 +534,9 @@ case class Eval(paths: EvalPaths,
 
   /**
     * Given a multi-line string, determine the largest w such that each line
-    * begins with at least w whitespace characters.
+    * begins with at least w whitespace characters. Trailing whitespace is
+    * stripped off prior to determining common whitespace.
     * @param s the string to trim
-    * @param ignoreEmptyLines ignore empty lines
-    * @param lineSep character to use to separate lines in the returned String
     * @return tuple (lineOffset, colOffset, trimmedString) where lineOffset
     *  is the number of lines trimmed from the beginning of the string,
     *  colOffset is the number of whitespace characters trimmed from the
@@ -547,45 +546,36 @@ case class Eval(paths: EvalPaths,
     *  beginning of each line.
     *  @example
     *    val s = "   \n  hello\n   goodbye\n "
-    *    stripLeadingWhitespace(s, false) => (1, 1, "hello\n  goodbye\n")
-    *     stripLeadingWhitespace(s, true) => (1, 2, "hello\n goodbye")
+    *    stripLeadingWhitespace(s) => (1, 2, "hello\n goodbye")
     */
-  private def stripLeadingWhitespace(
-      s: String,
-      ignoreEmptyLines: Boolean = true,
-      lineSep: String = System.lineSeparator()
-  ): String = {
-    val lines = s.split("\r\n?|\n")
+  private def stripLeadingWhitespace(s: String): String = {
+    // split string into lines and drop all trailing empty lines
+    val lines = s.split("\r\n?|\n").reverse.dropWhile(_.trim.isEmpty).reverse
     val wsRegex = "^([ \t]*)$".r
     val nonWsRegex = "^([ \t]*)(.+)$".r
     val (_, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
+      case ((lineOffset, content), wsRegex(_)) if content.isEmpty =>
+        (lineOffset + 1, content)
       case ((lineOffset, content), wsRegex(txt)) =>
-        if (content.isEmpty) {
-          (lineOffset + 1, content)
-        } else if (ignoreEmptyLines) {
-          (lineOffset, content)
-        } else {
-          (lineOffset, content :+ (txt, ""))
-        }
-      case ((lineOffset, content), nonWsRegex(ws, txt)) => (lineOffset, content :+ (ws, txt))
+        (lineOffset, content :+ (txt, ""))
+      case ((lineOffset, content), nonWsRegex(ws, txt)) =>
+        (lineOffset, content :+ (ws, txt))
     }
     if (content.isEmpty) {
       ""
     } else {
       val (whitespace, strippedLines) = content.unzip
       val colOffset = whitespace.map(_.length).min
-      val strippedContent = (
-          if (colOffset == 0) {
-            strippedLines
-          } else {
-            // add back to each line any whitespace longer than colOffset
-            strippedLines.zip(whitespace).map {
-              case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
-              case (line, _)                           => line
-            }
-          }
-      ).mkString(lineSep)
-      strippedContent
+      val strippedContent = if (colOffset == 0) {
+        strippedLines
+      } else {
+        // add back to each line any whitespace longer than colOffset
+        strippedLines.zip(whitespace).map {
+          case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+          case (line, _)                           => line
+        }
+      }
+      strippedContent.mkString(System.lineSeparator())
     }
   }
 

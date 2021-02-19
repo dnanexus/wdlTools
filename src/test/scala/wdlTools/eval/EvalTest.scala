@@ -462,7 +462,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     result shouldBe V_Int(5)
   }
 
-  it should "evaluate a task with an nunset optional input" in {
+  it should "evaluate a task with an unset optional input" in {
     val tDoc = parseAndTypeCheck(v1Dir.resolve("bwa_mem.wdl"))
     val task = tDoc.elements match {
       case Vector(task: TAT.Task) => task
@@ -491,6 +491,24 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
           env + (name -> wdlValue)
       }
     env("actual_disk_gb") shouldBe V_Int(1)
+  }
+
+  it should "evaluate a command with a line continuation before a missing optional placeholder" in {
+    val tDoc = parseAndTypeCheck(v1Dir.resolve("dangling.wdl"))
+    val task = tDoc.elements match {
+      case Vector(task: TAT.Task) => task
+      case _                      => throw new AssertionError("expected task")
+    }
+    val evaluator = createEvaluator()
+    val result =
+      evaluator.applyCommand(
+          task.command,
+          WdlValueBindings(Map("a" -> WdlValues.V_String("a"), "b" -> WdlValues.V_Null))
+      )
+    result shouldBe
+      """echo a \
+        |  
+        |echo "hello"""".stripMargin
   }
 
   it should "evaluate functions in v1.1" in {
