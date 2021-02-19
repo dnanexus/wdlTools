@@ -1,6 +1,6 @@
 # Change log
 
-## v0.12.5 ()
+## v0.12.5 (2021-02-19)
 
 * Preserve blank lines in command section
 
@@ -8,7 +8,7 @@
 
 * Add back placeholder support for v1.1
 
-## v0.12.3 (2021-02-8)
+## v0.12.3 (2021-02-08)
 
 * Fix WDL v1.1 parsing
 * Add `TypeInfer.applyExpression` function for type.checking expressions
