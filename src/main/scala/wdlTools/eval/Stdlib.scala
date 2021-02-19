@@ -862,7 +862,7 @@ case class Stdlib(paths: EvalPaths,
   private def read_lines(ctx: FunctionContext): V_Array = {
     val file = getWdlFile(ctx.getOneArg, ctx.loc)
     val content = ioSupport.readFile(file.value, ctx.loc)
-    V_Array(Source.fromString(content).getLines.map(x => V_String(x)).toVector)
+    V_Array(Source.fromString(content).getLines.map(V_String).toVector)
   }
 
   private val tsvConf = CsvConfiguration('\t', '"', QuotePolicy.WhenNeeded, Header.None)
@@ -878,7 +878,7 @@ case class Stdlib(paths: EvalPaths,
     V_Array(reader.map {
       case Left(err) =>
         throw new EvalException(s"Invalid tsv file ${file}: ${err}", ctx.loc)
-      case Right(row) => V_Array(row.map(x => V_String(x)))
+      case Right(row) => V_Array(row.map(V_String))
     }.toVector)
   }
 
