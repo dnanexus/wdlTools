@@ -89,7 +89,7 @@ jobs:
           prerelease: false
 
       - name: Upload assembly JAR
-        id: upload-release-asset
+        id: upload-release-assembly
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,8 +102,26 @@ jobs:
           asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
           asset_content_type: application/jar
 
+      - name: Create source tarball
+        run: |
+          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz
+
+      - name: Upload assembly tar.gz
+        id: upload-release-tgz
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the "Create release entry" step above, referencing it's ID to get its outputs object,
+          # which include a `upload_url`. See this blog post for more info:
+          # https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./wdlTools-${{ github.event.inputs.release-version }}.tar.gz
+          asset_name: wdlTools-${{ github.event.inputs.release-version }}.tar.gz
+          asset_content_type: application/gzip
+
       - name: Publish signed release to SonaType
-        run:
+        run: |
           # write credentials to the sbt config file
           mkdir -p ~/.sbt
           echo 'credentials += Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", "dnanexus", "${{ secrets.SONATYPE_PW }}")' > ~/.sbt/1.0/sonatype.sbt
