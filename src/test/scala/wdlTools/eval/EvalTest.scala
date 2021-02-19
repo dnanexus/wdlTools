@@ -11,6 +11,8 @@ import wdlTools.syntax.{Parsers, SourceLocation, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 
+import java.io.File
+
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
   private val v1_1Dir = Paths.get(getClass.getResource("/eval/v1.1").getPath)
@@ -532,6 +534,17 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     results("dquoted") shouldBe V_Array(V_String("\"1\""), V_String("\"2\""))
     results("squoted") shouldBe V_Array(V_String("'true'"), V_String("'false'"))
     results("sepd") shouldBe V_String("1.0,2.0")
+  }
+
+  it should "allow coercion from String to Int with read_lines" in {
+    val (evaluator, decls) =
+      parseAndTypeCheckAndGetDeclarations(v1_1Dir.resolve("read_lines.wdl"), WdlVersion.V1_1)
+    val tempFile = File.createTempFile("ints", ".txt")
+    tempFile.deleteOnExit()
+    FileUtils.writeFileContent(tempFile.toPath, "1\n2\n3")
+    val results = evaluator
+      .applyPrivateVariables(decls, WdlValueBindings(Map("f" -> V_File(tempFile.getAbsolutePath))))
+    results.get("i") shouldBe Some(V_Array(V_Int(1), V_Int(2), V_Int(3)))
   }
 
   it should "evaluate call expression" in {
