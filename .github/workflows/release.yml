@@ -104,7 +104,7 @@ jobs:
 
       - name: Create source tarball
         run: |
-          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz
+          tar --exclude-from=.gitignore -czf wdlTools-${{ github.event.inputs.release-version }}.tar.gz .
 
       - name: Upload assembly tar.gz
         id: upload-release-tgz
