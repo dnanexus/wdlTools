@@ -1,5 +1,9 @@
 # Change log
 
+## v0.12.5 ()
+
+* Preserve blank lines in command section
+
 ## v0.12.4 (2021-02-17)
 
 * Add back placeholder support for v1.1

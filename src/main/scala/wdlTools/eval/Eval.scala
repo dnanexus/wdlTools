@@ -549,17 +549,14 @@ case class Eval(paths: EvalPaths,
     *    stripLeadingWhitespace(s) => (1, 2, "hello\n goodbye")
     */
   private def stripLeadingWhitespace(s: String): String = {
-    // split string into lines and drop all trailing empty lines
-    val lines = s.split("\r\n?|\n").reverse.dropWhile(_.trim.isEmpty).reverse
+    // split string into lines and drop all leading and trailing empty lines
+    val lines =
+      s.split("\r\n?|\n").dropWhile(_.trim.isEmpty).reverse.dropWhile(_.trim.isEmpty).reverse
     val wsRegex = "^([ \t]*)$".r
     val nonWsRegex = "^([ \t]*)(.+)$".r
-    val (_, content) = lines.foldLeft((0, Vector.empty[(String, String)])) {
-      case ((lineOffset, content), wsRegex(_)) if content.isEmpty =>
-        (lineOffset + 1, content)
-      case ((lineOffset, content), wsRegex(txt)) =>
-        (lineOffset, content :+ (txt, ""))
-      case ((lineOffset, content), nonWsRegex(ws, txt)) =>
-        (lineOffset, content :+ (ws, txt))
+    val content = lines.foldLeft(Vector.empty[(String, String)]) {
+      case (content, wsRegex(txt))        => content :+ (txt, "")
+      case (content, nonWsRegex(ws, txt)) => content :+ (ws, txt)
     }
     if (content.isEmpty) {
       ""
