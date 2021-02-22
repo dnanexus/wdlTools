@@ -7,7 +7,7 @@ task bug16_chained_operations {
 
     Int j = i + i + i
 
-    command <<<
+    command<<<
     echo ~{j}
     >>>
 
