@@ -40,12 +40,8 @@ COMMAND: 'command'-> mode(Command);
 
 // Primitive Literals
 NONELITERAL: 'None';
-IntLiteral
-	: Digits
-	;
-FloatLiteral
-	: FloatFragment
-	;
+IntLiteral: Digits;
+FloatLiteral: FloatFragment;
 BoolLiteral
 	: 'true'
 	| 'false'
@@ -84,9 +80,7 @@ MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
 
-WHITESPACE
-	: [ \t\r\n]+ -> channel(HIDDEN)
-	;
+WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
 Identifier: CompleteIdentifier;
 
@@ -198,6 +192,7 @@ MetaArrayWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaObject;
 
+MetaObjectComment: '#' ~[\r\n]* -> channel(COMMENTS);
 MetaObjectIdentifier: Identifier;
 MetaObjectColon: ':' -> pushMode(MetaValue);
 MetaObjectCommaRbrace: ',' [ \t\r\n]* '}' -> popMode, popMode;

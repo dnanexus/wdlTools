@@ -201,7 +201,7 @@ meta
   :	META BeginMeta meta_kv* EndMeta
   ;
 
-// note: only specific keys are allowed in runtime, but enuerating
+// note: only specific keys are allowed in runtime, but enumerating
 // them here means they can't be used as identifiers elsewhere, so
 // we instead validate that the identifier is from among the allowed
 // set in the parser
