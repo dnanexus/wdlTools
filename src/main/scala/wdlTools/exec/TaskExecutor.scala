@@ -141,7 +141,7 @@ case class TaskExecutor(taskContext: TaskContext,
     logger.trace(s"Executing command file ${commandFile}")
     // execute the shell script in a child job - this call will only fail on timeout
     val (retcode, stdout, stderr) =
-      SysUtils.execScript(commandFile, timeout, logger, exceptionOnFailure = false)
+      SysUtils.execScript(commandFile, timeout, exceptionOnFailure = false)
     if (taskContext.runtime.isValidReturnCode(retcode)) {
       TaskExecutorSuccess(retcode, taskContext.jsonOutputs, stdout, stderr)
     } else {

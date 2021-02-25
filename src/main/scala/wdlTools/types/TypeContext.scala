@@ -58,7 +58,7 @@ case class TypeContext(
           s"name(s) ${existing.mkString(",")} already exists in scope"
       )
     }
-    copy(inputs = inputs.update(bindings))
+    copy(inputs = inputs.addAll(bindings))
   }
 
   def bindOutputSection(oututSection: Vector[TAT.OutputParameter]): TypeContext = {
@@ -72,7 +72,7 @@ case class TypeContext(
           s"name(s) ${existing.mkString(",")} already exists in scope"
       )
     }
-    copy(outputs = outputs.update(bindings))
+    copy(outputs = outputs.addAll(bindings))
   }
 
   def bindDeclaration(name: String, wdlType: WdlType): TypeContext = {
@@ -93,7 +93,7 @@ case class TypeContext(
           s"name(s) ${existing.mkString(",")} already exists in scope"
       )
     }
-    copy(declarations = declarations.update(bindings))
+    copy(declarations = declarations.addAll(bindings))
   }
 
   def bindStruct(s: T_Struct): TypeContext = {
@@ -174,8 +174,8 @@ case class TypeContext(
           s"Struct(s) ${doublyDefinedStructs.mkString(",")} already defined in a different way"
       )
     }
-    copy(aliases = aliases.update(newStructs),
-         callables = callables.update(importCallables),
+    copy(aliases = aliases.addAll(newStructs),
+         callables = callables.addAll(importCallables),
          namespaces = namespaces + namespace)
   }
 }

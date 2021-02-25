@@ -1129,12 +1129,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
           case scatter: AST.Scatter =>
             // a nested scatter
             val (tScatter, scatterBindings) = applyScatter(scatter, newCtx)
-            (tElements :+ tScatter, bindings.update(scatterBindings))
+            (tElements :+ tScatter, bindings.addAll(scatterBindings))
 
           case cond: AST.Conditional =>
             // a nested conditional
             val (tCond, condBindings) = applyConditional(cond, newCtx)
-            (tElements :+ tCond, bindings.update(condBindings))
+            (tElements :+ tCond, bindings.addAll(condBindings))
 
           case other => throw new RuntimeException(s"Unexpected workflow element ${other}")
         }

@@ -14,7 +14,7 @@ import org.antlr.v4.runtime.{
 
 import scala.jdk.CollectionConverters._
 import wdlTools.syntax
-import dx.util.{FileNode, Logger}
+import dx.util.{FileNode, LogLevel, Logger}
 
 import scala.collection.immutable.TreeMap
 
@@ -240,7 +240,7 @@ object Antlr4Util {
       // check if any errors were found
       val errors: Vector[SyntaxError] = errListener.getErrors
       if (errors.nonEmpty) {
-        if (!logger.quiet) {
+        if (logger.level >= LogLevel.Warning) {
           errors.foreach(err => logger.warning(err.toString))
         }
         throw new SyntaxException(errors)

@@ -3,6 +3,7 @@
 ## dev
 
 * Allow coercion of `read_lines` return value to array of any primitive type
+* Update to dxCommon 0.2.9
 
 ## 0.12.5 (2021-02-19)
 

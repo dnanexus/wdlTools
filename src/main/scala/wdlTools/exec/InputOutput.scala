@@ -81,11 +81,16 @@ object InputOutput {
                       evaluator: Eval,
                       ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
+    // create value bindings for the output parameters
+    // some values may already exist in the input bindings (ctx),
+    // so we copy them to the output bindings, otherwise evaluate
+    // the output parameter expression using the union of the input
+    // and output bindings
     outputParameters.foldLeft(init) {
       case (outCtx, OutputParameter(name, _, _, _)) if ctx.contains(name) =>
         outCtx.add(name, ctx.bindings(name))
       case (outCtx, OutputParameter(name, wdlType, expr, _)) =>
-        outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx)))
+        outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx.toMap)))
     }
   }
 }
