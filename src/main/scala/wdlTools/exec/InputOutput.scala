@@ -13,7 +13,7 @@ import wdlTools.eval.{
 }
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.{ExprGraph, WdlTypes}
+import wdlTools.types.{ExprGraph, TypeUtils, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 object InputOutput {
@@ -90,7 +90,14 @@ object InputOutput {
       case (outCtx, OutputParameter(name, _, _, _)) if ctx.contains(name) =>
         outCtx.add(name, ctx.bindings(name))
       case (outCtx, OutputParameter(name, wdlType, expr, _)) =>
-        outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx.toMap)))
+        // if the output parameter is optional, then it is okay if the
+        // expression fails to evaluate - we set the value to None
+        try {
+          outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx.toMap)))
+        } catch {
+          case _: EvalException if TypeUtils.isOptional(wdlType) =>
+            outCtx.add(name, WdlValues.V_Null)
+        }
     }
   }
 }
