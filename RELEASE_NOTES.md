@@ -1,6 +1,6 @@
 # Change log
 
-## dev
+## 0.12.6 (2021-02-25)
 
 * Allow coercion of `read_lines` return value to array of any primitive type
 * Update to dxCommon 0.2.9
