@@ -132,10 +132,15 @@ object WdlValueSerde {
           V_Map(m)
 
         // two ways of writing a pair: an object, or an array
+        // the WDL 1.0 spec contains a typo with field names as
+        // "Left" and "Right", so we support both
         case (T_Pair(lType, rType), JsObject(fields))
-            if Vector("left", "right").forall(fields.contains) =>
-          val left = inner(fields("left"), lType, s"${innerName}.left")
-          val right = inner(fields("right"), rType, s"${innerName}.right")
+            if fields.keySet.map(_.toLowerCase) == Set("left", "right") =>
+          val fieldsLower = fields.map {
+            case (name, value) => name.toLowerCase -> value
+          }
+          val left = inner(fieldsLower("left"), lType, s"${innerName}.left")
+          val right = inner(fieldsLower("right"), rType, s"${innerName}.right")
           V_Pair(left, right)
         case (T_Pair(lType, rType), JsArray(Vector(l, r))) =>
           val left = inner(l, lType, s"${innerName}.left")

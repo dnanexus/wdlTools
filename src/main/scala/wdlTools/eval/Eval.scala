@@ -140,9 +140,9 @@ case class Eval(paths: EvalPaths,
     // tests whether the given field name is legal for the given type
     def canResolveField(t: WdlTypes.T, field: String): Boolean = {
       TypeUtils.unwrapOptional(t) match {
-        case _: WdlTypes.T_Pair if Set("left", "right").contains(field) => true
-        case WdlTypes.T_Struct(_, fields) if fields.contains(field)     => true
-        case WdlTypes.T_Call(_, outputs) if outputs.contains(field)     => true
+        case _: WdlTypes.T_Pair if Set("left", "right").contains(field.toLowerCase) => true
+        case WdlTypes.T_Struct(_, fields) if fields.contains(field)                 => true
+        case WdlTypes.T_Call(_, outputs) if outputs.contains(field)                 => true
         // there's no way to guarantee the resolution is valid for these types:
         case WdlTypes.T_Object => true
         case WdlTypes.T_Any    => true

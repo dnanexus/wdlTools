@@ -7,21 +7,22 @@ object TestsGenerator {
   def apply(wdlName: String, doc: Document): String = {
     var data: Map[String, JsValue] = Map.empty
 
-    def getDummyValue(value: Type): JsValue = {
+    def getExampleValue(value: Type): JsValue = {
       value match {
         case _: TypeString      => JsString("foo")
         case _: TypeFile        => JsObject(Map("url" -> JsString("http://url/of/data/file")))
         case _: TypeInt         => JsNumber(0)
         case _: TypeFloat       => JsNumber(1.0)
         case _: TypeBoolean     => JsBoolean(true)
-        case TypeArray(t, _, _) => JsArray(getDummyValue(t))
-        case TypeMap(k, v, _)   => JsObject(k.toString -> getDummyValue(v))
+        case TypeArray(t, _, _) => JsArray(getExampleValue(t))
+        case TypeMap(k, v, _)   => JsObject(k.toString -> getExampleValue(v))
         case _: TypeObject      => JsObject("foo" -> JsString("bar"))
-        case TypePair(l, r, _)  => JsObject("left" -> getDummyValue(l), "right" -> getDummyValue(r))
+        case TypePair(l, r, _) =>
+          JsObject("left" -> getExampleValue(l), "right" -> getExampleValue(r))
         case TypeStruct(_, members, _) =>
           JsObject(members.collect {
             case StructMember(name, dataType, _) if !dataType.isInstanceOf[TypeOptional] =>
-              name -> getDummyValue(dataType)
+              name -> getExampleValue(dataType)
           }.toMap)
         case other => throw new Exception(s"Unrecognized type ${other}")
       }
@@ -32,7 +33,7 @@ object TestsGenerator {
         case Declaration(name, wdlType, expr, _)
             if expr.isEmpty && !wdlType.isInstanceOf[TypeOptional] && !data.contains(name) =>
           val dataName = s"input_${name}"
-          data += (dataName -> getDummyValue(wdlType))
+          data += (dataName -> getExampleValue(wdlType))
           name -> JsString(dataName)
       }.toMap)
     }
