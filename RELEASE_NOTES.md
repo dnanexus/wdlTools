@@ -1,5 +1,9 @@
 # Change log
 
+## dev
+
+* Handle 'Left' and 'Right' as keys for serialized `Pair`s
+
 ## 0.12.6 (2021-02-25)
 
 * Allow coercion of `read_lines` return value to array of any primitive type
