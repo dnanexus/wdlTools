@@ -51,29 +51,18 @@ object ConcreteSyntax {
 
   case class ExprIdentifier(id: String, loc: SourceLocation) extends Expr
 
-  // These are parts of string interpolation expressions like:
-  //
-  // ${true="--yes" false="--no" boolean_value}
-  // ${default="foo" optional_value}
-  // ${sep=", " array_value}
-  //
-  trait PlaceHolderPart extends Element
-  // true="--yes"    false="--no"
-  case class ExprPlaceholderPartEqual(b: Boolean, value: Expr, loc: SourceLocation)
-      extends PlaceHolderPart
-  // default="foo"
-  case class ExprPlaceholderPartDefault(value: Expr, loc: SourceLocation) extends PlaceHolderPart
-  // sep=", "
-  case class ExprPlaceholderPartSep(value: Expr, loc: SourceLocation) extends PlaceHolderPart
-
   // These are full expressions of the same kind
   //
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
   // ${sep=", " array_value}
-  case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprPlaceholderDefault(default: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprPlaceholderSep(sep: Expr, value: Expr, loc: SourceLocation) extends Expr
+  case class ExprPlaceholder(t: Option[Expr],
+                             f: Option[Expr],
+                             sep: Option[Expr],
+                             default: Option[Expr],
+                             value: Expr,
+                             loc: SourceLocation)
+      extends Expr
 
   case class ExprUnaryPlus(value: Expr, loc: SourceLocation) extends Expr
   case class ExprUnaryMinus(value: Expr, loc: SourceLocation) extends Expr

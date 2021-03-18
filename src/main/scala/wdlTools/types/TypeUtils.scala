@@ -397,16 +397,14 @@ object TypeUtils {
           s"object {$m2}"
 
         // ~{true="--yes" false="--no" boolean_value}
-        case TAT.ExprPlaceholderCondition(t, f, value, _, _) =>
-          s"{true=${inner(t, disableQuoting)} false=${inner(f, disableQuoting)} ${inner(value, disableQuoting)}}"
-
-        // ~{default="foo" optional_value}
-        case TAT.ExprPlaceholderDefault(default, value, _, _) =>
-          s"{default=${inner(default, disableQuoting)} ${inner(value, disableQuoting)}}"
-
-        // ~{sep=", " array_value}
-        case TAT.ExprPlaceholderSep(sep, value, _, _) =>
-          s"{sep=${inner(sep, disableQuoting)} ${inner(value, disableQuoting)}}"
+        case TAT.ExprPlaceholder(t, f, sep, default, value, _, _) =>
+          val optStr = Vector(
+              t.map(e => s"true=${inner(e, disableQuoting)}"),
+              f.map(e => s"false=${inner(e, disableQuoting)}"),
+              sep.map(e => s"sep=${inner(e, disableQuoting)}"),
+              default.map(e => s"default=${inner(e, disableQuoting)}")
+          ).flatten.mkString(" ")
+          s"{${optStr} ${inner(value, disableQuoting)}}"
 
         // Access an array element at [index]
         case TAT.ExprAt(array, index, _, _) =>
@@ -488,12 +486,11 @@ object TypeUtils {
         valMap.flatMap { case (k, v) => exprDependencies(k) ++ exprDependencies(v) }
       case TAT.ExprObject(fields, _, _) =>
         fields.flatMap { case (_, v) => exprDependencies(v) }
-      case TAT.ExprPlaceholderCondition(t: TAT.Expr, f: TAT.Expr, value: TAT.Expr, _, _) =>
-        exprDependencies(t) ++ exprDependencies(f) ++ exprDependencies(value)
-      case TAT.ExprPlaceholderDefault(default: TAT.Expr, value: TAT.Expr, _, _) =>
-        exprDependencies(default) ++ exprDependencies(value)
-      case TAT.ExprPlaceholderSep(sep: TAT.Expr, value: TAT.Expr, _, _) =>
-        exprDependencies(sep) ++ exprDependencies(value)
+      case TAT.ExprPlaceholder(t, f, sep, default, value: TAT.Expr, _, _) =>
+        Vector(t.map(exprDependencies),
+               f.map(exprDependencies),
+               sep.map(exprDependencies),
+               default.map(exprDependencies)).flatten.flatten.toMap ++ exprDependencies(value)
       // Access an array element at [index]
       case TAT.ExprAt(value, index, _, _) =>
         exprDependencies(value) ++ exprDependencies(index)

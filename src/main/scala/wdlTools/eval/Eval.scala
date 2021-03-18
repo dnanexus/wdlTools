@@ -279,37 +279,30 @@ case class Eval(paths: EvalPaths,
             interpolationValueToString(v, expr.loc)
           }
           V_String(strArray.mkString(""))
-        case TAT.ExprPlaceholderCondition(t, f, boolExpr, _, _) =>
-          // ~{true="--yes" false="--no" boolean_value}
-          inner(boolExpr, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
-            case V_Boolean(true) =>
-              inner(t, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
-            case V_Boolean(false) =>
-              inner(f, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
-            case other =>
-              throw new EvalException(
-                  s"invalid boolean value ${other}, should be a boolean",
-                  expr.loc
+        case TAT.ExprPlaceholder(t, f, sep, default, expr, _, _) =>
+          val ctxInPlaceholder = updatedCtx.advanceState(Some(ExprState.InPlaceholder))
+          val exprValue = inner(expr, ctxInPlaceholder)
+          (exprValue, t, f, sep, default) match {
+            case (V_Boolean(true), Some(tExpr), _, _, _)  => inner(tExpr, ctxInPlaceholder)
+            case (V_Boolean(false), _, Some(fExpr), _, _) => inner(fExpr, ctxInPlaceholder)
+            case (V_Array(array), _, _, Some(sepExpr), _) =>
+              val sepString = interpolationValueToString(
+                  inner(sepExpr, ctxInPlaceholder),
+                  sepExpr.loc
               )
-          }
-        case TAT.ExprPlaceholderDefault(defaultVal, optVal, _, _) =>
-          // ~{default="foo" optional_value}
-          inner(optVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
-            case V_Null => inner(defaultVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder)))
-            case other  => other
-          }
-        case TAT.ExprPlaceholderSep(sep: TAT.Expr, arrayVal: TAT.Expr, _, _) =>
-          // ~{sep=", " array_value}
-          val sepString = interpolationValueToString(
-              inner(sep, updatedCtx.advanceState(Some(ExprState.InPlaceholder))),
-              sep.loc
-          )
-          inner(arrayVal, updatedCtx.advanceState(Some(ExprState.InPlaceholder))) match {
-            case V_Array(array) =>
               val elements: Vector[String] = array.map(interpolationValueToString(_, expr.loc))
               V_String(elements.mkString(sepString))
-            case other =>
-              throw new EvalException(s"invalid array value ${other}, should be a string", expr.loc)
+            case (V_Null, _, _, _, Some(defaultValue)) => inner(defaultValue, ctxInPlaceholder)
+            case (value, None, None, None, _)          => value
+            case (value, _, _, _, _) =>
+              val optStr = Vector(t.map(_ => "true"),
+                                  f.map(_ => "false"),
+                                  sep.map(_ => "sep"),
+                                  default.map(_ => "default")).flatten.mkString(",")
+              throw new EvalException(
+                  s"placeholder value ${value} not compatible with options ${optStr}",
+                  expr.loc
+              )
           }
 
         case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, loc) =>

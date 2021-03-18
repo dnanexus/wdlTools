@@ -53,9 +53,13 @@ object ConcreteSyntax {
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
   // ${sep=", " array_value}
-  case class ExprPlaceholderEqual(t: Expr, f: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprPlaceholderDefault(default: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprPlaceholderSep(sep: Expr, value: Expr, loc: SourceLocation) extends Expr
+  case class ExprPlaceholder(t: Option[Expr],
+                             f: Option[Expr],
+                             sep: Option[Expr],
+                             default: Option[Expr],
+                             value: Expr,
+                             loc: SourceLocation)
+      extends Expr
 
   case class ExprUnaryPlus(value: Expr, loc: SourceLocation) extends Expr
   case class ExprUnaryMinus(value: Expr, loc: SourceLocation) extends Expr

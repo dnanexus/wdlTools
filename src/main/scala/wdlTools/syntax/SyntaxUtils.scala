@@ -49,17 +49,14 @@ object SyntaxUtils {
             .map(x => inner(x))
             .mkString(", ")
           s"${name} {$m}"
-        // ~{true="--yes" false="--no" boolean_value}
-        case ExprPlaceholderCondition(t: Expr, f: Expr, value: Expr, _) =>
-          s"{true=${inner(t)} false=${inner(f)} ${inner(value)}"
-
-        // ~{default="foo" optional_value}
-        case ExprPlaceholderDefault(default: Expr, value: Expr, _) =>
-          s"{default=${inner(default)} ${inner(value)}}"
-
-        // ~{sep=", " array_value}
-        case ExprPlaceholderSep(sep: Expr, value: Expr, _) =>
-          s"{sep=${prettyFormatExpr(sep, callback)} ${inner(value)}"
+        case ExprPlaceholder(t, f, sep, default, value, _) =>
+          val optStr = Vector(
+              t.map(e => s"true=${inner(e)}"),
+              f.map(e => s"false=${inner(e)}"),
+              sep.map(e => s"sep=${inner(e)}"),
+              default.map(e => s"default=${inner(e)}")
+          ).flatten.mkString(" ")
+          s"{${optStr} ${inner(value)}"
 
         // Access an array element at [index]
         case ExprAt(array: Expr, index: Expr, _) =>

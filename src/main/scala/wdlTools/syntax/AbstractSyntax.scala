@@ -58,10 +58,13 @@ object AbstractSyntax {
   // ~{true="--yes" false="--no" boolean_value}
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
-  case class ExprPlaceholderCondition(t: Expr, f: Expr, value: Expr, loc: SourceLocation)
+  case class ExprPlaceholder(t: Option[Expr],
+                             f: Option[Expr],
+                             sep: Option[Expr],
+                             default: Option[Expr],
+                             value: Expr,
+                             loc: SourceLocation)
       extends Expr
-  case class ExprPlaceholderDefault(default: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprPlaceholderSep(sep: Expr, value: Expr, loc: SourceLocation) extends Expr
 
   // Access an array element at [index]
   case class ExprAt(array: Expr, index: Expr, loc: SourceLocation) extends Expr

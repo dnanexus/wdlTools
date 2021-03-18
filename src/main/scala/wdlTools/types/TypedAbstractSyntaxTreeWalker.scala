@@ -129,14 +129,13 @@ class TypedAbstractSyntaxTreeVisitor {
     */
   def traverseExpression(ctx: VisitorContext[Expr]): Unit = {
     val exprs: Vector[Expr] = ctx.element match {
-      case ExprCompoundString(value, _, _)              => value
-      case ExprPair(l, r, _, _)                         => Vector(l, r)
-      case ExprArray(value, _, _)                       => value
-      case ExprMap(value, _, _)                         => value.keys.toVector ++ value.values.toVector
-      case ExprObject(value, _, _)                      => value.keys.toVector ++ value.values.toVector
-      case ExprPlaceholderCondition(t, f, value, _, _)  => Vector(t, f, value)
-      case ExprPlaceholderDefault(default, value, _, _) => Vector(default, value)
-      case ExprPlaceholderSep(sep, value, _, _)         => Vector(sep, value)
+      case ExprCompoundString(value, _, _) => value
+      case ExprPair(l, r, _, _)            => Vector(l, r)
+      case ExprArray(value, _, _)          => value
+      case ExprMap(value, _, _)            => value.keys.toVector ++ value.values.toVector
+      case ExprObject(value, _, _)         => value.keys.toVector ++ value.values.toVector
+      case ExprPlaceholder(t, f, sep, default, value, _, _) =>
+        Vector(t, f, sep, default).flatten :+ value
       case ExprAt(array, index, _, _)                   => Vector(array, index)
       case ExprIfThenElse(cond, tBranch, fBranch, _, _) => Vector(cond, tBranch, fBranch)
       case ExprApply(_, _, elements, _, _)              => elements

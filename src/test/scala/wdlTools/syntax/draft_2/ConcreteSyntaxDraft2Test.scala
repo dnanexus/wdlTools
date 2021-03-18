@@ -355,7 +355,12 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
       case ExprString("\n    echo ", _) =>
     }
     task.command.parts(1) should matchPattern {
-      case ExprPlaceholderSep(ExprString(",", _), ExprIdentifier("min_std_max_min", _), _) =>
+      case ExprPlaceholder(None,
+                           None,
+                           Some(ExprString(",", _)),
+                           None,
+                           ExprIdentifier("min_std_max_min", _),
+                           _) =>
     }
   }
 

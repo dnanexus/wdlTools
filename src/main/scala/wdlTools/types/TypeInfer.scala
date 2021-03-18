@@ -13,7 +13,6 @@ import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatExpr, prettyFormatType
 import TypeCheckingRegime._
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.Section.Section
-import wdlTools.types.TypedAbstractSyntax.WdlType
 import dx.util.{
   Bindings,
   DuplicateBindingException,
@@ -131,7 +130,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   }
 
   // unify a vector of types
-  private def unifyTypes(types: Iterable[WdlType],
+  private def unifyTypes(types: Iterable[WdlTypes.T],
                          errMsg: String,
                          locSource: SourceLocation,
                          ctx: UnificationContext): T = {
@@ -358,68 +357,108 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               }
               TAT.ExprIdentifier(id, t, loc)
 
-            case AST.ExprPlaceholderCondition(t: AST.Expr, f: AST.Expr, value: AST.Expr, loc) =>
-              // ${true="--yes" false="--no" boolean_value}
-              val (trueExpr, trueType) = nestedStringExpr(t, ExprState.InPlaceholder)
-              val (falseExpr, falseType) = nestedStringExpr(f, ExprState.InPlaceholder)
-              val valueExpr = nested(value, ExprState.InPlaceholder)
+            case AST.ExprPlaceholder(t, f, sep, default, expr, loc) =>
               val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
-              if (!unify.isCoercibleTo(T_Boolean, valueExpr.wdlType, unifyCtx)) {
-                val msg =
-                  s"""Condition ${prettyFormatExpr(valueExpr)} has type 
-                     |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean""".stripMargin
-                    .replaceAll("\n", " ")
-                handleError(msg, nestedExpr.loc)
-              }
-              val wdlType = if (trueType == falseType) {
-                trueType
-              } else {
-                T_String
-              }
-              TAT.ExprPlaceholderCondition(trueExpr, falseExpr, valueExpr, wdlType, loc)
-            case AST.ExprPlaceholderDefault(default: AST.Expr, value: AST.Expr, loc) =>
-              // ${default="foo" optional_value}
-              val (defaultExpr, defaultType) = nestedStringExpr(default, ExprState.InPlaceholder)
-              val valueExpr = nested(value, ExprState.InPlaceholder)
-              val unifyCtx = UnificationContext(section, inPlaceholder = true)
-              val t = valueExpr.wdlType match {
-                case T_Optional(vt2) if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
-                  defaultType
-                case T_Optional(vt2) if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
-                  T_String
-                case vt2 if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
-                  // another unsavory case. The optional_value is NOT optional.
-                  defaultType
-                case vt2 if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
-                  // another unsavory case. The optional_value is NOT optional.
-                  T_String
+              val valueExpr = nested(expr, ExprState.InPlaceholder)
+
+              val (defaultExpr, defaultValueType) = default
+                .map { d =>
+                  val (defaultExpr, defaultType) = nestedStringExpr(d, ExprState.InPlaceholder)
+                  val t = valueExpr.wdlType match {
+                    case T_Optional(vt2) if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
+                      defaultType
+                    case T_Optional(vt2) if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
+                      T_String
+                    case vt2 if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
+                      // the value is supposed to be optional but is not - we allow it anyway
+                      defaultType
+                    case vt2 if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
+                      // the value is supposed to be optional but is not - we allow it anyway
+                      T_String
+                    case _ =>
+                      val msg =
+                        s"""|Expression ${prettyFormatExpr(valueExpr)} has type
+                            |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to
+                            |${prettyFormatType(defaultExpr.wdlType)}""".stripMargin
+                          .replaceAll("\n", " ")
+                      handleError(msg, nestedExpr.loc)
+                      valueExpr.wdlType
+                  }
+                  (Some(defaultExpr), Some(t))
+                }
+                .getOrElse((None, None))
+
+              val tOption = t.map(nestedStringExpr(_, ExprState.InPlaceholder))
+              val fOption = f.map(nestedStringExpr(_, ExprState.InPlaceholder))
+              val sepOption = sep.map(nestedStringExpr(_, ExprState.InPlaceholder))
+
+              (tOption, fOption, sepOption) match {
+                case (Some((trueExpr, trueType)), Some((falseExpr, falseType)), None) =>
+                  val valueType = if (defaultValueType.isDefined) {
+                    TypeUtils.unwrapOptional(valueExpr.wdlType)
+                  } else {
+                    valueExpr.wdlType
+                  }
+                  if (!unify.isCoercibleTo(T_Boolean, valueType, unifyCtx)) {
+                    val msg =
+                      s"""Condition ${prettyFormatExpr(valueExpr)} has type
+                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to ${T_Boolean}""".stripMargin
+                        .replaceAll("\n", " ")
+                    handleError(msg, nestedExpr.loc)
+                  }
+                  val wdlType = (trueType, falseType, defaultValueType) match {
+                    case (t, f, Some(d)) if t == f && t == d => t
+                    case (t, f, None) if t == f              => t
+                    case _                                   => T_String
+                  }
+                  TAT.ExprPlaceholder(Some(trueExpr),
+                                      Some(falseExpr),
+                                      None,
+                                      defaultExpr,
+                                      valueExpr,
+                                      wdlType,
+                                      loc)
+                case (None, None, Some((sepExpr, _))) =>
+                  val valueType = if (defaultValueType.isDefined) {
+                    TypeUtils.unwrapOptional(valueExpr.wdlType)
+                  } else {
+                    valueExpr.wdlType
+                  }
+                  val t = valueType match {
+                    case T_Array(x, _) if unify.isCoercibleTo(T_String, x, unifyCtx) =>
+                      T_String
+                    case other =>
+                      val msg =
+                        s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(
+                               other
+                           )},
+                           |which is not coercible to Array[String]""".stripMargin
+                          .replaceAll("\n", " ")
+                      handleError(msg, valueExpr.loc)
+                      other
+                  }
+                  val wdlType = (t, defaultValueType) match {
+                    case (t, Some(d)) if t == d => t
+                    case _                      => T_String
+                  }
+                  TAT.ExprPlaceholder(None,
+                                      None,
+                                      Some(sepExpr),
+                                      defaultExpr,
+                                      valueExpr,
+                                      wdlType,
+                                      loc)
+                case (None, None, None) =>
+                  TAT.ExprPlaceholder(None,
+                                      None,
+                                      None,
+                                      defaultExpr,
+                                      valueExpr,
+                                      defaultValueType.get,
+                                      loc)
                 case _ =>
-                  val msg =
-                    s"""|Expression ${prettyFormatExpr(valueExpr)} has type 
-                        |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to 
-                        |${prettyFormatType(defaultExpr.wdlType)}""".stripMargin
-                      .replaceAll("\n", " ")
-                  handleError(msg, nestedExpr.loc)
-                  valueExpr.wdlType
+                  throw new Exception(s"invalid combination of placeholder options: ${nestedExpr}")
               }
-              TAT.ExprPlaceholderDefault(defaultExpr, valueExpr, t, loc)
-            case AST.ExprPlaceholderSep(sep: AST.Expr, value: AST.Expr, loc) =>
-              // ${sep=", " array_value}
-              val (sepExpr, _) = nestedStringExpr(sep, ExprState.InPlaceholder)
-              val valueExpr = nested(value, ExprState.InPlaceholder)
-              val unifyCtx = UnificationContext(section, inPlaceholder = true)
-              val t = valueExpr.wdlType match {
-                case T_Array(x, _) if unify.isCoercibleTo(T_String, x, unifyCtx) =>
-                  T_String
-                case other =>
-                  val msg =
-                    s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(other)},
-                       |which is not coercible to Array[String]""".stripMargin
-                      .replaceAll("\n", " ")
-                  handleError(msg, valueExpr.loc)
-                  other
-              }
-              TAT.ExprPlaceholderSep(sepExpr, valueExpr, t, loc)
 
             case AST.ExprIfThenElse(cond: AST.Expr,
                                     trueBranch: AST.Expr,
@@ -764,8 +803,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   private def calcSignature(
       inputSection: Vector[TAT.InputParameter],
       outputSection: Vector[TAT.OutputParameter]
-  ): (SeqMap[String, (WdlType, Boolean)], SeqMap[String, WdlType]) = {
-    val inputType: SeqMap[String, (WdlType, Boolean)] = inputSection
+  ): (SeqMap[String, (WdlTypes.T, Boolean)], SeqMap[String, WdlTypes.T]) = {
+    val inputType: SeqMap[String, (WdlTypes.T, Boolean)] = inputSection
       .map {
         case d: TAT.RequiredInputParameter =>
           // input is compulsory
@@ -779,7 +818,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       }
       .to(TreeSeqMap)
 
-    val outputType: SeqMap[String, WdlType] = outputSection
+    val outputType: SeqMap[String, WdlTypes.T] = outputSection
       .map { tDecl =>
         tDecl.name -> tDecl.wdlType
       }
@@ -1085,7 +1124,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case (name, t) => name -> TypeUtils.ensureOptional(t)
           }
           callName -> T_Call(callType.name, callOutput)
-        case (varName, typ: WdlType) =>
+        case (varName, typ: WdlTypes.T) =>
           varName -> TypeUtils.ensureOptional(typ)
       }
 

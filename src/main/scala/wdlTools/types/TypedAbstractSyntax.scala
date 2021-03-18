@@ -10,7 +10,6 @@ import scala.collection.immutable.SeqMap
 
 // A tree representing a WDL program with all of the types in place.
 object TypedAbstractSyntax {
-  type WdlType = WdlTypes.T
   type T_Function = WdlTypes.T_Function
 
   trait Element {
@@ -21,30 +20,31 @@ object TypedAbstractSyntax {
 
   // expressions
   sealed trait Expr extends Element {
-    val wdlType: WdlType
+    val wdlType: WdlTypes.T
   }
 
   // values
-  case class ValueNull(wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueNone(wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueBoolean(value: Boolean, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueInt(value: Long, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueFloat(value: Double, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueString(value: String, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueFile(value: String, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ValueDirectory(value: String, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprIdentifier(id: String, wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ValueNull(wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueNone(wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueBoolean(value: Boolean, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueInt(value: Long, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueFloat(value: Double, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueString(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueFile(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueDirectory(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ExprIdentifier(id: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
 
   // represents strings with interpolation. These occur only in command blocks.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr], wdlType: WdlType, loc: SourceLocation)
+  case class ExprCompoundString(value: Vector[Expr], wdlType: WdlTypes.T, loc: SourceLocation)
       extends Expr
 
-  case class ExprPair(l: Expr, r: Expr, wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprArray(value: Vector[Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprMap(value: SeqMap[Expr, Expr], wdlType: WdlType, loc: SourceLocation) extends Expr
-  case class ExprObject(value: SeqMap[Expr, Expr], wdlType: WdlType, loc: SourceLocation)
+  case class ExprPair(l: Expr, r: Expr, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ExprArray(value: Vector[Expr], wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ExprMap(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T, loc: SourceLocation)
+      extends Expr
+  case class ExprObject(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T, loc: SourceLocation)
       extends Expr
 
   // These are expressions of kind:
@@ -53,32 +53,24 @@ object TypedAbstractSyntax {
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
   //
-  sealed trait ExprPlaceholder extends Expr {
-    val value: Expr
-  }
-  case class ExprPlaceholderCondition(t: Expr,
-                                      f: Expr,
-                                      value: Expr,
-                                      wdlType: WdlType,
-                                      loc: SourceLocation)
-      extends ExprPlaceholder
-  case class ExprPlaceholderDefault(default: Expr,
-                                    value: Expr,
-                                    wdlType: WdlType,
-                                    loc: SourceLocation)
-      extends ExprPlaceholder
-  case class ExprPlaceholderSep(sep: Expr, value: Expr, wdlType: WdlType, loc: SourceLocation)
-      extends ExprPlaceholder
+  case class ExprPlaceholder(t: Option[Expr],
+                             f: Option[Expr],
+                             sep: Option[Expr],
+                             default: Option[Expr],
+                             value: Expr,
+                             wdlType: WdlTypes.T,
+                             loc: SourceLocation)
+      extends Expr
 
   // Access an array element at [index]
-  case class ExprAt(array: Expr, index: Expr, wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ExprAt(array: Expr, index: Expr, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
 
   // conditional:
   // if (x == 1) then "Sunday" else "Weekday"
   case class ExprIfThenElse(cond: Expr,
                             tBranch: Expr,
                             fBranch: Expr,
-                            wdlType: WdlType,
+                            wdlType: WdlTypes.T,
                             loc: SourceLocation)
       extends Expr
 
@@ -87,17 +79,17 @@ object TypedAbstractSyntax {
   case class ExprApply(funcName: String,
                        funcWdlType: T_Function,
                        elements: Vector[Expr],
-                       wdlType: WdlType,
+                       wdlType: WdlTypes.T,
                        loc: SourceLocation)
       extends Expr
 
   // Access a field in a struct or an object. For example:
   //   Int z = x.a
-  case class ExprGetName(e: Expr, id: String, wdlType: WdlType, loc: SourceLocation) extends Expr
+  case class ExprGetName(e: Expr, id: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
 
   sealed trait Variable extends Element {
     val name: String
-    val wdlType: WdlType
+    val wdlType: WdlTypes.T
   }
 
   // sections
@@ -138,7 +130,7 @@ object TypedAbstractSyntax {
     * A variable definition and assignment that does not appear in the input or output section,
     * i.e. it is private to the task/workflow.
     */
-  case class PrivateVariable(name: String, wdlType: WdlType, expr: Expr, loc: SourceLocation)
+  case class PrivateVariable(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
       extends WorkflowElement
       with Variable
 
@@ -195,7 +187,7 @@ object TypedAbstractSyntax {
   // a definition of a struct
   case class StructDefinition(name: String,
                               wdlType: WdlTypes.T_Struct,
-                              members: SeqMap[String, WdlType],
+                              members: SeqMap[String, WdlTypes.T],
                               loc: SourceLocation)
       extends DocumentElement
 

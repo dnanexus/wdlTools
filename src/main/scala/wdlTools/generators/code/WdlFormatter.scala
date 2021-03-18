@@ -1022,31 +1022,21 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             continue = false
         )
       // placeholders
-      case ExprPlaceholderCondition(t, f, value, loc) =>
+      case ExprPlaceholder(t, f, sep, default, value, loc) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,
             options = Some(
                 Vector(
-                    option(Symbols.TrueOption, t),
-                    option(Symbols.FalseOption, f)
-                )
+                    t.map(e => option(Symbols.TrueOption, e)),
+                    f.map(e => option(Symbols.FalseOption, e)),
+                    sep.map(e => option(Symbols.SepOption, e)),
+                    default.map(e => option(Symbols.DefaultOption, e))
+                ).flatten
             ),
             inString = inStringOrCommand,
             bounds = loc
         )
-      case ExprPlaceholderDefault(default, value, loc) =>
-        Placeholder(nested(value, inPlaceholder = true),
-                    placeholderOpen,
-                    options = Some(Vector(option(Symbols.DefaultOption, default))),
-                    inString = inStringOrCommand,
-                    bounds = loc)
-      case ExprPlaceholderSep(sep, value, loc) =>
-        Placeholder(nested(value, inPlaceholder = true),
-                    placeholderOpen,
-                    options = Some(Vector(option(Symbols.SepOption, sep))),
-                    inString = inStringOrCommand,
-                    bounds = loc)
       case ExprCompoundString(value, loc) if !inPlaceholder =>
         CompoundString(value.map(nested(_, inString = true)), quoting = !inStringOrCommand, loc)
       // other expressions need to be wrapped in a placeholder if they

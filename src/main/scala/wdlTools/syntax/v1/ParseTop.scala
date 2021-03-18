@@ -180,7 +180,7 @@ wdl_type
   ; */
   private def parse_placeholder_option(
       ctx: WdlV1Parser.Expression_placeholder_optionContext
-  ): PlaceHolderPart = {
+  ): (String, Expr) = {
     val expr: Expr =
       try {
         visitString(ctx.string())
@@ -198,17 +198,15 @@ wdl_type
           }
       }
     if (ctx.BoolLiteral() != null) {
-      val b = ctx.BoolLiteral().getText.toLowerCase() == "true"
-      return ExprPlaceholderPartEqual(b, expr, getSourceLocation(grammar.docSource, ctx))
+      (ctx.BoolLiteral().getText.toLowerCase(), expr)
+    } else if (ctx.DEFAULT() != null) {
+      ("default", expr)
+    } else if (ctx.SEP() != null) {
+      ("sep", expr)
+    } else {
+      throw new SyntaxException(s"Not one of three known variants of a placeholder",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.DEFAULT() != null) {
-      return ExprPlaceholderPartDefault(expr, getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.SEP() != null) {
-      return ExprPlaceholderPartSep(expr, getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException(s"Not one of three known variants of a placeholder",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   // These are full expressions of the same kind
@@ -216,32 +214,32 @@ wdl_type
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
   // ${sep=", " array_value}
-  private def parseEntirePlaceHolderExpression(placeHolders: Vector[PlaceHolderPart],
+  private def parseEntirePlaceHolderExpression(options: Map[String, Expr],
                                                expr: Expr,
                                                ctx: ParserRuleContext): Expr = {
 
-    val source = getSourceLocation(grammar.docSource, ctx)
-
-    placeHolders match {
-      case Vector() =>
-        // This is just an expression inside braces
-        // ${1}
-        // ${x + 3}
-        expr
-      case Vector(ExprPlaceholderPartDefault(default, _)) =>
-        // ${default="foo" optional_value}
-        ExprPlaceholderDefault(default, expr, source)
-      case Vector(ExprPlaceholderPartSep(sep, _)) =>
-        // ${sep=", " array_value}
-        ExprPlaceholderSep(sep, expr, source)
-      case Vector(ExprPlaceholderPartEqual(true, x, _), ExprPlaceholderPartEqual(false, y, _)) =>
-        // ${true="--yes" false="--no" boolean_value}
-        ExprPlaceholderEqual(x, y, expr, source)
-      case Vector(ExprPlaceholderPartEqual(false, y, _), ExprPlaceholderPartEqual(true, x, _)) =>
-        // ${false="--no" true="--yes" boolean_value}
-        ExprPlaceholderEqual(x, y, expr, source)
-      case _ =>
+    if (options.isEmpty) {
+      // This is just an expression inside braces
+      // ${1}
+      // ${x + 3}
+      expr
+    } else {
+      val loc = getSourceLocation(grammar.docSource, ctx)
+      val placeholder = ExprPlaceholder(
+          options.get("true"),
+          options.get("false"),
+          options.get("sep"),
+          options.get("default"),
+          expr,
+          loc
+      )
+      // according to the spec, only one of true/false, sep, or default is allowed; however,
+      // some "industry standard" workflows are not spec compliant and mix default with either
+      // sep or true/false, so we are compelled to allow it
+      if (placeholder.t.isDefined != placeholder.f.isDefined || placeholder.t.isDefined && placeholder.sep.isDefined) {
         throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
+      }
+      placeholder
     }
   }
 
@@ -249,13 +247,13 @@ wdl_type
   : StringCommandStart (expression_placeholder_option)* expr RBRACE
   ; */
   override def visitString_expr_part(ctx: WdlV1Parser.String_expr_partContext): Expr = {
-    val pHolder: Vector[PlaceHolderPart] = ctx
+    val options: Map[String, Expr] = ctx
       .expression_placeholder_option()
       .asScala
       .map(parse_placeholder_option)
-      .toVector
+      .toMap
     val expr = visitExpr(ctx.expr())
-    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
+    parseEntirePlaceHolderExpression(options, expr, ctx)
   }
 
   /* string_expr_with_string_part
@@ -898,13 +896,13 @@ task_input
   override def visitTask_command_expr_part(
       ctx: WdlV1Parser.Task_command_expr_partContext
   ): Expr = {
-    val placeHolders: Vector[PlaceHolderPart] = ctx
+    val options: Map[String, Expr] = ctx
       .expression_placeholder_option()
       .asScala
       .map(x => parse_placeholder_option(x))
-      .toVector
+      .toMap
     val expr = visitExpr(ctx.expr())
-    parseEntirePlaceHolderExpression(placeHolders, expr, ctx)
+    parseEntirePlaceHolderExpression(options, expr, ctx)
   }
 
   /* task_command_expr_with_string

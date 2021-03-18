@@ -626,28 +626,20 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             continue = false
         )
       // placeholders
-      case ExprPlaceholderCondition(t, f, value, _, _) =>
+      case ExprPlaceholder(t, f, sep, default, value, _, _) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,
             options = Some(
                 Vector(
-                    option(Symbols.TrueOption, t),
-                    option(Symbols.FalseOption, f)
-                )
+                    t.map(e => option(Symbols.TrueOption, e)),
+                    f.map(e => option(Symbols.FalseOption, e)),
+                    sep.map(e => option(Symbols.SepOption, e)),
+                    default.map(e => option(Symbols.DefaultOption, e))
+                ).flatten
             ),
             inString = inStringOrCommand
         )
-      case ExprPlaceholderDefault(default, value, _, _) =>
-        Placeholder(nested(value, inPlaceholder = true),
-                    placeholderOpen,
-                    options = Some(Vector(option(Symbols.DefaultOption, default))),
-                    inString = inStringOrCommand)
-      case ExprPlaceholderSep(sep, value, _, _) =>
-        Placeholder(nested(value, inPlaceholder = true),
-                    placeholderOpen,
-                    options = Some(Vector(option(Symbols.SepOption, sep))),
-                    inString = inStringOrCommand)
       case ExprCompoundString(value, _, _) if !inPlaceholder =>
         // Often/always an ExprCompoundString contains one or more empty
         // ValueStrings that we want to get rid of because they're useless
