@@ -5,6 +5,7 @@
 * **Breaking change**: replaces individual placeholder AST/TST elements with a single unified placeholder element
 * Adds support for non-compliant (but commonly used) combinations of placeholder options (default together with true/false or sep)
 * Handle 'Left' and 'Right' as keys for serialized `Pair`s
+* Emit warning rather than throw exception when there are duplicate keys in runtime/hints/meta sections
 
 ## 0.12.6 (2021-02-25)
 

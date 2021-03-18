@@ -5,6 +5,8 @@ import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
 import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
+import scala.collection.immutable.TreeSeqMap
+
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
                     fileResolver: FileSourceResolver = FileSourceResolver.get,
@@ -176,8 +178,22 @@ case class ParseAll(followImports: Boolean = false,
       }
     }
 
-    def translateMetaKV(kv: CST.MetaKV): AST.MetaKV = {
-      AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.loc)
+    private def translateMetaKVs(kvs: Vector[CST.MetaKV],
+                                 sectionName: String): Vector[AST.MetaKV] = {
+      kvs
+        .foldLeft(TreeSeqMap.empty[String, AST.MetaKV]) {
+          case (accu, kv) =>
+            val metaValue = translateMetaValue(kv.value)
+            if (accu.contains(kv.id)) {
+              logger.warning(
+                  s"""duplicate ${sectionName} key ${kv.id}: earlier value ${accu(kv.id)}
+                     |is overridden by later value ${metaValue}""".stripMargin.replaceAll("\n", " ")
+              )
+            }
+            accu + (kv.id -> AST.MetaKV(kv.id, metaValue, kv.loc))
+        }
+        .values
+        .toVector
     }
 
     def translateInputSection(
@@ -206,30 +222,32 @@ case class ParseAll(followImports: Boolean = false,
     }
 
     def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(meta.kvs.map(translateMetaKV), meta.loc)
+      AST.MetaSection(translateMetaKVs(meta.kvs, "meta"), meta.loc)
     }
 
     def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(paramMeta.kvs.map(translateMetaKV), paramMeta.loc)
+      AST.ParameterMetaSection(translateMetaKVs(paramMeta.kvs, "parameter_meta"), paramMeta.loc)
     }
 
     def translateRuntimeSection(
         runtime: CST.RuntimeSection
     ): AST.RuntimeSection = {
-      // check for duplicate ids
-      runtime.kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
-        case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section", kv.loc)
-      }
-
       AST.RuntimeSection(
-          runtime.kvs.map {
-            case CST.RuntimeKV(id, expr, text) =>
-              AST.RuntimeKV(id, translateExpr(expr), text)
-          },
+          runtime.kvs
+            .foldLeft(TreeSeqMap.empty[String, AST.RuntimeKV]) {
+              case (accu, CST.RuntimeKV(id, expr, text)) =>
+                val tExpr = translateExpr(expr)
+                if (accu.contains(id)) {
+                  logger.warning(
+                      s"duplicate runtime key ${id}: earlier value ${accu(id)} is overridden by later value ${tExpr}"
+                  )
+                }
+                accu + (id -> AST.RuntimeKV(id, tExpr, text))
+            }
+            .values
+            .toVector,
           runtime.loc
       )
     }

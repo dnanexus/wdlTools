@@ -105,10 +105,9 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "report duplicate key in runtime section " taggedAs Edge in {
-    assertThrows[SyntaxException] {
-      parser.parseDocument(getTaskSource("runtime_section_duplicate_key.wdl"))
-    }
+  it should "logs duplicate key in runtime section " taggedAs Edge in {
+    // TODO: test that logger issues warning
+    parser.parseDocument(getTaskSource("runtime_section_duplicate_key.wdl"))
   }
 
   it should "parse a WDL string" in {

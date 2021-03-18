@@ -5,6 +5,8 @@ import wdlTools.syntax.v2.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
 import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
 
+import scala.collection.immutable.TreeSeqMap
+
 // parse and follow imports
 case class ParseAll(followImports: Boolean = false,
                     fileResolver: FileSourceResolver = FileSourceResolver.get,
@@ -158,84 +160,87 @@ case class ParseAll(followImports: Boolean = false,
       }
     }
 
-    def translateInputSection(
+    private def translateInputSection(
         inp: CST.InputSection
     ): AST.InputSection = {
       AST.InputSection(inp.declarations.map(translateDeclaration), inp.loc)
     }
 
-    def translateOutputSection(
+    private def translateOutputSection(
         output: CST.OutputSection
     ): AST.OutputSection = {
       AST.OutputSection(output.declarations.map(translateDeclaration), output.loc)
     }
 
-    def translateCommandSection(
+    private def translateCommandSection(
         cs: CST.CommandSection
     ): AST.CommandSection = {
       AST.CommandSection(cs.parts.map(translateExpr), cs.loc)
     }
 
-    def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
+    private def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
       AST.Declaration(decl.name,
                       translateType(decl.wdlType),
                       decl.expr.map(translateExpr),
                       decl.loc)
     }
 
-    private def translateMetaKV(kvs: Vector[CST.MetaKV], name: String): Vector[AST.MetaKV] = {
-      // check for duplicate ids
-      kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
-        case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in ${name} section", kv.loc)
-      }
-
-      kvs.map(kv => AST.MetaKV(kv.id, translateMetaValue(kv.value), kv.loc))
+    private def translateMetaKVs(kvs: Vector[CST.MetaKV],
+                                 sectionName: String): Vector[AST.MetaKV] = {
+      kvs
+        .foldLeft(TreeSeqMap.empty[String, AST.MetaKV]) {
+          case (accu, kv) =>
+            val metaValue = translateMetaValue(kv.value)
+            if (accu.contains(kv.id)) {
+              logger.warning(
+                  s"""duplicate ${sectionName} key ${kv.id}: earlier value ${accu(kv.id)}
+                     |is overridden by later value ${metaValue}""".stripMargin.replaceAll("\n", " ")
+              )
+            }
+            accu + (kv.id -> AST.MetaKV(kv.id, metaValue, kv.loc))
+        }
+        .values
+        .toVector
     }
 
-    def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(translateMetaKV(meta.kvs, "meta"), meta.loc)
+    private def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
+      AST.MetaSection(translateMetaKVs(meta.kvs, "meta"), meta.loc)
     }
 
-    def translateParameterMetaSection(
+    private def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(translateMetaKV(paramMeta.kvs, "parameter_meta"), paramMeta.loc)
+      AST.ParameterMetaSection(translateMetaKVs(paramMeta.kvs, "parameter_meta"), paramMeta.loc)
     }
 
-    def translateHintsSection(
+    private def translateHintsSection(
         hints: CST.HintsSection
     ): AST.HintsSection = {
-      hints.kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
-        case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section", kv.loc)
-      }
-
-      AST.HintsSection(translateMetaKV(hints.kvs, "hints"), hints.loc)
+      AST.HintsSection(translateMetaKVs(hints.kvs, "hints"), hints.loc)
     }
 
-    def translateRuntimeSection(
+    private def translateRuntimeSection(
         runtime: CST.RuntimeSection
     ): AST.RuntimeSection = {
-      // check for duplicate ids
-      runtime.kvs.foldLeft(Set.empty[String]) {
-        case (accu, kv) if !accu.contains(kv.id) => accu + kv.id
-        case (_, kv) =>
-          throw new SyntaxException(s"key ${kv.id} defined twice in runtime section", kv.loc)
-      }
-
       AST.RuntimeSection(
-          runtime.kvs.map {
-            case CST.RuntimeKV(id, expr, text) =>
-              AST.RuntimeKV(id, translateExpr(expr), text)
-          },
+          runtime.kvs
+            .foldLeft(TreeSeqMap.empty[String, AST.RuntimeKV]) {
+              case (accu, CST.RuntimeKV(id, expr, text)) =>
+                val tExpr = translateExpr(expr)
+                if (accu.contains(id)) {
+                  logger.warning(
+                      s"duplicate runtime key ${id}: earlier value ${accu(id)} is overridden by later value ${tExpr}"
+                  )
+                }
+                accu + (id -> AST.RuntimeKV(id, tExpr, text))
+            }
+            .values
+            .toVector,
           runtime.loc
       )
     }
 
-    def translateWorkflowElement(
+    private def translateWorkflowElement(
         elem: CST.WorkflowElement
     ): AST.WorkflowElement = {
       elem match {
@@ -270,7 +275,7 @@ case class ParseAll(followImports: Boolean = false,
       }
     }
 
-    def translateWorkflow(wf: CST.Workflow): AST.Workflow = {
+    private def translateWorkflow(wf: CST.Workflow): AST.Workflow = {
       AST.Workflow(
           wf.name,
           wf.input.map(translateInputSection),
@@ -282,7 +287,7 @@ case class ParseAll(followImports: Boolean = false,
       )
     }
 
-    def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
+    private def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
       AST.TypeStruct(
           struct.name,
           struct.members.map {
@@ -293,8 +298,8 @@ case class ParseAll(followImports: Boolean = false,
       )
     }
 
-    def translateImportDoc(importDoc: CST.ImportDoc,
-                           importedDoc: Option[AST.Document]): AST.ImportDoc = {
+    private def translateImportDoc(importDoc: CST.ImportDoc,
+                                   importedDoc: Option[AST.Document]): AST.ImportDoc = {
       val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.loc)
       val nameAbst = importDoc.name.map {
         case CST.ImportName(value, text) => AST.ImportName(value, text)
@@ -307,7 +312,7 @@ case class ParseAll(followImports: Boolean = false,
       AST.ImportDoc(nameAbst, aliasesAbst, addrAbst, importedDoc, importDoc.loc)
     }
 
-    def translateTask(task: CST.Task): AST.Task = {
+    private def translateTask(task: CST.Task): AST.Task = {
       AST.Task(
           task.name,
           task.input.map(translateInputSection),
