@@ -1,6 +1,6 @@
 # Change log
 
-## dev
+## 0.12.7 (2021-03-17)
 
 * **Breaking change**: replaces individual placeholder AST/TST elements with a single unified placeholder element
 * Adds support for non-compliant (but commonly used) combinations of placeholder options (default together with true/false or sep)
