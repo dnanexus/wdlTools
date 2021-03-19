@@ -9,6 +9,9 @@ struct Tree {
 
 
 workflow foo {
+  input {
+    File json_file
+  }
   Boolean b1 = true
   Boolean b2 = b1
 
@@ -35,4 +38,6 @@ workflow foo {
   }
 
   Tree fir2 = fir
+
+  Map[String, String] mapFromObj = read_json(json_file)
 }

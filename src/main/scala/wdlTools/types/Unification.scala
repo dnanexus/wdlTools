@@ -152,6 +152,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           logger.trace(s"moderate coercion from ${innerFrom} to optional",
                        minLevel = TraceLevel.VVerbose)
           inner(l, r, minPriority = Priority.RegimeAllowed)
+        case (T_Map(T_String, _), T_Object) if regime <= Moderate =>
+          Some(Enum.max(minPriority, Priority.RegimeAllowed))
         case (T_Struct(structName, members), T_Map(T_String, valueType)) if regime <= Moderate =>
           // Coersions from Map to struct are not recommended and will fail unless the map key
           // type is String and the value type is coercible to all the struct member types

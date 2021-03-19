@@ -109,6 +109,11 @@ object Coercion {
           V_Struct(name1, members2.map {
             case (key, value) => key -> inner(members1(key), value)
           })
+        case (WdlTypes.T_Map(WdlTypes.T_String, valueType), V_Object(fields)) =>
+          val mapFields: SeqMap[V, V] = fields.map {
+            case (k, v) => V_String(k) -> inner(valueType, v)
+          }
+          V_Map(mapFields)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Object(fields)) =>
           coerceToStruct(name, fieldTypes, fields, loc)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Map(fields)) =>

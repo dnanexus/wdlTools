@@ -1,6 +1,6 @@
 package wdlTools.eval
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import dx.util.{EvalPaths, FileSourceResolver, FileUtils, Logger}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
@@ -223,9 +223,15 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "perform coercions" in {
+    val f = Files.createTempFile("test", ".json")
+    f.toFile.deleteOnExit()
+    FileUtils.writeFileContent(f, """{"a": "hello", "b": "goodbye"}""")
+
     val file = v1Dir.resolve("coercions.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
-    val bindings = evaluator.applyPrivateVariables(decls, WdlValueBindings.empty)
+    val bindings =
+      evaluator.applyPrivateVariables(decls,
+                                      WdlValueBindings(Map("json_file" -> V_File(f.toString))))
 
     bindings("i1") shouldBe V_Int(13)
     bindings("i3") shouldBe V_Int(8)
@@ -241,6 +247,9 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("s3") shouldBe V_String("4.3")
     bindings("s4") shouldBe V_String("hello")
     bindings("s5") shouldBe V_Optional(V_String("hello"))
+
+    bindings("mapFromObj") shouldBe V_Map(V_String("a") -> V_String("hello"),
+                                          V_String("b") -> V_String("goodbye"))
   }
 
   it should "perform non-standard coercions" in {
