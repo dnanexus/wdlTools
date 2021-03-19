@@ -1,5 +1,9 @@
 # Change log
 
+## 0.12.8 (dev)
+
+* Adds support for Object -> Map coercion
+
 ## 0.12.7 (2021-03-17)
 
 * **Breaking change**: replaces individual placeholder AST/TST elements with a single unified placeholder element
