@@ -1,9 +1,16 @@
 package wdlTools.syntax
 
-import java.nio.file.Path
-
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
-import dx.util.{FileNode, FileSourceResolver, Logger, TraceLevel}
+import dx.util.{
+  AddressableFileNode,
+  AddressableFileSource,
+  FileNode,
+  FileSourceResolver,
+  Logger,
+  TraceLevel
+}
+
+import java.net.URI
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
@@ -15,18 +22,25 @@ abstract class WdlParser(followImports: Boolean = false,
   // cache of documents that have already been fetched and parsed.
   private var docCache: Map[String, Option[AbstractSyntax.Document]] = Map.empty
 
-  protected def followImport(uri: String,
-                             parent: Option[Path] = None): Option[AbstractSyntax.Document] = {
+  protected def followImport(
+      uri: String,
+      parent: Option[AddressableFileSource] = None
+  ): Option[AbstractSyntax.Document] = {
     docCache.get(uri) match {
       case None =>
         logger.trace(s"parsing import ${uri}", minLevel = TraceLevel.VVerbose)
-        val fileResolverWithParent = parent match {
-          // Prepend the parent of the current directory to the search path
-          // in case we need to resolve relative imports.
-          case Some(path) => fileResolver.addToLocalSearchPath(Vector(path), append = false)
-          case None       => fileResolver
+        val fn: FileNode = if (URI.create(uri).getScheme == null && parent.isDefined) {
+          // a path relative to parent
+          parent.get.resolve(uri) match {
+            case fn: AddressableFileNode => fn
+            case other =>
+              throw new Exception(s"Not a FileNode: ${other}")
+          }
+        } else {
+          // a full URI
+          fileResolver.resolve(uri)
         }
-        val aDoc = Some(parseDocument(fileResolverWithParent.resolve(uri)))
+        val aDoc = Some(parseDocument(fn))
         docCache += (uri -> aDoc)
         aDoc
       case Some(aDoc) => aDoc

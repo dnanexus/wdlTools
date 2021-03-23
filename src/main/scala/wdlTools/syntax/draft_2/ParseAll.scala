@@ -11,7 +11,7 @@ import wdlTools.syntax.{
   AbstractSyntax => AST
 }
 import wdlTools.syntax.draft_2.{ConcreteSyntax => CST}
-import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
+import dx.util.{AddressableFileSource, FileNode, FileSourceResolver, Logger, StringFileNode}
 
 import scala.collection.immutable.TreeSeqMap
 
@@ -307,8 +307,8 @@ case class ParseAll(followImports: Boolean = false,
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (followImports) {
             val parent = doc.source match {
-              case fs: LocalFileSource => Some(fs.canonicalPath.getParent)
-              case _                   => None
+              case fs: AddressableFileSource => fs.getParent
+              case _                         => None
             }
             followImport(importDoc.addr.value, parent)
           } else {

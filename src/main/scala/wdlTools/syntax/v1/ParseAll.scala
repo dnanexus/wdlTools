@@ -3,7 +3,7 @@ package wdlTools.syntax.v1
 import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.v1.{ConcreteSyntax => CST}
 import wdlTools.syntax.{Operator, SyntaxError, SyntaxException, WdlParser, AbstractSyntax => AST}
-import dx.util.{FileNode, FileSourceResolver, LocalFileSource, Logger, StringFileNode}
+import dx.util.{AddressableFileSource, FileNode, FileSourceResolver, Logger, StringFileNode}
 
 import scala.collection.immutable.TreeSeqMap
 
@@ -345,8 +345,8 @@ case class ParseAll(followImports: Boolean = false,
         case importDoc: ConcreteSyntax.ImportDoc =>
           val importedDoc = if (followImports) {
             val parent = doc.source match {
-              case fs: LocalFileSource => Some(fs.canonicalPath.getParent)
-              case _                   => None
+              case fs: AddressableFileSource => fs.getParent
+              case _                         => None
             }
             followImport(importDoc.addr.value, parent)
           } else {

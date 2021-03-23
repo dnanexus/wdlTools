@@ -71,7 +71,14 @@ class AbstractSyntaxTest extends AnyFlatSpec with Matchers {
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/JointGenotyping.wdl"
     val FileSource = fileResolver.resolve(url)
     val doc = parser.parseDocument(FileSource)
+    doc.version.value shouldBe WdlVersion.V1
+  }
 
+  it should "parse GATK WholeGenomeGermlineSingleSample" in {
+    val url =
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-genome-processing-pipeline/1.3.0/WholeGenomeGermlineSingleSample.wdl"
+    val FileSource = fileResolver.resolve(url)
+    val doc = parser.parseDocument(FileSource)
     doc.version.value shouldBe WdlVersion.V1
   }
 

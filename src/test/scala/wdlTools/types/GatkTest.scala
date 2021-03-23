@@ -22,7 +22,8 @@ class GatkTest extends AnyWordSpec with Matchers {
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
       // Uses the keyword "version "
       //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
-      "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl"
+      "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl",
+      "https://raw.githubusercontent.com/gatk-workflows/gatk4-genome-processing-pipeline/1.3.0/WholeGenomeGermlineSingleSample.wdl"
       // Non standard usage of place holders
       //"https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
       //

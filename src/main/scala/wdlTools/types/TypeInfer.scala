@@ -364,24 +364,26 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val (defaultExpr, defaultValueType) = default
                 .map { d =>
                   val (defaultExpr, defaultType) = nestedStringExpr(d, ExprState.InPlaceholder)
-                  val t = valueExpr.wdlType match {
-                    case T_Optional(vt2) if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
+                  val t = TypeUtils.unwrapOptional(valueExpr.wdlType) match {
+                    case vt if unify.isCoercibleTo(defaultType, vt, unifyCtx) =>
+                      // the value is supposed to be optional but is not - we allow it anyway
                       defaultType
-                    case T_Optional(vt2) if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
+                    case vt if unify.isCoercibleTo(T_String, vt, unifyCtx) =>
+                      // the value is supposed to be optional but is not - we allow it anyway
                       T_String
-                    case vt2 if unify.isCoercibleTo(defaultType, vt2, unifyCtx) =>
-                      // the value is supposed to be optional but is not - we allow it anyway
-                      defaultType
-                    case vt2 if unify.isCoercibleTo(T_String, vt2, unifyCtx) =>
-                      // the value is supposed to be optional but is not - we allow it anyway
+                    case T_Array(vt, _)
+                        if sep.isDefined && unify.isCoercibleTo(T_String, vt, unifyCtx) =>
+                      // mixing default and sep - not technically allowed but we support it
+                      // since it is used in some "industry standard" workflows
                       T_String
                     case _ =>
-                      val msg =
-                        s"""|Expression ${prettyFormatExpr(valueExpr)} has type
-                            |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to
-                            |${prettyFormatType(defaultExpr.wdlType)}""".stripMargin
-                          .replaceAll("\n", " ")
-                      handleError(msg, nestedExpr.loc)
+                      handleError(
+                          s"""|Expression ${prettyFormatExpr(valueExpr)} has type
+                              |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to
+                              |${prettyFormatType(defaultExpr.wdlType)}""".stripMargin
+                            .replaceAll("\n", " "),
+                          nestedExpr.loc
+                      )
                       valueExpr.wdlType
                   }
                   (Some(defaultExpr), Some(t))
@@ -402,7 +404,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   if (!unify.isCoercibleTo(T_Boolean, valueType, unifyCtx)) {
                     val msg =
                       s"""Condition ${prettyFormatExpr(valueExpr)} has type
-                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to ${T_Boolean}""".stripMargin
+                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean""".stripMargin
                         .replaceAll("\n", " ")
                     handleError(msg, nestedExpr.loc)
                   }
