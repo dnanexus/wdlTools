@@ -548,7 +548,6 @@ case class Eval(paths: EvalPaths,
     val WsRegex = "^([ \t]*)(.*)$".r
 
     val content = lines.foldLeft(Vector.empty[(String, String)]) {
-      // case (content, wsRegex(txt))        => content :+ (txt, "")
       case (content, WsRegex(ws, txt)) if txt.length + ws.length > 0 => content :+ (ws, txt)
       case (content, WsRegex(_, _)) => content
     }
