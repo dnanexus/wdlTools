@@ -545,25 +545,21 @@ case class Eval(paths: EvalPaths,
     // split string into lines and drop all leading and trailing empty lines
     val lines =
       s.split("\r\n?|\n").dropWhile(_.trim.isEmpty).reverse.dropWhile(_.trim.isEmpty).reverse
-    val wsRegex = "^([ \t]*)$".r
-    val nonWsRegex = "^([ \t]*)(.+)$".r
+    val WsRegex = "^([ \t]*)(.*)$".r
+
     val content = lines.foldLeft(Vector.empty[(String, String)]) {
-      case (content, wsRegex(txt))        => content :+ (txt, "")
-      case (content, nonWsRegex(ws, txt)) => content :+ (ws, txt)
+      case (content, WsRegex(ws, txt)) if txt.length + ws.length > 0 => content :+ (ws, txt)
+      case (content, WsRegex(_, _)) => content
     }
     if (content.isEmpty) {
       ""
     } else {
       val (whitespace, strippedLines) = content.unzip
       val colOffset = whitespace.map(_.length).min
-      val strippedContent = if (colOffset == 0) {
-        strippedLines
-      } else {
-        // add back to each line any whitespace longer than colOffset
-        strippedLines.zip(whitespace).map {
-          case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
-          case (line, _)                           => line
-        }
+      // add back to each line any whitespace longer than colOffset
+      val strippedContent = strippedLines.zip(whitespace).map {
+        case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+        case (line, _)                           => line
       }
       strippedContent.mkString(System.lineSeparator())
     }
