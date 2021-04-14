@@ -289,7 +289,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "evaluate command with empty lines" in {
     val command = evalCommand("empty_lines.wdl")
-    command shouldBe "        cat <<-EOF > test.py\na = 1\nif a == 0:\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
+    command shouldBe "        cat <<-EOF > test.py\na = 1\n\n\n\nif a == 0:\n\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
   }
 
   it should "evaluate simple command section" in {

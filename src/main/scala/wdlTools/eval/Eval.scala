@@ -545,21 +545,28 @@ case class Eval(paths: EvalPaths,
     // split string into lines and drop all leading and trailing empty lines
     val lines =
       s.split("\r\n?|\n").dropWhile(_.trim.isEmpty).reverse.dropWhile(_.trim.isEmpty).reverse
-    val WsRegex = "^([ \t]*)(.*)$".r
 
-    val content = lines.foldLeft(Vector.empty[(String, String)]) {
-      case (content, WsRegex(ws, txt)) if txt.length + ws.length > 0 => content :+ (ws, txt)
-      case (content, WsRegex(_, _)) => content
-    }
-    if (content.isEmpty) {
+    if (lines.isEmpty) {
       ""
     } else {
-      val (whitespace, strippedLines) = content.unzip
-      val colOffset = whitespace.map(_.length).min
+      // split lines into leading whitespace and remaining text
+      val wsRegex = "^([ \t]*)(.*)$".r
+      val (whitespace, strippedLines, colOffsets) = lines.map {
+        case wsRegex(ws, txt) if ws.nonEmpty || txt.nonEmpty => (ws, txt, Some(ws.length))
+        case wsRegex(ws, txt)                                => (ws, txt, None)
+      }.unzip3
+      // determine the minimum leading whitespace, ignoring empty lines
+      val colOffset = colOffsets.flatten.min
       // add back to each line any whitespace longer than colOffset
-      val strippedContent = strippedLines.zip(whitespace).map {
-        case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
-        case (line, _)                           => line
+      val strippedContent = if (colOffset == 0) {
+        // there is no common leading whitespace - just return the lines as-is
+        lines
+      } else {
+        // add back to each line any whitespace longer than colOffset
+        strippedLines.zip(whitespace).map {
+          case (line, ws) if ws.length > colOffset => ws.drop(colOffset) + line
+          case (line, _)                           => line
+        }
       }
       strippedContent.mkString(System.lineSeparator())
     }

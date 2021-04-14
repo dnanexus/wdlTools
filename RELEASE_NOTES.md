@@ -1,12 +1,9 @@
 # Change log
 
-## 0.12.9
-
-* Fixed indentation issue in command block
-
 ## 0.12.8 (dev)
 
 * Adds support for Object -> Map coercion
+* Fixed indentation issue in command block
 * Bugfixes
 
 ## 0.12.7 (2021-03-17)
