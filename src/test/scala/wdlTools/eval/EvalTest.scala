@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
 import wdlTools.eval.WdlValues._
-import wdlTools.syntax.{Parsers, SourceLocation, WdlVersion}
+import wdlTools.syntax.{Antlr4Util, Parsers, SourceLocation, WdlVersion}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 import wdlTools.types.WdlTypes._
 
@@ -100,6 +100,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "call stdlib" in {
+    Antlr4Util.setParserTrace(true)
     val file = v1Dir.resolve("stdlib.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
     val ctx = WdlValueBindings(Map("empty_string" -> V_Null))
@@ -133,6 +134,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "He visited three places on his trip: Berlin, Berlin, C, D, and E"
     )
     bindings("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
+    bindings("fname1") shouldBe V_String("file.bam.bai")
 
     // transpose
     bindings("ar3") shouldBe V_Array(V_Int(0), V_Int(1), V_Int(2))

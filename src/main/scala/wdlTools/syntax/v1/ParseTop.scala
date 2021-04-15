@@ -140,6 +140,33 @@ wdl_type
                               getSourceLocation(grammar.docSource, ctx))
   }
 
+  // a string_part may be an escape sequence, in which case we need
+  // to replace it with its unescaped value
+  private def visitString_part_text(text: String, ctx: ParserRuleContext): String = {
+    if (text.startsWith("\\")) {
+      text.drop(1) match {
+        case "t"                                         => "\t"
+        case "n"                                         => "\n"
+        case "\\"                                        => "\\"
+        case "'"                                         => "'"
+        case "\""                                        => "\""
+        case s if s.startsWith("u") || s.startsWith("U") =>
+          // convert unicode escape to unicode character
+          new String(Character.toChars(Integer.parseInt(s.drop(1), 16)))
+        case s if s.startsWith("x") =>
+          // convert escaped hex value to integer
+          Integer.parseInt(s.drop(1), 16).toString
+        case s if s.length == 3 =>
+          Integer.parseInt(s, 8).toString
+        case _ =>
+          throw new SyntaxException(s"invalid escape sequence: ${text}",
+                                    getSourceLocation(grammar.docSource, ctx))
+      }
+    } else {
+      text
+    }
+  }
+
   /* string_part
   : StringPart*
   ; */
@@ -147,7 +174,9 @@ wdl_type
     ctx
       .StringPart()
       .asScala
-      .map(x => ExprString(x.getText, getSourceLocation(grammar.docSource, x)))
+      .map(x =>
+        ExprString(visitString_part_text(x.getText, ctx), getSourceLocation(grammar.docSource, x))
+      )
       .filterNot(_.value.isEmpty)
       .toVector match {
       case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
@@ -757,7 +786,13 @@ any_decls
     ; */
   override def visitMeta_string(ctx: WdlV1Parser.Meta_stringContext): MetaValueString = {
     MetaValueString(
-        ctx.meta_string_part().MetaStringPart().asScala.toVector.map(x => x.getText).mkString,
+        ctx
+          .meta_string_part()
+          .MetaStringPart()
+          .asScala
+          .toVector
+          .map(x => visitString_part_text(x.getText, ctx))
+          .mkString,
         getSourceLocation(grammar.docSource, ctx)
     )
   }
@@ -885,7 +920,7 @@ task_input
     val text: String = ctx
       .CommandStringPart()
       .asScala
-      .map(x => x.getText)
+      .map(x => visitString_part_text(x.getText, ctx))
       .mkString("")
     ExprString(text, getSourceLocation(grammar.docSource, ctx))
   }
@@ -1305,8 +1340,9 @@ document_element
 	: VERSION RELEASE_VERSION
 	; */
   override def visitVersion(ctx: WdlV1Parser.VersionContext): Version = {
-    if (ctx.ReleaseVersion() == null)
-      throw new Exception("version not specified")
+    if (ctx.ReleaseVersion() == null) {
+      throw new SyntaxException("version not specified", getSourceLocation(grammar.docSource, ctx))
+    }
     val value = ctx.ReleaseVersion().getText
     Version(WdlVersion.withName(value), getSourceLocation(grammar.docSource, ctx))
   }
