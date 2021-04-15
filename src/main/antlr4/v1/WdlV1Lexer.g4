@@ -130,7 +130,7 @@ HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 
 mode CurlyCommand;
 
-CommandEscapedChar: '\\' . -> type(CommandStringPart);
+CommandEscapedChar: ESC . -> type(CommandStringPart);
 CommandUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
 CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
@@ -174,14 +174,14 @@ MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaSquoteString;
 
-MetaSquoteEscapedChar: '\\' . -> type(MetaStringPart);
+MetaSquoteEscapedChar: ESC . -> type(MetaStringPart);
 MetaSquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(MetaStringPart);
 MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
 MetaStringPart: ~[\r\n']+;
 
 mode MetaDquoteString;
 
-MetaDquoteEscapedChar: '\\' . -> type(MetaStringPart);
+MetaDquoteEscapedChar: ESC . -> type(MetaStringPart);
 MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
@@ -219,9 +219,9 @@ fragment IdentifierFollow
 	;
 
 fragment EscapeSequence
-	: '\\' [btnfr"'\\]
-	| '\\' ([0-3]? [0-7])? [0-7]
-	| '\\' UnicodeEsc
+	: ESC [tn"'\\]
+	| ESC ([0-3]? [0-7])? [0-7]
+	| ESC UnicodeEsc
 	;
 
 fragment UnicodeEsc
