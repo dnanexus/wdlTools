@@ -381,7 +381,6 @@ case class ParseAll(followImports: Boolean = false,
         visitor.parseDocument
       } catch {
         case ex: Throwable =>
-          ex.printStackTrace()
           throw new SyntaxException(s"error parsing document ${fileSource.toString}", ex)
       }
     val errorListener = grammar.errListener

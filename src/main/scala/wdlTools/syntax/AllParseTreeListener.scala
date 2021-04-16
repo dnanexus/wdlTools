@@ -48,6 +48,8 @@ class AllParseTreeListener
   def exitExpression_placeholder_option(ctx: ParserRuleContext): Unit = {}
   def enterString_part(ctx: ParserRuleContext): Unit = {}
   def exitString_part(ctx: ParserRuleContext): Unit = {}
+  def enterString_parts(ctx: ParserRuleContext): Unit = {}
+  def exitString_parts(ctx: ParserRuleContext): Unit = {}
   def enterString_expr_part(ctx: ParserRuleContext): Unit = {}
   def exitString_expr_part(ctx: ParserRuleContext): Unit = {}
   def enterString_expr_with_string_part(ctx: ParserRuleContext): Unit = {}
@@ -138,6 +140,8 @@ class AllParseTreeListener
   def exitMeta_value(ctx: ParserRuleContext): Unit = {}
   def enterMeta_string_part(ctx: ParserRuleContext): Unit = {}
   def exitMeta_string_part(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_string_parts(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_string_parts(ctx: ParserRuleContext): Unit = {}
   def enterMeta_string(ctx: ParserRuleContext): Unit = {}
   def exitMeta_string(ctx: ParserRuleContext): Unit = {}
   def enterMeta_array(ctx: ParserRuleContext): Unit = {}
@@ -166,6 +170,8 @@ class AllParseTreeListener
   def exitTask_output(ctx: ParserRuleContext): Unit = {}
   def enterTask_command_string_part(ctx: ParserRuleContext): Unit = {}
   def exitTask_command_string_part(ctx: ParserRuleContext): Unit = {}
+  def enterTask_command_string_parts(ctx: ParserRuleContext): Unit = {}
+  def exitTask_command_string_parts(ctx: ParserRuleContext): Unit = {}
   def enterTask_command_expr_part(ctx: ParserRuleContext): Unit = {}
   def exitTask_command_expr_part(ctx: ParserRuleContext): Unit = {}
   def enterTask_command_expr_with_string(ctx: ParserRuleContext): Unit = {}
@@ -884,6 +890,12 @@ class AllParseTreeListener
   override def exitString_part(ctx: WdlV1Parser.String_partContext): Unit = {
     exitString_part(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterString_parts(ctx: WdlV1Parser.String_partsContext): Unit = {
+    enterString_parts(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString_parts(ctx: WdlV1Parser.String_partsContext): Unit = {
+    exitString_parts(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterString_expr_part(ctx: WdlV1Parser.String_expr_partContext): Unit = {
     enterString_expr_part(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1164,6 +1176,12 @@ class AllParseTreeListener
   override def exitMeta_string_part(ctx: WdlV1Parser.Meta_string_partContext): Unit = {
     exitMeta_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterMeta_string_parts(ctx: WdlV1Parser.Meta_string_partsContext): Unit = {
+    enterMeta_string_parts(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_string_parts(ctx: WdlV1Parser.Meta_string_partsContext): Unit = {
+    exitMeta_string_parts(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterMeta_string(ctx: WdlV1Parser.Meta_stringContext): Unit = {
     enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -1239,6 +1257,16 @@ class AllParseTreeListener
       ctx: WdlV1Parser.Task_command_string_partContext
   ): Unit = {
     exitTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterTask_command_string_parts(
+      ctx: WdlV1Parser.Task_command_string_partsContext
+  ): Unit = {
+    enterTask_command_string_parts(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitTask_command_string_parts(
+      ctx: WdlV1Parser.Task_command_string_partsContext
+  ): Unit = {
+    exitTask_command_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterTask_command_expr_part(ctx: WdlV1Parser.Task_command_expr_partContext): Unit = {
     enterTask_command_expr_part(ctx.asInstanceOf[ParserRuleContext])

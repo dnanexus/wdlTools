@@ -90,23 +90,23 @@ Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;
 
-SQuoteEscapedChar: EscapeSequence -> type(StringPart);
+EscStringPart: EscapeSequence;
 SQuoteDollarString: '$'  -> type(StringPart);
 SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
 SQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[$~{\r\n']+;
+StringPart: ~[$~{\r\n'\\]+;
 
 mode DquoteInterpolatedString;
 
-DQuoteEscapedChar: EscapeSequence -> type(StringPart);
+DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
 DQuoteTildeString: '~' -> type(StringPart);
 DQuoteDollarString: '$' -> type(StringPart);
 DQUoteCurlString: '{' -> type(StringPart);
 DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
+DQuoteStringPart: ~[$~{\r\n"\\]+ -> type(StringPart);
 
 mode Command;
 
@@ -116,24 +116,24 @@ BeginLBrace: '{' -> mode(CurlyCommand);
 
 mode HereDocCommand;
 
-HereDocEscapedChar: EscapeSequence -> type(CommandStringPart);
+HereDocEscapedChar: EscapeSequence -> type(CommandEscStringPart);
 HereDocTildeString: '~' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
 HereDocCurlyStringCommand: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
 EndHereDocCommand: '>>>' -> mode(DEFAULT_MODE), type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
-HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
+HereDocStringPart: ~[~{>\\]+ -> type(CommandStringPart);
 
 mode CurlyCommand;
 
-CommandEscapedChar: EscapeSequence -> type(CommandStringPart);
+CommandEscStringPart: EscapeSequence;
 CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
 StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
 EndCommand: '}' -> mode(DEFAULT_MODE);
-CommandStringPart: ~[$~{}]+;
+CommandStringPart: ~[$~{}\\]+;
 
 mode Version;
 
@@ -170,15 +170,15 @@ MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaSquoteString;
 
-MetaSquoteEscapedChar: EscapeSequence -> type(MetaStringPart);
+MetaEscStringPart: EscapeSequence;
 MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
-MetaStringPart: ~[\r\n']+;
+MetaStringPart: ~[\r\n'\\]+;
 
 mode MetaDquoteString;
 
-MetaDquoteEscapedChar: EscapeSequence -> type(MetaStringPart);
+MetaDquoteEscapedChar: EscapeSequence -> type(MetaEscStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
-MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
+MetaDquoteStringPart: ~[\r\n"\\]+ -> type(MetaStringPart);
 
 mode MetaArray;
 
