@@ -87,6 +87,13 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("l0") shouldBe V_String("a")
     bindings("l1") shouldBe V_String("b")
 
+    // escape sequences
+    bindings("esc") shouldBe V_String("hello\n\t\"x\\o\"")
+    bindings("esc_unicode") shouldBe V_String("\u274C")
+    bindings("esc_unicode2") shouldBe V_String("🌭")
+    bindings("esc_hex") shouldBe V_String("204")
+    bindings("esc_oct") shouldBe V_String("23")
+
     // pairs
     bindings("l") shouldBe V_String("hello")
     bindings("r") shouldBe V_Boolean(true)

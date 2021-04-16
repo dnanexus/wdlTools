@@ -42,6 +42,13 @@ workflow foo {
 
   String l1 = if (false) then "a" else "b"
 
+  # escape sequences
+  String esc = "hello\n\t\"x\\o\""
+  String esc_unicode = "\u274C"
+  String esc_unicode2 = "\U0001F32D"
+  String esc_hex = "\xCC"
+  String esc_oct = "\027"
+
   # access pairs
   Pair[String, Boolean] p = ("hello", true)
   String l = p.left
