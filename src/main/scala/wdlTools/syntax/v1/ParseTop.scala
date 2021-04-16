@@ -161,9 +161,6 @@ wdl_type
     }
   }
 
-  /* string_part
-  : StringPart*
-  ; */
   override def visitString_part(ctx: WdlV1Parser.String_partContext): ExprString = {
     if (ctx.StringPart() != null) {
       ExprString(ctx.StringPart().getText, getSourceLocation(grammar.docSource, ctx))
