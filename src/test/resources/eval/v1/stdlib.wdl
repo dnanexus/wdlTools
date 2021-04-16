@@ -37,6 +37,8 @@ workflow foo {
   String sentence1 = sub(sentence, "He", "She")
   String sentence2 = sub(sentence, "A[ab]", "Berlin")
   String sentence3 = sub(sentence, "[a-z]*", "")
+  String fname = "file.bai"
+  String fname1 = sub(fname, "\\.bai$", ".bam.bai")
 
   # range
   Array[Int] ar3 = range(3)

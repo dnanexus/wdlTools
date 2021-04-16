@@ -50,7 +50,12 @@ expression_placeholder_option
 	;
 
 string_part
-	: StringPart*
+  : EscStringPart
+  | StringPart
+  ;
+
+string_parts
+	: string_part*
 	;
 
 string_expr_part
@@ -58,12 +63,12 @@ string_expr_part
 	;
 
 string_expr_with_string_part
-	: string_expr_part string_part
+	: string_expr_part string_parts
 	;
 
 string
-	: DQUOTE string_part string_expr_with_string_part* DQUOTE
-	| SQUOTE string_part string_expr_with_string_part* SQUOTE
+	: DQUOTE string_parts string_expr_with_string_part* DQUOTE
+	| SQUOTE string_parts string_expr_with_string_part* SQUOTE
 	;
 
 primitive_literal
@@ -174,21 +179,21 @@ task_output
 	: OUTPUT LBRACE (bound_decls)* RBRACE
 	;
 
-task_command_string_part
+task_command_string_parts
 	: CommandStringPart*
 	;
 
 task_command_expr_part
-	: StringCommandStart  (expression_placeholder_option)* expr RBRACE
+	: StringCommandStart (expression_placeholder_option)* expr RBRACE
 	;
 
 task_command_expr_with_string
-	: task_command_expr_part task_command_string_part
+	: task_command_expr_part task_command_string_parts
 	;
 
 task_command
-	: COMMAND BeginLBrace task_command_string_part task_command_expr_with_string* EndCommand
-	| COMMAND BeginHereDoc task_command_string_part task_command_expr_with_string* EndCommand
+	: COMMAND BeginLBrace task_command_string_parts task_command_expr_with_string* EndCommand
+	| COMMAND BeginHereDoc task_command_string_parts task_command_expr_with_string* EndCommand
 	;
 
 task_element

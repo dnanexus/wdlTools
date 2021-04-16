@@ -116,6 +116,68 @@ wdl_type
                               getSourceLocation(grammar.docSource, ctx))
   }
 
+  private def visitEscapse_sequence(terminalNode: TerminalNode): String = {
+    terminalNode.getText.drop(1) match {
+      case "t"                                         => "\t"
+      case "n"                                         => "\n"
+      case "\\"                                        => "\\"
+      case "'"                                         => "'"
+      case "\""                                        => "\""
+      case s if s.startsWith("u") || s.startsWith("U") =>
+        // convert unicode escape to unicode character
+        new String(Character.toChars(Integer.parseInt(s.drop(1), 16)))
+      case s if s.startsWith("x") =>
+        // convert escaped hex value to integer
+        Integer.parseInt(s.drop(1), 16).toString
+      case s if s.length == 3 =>
+        Integer.parseInt(s, 8).toString
+      case _ =>
+        throw new SyntaxException(s"invalid escape sequence: ${terminalNode}",
+                                  getSourceLocation(grammar.docSource, terminalNode))
+    }
+  }
+
+  override def visitString_part(ctx: WdlDraft2Parser.String_partContext): ExprString = {
+    if (ctx.StringPart() != null) {
+      ExprString(ctx.StringPart().getText, getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.EscStringPart() != null) {
+      ExprString(visitEscapse_sequence(ctx.EscStringPart()),
+                 getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException(s"invalid string_part ${ctx}",
+                                getSourceLocation(grammar.docSource, ctx))
+    }
+  }
+
+  /* string_part
+  : StringPart*
+  ; */
+  override def visitString_parts(ctx: WdlDraft2Parser.String_partsContext): Expr = {
+    ctx
+      .string_part()
+      .asScala
+      .map(visitString_part)
+      .filterNot(_.value.isEmpty)
+      .toVector match {
+      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
+      case Vector(e) => e
+      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+    }
+  }
+
+  /* string_expr_part
+  : StringCommandStart (expression_placeholder_option)* expr RBRACE
+  ; */
+  override def visitString_expr_part(ctx: WdlDraft2Parser.String_expr_partContext): Expr = {
+    val pHolder: Map[String, Expr] = ctx
+      .expression_placeholder_option()
+      .asScala
+      .map(parse_placeholder_option)
+      .toMap
+    val expr = visitExpr(ctx.expr())
+    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
+  }
+
   /* string_expr_with_string_part
   : string_expr_part string_part
   ; */
@@ -123,7 +185,7 @@ wdl_type
       ctx: WdlDraft2Parser.String_expr_with_string_partContext
   ): Expr = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
-    val stringPart = visitString_part(ctx.string_part())
+    val stringPart = visitString_parts(ctx.string_parts())
     val loc = getSourceLocation(grammar.docSource, ctx)
     (exprPart, stringPart) match {
       case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e), loc)
@@ -138,8 +200,7 @@ string
   ;
    */
   override def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
-    val stringPart =
-      ExprString(ctx.string_part().getText, getSourceLocation(grammar.docSource, ctx.string_part()))
+    val stringPart = visitString_parts(ctx.string_parts())
     val exprPart: Vector[Expr] = ctx
       .string_expr_with_string_part()
       .asScala
@@ -226,35 +287,6 @@ string
         throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
       }
       placeholder
-    }
-  }
-
-  /* string_expr_part
-  : StringCommandStart (expression_placeholder_option)* expr RBRACE
-  ; */
-  override def visitString_expr_part(ctx: WdlDraft2Parser.String_expr_partContext): Expr = {
-    val pHolder: Map[String, Expr] = ctx
-      .expression_placeholder_option()
-      .asScala
-      .map(parse_placeholder_option)
-      .toMap
-    val expr = visitExpr(ctx.expr())
-    parseEntirePlaceHolderExpression(pHolder, expr, ctx)
-  }
-
-  /* string_part
-  : StringPart*
-  ; */
-  override def visitString_part(ctx: WdlDraft2Parser.String_partContext): Expr = {
-    ctx
-      .StringPart()
-      .asScala
-      .map(x => ExprString(x.getText, getSourceLocation(grammar.docSource, x)))
-      .filterNot(_.value.isEmpty)
-      .toVector match {
-      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) => e
-      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -671,7 +703,19 @@ any_decls
    ; */
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = getIdentifierText(ctx.Identifier(), ctx)
-    val value = ctx.string().string_part().getText
+    val value = visitString_parts(ctx.string().string_parts()) match {
+      case ExprString(value, _) => value
+      case ExprCompoundString(parts, _) =>
+        parts
+          .map {
+            case ExprString(value, _) => value
+            case expr =>
+              throw new SyntaxException(s"invalid meta string ${ctx.string}", expr.loc)
+          }
+          .mkString("")
+      case expr =>
+        throw new SyntaxException(s"invalid meta string ${ctx.string}", expr.loc)
+    }
     MetaKV(id, value, getSourceLocation(grammar.docSource, ctx))
   }
 
@@ -733,13 +777,13 @@ any_decls
   /* task_command_string_part
     : CommandStringPart*
     ; */
-  override def visitTask_command_string_part(
-      ctx: WdlDraft2Parser.Task_command_string_partContext
+  override def visitTask_command_string_parts(
+      ctx: WdlDraft2Parser.Task_command_string_partsContext
   ): ExprString = {
     val text: String = ctx
       .CommandStringPart()
       .asScala
-      .map(x => x.getText)
+      .map(_.getText)
       .mkString("")
     ExprString(text, getSourceLocation(grammar.docSource, ctx))
   }
@@ -766,8 +810,8 @@ any_decls
       ctx: WdlDraft2Parser.Task_command_expr_with_stringContext
   ): Expr = {
     val exprPart: Expr = visitTask_command_expr_part(ctx.task_command_expr_part())
-    val stringPart: Expr = visitTask_command_string_part(
-        ctx.task_command_string_part()
+    val stringPart: Expr = visitTask_command_string_parts(
+        ctx.task_command_string_parts()
     )
     (exprPart, stringPart) match {
       case (e, ExprString(s, _)) if s.isEmpty => e
@@ -782,7 +826,7 @@ any_decls
   | HEREDOC_COMMAND task_command_string_part task_command_expr_with_string* EndCommand
   ; */
   override def visitTask_command(ctx: WdlDraft2Parser.Task_commandContext): CommandSection = {
-    val start: Expr = visitTask_command_string_part(ctx.task_command_string_part())
+    val start: Expr = visitTask_command_string_parts(ctx.task_command_string_parts())
     val parts: Vector[Expr] = ctx
       .task_command_expr_with_string()
       .asScala

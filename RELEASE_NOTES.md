@@ -3,6 +3,7 @@
 ## 0.12.8 (dev)
 
 * Adds support for Object -> Map coercion
+* Fixes processing of escape sequences (including regular expressions used in second argument to `sub`)  
 * Bugfixes
 
 ## 0.12.7 (2021-03-17)
