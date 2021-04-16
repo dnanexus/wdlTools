@@ -316,6 +316,12 @@ class AllParseTreeListener
   override def exitString_part(ctx: WdlDraft2Parser.String_partContext): Unit = {
     exitString_part(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterString_parts(ctx: WdlDraft2Parser.String_partsContext): Unit = {
+    enterString_part(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitString_parts(ctx: WdlDraft2Parser.String_partsContext): Unit = {
+    exitString_part(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterString_expr_part(ctx: WdlDraft2Parser.String_expr_partContext): Unit = {
     enterString_expr_part(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -614,15 +620,15 @@ class AllParseTreeListener
   override def exitTask_output(ctx: WdlDraft2Parser.Task_outputContext): Unit = {
     exitTask_output(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterTask_command_string_part(
-      ctx: WdlDraft2Parser.Task_command_string_partContext
+  override def enterTask_command_string_parts(
+      ctx: WdlDraft2Parser.Task_command_string_partsContext
   ): Unit = {
-    enterTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
+    enterTask_command_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitTask_command_string_part(
-      ctx: WdlDraft2Parser.Task_command_string_partContext
+  override def exitTask_command_string_parts(
+      ctx: WdlDraft2Parser.Task_command_string_partsContext
   ): Unit = {
-    exitTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
+    exitTask_command_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterTask_command_expr_part(
       ctx: WdlDraft2Parser.Task_command_expr_partContext
@@ -1247,16 +1253,6 @@ class AllParseTreeListener
   }
   override def exitTask_output(ctx: WdlV1Parser.Task_outputContext): Unit = {
     exitTask_output(ctx.asInstanceOf[ParserRuleContext])
-  }
-  override def enterTask_command_string_part(
-      ctx: WdlV1Parser.Task_command_string_partContext
-  ): Unit = {
-    enterTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
-  }
-  override def exitTask_command_string_part(
-      ctx: WdlV1Parser.Task_command_string_partContext
-  ): Unit = {
-    exitTask_command_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterTask_command_string_parts(
       ctx: WdlV1Parser.Task_command_string_partsContext

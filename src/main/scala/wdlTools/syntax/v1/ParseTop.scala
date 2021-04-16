@@ -931,28 +931,13 @@ task_input
     OutputSection(decls, getSourceLocation(grammar.docSource, ctx))
   }
 
-  override def visitTask_command_string_part(
-      ctx: WdlV1Parser.Task_command_string_partContext
-  ): ExprString = {
-    val text = if (ctx.CommandStringPart() != null) {
-      ctx.CommandStringPart().getText
-    } else if (ctx.CommandEscStringPart() != null) {
-      visitEscapse_sequence(ctx.CommandEscStringPart())
-    } else {
-      throw new SyntaxException(s"invalid task_command_string_part ${ctx}",
-                                getSourceLocation(grammar.docSource, ctx))
-    }
-    ExprString(text, getSourceLocation(grammar.docSource, ctx))
-  }
-
   override def visitTask_command_string_parts(
       ctx: WdlV1Parser.Task_command_string_partsContext
   ): ExprString = {
     val text = ctx
-      .task_command_string_part()
+      .CommandStringPart()
       .asScala
-      .map(visitTask_command_string_part)
-      .map(_.value)
+      .map(_.getText)
       .mkString("")
     ExprString(text, getSourceLocation(grammar.docSource, ctx))
   }

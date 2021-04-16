@@ -229,13 +229,8 @@ task_output
   : OUTPUT LBRACE (bound_decls)* RBRACE
   ;
 
-task_command_string_part
-  : CommandStringPart
-  | CommandEscStringPart
-  ;
-
 task_command_string_parts
-  : task_command_string_part*
+  : CommandStringPart*
   ;
 
 task_command_expr_part

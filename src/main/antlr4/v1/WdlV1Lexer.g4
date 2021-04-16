@@ -116,24 +116,22 @@ BeginLBrace: '{' -> mode(CurlyCommand);
 
 mode HereDocCommand;
 
-HereDocEscapedChar: EscapeSequence -> type(CommandEscStringPart);
 HereDocTildeString: '~' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
 HereDocCurlyStringCommand: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
 EndHereDocCommand: '>>>' -> mode(DEFAULT_MODE), type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
-HereDocStringPart: ~[~{>\\]+ -> type(CommandStringPart);
+HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 
 mode CurlyCommand;
 
-CommandEscStringPart: EscapeSequence;
 CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
 StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
 EndCommand: '}' -> mode(DEFAULT_MODE);
-CommandStringPart: ~[$~{}\\]+;
+CommandStringPart: ~[$~{}]+;
 
 mode Version;
 
