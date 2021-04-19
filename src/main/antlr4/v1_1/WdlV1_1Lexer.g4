@@ -93,25 +93,23 @@ Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;
 
-SQuoteEscapedChar: '\\' . -> type(StringPart);
+EscStringPart: EscapeSequence;
 SQuoteDollarString: '$'  -> type(StringPart);
 SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
 SQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
-SQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(StringPart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[$~{\r\n']+;
+StringPart: ~[$~{\r\n'\\]+;
 
 mode DquoteInterpolatedString;
 
-DQuoteEscapedChar: '\\' . -> type(StringPart);
+DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
 DQuoteTildeString: '~' -> type(StringPart);
 DQuoteDollarString: '$' -> type(StringPart);
 DQUoteCurlString: '{' -> type(StringPart);
 DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
-DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(StringPart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[$~{\r\n"]+ -> type(StringPart);
+DQuoteStringPart: ~[$~{\r\n"\\]+ -> type(StringPart);
 
 mode Command;
 
@@ -121,8 +119,6 @@ BeginLBrace: '{' -> mode(CurlyCommand);
 
 mode HereDocCommand;
 
-HereDocUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
-HereDocEscapedChar: '\\' . -> type(CommandStringPart);
 HereDocTildeString: '~' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
 HereDocCurlyStringCommand: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
@@ -133,8 +129,6 @@ HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 
 mode CurlyCommand;
 
-CommandEscapedChar: '\\' . -> type(CommandStringPart);
-CommandUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
 CommandTildeString: '~'  -> type(CommandStringPart);
 CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
@@ -177,15 +171,14 @@ MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaSquoteString;
 
-MetaSquoteEscapedChar: '\\' . -> type(MetaStringPart);
+MetaEscStringPart: EscapeSequence;
 MetaSquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(MetaStringPart);
 MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
-MetaStringPart: ~[\r\n']+;
+MetaStringPart: ~[\r\n'\\]+;
 
 mode MetaDquoteString;
 
-MetaDquoteEscapedChar: '\\' . -> type(MetaStringPart);
-MetaDquoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(MetaStringPart);
+MetaDquoteEscapedChar: EscapeSequence -> type(MetaEscStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"]+ -> type(MetaStringPart);
 
@@ -220,19 +213,37 @@ fragment IdentifierFollow
 	: [a-zA-Z0-9_]+
 	;
 
-fragment EscapeSequence
-    : '\\' [btnfr"'\\]
-    | '\\' ([0-3]? [0-7])? [0-7]
-    | '\\' UnicodeEsc
-    ;
-
-fragment UnicodeEsc
-   : 'u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?
-   ;
+fragment OctDigit
+  : [0-7]
+  ;
 
 fragment HexDigit
-   : [0-9a-fA-F]
-   ;
+	: [0-9a-fA-F]
+	;
+
+fragment OctEsc
+  : OctDigit OctDigit OctDigit
+  ;
+
+fragment HexEsc
+  : 'x' HexDigit HexDigit
+  ;
+
+fragment UnicodeEsc
+	: 'u' HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment UnicodeEsc2
+	: 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment EscapeSequence
+	: ESC [tn"'\\]
+	| ESC OctEsc
+	| ESC HexEsc
+	| ESC UnicodeEsc
+	| ESC UnicodeEsc2
+	;
 
 fragment Digit
 	: [0-9]

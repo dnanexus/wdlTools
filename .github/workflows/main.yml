@@ -19,9 +19,8 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Build
+      - name: Install & build
         run: |
-          sudo apt-get update
           # compile antlr4 sources
           cd ${GITHUB_WORKSPACE}
           make

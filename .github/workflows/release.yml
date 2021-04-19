@@ -14,44 +14,25 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v2
-
       - name: Install java
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-
       - name: Install & build
         run: |
-          sudo apt-get update
-
-          # install java
-          sudo apt-get install wget make openjdk-8-jdk-headless
-
           # compile antlr4 sources
           cd ${GITHUB_WORKSPACE}
           make
-
-          # install sbt
-          echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
-          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
-          sudo apt-get install -y sbt
-
-          # compile
-          sbt compile
-
       - name: Unit Tests
         run: |
           sbt test
-
       - name: Assembly
         run: |
           sbt assembly
           mv ./target/wdlTools.jar ./wdlTools-${{ github.event.inputs.release-version }}.jar
-
       - name: Scala formatting
         run: |
           sbt scalafmtCheckAll
-
       - name: Extract release notes and set version in application.conf files
         id: update-release
         run: |
@@ -65,7 +46,6 @@ jobs:
           RELEASE_NOTES_PATH="./release_notes_${{ github.event.inputs.release-version }}.md"
           sed -n '/## ${{ github.event.inputs.release-version }}/,/##/p' RELEASE_NOTES.md | sed '1d; $d' > $RELEASE_NOTES_PATH
           echo ::set-output name=release-notes-path::$(echo "${RELEASE_NOTES_PATH}")
-
       - name: Commit changes to application.conf files
         uses: EndBug/add-and-commit@v7
         with:
@@ -75,7 +55,6 @@ jobs:
           ]'
           push: false
           tag: ${{ github.event.inputs.release-version }}
-
       - name: Create release entry
         id: create-release
         uses: actions/create-release@v1
@@ -87,7 +66,6 @@ jobs:
           body_path: ${{ steps.update-release.outputs.release-notes-path }}
           draft: true
           prerelease: false
-
       - name: Upload assembly JAR
         id: upload-release-assembly
         uses: actions/upload-release-asset@v1
@@ -101,14 +79,12 @@ jobs:
           asset_path: ./wdlTools-${{ github.event.inputs.release-version }}.jar
           asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
           asset_content_type: application/jar
-
       - name: Push local release branch and tag to origin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git push origin HEAD:${{ github.ref }}
           git push origin HEAD:${{ github.event.inputs.release-version }}
-
       - name: Rollback release if unsuccessfull
         if: ${{ cancelled() || failure() }}
         uses: author/action-rollback@stable

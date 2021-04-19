@@ -87,23 +87,21 @@ Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;
 
-SQuoteEscapedChar: '\\' . -> type(StringPart);
+EscStringPart: EscapeSequence;
 SQuoteDollarString: '$'  -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
 SQuoteCommandStart: ('${') -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
-SQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)? -> type(StringPart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[${\r\n']+;
+StringPart: ~[${\r\n'\\]+;
 
 mode DquoteInterpolatedString;
 
-DQuoteEscapedChar: '\\' . -> type(StringPart);
+DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
 DQuoteDollarString: '$' -> type(StringPart);
 DQUoteCurlString: '{' -> type(StringPart);
 DQuoteCommandStart: ('${') -> pushMode(DEFAULT_MODE), type(StringCommandStart);
-DQuoteUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?) -> type(StringPart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[${\r\n"]+ -> type(StringPart);
+DQuoteStringPart: ~[${\r\n"\\]+ -> type(StringPart);
 
 mode Command;
 
@@ -111,10 +109,16 @@ BeginWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 BeginHereDoc: '<<<' -> mode(HereDocCommand);
 BeginLBrace: '{' -> mode(CurlyCommand);
 
+mode CurlyCommand;
+
+CommandDollarString: '$' -> type(CommandStringPart);
+CommandCurlyString: '{' -> type(CommandStringPart);
+StringCommandStart:  ('${') -> pushMode(DEFAULT_MODE);
+EndCommand: '}' -> mode(DEFAULT_MODE);
+CommandStringPart: ~[${}]+;
+
 mode HereDocCommand;
 
-HereDocUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
-HereDocEscapedChar: '\\' . -> type(CommandStringPart);
 HereDocDollarString: '$' -> type(CommandStringPart);
 HereDocCurlyString: '{' -> type(CommandStringPart);
 HereDocCurlyStringCommand: ('${') -> pushMode(DEFAULT_MODE), type(StringCommandStart);
@@ -122,16 +126,6 @@ HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
 EndHereDocCommand: '>>>' -> mode(DEFAULT_MODE), type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
 HereDocStringPart: ~[${>]+ -> type(CommandStringPart);
-
-mode CurlyCommand;
-
-CommandEscapedChar: '\\' . -> type(CommandStringPart);
-CommandUnicodeEscape: '\\u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?;
-CommandDollarString: '$' -> type(CommandStringPart);
-CommandCurlyString: '{' -> type(CommandStringPart);
-StringCommandStart:  ('${') -> pushMode(DEFAULT_MODE);
-EndCommand: '}' -> mode(DEFAULT_MODE);
-CommandStringPart: ~[${}]+;
 
 // Fragments
 
@@ -147,18 +141,36 @@ fragment IdentifierFollow
 	: [a-zA-Z0-9_]+
 	;
 
-fragment EscapeSequence
-	: '\\' [btnfr"'\\]
-	| '\\' ([0-3]? [0-7])? [0-7]
-	| '\\' UnicodeEsc
-	;
-
-fragment UnicodeEsc
-	: 'u' (HexDigit (HexDigit (HexDigit HexDigit?)?)?)?
-	;
+fragment OctDigit
+  : [0-7]
+  ;
 
 fragment HexDigit
 	: [0-9a-fA-F]
+	;
+
+fragment OctEsc
+  : OctDigit OctDigit OctDigit
+  ;
+
+fragment HexEsc
+  : 'x' HexDigit HexDigit
+  ;
+
+fragment UnicodeEsc
+	: 'u' HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment UnicodeEsc2
+	: 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment EscapeSequence
+	: ESC [tn"'\\]
+	| ESC OctEsc
+	| ESC HexEsc
+	| ESC UnicodeEsc
+	| ESC UnicodeEsc2
 	;
 
 fragment Digit
