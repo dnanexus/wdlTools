@@ -6,11 +6,13 @@ import dx.util.{
   AddressableFileSource,
   FileNode,
   FileSourceResolver,
+  LocalFileSource,
   Logger,
   TraceLevel
 }
 
 import java.net.URI
+import java.nio.file.Paths
 
 trait DocumentWalker[T] {
   def walk(visitor: (Document, T) => T): T
@@ -30,9 +32,15 @@ abstract class WdlParser(followImports: Boolean = false,
       case None =>
         logger.trace(s"parsing import ${uri}", minLevel = TraceLevel.VVerbose)
         val fn: FileNode = if (URI.create(uri).getScheme == null && parent.isDefined) {
-          // a path relative to parent
           parent.get.resolve(uri) match {
-            case fn: AddressableFileNode => fn
+            case fn: AddressableFileNode if fn.exists =>
+              // a path relative to parent
+              fn
+            case _: LocalFileSource =>
+              // the imported file is not relative to the parent, but
+              // but LocalFileAccessProtocol may be configured to look
+              // for it in a different folder
+              fileResolver.fromPath(Paths.get(uri))
             case other =>
               throw new Exception(s"Not a FileNode: ${other}")
           }

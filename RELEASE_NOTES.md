@@ -6,6 +6,7 @@
 * Fixed indentation issue in command block
 * Fixes processing of escape sequences (including regular expressions used in second argument to `sub`)  
 * Other bugfixes
+* Updates to dxCommon 0.2.12
 
 ## 0.12.7 (2021-03-17)
 

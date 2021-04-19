@@ -19,14 +19,17 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   private val v2Dir = Paths.get(getClass.getResource("/types/v2").getPath)
   private val v1StructsDir =
     Paths.get(getClass.getResource("/types/v1/structs").getPath)
+  private val v1ImportsDir =
+    Paths.get(getClass.getResource("/types/v1/imports").getPath)
   private val v2StructsDir =
     Paths.get(getClass.getResource("/types/v2/structs").getPath)
 
   private def check(dir: Path,
                     file: String,
                     udfs: Vector[UserDefinedFunctionPrototype] = Vector.empty,
-                    substituteFunctionsForTasks: Boolean = false): TAT.Document = {
-    val fileResolver = FileSourceResolver.create(Vector(dir))
+                    substituteFunctionsForTasks: Boolean = false,
+                    importDirs: Set[Path] = Set.empty): TAT.Document = {
+    val fileResolver = FileSourceResolver.create((importDirs + dir).toVector)
     val checker =
       TypeInfer(userDefinedFunctions = udfs,
                 substituteFunctionsForTasks = substituteFunctionsForTasks,
@@ -117,6 +120,10 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     }
     subTasks.size shouldBe 1
     topTasks.head shouldBe subTasks.head
+  }
+
+  it should "handle import in different folder" in {
+    check(v1Dir, "import_folder.wdl", importDirs = Set(v1ImportsDir))
   }
 
   it should "allow UDFs" in {
