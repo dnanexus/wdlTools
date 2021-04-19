@@ -87,6 +87,13 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("l0") shouldBe V_String("a")
     bindings("l1") shouldBe V_String("b")
 
+    // escape sequences
+    bindings("esc") shouldBe V_String("hello\n\t\"x\\o\"")
+    bindings("esc_unicode") shouldBe V_String("\u274C")
+    bindings("esc_unicode2") shouldBe V_String("🌭")
+    bindings("esc_hex") shouldBe V_String("204")
+    bindings("esc_oct") shouldBe V_String("23")
+
     // pairs
     bindings("l") shouldBe V_String("hello")
     bindings("r") shouldBe V_Boolean(true)
@@ -133,6 +140,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "He visited three places on his trip: Berlin, Berlin, C, D, and E"
     )
     bindings("sentence3") shouldBe V_String("H      : A, A, C, D,  E")
+    bindings("fname1") shouldBe V_String("file.bam.bai")
 
     // transpose
     bindings("ar3") shouldBe V_Array(V_Int(0), V_Int(1), V_Int(2))
@@ -275,6 +283,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
     val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
     evaluator.applyCommand(task.command, ctx)
+  }
+
+  it should "evaluate command with leading spaces" in {
+    val command = evalCommand("leading_spaces.wdl")
+    command shouldBe "        cat <<-EOF > test.py\na = 1\nif a == 0:\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
+  }
+
+  it should "evaluate command with leading spaces2" in {
+    val command = evalCommand("leading_spaces2.wdl")
+    command shouldBe "    cat <<-EOF > test.py\na = 1\nif a == 0:\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n    python3 test.py"
+  }
+
+  it should "evaluate command with empty lines" in {
+    val command = evalCommand("empty_lines.wdl")
+    command shouldBe "        cat <<-EOF > test.py\na = 1\n\n\n\nif a == 0:\n\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
   }
 
   it should "evaluate simple command section" in {
