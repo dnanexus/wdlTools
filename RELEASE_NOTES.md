@@ -1,11 +1,11 @@
 # Change log
 
-## 0.12.8 (dev)
+## 0.12.8 (2021-04-19) 
 
 * Adds support for Object -> Map coercion
 * Fixed indentation issue in command block
 * Fixes processing of escape sequences (including regular expressions used in second argument to `sub`)  
-* Bugfixes
+* Other bugfixes
 
 ## 0.12.7 (2021-03-17)
 
