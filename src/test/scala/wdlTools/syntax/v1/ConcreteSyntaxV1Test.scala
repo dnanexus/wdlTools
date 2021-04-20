@@ -9,12 +9,13 @@ import wdlTools.syntax.{Comment, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
-class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
+class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
   private val sourcePath = Paths.get(getClass.getResource("/syntax/v1").getPath)
   private val tasksDir = sourcePath.resolve("tasks")
   private val workflowsDir = sourcePath.resolve("workflows")
   private val structsDir = sourcePath.resolve("structs")
-  private val fileResolver = FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir))
+  private val fileResolver =
+    FileSourceResolver.create(Vector(tasksDir, workflowsDir, structsDir))
   private val logger = Logger.Quiet
 
   private def getTaskSource(fname: String): FileNode = {
@@ -29,8 +30,8 @@ class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
     fileResolver.fromPath(structsDir.resolve(fname))
   }
 
-  private def getDocument(FileSource: FileNode): Document = {
-    ParseTop(WdlV1Grammar.newInstance(FileSource, Vector.empty, logger = logger)).parseDocument
+  private def getDocument(fileSource: FileNode): Document = {
+    ParseTop(WdlV1Grammar.newInstance(fileSource, Vector.empty, logger = logger)).parseDocument
   }
 
   it should "handle various types" in {

@@ -1,11 +1,17 @@
 # Change log
 
+## 0.12.9 (2021-04-19)
+
+* Fix resolution of imports using local paths not relative to the main document
+* Update to dxCommon 0.2.12
+
 ## 0.12.8 (2021-04-19) 
 
 * Adds support for Object -> Map coercion
 * Fixed indentation issue in command block
 * Fixes processing of escape sequences (including regular expressions used in second argument to `sub`)  
 * Other bugfixes
+* Updates to dxCommon 0.2.12
 
 ## 0.12.7 (2021-03-17)
 
