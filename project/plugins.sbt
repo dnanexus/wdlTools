@@ -7,6 +7,8 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 // sbt-pgp plugin used to sign the artifcat with pgp keys
 addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "2.3")
 addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
+// sbt-github-packages plugin used to publish snapshot versions to github packages
+addSbtPlugin("com.codecommit" % "sbt-github-packages" % "0.5.2")
 
 // This prevents the SLF dialog from appearing when starting
 // an SBT session

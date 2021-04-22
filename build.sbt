@@ -27,15 +27,24 @@ val root = project.in(file("."))
 // e.g wdlTools_2.11
 crossPaths := false
 
+//resolvers ++= Seq(
+//    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
+//)
+
+val githubResolver = Resolver.githubPackages("dnanexus", "dxScala")
+resolvers += githubResolver
+
 // add sonatype repository settings
 // snapshot versions publish to sonatype snapshot repository
 // other versions publish to sonatype staging repository
 publishTo := Some(
     if (isSnapshot.value)
-      Opts.resolver.sonatypeSnapshots
+      githubResolver
     else
       Opts.resolver.sonatypeStaging
 )
+githubOwner := "dnanexus"
+githubRepository := "wdlTools"
 
 // reduce the maximum number of errors shown by the Scala compiler
 maxErrors := 20
@@ -76,10 +85,6 @@ scalacOptions ++= Seq(
 assemblyJarName in assembly := "wdlTools.jar"
 logLevel in assembly := Level.Info
 //assemblyOutputPath in assembly := file("applet_resources/resources/dxWDL.jar")
-
-//resolvers ++= Seq(
-//    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
-//)
 
 val dxCommonVersion = "0.2.12"
 val antlr4Version = "4.9"
