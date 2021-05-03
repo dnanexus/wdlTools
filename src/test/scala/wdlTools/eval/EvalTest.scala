@@ -1,7 +1,7 @@
 package wdlTools.eval
 
 import java.nio.file.{Files, Path, Paths}
-import dx.util.{EvalPaths, FileSourceResolver, FileUtils, Logger}
+import dx.util.{EvalPaths, FileSourceResolver, FileUtils, Logger, SysUtils}
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -592,5 +592,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "RG_LB" -> (T_String, V_String("dataset_dataset_str1"))
     )
     evaluator.applyExprAndCoerce(call.inputs("rg"), T_String, Eval.createBindingsFromEnv(env))
+  }
+
+  it should "handle escape sequences" in {
+    val tDoc = parseAndTypeCheck(v1_1Dir.resolve("escape_sequences.wdl"))
+    val task = tDoc.elements match {
+      case Vector(task: TAT.Task) => task
+      case _                      => throw new Exception("expected a single task")
+    }
+    val evaluator = createEvaluator()
+    val bindings = evaluator.applyPrivateVariables(task.privateVariables)
+    val command = evaluator.applyCommand(task.command, bindings)
+    val (_, stdout, _) = SysUtils.execCommand(command)
+    stdout shouldBe "1^I1$\n2\\t2$\n3\\^I3$\n4\\\\t4$\n"
+    FileUtils.writeFileContent(evaluator.paths.getStdoutFile(), stdout)
+    val outputExpr = task.outputs.head.expr
+    evaluator.applyExpr(outputExpr) shouldBe V_String("1^I1$\n2\\t2$\n3\\^I3$\n4\\\\t4$")
   }
 }
