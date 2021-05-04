@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Escape strings when generating/formatting code (unless they are in the command block)
+
 ## 0.12.9 (2021-04-19)
 
 * Fix resolution of imports using local paths not relative to the main document
