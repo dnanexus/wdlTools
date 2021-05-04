@@ -79,7 +79,7 @@ lazy val dependencies = {
 //    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
 //)
 
-val githubResolver = Resolver.githubPackages("dnanexus", "dxScala")
+val githubResolver = Resolver.githubPackages("dnanexus-rnd", "wdlTools")
 resolvers += githubResolver
 
 lazy val settings = Seq(
@@ -104,7 +104,7 @@ lazy val settings = Seq(
           Opts.resolver.sonatypeStaging
         }
     ),
-    githubOwner := "dnanexus",
+    githubOwner := "dnanexus-rnd",
     githubRepository := "wdlTools",
     publishMavenStyle := true,
     // If an exception is thrown during tests, show the full
