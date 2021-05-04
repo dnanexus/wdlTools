@@ -176,16 +176,16 @@ wdl_type
   }
 
   override def visitString_parts(ctx: WdlV1_1Parser.String_partsContext): Expr = {
-    ctx
-      .string_part()
-      .asScala
-      .map(visitString_part)
-      .filterNot(_.value.isEmpty)
-      .toVector match {
-      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) => e
-      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+    val parts = ctx.string_part().asScala.map(visitString_part).toVector
+    val (strings, locs) = parts.collect {
+      case ExprString(value, loc) if value.nonEmpty => (value, loc)
+    }.unzip
+    val loc = if (locs.nonEmpty) {
+      SourceLocation.merge(locs)
+    } else {
+      getSourceLocation(grammar.docSource, ctx)
     }
+    ExprString(strings.mkString(""), loc)
   }
 
   // These are parts of string interpolation expressions like:

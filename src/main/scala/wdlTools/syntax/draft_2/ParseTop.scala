@@ -152,17 +152,17 @@ wdl_type
   /* string_part
   : StringPart*
   ; */
-  override def visitString_parts(ctx: WdlDraft2Parser.String_partsContext): Expr = {
-    ctx
-      .string_part()
-      .asScala
-      .map(visitString_part)
-      .filterNot(_.value.isEmpty)
-      .toVector match {
-      case Vector()  => ExprString("", getSourceLocation(grammar.docSource, ctx))
-      case Vector(e) => e
-      case parts     => ExprCompoundString(parts, getSourceLocation(grammar.docSource, ctx))
+  override def visitString_parts(ctx: WdlDraft2Parser.String_partsContext): ExprString = {
+    val parts = ctx.string_part().asScala.map(visitString_part).toVector
+    val (strings, locs) = parts.collect {
+      case ExprString(value, loc) if value.nonEmpty => (value, loc)
+    }.unzip
+    val loc = if (locs.nonEmpty) {
+      SourceLocation.merge(locs)
+    } else {
+      getSourceLocation(grammar.docSource, ctx)
     }
+    ExprString(strings.mkString(""), loc)
   }
 
   /* string_expr_part
@@ -703,19 +703,7 @@ any_decls
    ; */
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = getIdentifierText(ctx.Identifier(), ctx)
-    val value = visitString_parts(ctx.string().string_parts()) match {
-      case ExprString(value, _) => value
-      case ExprCompoundString(parts, _) =>
-        parts
-          .map {
-            case ExprString(value, _) => value
-            case expr =>
-              throw new SyntaxException(s"invalid meta string ${ctx.string}", expr.loc)
-          }
-          .mkString("")
-      case expr =>
-        throw new SyntaxException(s"invalid meta string ${ctx.string}", expr.loc)
-    }
+    val value = visitString_parts(ctx.string().string_parts()).value
     MetaKV(id, value, getSourceLocation(grammar.docSource, ctx))
   }
 

@@ -732,19 +732,20 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     }
   }
 
-  private def flattenCompoundString(expr: Expr): String = {
+  private def getString(expr: Expr): String = {
     expr match {
+      case ExprString(value, _) => value
       case ExprCompoundString(parts, _) =>
         parts
           .flatMap {
             case ExprString(s, _)        => Vector(s)
-            case cs: ExprCompoundString  => flattenCompoundString(cs)
+            case cs: ExprCompoundString  => getString(cs)
             case ExprIdentifier(name, _) => Vector(s"$${${name}}")
             case other =>
               throw new Exception(s"unexpected expression ${other}")
           }
           .mkString("")
-      case _ => throw new Exception(s"not a compound string: ${expr}")
+      case _ => throw new Exception(s"not a string or compound string: ${expr}")
     }
   }
 
@@ -763,7 +764,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       case Some(
           ExprApply("select_first", Vector(ExprArrayLiteral(Vector(_, cs), _)), _)
           ) =>
-        flattenCompoundString(cs)
+        getString(cs)
       case _ =>
         throw new Exception(s"unexpected expression ${decl.expr}")
     }
@@ -785,7 +786,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       case Some(
           ExprArrayLiteral(strings, _)
           ) =>
-        strings.map(flattenCompoundString)
+        strings.map(getString)
       case _ =>
         throw new Exception(s"unexpected expression ${decl.expr}")
     }

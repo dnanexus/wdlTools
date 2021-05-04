@@ -124,4 +124,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "regenerate a WDL with only a placeholder in the command" in {
     generate("bug-382.wdl")
   }
+
+  it should "escape strings" in {
+    generate("escape_sequences.wdl", validateContentSelf = true)
+  }
 }
