@@ -797,4 +797,8 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
         "4\\\\t4"
     )
   }
+
+  it should "parse expressions with whitespace" in {
+    getDocument(getTaskSource("spaces.wdl"))
+  }
 }
