@@ -47,7 +47,7 @@ trait Sized {
 object Utils {
 
   /**
-    * Escapes a String according to the rules in the spec.
+    * Escapes special characters in a String.
     */
   def escape(raw: String): String = {
     val quoted = Literal(Constant(raw)).toString
