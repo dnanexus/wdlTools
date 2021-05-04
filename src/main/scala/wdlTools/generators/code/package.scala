@@ -8,6 +8,7 @@
   */
 package wdlTools.generators.code
 
+import scala.reflect.runtime.universe._
 import wdlTools.syntax.BuiltinSymbols
 
 object Indenting extends Enumeration {
@@ -41,6 +42,17 @@ trait Sized {
     * The length of the element's first line, if it were formatted with line-wrapping.
     */
   def firstLineLength: Int = length
+}
+
+object Utils {
+
+  /**
+    * Escapes a String according to the rules in the spec.
+    */
+  def escape(raw: String): String = {
+    val quoted = Literal(Constant(raw)).toString
+    quoted.substring(1, quoted.length - 1)
+  }
 }
 
 /**
