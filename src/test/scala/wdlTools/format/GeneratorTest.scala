@@ -29,6 +29,15 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  /**
+    * Parse a WDL file and generate a new WDL from the AST.
+    * @param fname the filename to parse
+    * @param validateParse if true, the generated WDL is parsed to make sure it's valid
+    * @param validateContentSelf if true, checks that the generated WDL is identical to the source WDL
+    * @param validateContentFile validates the generated WDL against the specified file
+    * @param wdlVersion the version of WDL to generate
+    * @return
+    */
   private def generate(
       fname: String,
       validateParse: Boolean = true,
