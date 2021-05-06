@@ -93,6 +93,7 @@ object EvalUtils {
     }
   }
 
+  @tailrec
   def unwrapOptional(v: V, mustBeOptional: Boolean = false): V = {
     v match {
       case V_Optional(wrapped) => unwrapOptional(wrapped)
