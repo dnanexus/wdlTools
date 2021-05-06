@@ -2,7 +2,8 @@
 
 ## in develop
 
-* Escape strings when generating/formatting code (unless they are in the command block)
+* Escapes strings when generating/formatting code (unless they are in the command block)
+* Always unwraps `V_Optional` values during expression evaluation
 
 ## 0.12.9 (2021-04-19)
 
