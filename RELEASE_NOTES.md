@@ -4,6 +4,7 @@
 
 * Escapes strings when generating/formatting code (unless they are in the command block)
 * Always unwraps `V_Optional` values during expression evaluation
+* Fixes issues with using expressions in placeholder option values
 
 ## 0.12.9 (2021-04-19)
 
