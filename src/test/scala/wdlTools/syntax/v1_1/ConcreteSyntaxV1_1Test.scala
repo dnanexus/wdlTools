@@ -23,4 +23,8 @@ class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
   it should "parse sep option and sep function" in {
     getDocument("sep.wdl")
   }
+
+  it should "parse nested expressions" in {
+    getDocument("nested_expr.wdl")
+  }
 }
