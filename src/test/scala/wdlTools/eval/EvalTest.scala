@@ -609,4 +609,14 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val outputExpr = task.outputs.head.expr
     evaluator.applyExpr(outputExpr) shouldBe V_String("1^I1$\n2\\t2$\n3\\^I3$\n4\\\\t4$")
   }
+
+  it should "evaluate command section with boolean flag expression" in {
+    val command = evalCommand(v1_1Dir.resolve("apps_579_boolean_flag_expr.wdl"))
+    command shouldBe "if_true=\"x\"\nif_false=\"y\"\necho $if_true"
+  }
+
+  it should "evaluate command section with string substitution expression" in {
+    val command = evalCommand(v1_1Dir.resolve("apps_579_string_substitution_expr.wdl"))
+    command shouldBe "echo aa"
+  }
 }
