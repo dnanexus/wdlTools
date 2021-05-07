@@ -168,6 +168,13 @@ If you encounter any additional issues while creating the release, you will need
 
 To complete the release, open a PR to merge the release branch into main. You can then delete the release branch.
 
+Unfortunately, the tags that are created on the release branch are not merged into `main` when merging the PR. Thus, after merging the PR, you must manually tag the `main` branch with the release, e.g.
+
+```
+$ git tag wdlTools-0.12.10 -am "release wdlTools 0.12.10"
+$ git push origin wdlTools-0.12.10
+```
+
 ## wdlTools CLI
 
 ### Adding a new command
