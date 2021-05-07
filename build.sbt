@@ -82,6 +82,8 @@ lazy val dependencies = {
 val githubResolver = Resolver.githubPackages("dnanexus-rnd", "wdlTools")
 resolvers += githubResolver
 
+val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("github")
+
 lazy val settings = Seq(
     scalacOptions ++= compilerOptions,
     // exclude Java sources from scaladoc
@@ -98,7 +100,7 @@ lazy val settings = Seq(
     // snapshot versions publish to sonatype snapshot repository
     // other versions publish to sonatype staging repository
     publishTo := Some(
-        if (isSnapshot.value) {
+        if (isSnapshot.value || releaseTarget == "github") {
           githubResolver
         } else {
           Opts.resolver.sonatypeStaging
