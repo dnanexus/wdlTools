@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.12.10 (2021-05-07)
 
 * Escapes strings when generating/formatting code (unless they are in the command block)
 * Always unwraps `V_Optional` values during expression evaluation
