@@ -89,6 +89,11 @@ jobs:
         run: |
           git push origin HEAD:${{ github.ref }}
           git push origin HEAD:${{ github.event.inputs.release-version }}
+      - name: Publish package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sbt publish
       - name: Rollback release if unsuccessfull
         if: ${{ cancelled() || failure() }}
         uses: author/action-rollback@stable

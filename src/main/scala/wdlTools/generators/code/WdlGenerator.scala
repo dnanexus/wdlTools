@@ -574,7 +574,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     def option(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
-      val exprSized = nested(value, inPlaceholder = true)
+      val exprSized = nested(value)
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
