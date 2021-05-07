@@ -40,7 +40,7 @@ lazy val wdlTools = root.settings(
 )
 
 lazy val dependencies = {
-  val dxCommonVersion = "0.2.12"
+  val dxCommonVersion = "0.3.0"
   val antlr4Version = "4.9"
   val scallopVersion = "3.4.0"
   val typesafeVersion = "1.3.3"
@@ -79,8 +79,9 @@ lazy val dependencies = {
 //    "zalando-maven" at "https://dl.bintray.com/zalando/maven"
 //)
 
-val githubResolver = Resolver.githubPackages("dnanexus-rnd", "wdlTools")
-resolvers += githubResolver
+val githubDxScalaResolver = Resolver.githubPackages("dnanexus", "dxScala")
+val githubWdlToolsResolver = Resolver.githubPackages("dnanexus-rnd", "wdlTools")
+resolvers ++= Vector(githubWdlToolsResolver, githubDxScalaResolver)
 
 val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("github")
 
@@ -101,7 +102,7 @@ lazy val settings = Seq(
     // other versions publish to sonatype staging repository
     publishTo := Some(
         if (isSnapshot.value || releaseTarget == "github") {
-          githubResolver
+          githubWdlToolsResolver
         } else {
           Opts.resolver.sonatypeStaging
         }
