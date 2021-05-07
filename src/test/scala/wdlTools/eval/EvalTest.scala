@@ -269,8 +269,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i2") shouldBe V_Int(13)
   }
 
-  private def evalCommand(wdlSourceFileName: String): String = {
-    val file = v1Dir.resolve(wdlSourceFileName)
+  private def evalCommand(file: Path): String = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -286,57 +285,57 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   it should "evaluate command with leading spaces" in {
-    val command = evalCommand("leading_spaces.wdl")
+    val command = evalCommand(v1Dir.resolve("leading_spaces.wdl"))
     command shouldBe "        cat <<-EOF > test.py\na = 1\nif a == 0:\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
   }
 
   it should "evaluate command with leading spaces2" in {
-    val command = evalCommand("leading_spaces2.wdl")
+    val command = evalCommand(v1Dir.resolve("leading_spaces2.wdl"))
     command shouldBe "    cat <<-EOF > test.py\na = 1\nif a == 0:\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n    python3 test.py"
   }
 
   it should "evaluate command with empty lines" in {
-    val command = evalCommand("empty_lines.wdl")
+    val command = evalCommand(v1Dir.resolve("empty_lines.wdl"))
     command shouldBe "        cat <<-EOF > test.py\na = 1\n\n\n\nif a == 0:\n\n    print(\"a = 0\")\nelse:\n    print(\"a = 1\")\nEOF\n        python3 test.py"
   }
 
   it should "evaluate simple command section" in {
-    val command = evalCommand("command_simple.wdl")
+    val command = evalCommand(v1Dir.resolve("command_simple.wdl"))
     command shouldBe "We just discovered a new flower with 100 basepairs. Is that possible?"
   }
 
   it should "evaluate command section with some variables" in {
-    val command = evalCommand("command2.wdl")
+    val command = evalCommand(v1Dir.resolve("command2.wdl"))
     command shouldBe "His trumpet playing is not bad"
   }
 
   it should "command section with several kinds of primitives" in {
-    val command = evalCommand("command3.wdl")
+    val command = evalCommand(v1Dir.resolve("command3.wdl"))
     command shouldBe "His trumpet playing is good. There are 10 instruments in the band. It this true?"
   }
 
   it should "separator placeholder" in {
-    val command = evalCommand("sep_placeholder.wdl")
+    val command = evalCommand(v1Dir.resolve("sep_placeholder.wdl"))
     command shouldBe "We have lots of numbers here 1, 10, 100"
   }
 
   it should "boolean placeholder" in {
-    val command = evalCommand("bool_placeholder.wdl")
+    val command = evalCommand(v1Dir.resolve("bool_placeholder.wdl"))
     command shouldBe s"--no${linesep}--yes"
   }
 
   it should "default placeholder" in {
-    val command = evalCommand("default_placeholder.wdl")
+    val command = evalCommand(v1Dir.resolve("default_placeholder.wdl"))
     command shouldBe "hello"
   }
 
   it should "strip common indent" in {
-    val command = evalCommand("indented_command.wdl")
+    val command = evalCommand(v1Dir.resolve("indented_command.wdl"))
     command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
   }
 
   it should "strip common indent in python heredoc" in {
-    val command = evalCommand("python_heredoc.wdl")
+    val command = evalCommand(v1Dir.resolve("python_heredoc.wdl"))
     command shouldBe """python <<CODE
                        |  with open("/path/to/file.txt") as fp:
                        |    for line in fp:
