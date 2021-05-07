@@ -1,0 +1,54 @@
+name: Publish Snapshot Workflow
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  publish:
+    name: Publish Snapshot
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v2
+      - name: Install Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+      - name: Install other dependencies
+        run: |
+          sudo apt update -y && sudo apt install -y jq
+      - name: Install & build
+        run: |
+          # compile antlr4 sources
+          cd ${GITHUB_WORKSPACE}
+          make
+      - name: Get snapshot versions
+        id: versions
+        run: |
+          version=`grep -o -P "\d+\.\d+\.\d+-SNAPSHOT" src/main/resources/application.conf`
+          if [ -z "$version" ]; then
+            echo "wdlTools version does not end in '-SNAPSHOT'; only snapshot versions are allowed in the develop branch"
+            exit 1
+          fi
+          query="{\"query\": \"query { repository(owner:\\\"dnanexus-rnd\\\", name:\\\"wdlTools\\\") { packages(names:[\\\"com.dnanexus.wdlTools\\\"], first:1) { nodes { version(version:\\\"${version}\\\") { id } } } } }\" }"
+          version_json=`curl \
+            -X POST \
+            -H "Accept: application/vnd.github.package-deletes-preview+json" \
+            -H "Authorization: bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -d "$query" \
+            https://api.github.com/graphql`
+          version_id=`echo $version_json | jq .data.repository.packages.nodes[0].version.id`
+          echo ::set-output name=version_id::"${version_id}"
+      - name: Delete existing snapshot
+        uses: actions/delete-package-versions@v1
+        if: ${{ steps.versions.outputs.version_id != 'null' }}
+        with:
+          repo: dnanexus
+          package-name: com.dnanexus.wdlTools
+          package-version-ids: ${{ steps.versions.outputs.version_id }}
+      - name: Publish Snapshot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sbt publish

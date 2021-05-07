@@ -519,7 +519,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   private def buildExpression(
       expr: Expr,
       placeholderOpen: String = Symbols.PlaceholderOpenDollar,
-      inStringOrCommand: Boolean = false,
+      inString: Boolean = false,
+      inCommand: Boolean = false,
       inPlaceholder: Boolean = false,
       inOperation: Boolean = false,
       parentOperation: Option[String] = None,
@@ -540,14 +541,15 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
      */
     def nested(nestedExpression: Expr,
                placeholderOpen: String = placeholderOpen,
-               inString: Boolean = inStringOrCommand,
+               inString: Boolean = inString,
                inPlaceholder: Boolean = inPlaceholder,
                inOperation: Boolean = inOperation,
                parentOperation: Option[String] = None): Sized = {
       buildExpression(
           nestedExpression,
           placeholderOpen = placeholderOpen,
-          inStringOrCommand = inString,
+          inString = inString,
+          inCommand = inCommand,
           inPlaceholder = inPlaceholder,
           inOperation = inOperation,
           parentOperation = parentOperation,
@@ -561,13 +563,18 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       } else {
         value
       }
-      Literal(v, quoting = inPlaceholder || !inStringOrCommand)
+      val escaped = if (!inCommand) {
+        Utils.escape(v)
+      } else {
+        v
+      }
+      Literal(escaped, quoting = inPlaceholder || !(inString || inCommand))
     }
 
     def option(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
-      val exprSized = nested(value, inPlaceholder = true)
+      val exprSized = nested(value)
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
@@ -580,7 +587,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       case ValueBoolean(value, _, _)   => Literal(value)
       case ValueInt(value, _, _)       => Literal(value)
       case ValueFloat(value, _, _)     => Literal(value)
-      case ExprPair(left, right, _, _) if !(inStringOrCommand || inPlaceholder) =>
+      case ExprPair(left, right, _, _) if !(inString || inCommand || inPlaceholder) =>
         Container(
             Vector(nested(left), nested(right)),
             Some(Symbols.ArrayDelimiter),
@@ -638,7 +645,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                     default.map(e => option(Symbols.DefaultOption, e))
                 ).flatten
             ),
-            inString = inStringOrCommand
+            inString = inString || inCommand
         )
       case ExprCompoundString(value, _, _) if !inPlaceholder =>
         // Often/always an ExprCompoundString contains one or more empty
@@ -648,27 +655,28 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           case ValueString(s, _, _) => s.nonEmpty
           case _                    => true
         }
-        CompoundString(filteredExprs.map(nested(_, inString = true)), quoting = !inStringOrCommand)
+        CompoundString(filteredExprs.map(nested(_, inString = true)),
+                       quoting = !(inString || inCommand))
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
         val sized = other match {
           case ExprIdentifier(id, _, _) => Literal(id)
           case ExprAt(array, index, _, _) =>
-            val arraySized = nested(array, inPlaceholder = inStringOrCommand)
+            val arraySized = nested(array, inPlaceholder = inString || inCommand)
             val prefix = Sequence(
                 Vector(arraySized, Literal(Symbols.IndexOpen))
             )
             val suffix = Literal(Symbols.IndexClose)
             Container(
-                Vector(nested(index, inPlaceholder = inStringOrCommand)),
+                Vector(nested(index, inPlaceholder = inString || inCommand)),
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
           case ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
-            val condSized = nested(cond, inOperation = false, inPlaceholder = inStringOrCommand)
-            val tSized = nested(tBranch, inOperation = false, inPlaceholder = inStringOrCommand)
-            val fSized = nested(fBranch, inOperation = false, inPlaceholder = inStringOrCommand)
+            val condSized = nested(cond, inOperation = false, inPlaceholder = inString || inCommand)
+            val tSized = nested(tBranch, inOperation = false, inPlaceholder = inString || inCommand)
+            val fSized = nested(fBranch, inOperation = false, inPlaceholder = inString || inCommand)
             Container(
                 Vector(
                     Literal(Symbols.If),
@@ -684,14 +692,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             val symbol = Operator.Vectorizable(oper).symbol
             val operands = args.map(
                 nested(_,
-                       inPlaceholder = inStringOrCommand,
+                       inPlaceholder = inString || inCommand,
                        inOperation = true,
                        parentOperation = Some(oper))
             )
             Operation(symbol,
                       operands,
                       grouped = inOperation && !parentOperation.contains(oper),
-                      inString = inStringOrCommand)
+                      inString = inString || inCommand)
           case ExprApply(oper, _, Vector(value), _, _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             Sequence(Vector(Literal(symbol), nested(value, inOperation = true)))
@@ -701,16 +709,16 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 symbol,
                 Vector(
                     nested(lhs,
-                           inPlaceholder = inStringOrCommand,
+                           inPlaceholder = inString || inCommand,
                            inOperation = true,
                            parentOperation = Some(oper)),
                     nested(rhs,
-                           inPlaceholder = inStringOrCommand,
+                           inPlaceholder = inString || inCommand,
                            inOperation = true,
                            parentOperation = Some(oper))
                 ),
                 grouped = inOperation && !parentOperation.contains(oper),
-                inString = inStringOrCommand
+                inString = inString || inCommand
             )
           case ExprApply(funcName, _, elements, _, _) =>
             val prefix = Sequence(
@@ -718,20 +726,20 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             )
             val suffix = Literal(Symbols.FunctionCallClose)
             Container(
-                elements.map(nested(_, inPlaceholder = inStringOrCommand)),
+                elements.map(nested(_, inPlaceholder = inString || inCommand)),
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
           case ExprGetName(e, id, _, _) =>
-            val exprSized = nested(e, inPlaceholder = inStringOrCommand)
+            val exprSized = nested(e, inPlaceholder = inString || inCommand)
             val idLiteral = Literal(id)
             Sequence(
                 Vector(exprSized, Literal(Symbols.Access), idLiteral)
             )
           case other => throw new Exception(s"Unrecognized expression $other")
         }
-        if (inStringOrCommand && !inPlaceholder) {
-          Placeholder(sized, placeholderOpen, inString = inStringOrCommand)
+        if ((inString || inCommand) && !inPlaceholder) {
+          Placeholder(sized, placeholderOpen, inString = inString || inCommand)
         } else {
           sized
         }
@@ -1191,7 +1199,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inStringOrCommand = true,
+                  inCommand = true,
                   stringModifier = replaceIndent
               )
           )

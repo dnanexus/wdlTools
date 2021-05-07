@@ -226,7 +226,7 @@ case class Eval(paths: EvalPaths,
           nestedCtx.advanceState()
         case _ => nestedCtx
       }
-      val v = nestedExpr match {
+      val v = EvalUtils.unwrapOptional(nestedExpr match {
         case _: TAT.ValueNull      => V_Null
         case _: TAT.ValueNone      => V_Null
         case x: TAT.ValueBoolean   => V_Boolean(x.value)
@@ -267,7 +267,7 @@ case class Eval(paths: EvalPaths,
           )
 
         case TAT.ExprIdentifier(id, _, _) if updatedCtx.bindings.contains(id) =>
-          EvalUtils.unwrapOptional(updatedCtx.bindings(id))
+          updatedCtx.bindings(id)
         case TAT.ExprIdentifier(id, _, _) =>
           throw new EvalException(s"identifier ${id} not found")
 
@@ -370,8 +370,8 @@ case class Eval(paths: EvalPaths,
           standardLibrary.call(funcName, funcArgs, loc, updatedCtx.exprState)
 
         case other =>
-          throw new Exception(s"sanity: expression ${other} not implemented")
-      }
+          throw new Exception(s"expression ${other} not implemented")
+      })
       validate(v, expr.loc)
       v
     }

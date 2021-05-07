@@ -731,4 +731,74 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       getDocument(getWorkflowSource("unterminated_dquote.wdl"))
     }
   }
+
+  private def getString(expr: Expr): String = {
+    expr match {
+      case ExprString(value, _) => value
+      case ExprCompoundString(parts, _) =>
+        parts
+          .flatMap {
+            case ExprString(s, _)        => Vector(s)
+            case cs: ExprCompoundString  => getString(cs)
+            case ExprIdentifier(name, _) => Vector(s"$${${name}}")
+            case other =>
+              throw new Exception(s"unexpected expression ${other}")
+          }
+          .mkString("")
+      case _ => throw new Exception(s"not a string or compound string: ${expr}")
+    }
+  }
+
+  it should "parse strings with escape sequences I" in {
+    val doc = getDocument(getWorkflowSource("escape_sequences.wdl"))
+    val task = doc.elements match {
+      case Vector(t: Task) => t
+      case _               => throw new Exception("expected a single Task")
+    }
+    val decl = task.declarations
+      .collectFirst {
+        case d if d.name == "actual_read_group" => d
+      }
+      .getOrElse(throw new Exception("missing declaration actual_read_group"))
+    val s = decl.expr match {
+      case Some(
+          ExprApply("select_first", Vector(ExprArrayLiteral(Vector(_, cs), _)), _)
+          ) =>
+        getString(cs)
+      case _ =>
+        throw new Exception(s"unexpected expression ${decl.expr}")
+    }
+    s shouldBe "@RG\\tID:${sample_name}\\tSM:${sample_name}\\tLB:${sample_name}\\tPL:ILLUMINA"
+  }
+
+  it should "parse strings with escape sequences II" in {
+    val doc = getDocument(getWorkflowSource("escape_sequences2.wdl"))
+    val task = doc.elements match {
+      case Vector(t: Task) => t
+      case _               => throw new Exception("expected a single Task")
+    }
+    val decl = task.declarations
+      .collectFirst {
+        case d if d.name == "a" => d
+      }
+      .getOrElse(throw new Exception("missing declaration actual_read_group"))
+    val strings = decl.expr match {
+      case Some(
+          ExprArrayLiteral(strings, _)
+          ) =>
+        strings.map(getString)
+      case _ =>
+        throw new Exception(s"unexpected expression ${decl.expr}")
+    }
+    strings shouldBe Vector(
+        "1\t1",
+        "2\\t2",
+        "3\\\t3",
+        "4\\\\t4"
+    )
+  }
+
+  it should "parse expressions with whitespace" in {
+    getDocument(getTaskSource("spaces.wdl"))
+  }
 }
