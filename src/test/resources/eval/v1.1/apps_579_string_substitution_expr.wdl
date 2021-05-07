@@ -1,9 +1,7 @@
 version 1.1
 
 task apps_579_sub_t {
-    input {
-        String s = "aabb"
-    }
+    String s = "aabb"
 
     command <<<
     echo ~{sub(s, "bb$", "")}

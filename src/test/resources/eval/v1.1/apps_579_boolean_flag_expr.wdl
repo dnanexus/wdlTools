@@ -1,9 +1,7 @@
 version 1.1
 
 task apps_579_boolean_t {
-    input {
-        Boolean bool_flag = true
-    }
+    Boolean bool_flag = true
 
     command <<<
     if_true="x"
