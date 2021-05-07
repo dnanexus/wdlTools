@@ -574,7 +574,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     def option(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
-      val exprSized = nested(value)
+      val exprSized = nested(value, inPlaceholder = true)
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
@@ -587,18 +587,18 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       case ValueBoolean(value, _, _)   => Literal(value)
       case ValueInt(value, _, _)       => Literal(value)
       case ValueFloat(value, _, _)     => Literal(value)
-      case ExprPair(left, right, _, _) if !(inString || inCommand || inPlaceholder) =>
-        Container(
-            Vector(nested(left), nested(right)),
-            Some(Symbols.ArrayDelimiter),
-            Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
-        )
       case ExprArray(value, _, _) =>
         Container(
             value.map(nested(_)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
             wrapping = Wrapping.AllOrNone
+        )
+      case ExprPair(left, right, _, _) =>
+        Container(
+            Vector(nested(left), nested(right)),
+            Some(Symbols.ArrayDelimiter),
+            Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
         )
       case ExprMap(value, _, _) =>
         Container(
@@ -647,7 +647,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             ),
             inString = inString || inCommand
         )
-      case ExprCompoundString(value, _, _) if !inPlaceholder =>
+      case ExprCompoundString(value, _, _) =>
         // Often/always an ExprCompoundString contains one or more empty
         // ValueStrings that we want to get rid of because they're useless
         // and can mess up formatting
