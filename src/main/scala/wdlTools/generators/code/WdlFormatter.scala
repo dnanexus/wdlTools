@@ -954,14 +954,6 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       case ValueBoolean(value, loc) => Literal.fromStart(value, loc)
       case ValueInt(value, loc)     => Literal.fromStart(value, loc)
       case ValueFloat(value, loc)   => Literal.fromStart(value, loc)
-      case ExprPair(left, right, loc) if !(inString || inCommand || inPlaceholder) =>
-        BoundedContainer(
-            Vector(nested(left), nested(right)),
-            Some(Literal.fromStart(Symbols.GroupOpen, loc),
-                 Literal.fromEnd(Symbols.GroupClose, loc)),
-            Some(Symbols.ArrayDelimiter),
-            loc
-        )
       case ExprArray(value, loc) =>
         BoundedContainer(
             value.map(nested(_)),
@@ -970,6 +962,14 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             Some(Symbols.ArrayDelimiter),
             loc,
             wrapping = Wrapping.AllOrNone
+        )
+      case ExprPair(left, right, loc) =>
+        BoundedContainer(
+            Vector(nested(left), nested(right)),
+            Some(Literal.fromStart(Symbols.GroupOpen, loc),
+                 Literal.fromEnd(Symbols.GroupClose, loc)),
+            Some(Symbols.ArrayDelimiter),
+            loc
         )
       case ExprMap(value, loc) =>
         BoundedContainer(
@@ -1044,7 +1044,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             inString = inString || inCommand,
             bounds = loc
         )
-      case ExprCompoundString(value, loc) if !inPlaceholder =>
+      case ExprCompoundString(value, loc) =>
         CompoundString(value.map(nested(_, inString = true)),
                        quoting = !(inString || inCommand),
                        loc)
