@@ -930,7 +930,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     }
 
     def option(name: String, value: Expr): Span = {
-      val exprSpan = nested(value)
+      val exprSpan = nested(value, inPlaceholder = true)
       val eqLiteral = Literal.fromNext(Symbols.Assignment, exprSpan)
       val nameLiteral = Literal.fromNext(name, eqLiteral)
       SpanSequence(Vector(nameLiteral, eqLiteral, exprSpan))
