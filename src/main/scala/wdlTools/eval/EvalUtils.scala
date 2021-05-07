@@ -93,9 +93,10 @@ object EvalUtils {
     }
   }
 
+  @tailrec
   def unwrapOptional(v: V, mustBeOptional: Boolean = false): V = {
     v match {
-      case V_Optional(wrapped) => wrapped
+      case V_Optional(wrapped) => unwrapOptional(wrapped)
       case _ if mustBeOptional =>
         throw new Exception(s"Value ${v} is not V_Optional")
       case _ => v
