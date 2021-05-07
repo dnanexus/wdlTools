@@ -1,5 +1,9 @@
 # Change log
 
+## 0.12.11 (2021-05-07)
+
+* Fixes regression in code generator and formatter
+
 ## 0.12.10 (2021-05-07)
 
 * Escapes strings when generating/formatting code (unless they are in the command block)
