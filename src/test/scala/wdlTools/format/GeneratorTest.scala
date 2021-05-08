@@ -137,4 +137,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "escape strings" in {
     generate("escape_sequences.wdl", validateContentSelf = true)
   }
+
+  it should "include quotes for strings in placeholders" in {
+    generate("sum_array.wdl", validateContentSelf = true)
+  }
 }
