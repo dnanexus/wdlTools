@@ -73,7 +73,7 @@ object ConcreteSyntax {
       extends Expr
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr)(val loc: SourceLocation)
       extends Expr
-  case class ExprGetName(e: Expr, id: String)(val loc: SourceLocation) extends Expr
+  case class ExprGetName(expr: Expr, id: String)(val loc: SourceLocation) extends Expr
 
   case class Declaration(name: String, wdlType: Type, expr: Option[Expr])(val loc: SourceLocation)
       extends WorkflowElement

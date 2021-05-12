@@ -53,12 +53,11 @@ object ConcreteSyntax {
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
   // ${sep=", " array_value}
-  case class ExprPlaceholder(t: Option[Expr],
-                             f: Option[Expr],
-                             sep: Option[Expr],
-                             default: Option[Expr],
-                             value: Expr,
-                             loc: SourceLocation)
+  case class ExprPlaceholder(trueOpt: Option[Expr],
+                             falseOpt: Option[Expr],
+                             sepOpt: Option[Expr],
+                             defaultOpt: Option[Expr],
+                             value: Expr)(val loc: SourceLocation)
       extends Expr
 
   case class ExprUnaryPlus(value: Expr)(val loc: SourceLocation) extends Expr
@@ -83,7 +82,7 @@ object ConcreteSyntax {
       extends Expr
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr)(val loc: SourceLocation)
       extends Expr
-  case class ExprGetName(e: Expr, id: String)(val loc: SourceLocation) extends Expr
+  case class ExprGetName(expr: Expr, id: String)(val loc: SourceLocation) extends Expr
 
   case class Declaration(name: String, wdlType: Type, expr: Option[Expr])(val loc: SourceLocation)
       extends WorkflowElement
@@ -144,8 +143,7 @@ object ConcreteSyntax {
                   declarations: Vector[Declaration],
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
-                  runtime: Option[RuntimeSection],
-                  loc: SourceLocation)
+                  runtime: Option[RuntimeSection])(val loc: SourceLocation)
       extends DocumentElement
 
   case class CallAlias(name: String)(val loc: SourceLocation) extends Element
@@ -165,8 +163,7 @@ object ConcreteSyntax {
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
-                      body: Vector[WorkflowElement],
-                      loc: SourceLocation)
+                      body: Vector[WorkflowElement])(val loc: SourceLocation)
       extends Element
 
   case class Version(value: WdlVersion = WdlVersion.V1)(val loc: SourceLocation) extends Element
@@ -174,7 +171,6 @@ object ConcreteSyntax {
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
-                      loc: SourceLocation,
-                      comments: CommentMap)
+                      comments: CommentMap)(val loc: SourceLocation)
       extends Element
 }

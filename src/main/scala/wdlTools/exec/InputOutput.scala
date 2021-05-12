@@ -32,15 +32,15 @@ object InputOutput {
           case param: RequiredInputParameter if inputValues.contains(param.name) =>
             // ensure the required value is not T_Optional
             WdlValueUtils.unwrapOptional(inputValues(decl.name))
-          case RequiredInputParameter(_, WdlTypes.T_Array(_, false), _) if nullCollectionAsEmpty =>
+          case RequiredInputParameter(_, WdlTypes.T_Array(_, false)) if nullCollectionAsEmpty =>
             // Special handling for required input Arrays that are non-optional but
             // allowed to be empty and do not have a value specified - set the value
             // to the empty array rather than throwing an exception.
             WdlValues.V_Array()
-          case RequiredInputParameter(_, _: WdlTypes.T_Map, _) if nullCollectionAsEmpty =>
+          case RequiredInputParameter(_, _: WdlTypes.T_Map) if nullCollectionAsEmpty =>
             // Special handling for required input Maps that are non-optional
             WdlValues.V_Map()
-          case RequiredInputParameter(_, WdlTypes.T_Object, _) if nullCollectionAsEmpty =>
+          case RequiredInputParameter(_, WdlTypes.T_Object) if nullCollectionAsEmpty =>
             // Special handling for required input Objects that are non-optional
             WdlValues.V_Object()
           case param: RequiredInputParameter =>
@@ -53,7 +53,7 @@ object InputOutput {
             inputValues(param.name)
           case _: OptionalInputParameter =>
             WdlValues.V_Null
-          case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, loc) =>
+          case OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>
             // An input definition that has a default value supplied.
             // Typical WDL example would be a declaration like: "Int x = 5"
             try {
@@ -69,7 +69,7 @@ object InputOutput {
                 throw new ExecException(
                     s"Could not evaluate default value expression for input parameter ${name}",
                     t,
-                    loc
+                    decl.loc
                 )
             }
         }
@@ -87,9 +87,9 @@ object InputOutput {
     // the output parameter expression using the union of the input
     // and output bindings
     outputParameters.foldLeft(init) {
-      case (outCtx, OutputParameter(name, _, _, _)) if ctx.contains(name) =>
+      case (outCtx, OutputParameter(name, _, _)) if ctx.contains(name) =>
         outCtx.add(name, ctx.bindings(name))
-      case (outCtx, OutputParameter(name, wdlType, expr, _)) =>
+      case (outCtx, OutputParameter(name, wdlType, expr)) =>
         // if the output parameter is optional, then it is okay if the
         // expression fails to evaluate - we set the value to None
         try {

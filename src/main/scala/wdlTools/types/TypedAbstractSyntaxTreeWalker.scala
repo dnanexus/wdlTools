@@ -129,18 +129,18 @@ class TypedAbstractSyntaxTreeVisitor {
     */
   def traverseExpression(ctx: VisitorContext[Expr]): Unit = {
     val exprs: Vector[Expr] = ctx.element match {
-      case ExprCompoundString(value, _, _) => value
-      case ExprPair(l, r, _, _)            => Vector(l, r)
-      case ExprArray(value, _, _)          => value
-      case ExprMap(value, _, _)            => value.keys.toVector ++ value.values.toVector
-      case ExprObject(value, _, _)         => value.keys.toVector ++ value.values.toVector
-      case ExprPlaceholder(t, f, sep, default, value, _, _) =>
+      case ExprCompoundString(value, _) => value
+      case ExprPair(l, r, _)            => Vector(l, r)
+      case ExprArray(value, _)          => value
+      case ExprMap(value, _)            => value.keys.toVector ++ value.values.toVector
+      case ExprObject(value, _)         => value.keys.toVector ++ value.values.toVector
+      case ExprPlaceholder(t, f, sep, default, value, _) =>
         Vector(t, f, sep, default).flatten :+ value
-      case ExprAt(array, index, _, _)                   => Vector(array, index)
-      case ExprIfThenElse(cond, tBranch, fBranch, _, _) => Vector(cond, tBranch, fBranch)
-      case ExprApply(_, _, elements, _, _)              => elements
-      case ExprGetName(e, _, _, _)                      => Vector(e)
-      case _                                            => Vector.empty
+      case ExprAt(array, index, _)                   => Vector(array, index)
+      case ExprIfThenElse(cond, tBranch, fBranch, _) => Vector(cond, tBranch, fBranch)
+      case ExprApply(_, _, elements, _)              => elements
+      case ExprGetName(e, _, _)                      => Vector(e)
+      case _                                         => Vector.empty
     }
     exprs.foreach { e =>
       traverseExpression(ctx.createChildContext[Expr](e))
@@ -256,9 +256,9 @@ class TypedAbstractSyntaxTreeWalker(followImports: Boolean = false)
 
   override def visitInputDefinition(ctx: VisitorContext[InputParameter]): Unit = {
     ctx.element match {
-      case RequiredInputParameter(name, wdlType, _) => visitVariable(name, wdlType, None, ctx)
-      case OptionalInputParameter(name, wdlType, _) => visitVariable(name, wdlType, None, ctx)
-      case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
+      case RequiredInputParameter(name, wdlType) => visitVariable(name, wdlType, None, ctx)
+      case OptionalInputParameter(name, wdlType) => visitVariable(name, wdlType, None, ctx)
+      case OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>
         visitVariable(name, wdlType, Some(defaultExpr), ctx)
     }
   }

@@ -20,7 +20,7 @@ import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException}
 case class ParseTop(grammar: WdlDraft2Grammar) extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
-      throw new SyntaxException("missing identifier")(getSourceLocation(grammar.docSource, ctx))
+      throw new SyntaxException("missing identifier", getSourceLocation(grammar.docSource, ctx))
     }
     identifier.getText
   }
@@ -67,26 +67,27 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlDraft2Parser.Type_baseContext): Type = {
-    if (ctx.array_type() != null)
-      return visitArray_type(ctx.array_type())
-    if (ctx.map_type() != null)
-      return visitMap_type(ctx.map_type())
-    if (ctx.pair_type() != null)
-      return visitPair_type(ctx.pair_type())
-    if (ctx.STRING() != null)
-      return TypeString()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.FILE() != null)
-      return TypeFile()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.BOOLEAN() != null)
-      return TypeBoolean()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.OBJECT() != null)
-      return TypeObject()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.INT() != null)
-      return TypeInt()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.FLOAT() != null)
-      return TypeFloat()(getSourceLocation(grammar.docSource, ctx))
-    throw new SyntaxException("sanity: unrecgonized type case",
-                              getSourceLocation(grammar.docSource, ctx))
+    if (ctx.array_type() != null) {
+      visitArray_type(ctx.array_type())
+    } else if (ctx.map_type() != null) {
+      visitMap_type(ctx.map_type())
+    } else if (ctx.pair_type() != null) {
+      visitPair_type(ctx.pair_type())
+    } else if (ctx.STRING() != null) {
+      TypeString()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FILE() != null) {
+      TypeFile()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.BOOLEAN() != null) {
+      TypeBoolean()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.OBJECT() != null) {
+      TypeObject()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.INT() != null) {
+      TypeInt()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FLOAT() != null) {
+      TypeFloat()(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException(s"unrecgonized type", getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /*
@@ -95,6 +96,9 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlDraft2Parser.Wdl_typeContext): Type = {
+    if (ctx.type_base == null) {
+      throw new SyntaxException("missing type", getSourceLocation(grammar.docSource, ctx))
+    }
     val t = visitType_base(ctx.type_base())
     if (ctx.OPTIONAL() != null) {
       TypeOptional(t)(getSourceLocation(grammar.docSource, ctx))
@@ -107,13 +111,12 @@ wdl_type
 
   override def visitNumber(ctx: WdlDraft2Parser.NumberContext): Expr = {
     if (ctx.IntLiteral() != null) {
-      return ExprInt(ctx.getText.toLong)(getSourceLocation(grammar.docSource, ctx))
+      ExprInt(ctx.getText.toLong)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FloatLiteral() != null) {
+      ExprFloat(ctx.getText.toDouble)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("unrecognized number", getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.FloatLiteral() != null) {
-      return ExprFloat(ctx.getText.toDouble)(getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException("Not an integer nor a float",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   private def visitEscapse_sequence(terminalNode: TerminalNode): String = {
@@ -145,7 +148,7 @@ wdl_type
           getSourceLocation(grammar.docSource, ctx)
       )
     } else {
-      throw new SyntaxException(s"invalid string_part ${ctx}",
+      throw new SyntaxException(s"unrecognized string_part ${ctx}",
                                 getSourceLocation(grammar.docSource, ctx))
     }
   }
@@ -281,8 +284,8 @@ string
       // according to the spec, only one of true/false, sep, or default is allowed; however,
       // some "industry standard" workflows are not spec compliant and mix default with either
       // sep or true/false, so we are compelled to allow it
-      if (placeholder.t.isDefined != placeholder.f.isDefined || placeholder.t.isDefined && placeholder.sep.isDefined) {
-        throw new SyntaxException("invalid place holder")(getSourceLocation(grammar.docSource, ctx))
+      if (placeholder.trueOpt.isDefined != placeholder.falseOpt.isDefined || placeholder.trueOpt.isDefined && placeholder.sepOpt.isDefined) {
+        throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
       }
       placeholder
     }
@@ -297,19 +300,17 @@ string
   override def visitPrimitive_literal(ctx: WdlDraft2Parser.Primitive_literalContext): Expr = {
     if (ctx.BoolLiteral() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return ExprBoolean(value)(getSourceLocation(grammar.docSource, ctx))
+      ExprBoolean(value)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.number() != null) {
+      visitNumber(ctx.number())
+    } else if (ctx.string() != null) {
+      visitString(ctx.string())
+    } else if (ctx.Identifier() != null) {
+      ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("unrecognized primitive_literal",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.number() != null) {
-      return visitNumber(ctx.number())
-    }
-    if (ctx.string() != null) {
-      return visitString(ctx.string())
-    }
-    if (ctx.Identifier() != null) {
-      return ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException("Not one of four supported variants of primitive_literal",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   override def visitLor(ctx: WdlDraft2Parser.LorContext): Expr = {
@@ -420,9 +421,10 @@ string
       .toVector
 
     val n = elements.size
-    if (n % 2 != 0)
+    if (n % 2 != 0) {
       throw new SyntaxException("the expressions in a map must come in pairs",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
 
     val m: Vector[ExprMember] = Vector.tabulate(n / 2) { i =>
       val key = elements(2 * i)
@@ -475,12 +477,14 @@ string
   override def visitUnarysigned(ctx: WdlDraft2Parser.UnarysignedContext): Expr = {
     val expr = visitExpr(ctx.expr())
 
-    if (ctx.PLUS() != null)
+    if (ctx.PLUS() != null) {
       ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else if (ctx.MINUS() != null)
+    } else if (ctx.MINUS() != null) {
       ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else
-      throw new SyntaxException("sanity")(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("invalid unary operation",
+                                getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -612,7 +616,8 @@ string
       visitChildren(ctx).asInstanceOf[Expr]
     } catch {
       case _: NullPointerException =>
-        throw new SyntaxException("bad expression")(getSourceLocation(grammar.docSource, ctx))
+        throw new SyntaxException("unrecognized expression",
+                                  getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -675,10 +680,12 @@ bound_decls
                                 getSourceLocation(grammar.docSource, ctx))
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
-    if (ctx.expr() == null)
-      return Declaration(name, wdlType, None)(getSourceLocation(grammar.docSource, ctx))
-    val expr: Expr = visitExpr(ctx.expr())
-    Declaration(name, wdlType, Some(expr))(getSourceLocation(grammar.docSource, ctx))
+    if (ctx.expr() == null) {
+      Declaration(name, wdlType, None)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      val expr: Expr = visitExpr(ctx.expr())
+      Declaration(name, wdlType, Some(expr))(getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /*
@@ -688,11 +695,14 @@ any_decls
 	;
    */
   override def visitAny_decls(ctx: WdlDraft2Parser.Any_declsContext): Declaration = {
-    if (ctx.unbound_decls() != null)
-      return visitUnbound_decls(ctx.unbound_decls())
-    if (ctx.bound_decls() != null)
-      return visitBound_decls(ctx.bound_decls())
-    throw new SyntaxException("bad declaration format")(getSourceLocation(grammar.docSource, ctx))
+    if (ctx.unbound_decls() != null) {
+      visitUnbound_decls(ctx.unbound_decls())
+    } else if (ctx.bound_decls() != null) {
+      visitBound_decls(ctx.bound_decls())
+    } else {
+      throw new SyntaxException("unrecognized declaration",
+                                getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /* meta_kv
@@ -1116,15 +1126,18 @@ scatter
   override def visitInner_workflow_element(
       ctx: WdlDraft2Parser.Inner_workflow_elementContext
   ): WorkflowElement = {
-    if (ctx.bound_decls() != null)
-      return visitBound_decls(ctx.bound_decls())
-    if (ctx.call() != null)
-      return visitCall(ctx.call())
-    if (ctx.scatter() != null)
-      return visitScatter(ctx.scatter())
-    if (ctx.conditional() != null)
-      return visitConditional(ctx.conditional())
-    throw new Exception("sanity")
+    if (ctx.bound_decls() != null) {
+      visitBound_decls(ctx.bound_decls())
+    } else if (ctx.call() != null) {
+      visitCall(ctx.call())
+    } else if (ctx.scatter() != null) {
+      visitScatter(ctx.scatter())
+    } else if (ctx.conditional() != null) {
+      visitConditional(ctx.conditional())
+    } else {
+      throw new SyntaxException("unrecognized workflow element",
+                                getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /*
@@ -1169,12 +1182,10 @@ scatter
       case x: WdlDraft2Parser.Wf_parameter_meta_elementContext =>
         visitParameter_meta(x.parameter_meta())
     }, "parameter_meta", ctx)
-
     val wfElems: Vector[WorkflowElement] = elems.collect {
       case x: WdlDraft2Parser.Wf_inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
-
     // We treat as an input any unbound declaration as well as any bound declaration
     // that doesn't require evaluation.
     val (noEvalDecls, wfBody) = wfElems.partition {
@@ -1212,6 +1223,7 @@ document_element
   ): DocumentElement = {
     visitChildren(ctx).asInstanceOf[DocumentElement]
   }
+
   /*
   document
     : version document_element* (workflow document_element*)?

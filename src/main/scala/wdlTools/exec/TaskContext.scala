@@ -16,8 +16,8 @@ case class TaskContext(task: Task,
                        logger: Logger = Logger.get) {
   private lazy val dockerUtils = DockerUtils(fileResolver, logger)
   private lazy val hasCommand: Boolean = task.command.parts.exists {
-    case ValueString(s, _, _) => s.trim.nonEmpty
-    case _                    => true
+    case ValueString(s, _) => s.trim.nonEmpty
+    case _                 => true
   }
   // The inputs and runtime section are evaluated using the host paths
   // (which will be the same as the guest paths, unless we're running in a container)

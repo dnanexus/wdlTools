@@ -53,10 +53,10 @@ object ConcreteSyntax {
   // ${true="--yes" false="--no" boolean_value}
   // ${default="foo" optional_value}
   // ${sep=", " array_value}
-  case class ExprPlaceholder(t: Option[Expr],
-                             f: Option[Expr],
-                             sep: Option[Expr],
-                             default: Option[Expr],
+  case class ExprPlaceholder(trueOpt: Option[Expr],
+                             falseOpt: Option[Expr],
+                             sepOpt: Option[Expr],
+                             defaultOpt: Option[Expr],
                              value: Expr)(val loc: SourceLocation)
       extends Expr
 
@@ -82,7 +82,7 @@ object ConcreteSyntax {
       extends Expr
   case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr)(val loc: SourceLocation)
       extends Expr
-  case class ExprGetName(e: Expr, id: String)(val loc: SourceLocation) extends Expr
+  case class ExprGetName(expr: Expr, id: String)(val loc: SourceLocation) extends Expr
 
   case class Declaration(name: String, wdlType: Type, expr: Option[Expr])(val loc: SourceLocation)
       extends WorkflowElement

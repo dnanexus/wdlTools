@@ -46,7 +46,7 @@ object AbstractSyntax {
   // For example:
   //  "some string part ~{ident + ident} some string part after"
   case class ExprCompoundString(value: Vector[Expr])(val loc: SourceLocation) extends Expr
-  case class ExprPair(l: Expr, r: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprPair(left: Expr, right: Expr)(val loc: SourceLocation) extends Expr
   case class ExprArray(value: Vector[Expr])(val loc: SourceLocation) extends Expr
   case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
   case class ExprMap(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
@@ -59,10 +59,10 @@ object AbstractSyntax {
   // ~{true="--yes" false="--no" boolean_value}
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
-  case class ExprPlaceholder(t: Option[Expr],
-                             f: Option[Expr],
-                             sep: Option[Expr],
-                             default: Option[Expr],
+  case class ExprPlaceholder(trueOpt: Option[Expr],
+                             falseOpt: Option[Expr],
+                             sepOpt: Option[Expr],
+                             defaultOpt: Option[Expr],
                              value: Expr)(val loc: SourceLocation)
       extends Expr
 
@@ -71,7 +71,7 @@ object AbstractSyntax {
 
   // conditional:
   // if (x == 1) then "Sunday" else "Weekday"
-  case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr)(val loc: SourceLocation)
+  case class ExprIfThenElse(cond: Expr, trueExpr: Expr, falseExpr: Expr)(val loc: SourceLocation)
       extends Expr
 
   // Apply a standard library function to arguments. For example:
@@ -81,7 +81,7 @@ object AbstractSyntax {
 
   // Access a field in a struct or an object. For example:
   //   Int z = x.a
-  case class ExprGetName(e: Expr, id: String)(val loc: SourceLocation) extends Expr
+  case class ExprGetName(expr: Expr, id: String)(val loc: SourceLocation) extends Expr
 
   case class Declaration(name: String, wdlType: Type, expr: Option[Expr])(val loc: SourceLocation)
       extends WorkflowElement

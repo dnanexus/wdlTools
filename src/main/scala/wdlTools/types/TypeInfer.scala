@@ -269,8 +269,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
             // complex types
             case e: AST.ExprPair =>
-              val l2 = nested(e.l, nextState)
-              val r2 = nested(e.r, nextState)
+              val l2 = nested(e.left, nextState)
+              val r2 = nested(e.right, nextState)
               val t = T_Pair(l2.wdlType, r2.wdlType)
               TAT.ExprPair(l2, r2, t)(e.loc)
             case e: AST.ExprArray if e.value.isEmpty =>
@@ -358,9 +358,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
 
             case e: AST.ExprPlaceholder =>
               val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
-              val valueExpr = nested(expr, ExprState.InPlaceholder)
+              val valueExpr = nested(e.value, ExprState.InPlaceholder)
 
-              val (defaultExpr, defaultValueType) = e.default
+              val (defaultExpr, defaultValueType) = e.defaultOpt
                 .map { d =>
                   val (defaultExpr, defaultType) = nestedStringExpr(d, ExprState.InPlaceholder)
                   val t = TypeUtils.unwrapOptional(valueExpr.wdlType) match {
@@ -371,7 +371,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                       // the value is supposed to be optional but is not - we allow it anyway
                       T_String
                     case T_Array(vt, _)
-                        if e.sep.isDefined && unify.isCoercibleTo(T_String, vt, unifyCtx) =>
+                        if e.sepOpt.isDefined && unify.isCoercibleTo(T_String, vt, unifyCtx) =>
                       // mixing default and sep - not technically allowed but we support it
                       // since it is used in some "industry standard" workflows
                       T_String
@@ -389,9 +389,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
                 .getOrElse((None, None))
 
-              val tOption = e.t.map(nestedStringExpr(_, ExprState.InPlaceholder))
-              val fOption = e.f.map(nestedStringExpr(_, ExprState.InPlaceholder))
-              val sepOption = e.sep.map(nestedStringExpr(_, ExprState.InPlaceholder))
+              val tOption = e.trueOpt.map(nestedStringExpr(_, ExprState.InPlaceholder))
+              val fOption = e.falseOpt.map(nestedStringExpr(_, ExprState.InPlaceholder))
+              val sepOption = e.sepOpt.map(nestedStringExpr(_, ExprState.InPlaceholder))
 
               (tOption, fOption, sepOption) match {
                 case (Some((trueExpr, trueType)), Some((falseExpr, falseType)), None) =>
@@ -458,8 +458,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ExprIfThenElse =>
               // if (x == 1) then "Sunday" else "Weekday"
               val eCond = nested(e.cond, nextState)
-              val eTrueBranch = nested(e.tBranch, nextState)
-              val eFalseBranch = nested(e.fBranch, nextState)
+              val eTrueBranch = nested(e.trueExpr, nextState)
+              val eFalseBranch = nested(e.falseExpr, nextState)
               val t = {
                 if (eCond.wdlType != T_Boolean) {
                   handleError(
@@ -517,9 +517,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ExprGetName =>
               // Access a field in a struct or an object. For example "x.a" in:
               //   Int z = x.a
-              val expr = nested(e.e, nextState)
-              val wdlType = typeEvalExprGetName(expr, e.id, ctx)
-              TAT.ExprGetName(expr, e.id, wdlType)(e.loc)
+              val lhsExpr = nested(e.expr, nextState)
+              val wdlType = typeEvalExprGetName(lhsExpr, e.id, ctx)
+              TAT.ExprGetName(lhsExpr, e.id, wdlType)(e.loc)
 
             // vectorize any mathematical operations
             case applyExpr: AST.ExprApply if canVectorize(applyExpr) =>

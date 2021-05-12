@@ -29,13 +29,13 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    val InputSection(decls, _) = task.input.get
-    decls(0) should matchPattern { case Declaration("i", TypeInt(_), None, _)       => }
-    decls(1) should matchPattern { case Declaration("s", TypeString(_), None, _)    => }
-    decls(2) should matchPattern { case Declaration("x", TypeFloat(_), None, _)     => }
-    decls(3) should matchPattern { case Declaration("b", TypeBoolean(_), None, _)   => }
-    decls(4) should matchPattern { case Declaration("f", TypeFile(_), None, _)      => }
-    decls(5) should matchPattern { case Declaration("d", TypeDirectory(_), None, _) => }
+    val InputSection(decls) = task.input.get
+    decls(0) should matchPattern { case Declaration("i", TypeInt(), None)       => }
+    decls(1) should matchPattern { case Declaration("s", TypeString(), None)    => }
+    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None)     => }
+    decls(3) should matchPattern { case Declaration("b", TypeBoolean(), None)   => }
+    decls(4) should matchPattern { case Declaration("f", TypeFile(), None)      => }
+    decls(5) should matchPattern { case Declaration("d", TypeDirectory(), None) => }
   }
 
   it should "parse a complex workflow with imports" in {
@@ -54,10 +54,10 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
   it should "handle passthrough syntax for call inputs" in {
     val doc = getDocument(getSource("passthrough.wdl"))
     doc.workflow.get.body match {
-      case Vector(Call(_, _, _, Some(inputs), _)) =>
+      case Vector(Call(_, _, _, Some(inputs))) =>
         inputs.value.size shouldBe 1
         inputs.value.head.expr should matchPattern {
-          case ExprIdentifier("s", _) =>
+          case ExprIdentifier("s") =>
         }
       case _ => throw new Exception("unexpected inputs")
     }

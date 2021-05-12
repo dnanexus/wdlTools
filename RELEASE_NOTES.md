@@ -1,5 +1,11 @@
 # Change log
 
+## in develop
+
+* **Breaking changes**:
+    * `loc` is moved from the first to second parameter section in all AST case classes to prevent it from being included in the `equals` and `hashCode` implementations
+    * Some fields of AST case classes are renamed for greater clarity
+
 ## 0.12.11 (2021-05-07)
 
 * Fixes regession in code generator and formatter

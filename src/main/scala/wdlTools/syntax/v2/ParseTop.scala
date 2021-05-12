@@ -16,7 +16,7 @@ case class ParseTop(grammar: WdlV2Grammar) extends WdlV2ParserBaseVisitor[Elemen
 
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
     if (identifier == null) {
-      throw new SyntaxException("missing identifier")(getSourceLocation(grammar.docSource, ctx))
+      throw new SyntaxException("missing identifier", getSourceLocation(grammar.docSource, ctx))
     }
     identifier.getText
   }
@@ -90,27 +90,29 @@ type_base
 	;
    */
   override def visitType_base(ctx: WdlV2Parser.Type_baseContext): Type = {
-    if (ctx.array_type() != null)
-      return visitArray_type(ctx.array_type())
-    if (ctx.map_type() != null)
-      return visitMap_type(ctx.map_type())
-    if (ctx.pair_type() != null)
-      return visitPair_type(ctx.pair_type())
-    if (ctx.STRING() != null)
-      return TypeString()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.FILE() != null)
-      return TypeFile()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.DIRECTORY() != null)
-      return TypeDirectory()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.BOOLEAN() != null)
-      return TypeBoolean()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.INT() != null)
-      return TypeInt()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.FLOAT() != null)
-      return TypeFloat()(getSourceLocation(grammar.docSource, ctx))
-    if (ctx.Identifier() != null)
-      return TypeIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
-    throw new SyntaxException("unrecgonized type")(getSourceLocation(grammar.docSource, ctx))
+    if (ctx.array_type() != null) {
+      visitArray_type(ctx.array_type())
+    } else if (ctx.map_type() != null) {
+      visitMap_type(ctx.map_type())
+    } else if (ctx.pair_type() != null) {
+      visitPair_type(ctx.pair_type())
+    } else if (ctx.STRING() != null) {
+      TypeString()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FILE() != null) {
+      TypeFile()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.DIRECTORY() != null) {
+      TypeDirectory()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.BOOLEAN() != null) {
+      TypeBoolean()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.INT() != null) {
+      TypeInt()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FLOAT() != null) {
+      TypeFloat()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.Identifier() != null) {
+      TypeIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("unrecgonized type", getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /*
@@ -119,8 +121,9 @@ wdl_type
   ;
    */
   override def visitWdl_type(ctx: WdlV2Parser.Wdl_typeContext): Type = {
-    if (ctx.type_base == null)
-      throw new SyntaxException("bad type")(getSourceLocation(grammar.docSource, ctx))
+    if (ctx.type_base == null) {
+      throw new SyntaxException("unrecognized type", getSourceLocation(grammar.docSource, ctx))
+    }
     val t = visitType_base(ctx.type_base())
     if (ctx.OPTIONAL() != null) {
       TypeOptional(t)(getSourceLocation(grammar.docSource, ctx))
@@ -133,13 +136,13 @@ wdl_type
 
   override def visitNumber(ctx: WdlV2Parser.NumberContext): Expr = {
     if (ctx.IntLiteral() != null) {
-      return ExprInt(ctx.getText.toLong)(getSourceLocation(grammar.docSource, ctx))
+      ExprInt(ctx.getText.toLong)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.FloatLiteral() != null) {
+      ExprFloat(ctx.getText.toDouble)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException(s"unrecognized number ${ctx.getText}",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.FloatLiteral() != null) {
-      return ExprFloat(ctx.getText.toDouble)(getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException(s"Not an integer nor a float ${ctx.getText}",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   private def visitEscapse_sequence(terminalNode: TerminalNode): String = {
@@ -171,7 +174,7 @@ wdl_type
           getSourceLocation(grammar.docSource, ctx)
       )
     } else {
-      throw new SyntaxException(s"invalid string_part ${ctx}",
+      throw new SyntaxException(s"unrecognized string_part ${ctx}",
                                 getSourceLocation(grammar.docSource, ctx))
     }
   }
@@ -239,23 +242,20 @@ string
 	; */
   override def visitPrimitive_literal(ctx: WdlV2Parser.Primitive_literalContext): Expr = {
     if (ctx.NONELITERAL() != null) {
-      return ExprNone()(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.BoolLiteral() != null) {
+      ExprNone()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.BoolLiteral() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return ExprBoolean(value)(getSourceLocation(grammar.docSource, ctx))
+      ExprBoolean(value)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.number() != null) {
+      visitNumber(ctx.number())
+    } else if (ctx.string() != null) {
+      visitString(ctx.string())
+    } else if (ctx.Identifier() != null) {
+      ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("unrecognized primitive_literal",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.number() != null) {
-      return visitNumber(ctx.number())
-    }
-    if (ctx.string() != null) {
-      return visitString(ctx.string())
-    }
-    if (ctx.Identifier() != null) {
-      return ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
-    }
-    throw new SyntaxException("Not one of four supported variants of primitive_literal",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   override def visitLor(ctx: WdlV2Parser.LorContext): Expr = {
@@ -275,6 +275,7 @@ string
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
     ExprEqeq(arg0, arg1)(getSourceLocation(grammar.docSource, ctx))
   }
+
   override def visitLt(ctx: WdlV2Parser.LtContext): Expr = {
     val arg0 = visitExpr_infix2(ctx.expr_infix2())
     val arg1 = visitExpr_infix3(ctx.expr_infix3())
@@ -366,9 +367,10 @@ string
       .toVector
 
     val n = elements.size
-    if (n % 2 != 0)
+    if (n % 2 != 0) {
       throw new SyntaxException("the expressions in a map must come in pairs",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
 
     val m: Vector[ExprMember] = Vector.tabulate(n / 2) { i =>
       val key = elements(2 * i)
@@ -425,13 +427,14 @@ string
   // | (PLUS | MINUS) expr #unarysigned
   override def visitUnarysigned(ctx: WdlV2Parser.UnarysignedContext): Expr = {
     val expr = visitExpr(ctx.expr())
-
-    if (ctx.PLUS() != null)
+    if (ctx.PLUS() != null) {
       ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else if (ctx.MINUS() != null)
+    } else if (ctx.MINUS() != null) {
       ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else
-      throw new SyntaxException("bad unary expression")(getSourceLocation(grammar.docSource, ctx))
+    } else {
+      throw new SyntaxException("unrecognized unary expression",
+                                getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -566,7 +569,8 @@ string
       visitChildren(ctx).asInstanceOf[Expr]
     } catch {
       case _: NullPointerException =>
-        throw new SyntaxException("bad expression")(getSourceLocation(grammar.docSource, ctx))
+        throw new SyntaxException("unrecognized expression",
+                                  getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -603,7 +607,7 @@ string
       case left_name: WdlV2Parser.Left_nameContext           => visitLeft_name(left_name)
       case get_name: WdlV2Parser.Get_nameContext             => visitGet_name(get_name)
       case _ =>
-        throw new SyntaxException("bad expression")(getSourceLocation(grammar.docSource, ctx))
+        throw new SyntaxException("bad expression", getSourceLocation(grammar.docSource, ctx))
     }
   }
 
@@ -613,9 +617,10 @@ unbound_decls
 	;
    */
   override def visitUnbound_decls(ctx: WdlV2Parser.Unbound_declsContext): Declaration = {
-    if (ctx.wdl_type() == null)
-      throw new SyntaxException("type missing in declaration",
+    if (ctx.wdl_type() == null) {
+      throw new SyntaxException("unrecognized declaration",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
     Declaration(name, wdlType, None)(getSourceLocation(grammar.docSource, ctx))
@@ -627,9 +632,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlV2Parser.Bound_declsContext): Declaration = {
-    if (ctx.wdl_type() == null)
-      throw new SyntaxException("type missing in declaration",
+    if (ctx.wdl_type() == null) {
+      throw new SyntaxException("unrecognized declaration",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
     val wdlType = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
     if (ctx.expr() == null) {
@@ -647,11 +653,13 @@ any_decls
 	;
    */
   override def visitAny_decls(ctx: WdlV2Parser.Any_declsContext): Declaration = {
-    if (ctx.unbound_decls() != null)
-      return visitUnbound_decls(ctx.unbound_decls())
-    if (ctx.bound_decls() != null)
-      return visitBound_decls(ctx.bound_decls())
-    throw new SyntaxException("bad declaration format")(getSourceLocation(grammar.docSource, ctx))
+    if (ctx.unbound_decls() != null) {
+      visitUnbound_decls(ctx.unbound_decls())
+    } else if (ctx.bound_decls() != null) {
+      visitBound_decls(ctx.bound_decls())
+    } else {
+      throw new SyntaxException("unrecognized format", getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   /* meta_value
@@ -664,31 +672,26 @@ any_decls
     ; */
   override def visitMeta_value(ctx: WdlV2Parser.Meta_valueContext): MetaValue = {
     if (ctx.MetaNull() != null) {
-      return MetaValueNull()(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.MetaBool() != null) {
+      MetaValueNull()(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaBool() != null) {
       val value = ctx.getText.toLowerCase() == "true"
-      return MetaValueBoolean(value)(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.MetaInt() != null) {
-      return MetaValueInt(ctx.MetaInt().getText.toLong)(getSourceLocation(grammar.docSource, ctx))
-    }
-    if (ctx.MetaFloat() != null) {
-      return MetaValueFloat(ctx.MetaFloat().getText.toDouble)(
+      MetaValueBoolean(value)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaInt() != null) {
+      MetaValueInt(ctx.MetaInt().getText.toLong)(getSourceLocation(grammar.docSource, ctx))
+    } else if (ctx.MetaFloat() != null) {
+      MetaValueFloat(ctx.MetaFloat().getText.toDouble)(
           getSourceLocation(grammar.docSource, ctx)
       )
+    } else if (ctx.meta_string() != null) {
+      visitMeta_string(ctx.meta_string())
+    } else if (ctx.meta_array() != null) {
+      visitMeta_array(ctx.meta_array())
+    } else if (ctx.meta_object() != null) {
+      visitMeta_object(ctx.meta_object())
+    } else {
+      throw new SyntaxException("unrecognized meta_value",
+                                getSourceLocation(grammar.docSource, ctx))
     }
-    if (ctx.meta_string() != null) {
-      return visitMeta_string(ctx.meta_string())
-    }
-    if (ctx.meta_array() != null) {
-      return visitMeta_array(ctx.meta_array())
-    }
-    if (ctx.meta_object() != null) {
-      return visitMeta_object(ctx.meta_object())
-    }
-    throw new SyntaxException("Not one of four supported variants of meta_value",
-                              getSourceLocation(grammar.docSource, ctx))
   }
 
   override def visitMeta_string_part(ctx: WdlV2Parser.Meta_string_partContext): MetaValueString = {
@@ -697,7 +700,7 @@ any_decls
     } else if (ctx.MetaEscStringPart() != null) {
       visitEscapse_sequence(ctx.MetaEscStringPart())
     } else {
-      throw new SyntaxException(s"invalid meta_string_part ${ctx}",
+      throw new SyntaxException(s"unrecognized meta_string_part ${ctx}",
                                 getSourceLocation(grammar.docSource, ctx))
     }
     MetaValueString(text)(getSourceLocation(grammar.docSource, ctx))
@@ -1109,10 +1112,11 @@ task_input
 	: LBRACE call_inputs? RBRACE
 	; */
   override def visitCall_body(ctx: WdlV2Parser.Call_bodyContext): CallInputs = {
-    if (ctx.call_inputs() == null)
+    if (ctx.call_inputs() == null) {
       CallInputs(Vector.empty)(getSourceLocation(grammar.docSource, ctx))
-    else
+    } else {
       visitCall_inputs(ctx.call_inputs())
+    }
   }
 
   /* call
@@ -1205,15 +1209,17 @@ scatter
   override def visitInner_workflow_element(
       ctx: WdlV2Parser.Inner_workflow_elementContext
   ): WorkflowElement = {
-    if (ctx.bound_decls() != null)
+    if (ctx.bound_decls() != null) {
       return visitBound_decls(ctx.bound_decls())
-    if (ctx.call() != null)
+    } else if (ctx.call() != null) {
       return visitCall(ctx.call())
-    if (ctx.scatter() != null)
+    } else if (ctx.scatter() != null) {
       return visitScatter(ctx.scatter())
-    if (ctx.conditional() != null)
+    } else if (ctx.conditional() != null) {
       return visitConditional(ctx.conditional())
-    throw new Exception("sanity")
+    } else {
+      throw new Exception("unrecognized workflow element")
+    }
   }
 
   /*
@@ -1278,7 +1284,7 @@ document_element
 	; */
   override def visitVersion(ctx: WdlV2Parser.VersionContext): Version = {
     if (ctx.ReleaseVersion() == null) {
-      throw new Exception("version not specified")
+      throw new Exception("unrecognized version")
     }
     val value = ctx.ReleaseVersion().getText
     Version(WdlVersion.withName(value))(getSourceLocation(grammar.docSource, ctx))

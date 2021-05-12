@@ -145,7 +145,7 @@ case class ParseAll(followImports: Boolean = false,
           }
           AST.ExprApply(e.funcName, e.elements.map(translateExpr))(e.loc)
         case e: CST.ExprGetName =>
-          AST.ExprGetName(translateExpr(e), e.id)(e.loc)
+          AST.ExprGetName(translateExpr(e.expr), e.id)(e.loc)
 
         case other =>
           throw new Exception(s"invalid concrete syntax element ${other}")

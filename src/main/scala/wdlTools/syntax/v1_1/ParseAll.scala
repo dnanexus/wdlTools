@@ -71,10 +71,10 @@ case class ParseAll(followImports: Boolean = false,
 
         // string place holders
         case e: CST.ExprPlaceholder =>
-          AST.ExprPlaceholder(e.t.map(translateExpr),
-                              e.f.map(translateExpr),
-                              e.sep.map(translateExpr),
-                              e.default.map(translateExpr),
+          AST.ExprPlaceholder(e.trueOpt.map(translateExpr),
+                              e.falseOpt.map(translateExpr),
+                              e.sepOpt.map(translateExpr),
+                              e.defaultOpt.map(translateExpr),
                               translateExpr(e.value))(e.loc)
 
         // operators on one argument
@@ -146,13 +146,12 @@ case class ParseAll(followImports: Boolean = false,
                              translateExpr(e.fBranch))(e.loc)
         case e: CST.ExprApply =>
           if (Operator.All.contains(e.funcName)) {
-            throw new SyntaxException(s"${e.funcName} is reserved and not a valid function name")(
-                e.loc
-            )
+            throw new SyntaxException(s"${e.funcName} is reserved and not a valid function name",
+                                      e.loc)
           }
           AST.ExprApply(e.funcName, e.elements.map(translateExpr))(e.loc)
         case e: CST.ExprGetName =>
-          AST.ExprGetName(translateExpr(e), e.id)(e.loc)
+          AST.ExprGetName(translateExpr(e.expr), e.id)(e.loc)
 
         case other =>
           throw new Exception(s"invalid concrete syntax element ${other}")
