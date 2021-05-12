@@ -15,7 +15,7 @@ import org.openwdl.wdl.parser.draft_2.WdlDraft2Parser.{
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.getSourceLocation
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException}
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, SyntaxException}
 
 case class ParseTop(grammar: WdlDraft2Grammar) extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
@@ -187,39 +187,44 @@ wdl_type
   ; */
   override def visitString_expr_with_string_part(
       ctx: WdlDraft2Parser.String_expr_with_string_partContext
-  ): Expr = {
+  ): ExprCompoundString = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val stringPart = visitString_parts(ctx.string_parts())
     val loc = getSourceLocation(grammar.docSource, ctx)
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
-      case (e, s)                          => ExprCompoundString(Vector(e, s))(loc)
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s))(loc)
     }
   }
 
   /*
-string
-  : DQUOTE string_part string_expr_with_string_part* DQUOTE
-  | SQUOTE string_part string_expr_with_string_part* SQUOTE
-  ;
+  string
+    : DQUOTE string_part string_expr_with_string_part* DQUOTE
+    | SQUOTE string_part string_expr_with_string_part* SQUOTE
+    ;
    */
-  override def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
-    val stringPart = visitString_parts(ctx.string_parts())
-    val exprPart: Vector[Expr] = ctx
-      .string_expr_with_string_part()
-      .asScala
+  private def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
+    val (quoting, stringParts, stringExprWithStringPart) = ctx match {
+      case sq: WdlDraft2Parser.Squote_stringContext =>
+        (Quoting.Single, sq.string_parts(), sq.string_expr_with_string_part())
+      case dq: WdlDraft2Parser.Dquote_stringContext =>
+        (Quoting.Double, dq.string_parts(), dq.string_expr_with_string_part())
+    }
+    val stringPart = visitString_parts(stringParts)
+    val exprPart: Vector[Expr] = stringExprWithStringPart.asScala
       .map(visitString_expr_with_string_part)
       .toVector
-      .flatMap {
-        case ExprCompoundString(v) => v
-        case e                     => Vector(e)
-      }
+      .flatMap(_.value)
     (stringPart, exprPart) match {
-      case (s: ExprString, Vector()) => s
-      case (ExprString(s), parts) if s.isEmpty =>
-        ExprCompoundString(parts)(getSourceLocation(grammar.docSource, ctx))
+      case (s: ExprString, Vector()) => s.copy(quoting = Some(quoting))(s.loc)
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, quoting = Some(quoting))(
+            getSourceLocation(grammar.docSource, ctx)
+        )
       case (s, parts) =>
-        ExprCompoundString(s +: parts)(getSourceLocation(grammar.docSource, ctx))
+        ExprCompoundString(s +: parts, quoting = Some(quoting))(
+            getSourceLocation(grammar.docSource, ctx)
+        )
     }
   }
 
@@ -710,8 +715,14 @@ any_decls
    ; */
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = getIdentifierText(ctx.Identifier(), ctx)
-    val value = visitString_parts(ctx.string().string_parts()).value
-    MetaKV(id, value)(getSourceLocation(grammar.docSource, ctx))
+    val (quoting, stringParts) = ctx.string() match {
+      case sq: WdlDraft2Parser.Squote_stringContext =>
+        (Quoting.Single, sq.string_parts())
+      case dq: WdlDraft2Parser.Dquote_stringContext =>
+        (Quoting.Double, dq.string_parts())
+    }
+    val value = visitString_parts(stringParts).value
+    MetaKV(id, value, quoting)(getSourceLocation(grammar.docSource, ctx))
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
@@ -881,20 +892,18 @@ any_decls
         .getOrElse(Set.empty)
 
     // make sure the input and output sections to not intersect
-    val both = inputVarNames intersect outputVarNames
-    if (both.nonEmpty)
+    val both = inputVarNames.intersect(outputVarNames)
+    if (both.nonEmpty) {
       throw new SyntaxException(s"${both} appears in both input and output sections",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
 
-    val ioVarNames = inputVarNames ++ outputVarNames
-
-    paramMeta.kvs.foreach {
-      case MetaKV(k, _) =>
-        if (!(ioVarNames contains k))
-          throw new SyntaxException(
-              s"parameter ${k} does not appear in the input or output sections",
-              getSourceLocation(grammar.docSource, ctx)
-          )
+    val undefined = paramMeta.kvs.map(_.id).toSet.diff(inputVarNames ++ outputVarNames)
+    if (undefined.nonEmpty) {
+      throw new SyntaxException(
+          s"parameter(s) ${undefined.mkString(",")} do not appear in the input or output sections",
+          getSourceLocation(grammar.docSource, ctx)
+      )
     }
   }
 

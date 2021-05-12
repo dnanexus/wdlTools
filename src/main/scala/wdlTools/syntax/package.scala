@@ -1,6 +1,6 @@
 package wdlTools.syntax
 
-import dx.util.{FileNode, StringFileNode}
+import dx.util.{Enum, FileNode, StringFileNode}
 
 import scala.collection.immutable.TreeMap
 
@@ -182,4 +182,9 @@ case class CommentMap(comments: TreeMap[Int, Comment]) {
 
 object CommentMap {
   val empty: CommentMap = CommentMap(TreeMap.empty)
+}
+
+object Quoting extends Enum {
+  type Quoting = Value
+  val Single, Double = Value
 }

@@ -67,8 +67,8 @@ string_expr_with_string_part
 	;
 
 string
-	: DQUOTE string_parts string_expr_with_string_part* DQUOTE
-	| SQUOTE string_parts string_expr_with_string_part* SQUOTE
+	: DQUOTE string_parts string_expr_with_string_part* DQUOTE #dquote_string
+	| SQUOTE string_parts string_expr_with_string_part* SQUOTE #squote_string
 	;
 
 primitive_literal
