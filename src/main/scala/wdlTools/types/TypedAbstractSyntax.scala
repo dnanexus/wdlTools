@@ -253,6 +253,7 @@ object TypedAbstractSyntax {
   case class Document(source: FileNode,
                       version: Version,
                       elements: Vector[DocumentElement],
-                      workflow: Option[Workflow])(val loc: SourceLocation)(val comments: CommentMap)
+                      workflow: Option[Workflow],
+                      comments: CommentMap)(val loc: SourceLocation)
       extends Element
 }
