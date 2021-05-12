@@ -269,7 +269,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i2") shouldBe V_Int(13)
   }
 
-  private def evalCommand(file: Path): String = {
+  private def evalCommand(file: Path,
+                          bindings: WdlValueBindings = WdlValueBindings.empty): String = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -280,7 +281,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
+    val ctx = evaluator.applyPrivateVariables(task.privateVariables, bindings)
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -332,6 +333,20 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "strip common indent" in {
     val command = evalCommand(v1Dir.resolve("indented_command.wdl"))
     command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
+  }
+
+  it should "strip common indent in a complex command block" in {
+    val bindings = WdlValueBindings(
+        Map(
+            "read1_fastq" -> V_File("read1.fq"),
+            "read2_fastq" -> V_File("read2.fq"),
+            "genome" -> V_File("genome.tgz"),
+            "run_name" -> V_String("test"),
+            "manifest" -> V_File("manifest.json")
+        )
+    )
+    val command = evalCommand(v1Dir.resolve("command4.wdl"), bindings)
+    println(command)
   }
 
   it should "strip common indent in python heredoc" in {
