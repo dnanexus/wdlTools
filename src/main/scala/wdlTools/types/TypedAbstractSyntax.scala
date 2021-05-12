@@ -254,6 +254,6 @@ object TypedAbstractSyntax {
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
-                      loc: SourceLocation)(val comments: CommentMap)
+                      comments: CommentMap)(val loc: SourceLocation)
       extends Element
 }

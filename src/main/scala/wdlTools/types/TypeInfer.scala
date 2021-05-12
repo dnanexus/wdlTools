@@ -1289,7 +1289,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
 
     val tVersion = TAT.Version(doc.version.value)(doc.version.loc)
-    val tDoc = TAT.Document(doc.source, tVersion, elements, workflow, doc.loc)(doc.comments)
+    val tDoc = TAT.Document(doc.source, tVersion, elements, workflow, doc.comments)(doc.loc)
     (tDoc, finalContext)
   }
 
