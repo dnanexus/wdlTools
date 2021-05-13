@@ -335,20 +335,6 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     command shouldBe " echo 'hello Steve'\necho 'how are you, Steve?'\n   echo 'goodbye Steve'"
   }
 
-  it should "strip common indent in a complex command block" in {
-    val bindings = WdlValueBindings(
-        Map(
-            "read1_fastq" -> V_File("read1.fq"),
-            "read2_fastq" -> V_File("read2.fq"),
-            "genome" -> V_File("genome.tgz"),
-            "run_name" -> V_String("test"),
-            "manifest" -> V_File("manifest.json")
-        )
-    )
-    val command = evalCommand(v1Dir.resolve("command4.wdl"), bindings)
-    println(command)
-  }
-
   it should "strip common indent in python heredoc" in {
     val command = evalCommand(v1Dir.resolve("python_heredoc.wdl"))
     command shouldBe """python <<CODE

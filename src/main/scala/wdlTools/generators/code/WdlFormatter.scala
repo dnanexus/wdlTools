@@ -215,7 +215,7 @@ object WdlFormatter {
       if (!atLineStart) {
         // the line could have trailing whitespace, such as from a comment or
         // when a space was added prior to a line-wrap - trim it off
-        lines.append(currentLine.toString.replaceAll("""(?m)\s+$""", ""))
+        lines.append(currentLine.toString.replaceAll("""(?m)[ \t]+$""", ""))
         if (continue) {
           dent(indenting)
         } else {
@@ -1687,7 +1687,6 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineFormatter's current indent level.
     private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
-    private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
     private val commandEndRegexp = "\\s+$".r
     private val commentRegexp = "#+\\s*(.+)".r
     //private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
