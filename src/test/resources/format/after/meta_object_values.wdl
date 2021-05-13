@@ -7,8 +7,8 @@ task suggestion_values_cgrep {
   }
 
   command <<<
-    grep '~{pattern}' ~{in_file} | wc -l
-    cp ~{in_file} out_file
+        grep '~{pattern}' ~{in_file} | wc -l
+        cp ~{in_file} out_file
   >>>
 
   output {

@@ -580,27 +580,27 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
     expr match {
       // literal values
-      case ValueNone(_, _)             => Literal(Symbols.None)
-      case ValueString(value, _, _)    => string(value)
-      case ValueFile(value, _, _)      => string(value)
-      case ValueDirectory(value, _, _) => string(value)
-      case ValueBoolean(value, _, _)   => Literal(value)
-      case ValueInt(value, _, _)       => Literal(value)
-      case ValueFloat(value, _, _)     => Literal(value)
-      case ExprArray(value, _, _) =>
+      case ValueNone(_)             => Literal(Symbols.None)
+      case ValueString(value, _)    => string(value)
+      case ValueFile(value, _)      => string(value)
+      case ValueDirectory(value, _) => string(value)
+      case ValueBoolean(value, _)   => Literal(value)
+      case ValueInt(value, _)       => Literal(value)
+      case ValueFloat(value, _)     => Literal(value)
+      case ExprArray(value, _) =>
         Container(
             value.map(nested(_)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
             wrapping = Wrapping.AllOrNone
         )
-      case ExprPair(left, right, _, _) =>
+      case ExprPair(left, right, _) =>
         Container(
             Vector(nested(left), nested(right)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
         )
-      case ExprMap(value, _, _) =>
+      case ExprMap(value, _) =>
         Container(
             value.map {
               case (k, v) => KeyValue(nested(k), nested(v))
@@ -610,7 +610,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             Wrapping.Always,
             continue = false
         )
-      case ExprObject(value, wdlType, _) =>
+      case ExprObject(value, wdlType) =>
         val name = wdlType match {
           case T_Struct(name, _) if targetVersion.exists(_ >= WdlVersion.V2) =>
             name
@@ -621,7 +621,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         }
         Container(
             value.map {
-              case (ValueString(k, _, _), v) =>
+              case (ValueString(k, _), v) =>
                 KeyValue(Literal(k), nested(v))
               case other =>
                 throw new Exception(s"invalid object member ${other}")
@@ -633,7 +633,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             continue = false
         )
       // placeholders
-      case ExprPlaceholder(t, f, sep, default, value, _, _) =>
+      case ExprPlaceholder(t, f, sep, default, value, _) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,
@@ -647,13 +647,13 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             ),
             inString = inString || inCommand
         )
-      case ExprCompoundString(value, _, _) =>
+      case ExprCompoundString(value, _) =>
         // Often/always an ExprCompoundString contains one or more empty
         // ValueStrings that we want to get rid of because they're useless
         // and can mess up formatting
         val filteredExprs = value.filter {
-          case ValueString(s, _, _) => s.nonEmpty
-          case _                    => true
+          case ValueString(s, _) => s.nonEmpty
+          case _                 => true
         }
         CompoundString(filteredExprs.map(nested(_, inString = true)),
                        quoting = !(inString || inCommand))
@@ -661,8 +661,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       // appear in a string or command block
       case other =>
         val sized = other match {
-          case ExprIdentifier(id, _, _) => Literal(id)
-          case ExprAt(array, index, _, _) =>
+          case ExprIdentifier(id, _) => Literal(id)
+          case ExprAt(array, index, _) =>
             val arraySized = nested(array, inPlaceholder = inString || inCommand)
             val prefix = Sequence(
                 Vector(arraySized, Literal(Symbols.IndexOpen))
@@ -673,7 +673,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
-          case ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
+          case ExprIfThenElse(cond, tBranch, fBranch, _) =>
             val condSized = nested(cond, inOperation = false, inPlaceholder = inString || inCommand)
             val tSized = nested(tBranch, inOperation = false, inPlaceholder = inString || inCommand)
             val fSized = nested(fBranch, inOperation = false, inPlaceholder = inString || inCommand)
@@ -687,7 +687,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                     fSized
                 )
             )
-          case ExprApply(oper, _, Vector(ExprArray(args, _, _)), _, _)
+          case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
             val symbol = Operator.Vectorizable(oper).symbol
             val operands = args.map(
@@ -700,10 +700,10 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                       operands,
                       grouped = inOperation && !parentOperation.contains(oper),
                       inString = inString || inCommand)
-          case ExprApply(oper, _, Vector(value), _, _) if Operator.All.contains(oper) =>
+          case ExprApply(oper, _, Vector(value), _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             Sequence(Vector(Literal(symbol), nested(value, inOperation = true)))
-          case ExprApply(oper, _, Vector(lhs, rhs), _, _) if Operator.All.contains(oper) =>
+          case ExprApply(oper, _, Vector(lhs, rhs), _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             Operation(
                 symbol,
@@ -720,7 +720,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 grouped = inOperation && !parentOperation.contains(oper),
                 inString = inString || inCommand
             )
-          case ExprApply(funcName, _, elements, _, _) =>
+          case ExprApply(funcName, _, elements, _) =>
             val prefix = Sequence(
                 Vector(Literal(funcName), Literal(Symbols.FunctionCallOpen))
             )
@@ -730,7 +730,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
-          case ExprGetName(e, id, _, _) =>
+          case ExprGetName(e, id, _) =>
             val exprSized = nested(e, inPlaceholder = inString || inCommand)
             val idLiteral = Literal(id)
             Sequence(
@@ -872,23 +872,23 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       extends BlockStatement(Symbols.Input) {
     override def body: Option[Statement] =
       Some(Section(inputs.map {
-        case RequiredInputParameter(name, wdlType, _) => DeclarationStatement(name, wdlType)
-        case OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
+        case RequiredInputParameter(name, wdlType) => DeclarationStatement(name, wdlType)
+        case OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>
           DeclarationStatement(name, wdlType, Some(defaultExpr))
-        case OptionalInputParameter(name, wdlType, _) => DeclarationStatement(name, wdlType)
+        case OptionalInputParameter(name, wdlType) => DeclarationStatement(name, wdlType)
       }))
   }
 
   private def buildMeta(metaValue: MetaValue): Sized = {
     metaValue match {
       // literal values
-      case MetaValueNull(_) => Literal(Symbols.Null)
-      case MetaValueString(value, _) =>
+      case MetaValueNull() => Literal(Symbols.Null)
+      case MetaValueString(value) =>
         Literal(value, quoting = true)
-      case MetaValueBoolean(value, _) => Literal(value)
-      case MetaValueInt(value, _)     => Literal(value)
-      case MetaValueFloat(value, _)   => Literal(value)
-      case MetaValueArray(value, _) =>
+      case MetaValueBoolean(value) => Literal(value)
+      case MetaValueInt(value)     => Literal(value)
+      case MetaValueFloat(value)   => Literal(value)
+      case MetaValueArray(value) =>
         Container(
             value.map(buildMeta),
             Some(Symbols.ArrayDelimiter),
@@ -896,7 +896,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             wrapping = Wrapping.AllOrNone,
             continue = false
         )
-      case MetaValueObject(value, _) =>
+      case MetaValueObject(value) =>
         Container(
             value.map {
               case (name, value) => KeyValue(Literal(name), buildMeta(value))
@@ -980,7 +980,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   private case class CallInputsStatement(inputs: Map[String, Expr]) extends BaseStatement {
     private val key = Literal(Symbols.Input)
     private val value = inputs.flatMap {
-      case (_, ValueNone(_, _)) if omitNullInputs => None
+      case (_, ValueNone(_)) if omitNullInputs => None
       case (name, expr) =>
         val nameToken = Literal(name)
         val exprSized = buildExpression(expr)
@@ -1098,8 +1098,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     // check whether there is at least one non-whitespace command part
     private def hasCommand: Boolean = {
       command.parts.exists {
-        case ValueString(value, _, _) => value.trim.nonEmpty
-        case _                        => true
+        case ValueString(value, _) => value.trim.nonEmpty
+        case _                     => true
       }
     }
 
@@ -1110,7 +1110,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       if (hasCommand) {
         // The parser swallows anyting after the opening token ('{' or '<<<') as part of the
         // command block, so we need to parse out any in-line WDL comment on the first line.
-        val headExpr: Expr = command.parts.head match {
+        val (headExpr: Expr, indent) = command.parts.head match {
           case v: ValueString =>
             v.value match {
               case commandStartRegexp(first, rest) =>
@@ -1120,35 +1120,34 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    v.copy(value = "")
+                    (v.copy(value = "")(v.loc), false)
                   case s if s.startsWith(Symbols.Comment) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment -
                     // we don't want to break anything so we'll just format the whole
                     // block as-is
-                    v
+                    (v, false)
                   case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
                     // the first is empty or a WDL comment so we ignore it
-                    v.copy(value = rest)
+                    (v.copy(value = rest)(v.loc), false)
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    v.copy(value = s)
+                    (v.copy(value = s)(v.loc), true)
                   case _ =>
                     // opening line has some real content, so leave as-is
-                    v
+                    (v, false)
                 }
               case other =>
                 throw new RuntimeException(s"unexpected command part ${other}")
             }
-          case other => other
+          case other => (other, false)
         }
 
         def trimLast(last: Expr): Expr = {
           last match {
-            case ValueString(s, wdlType, text) =>
+            case ValueString(s, wdlType) =>
               // If the last part is just the whitespace before the close block, throw it out
-              ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType, text)
-            case other =>
-              other
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType)(last.loc)
+            case other => other
           }
         }
 
@@ -1165,9 +1164,15 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           )
         }
 
-        val bodyGenerator = lineGenerator.derive(newIndenting = Indenting.Never,
-                                                 newSpacing = Spacing.Off,
-                                                 newWrapping = Wrapping.Never)
+        val bodyGenerator = if (indent) {
+          lineGenerator.derive(newIndentSteps = Some(1),
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
+        } else {
+          lineGenerator.derive(newIndenting = Indenting.Never,
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
+        }
 
         bodyGenerator.endLine(continue = true)
         bodyGenerator.beginLine()

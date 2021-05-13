@@ -357,37 +357,37 @@ object TypeUtils {
         return callbackValue.get
       }
       innerExpr match {
-        case TAT.ValueNull(_, _)                    => "null"
-        case TAT.ValueNone(_, _)                    => "None"
-        case TAT.ValueBoolean(value: Boolean, _, _) => value.toString
-        case TAT.ValueInt(value, _, _)              => value.toString
-        case TAT.ValueFloat(value, _, _)            => value.toString
+        case TAT.ValueNull(_)                    => "null"
+        case TAT.ValueNone(_)                    => "None"
+        case TAT.ValueBoolean(value: Boolean, _) => value.toString
+        case TAT.ValueInt(value, _)              => value.toString
+        case TAT.ValueFloat(value, _)            => value.toString
 
         // add double quotes around string-like value unless disableQuoting = true
-        case TAT.ValueString(value, _, _) =>
+        case TAT.ValueString(value, _) =>
           if (disableQuoting) value else s""""$value""""
-        case TAT.ValueFile(value, _, _) =>
+        case TAT.ValueFile(value, _) =>
           if (disableQuoting) value else s""""$value""""
-        case TAT.ValueDirectory(value, _, _) =>
+        case TAT.ValueDirectory(value, _) =>
           if (disableQuoting) value else s""""$value""""
 
-        case TAT.ExprIdentifier(id: String, _, _) => id
+        case TAT.ExprIdentifier(id: String, _) => id
 
-        case TAT.ExprCompoundString(value, _, _) =>
+        case TAT.ExprCompoundString(value, _) =>
           val vec = value.map(x => inner(x, disableQuoting)).mkString(", ")
           s"ExprCompoundString(${vec})"
-        case TAT.ExprPair(l, r, _, _) =>
+        case TAT.ExprPair(l, r, _) =>
           s"(${inner(l, disableQuoting)}, ${inner(r, disableQuoting)})"
-        case TAT.ExprArray(value, _, _) =>
+        case TAT.ExprArray(value, _) =>
           "[" + value.map(x => inner(x, disableQuoting)).mkString(", ") + "]"
-        case TAT.ExprMap(value, _, _) =>
+        case TAT.ExprMap(value, _) =>
           val m2 = value
             .map {
               case (k, v) => s"${inner(k, disableQuoting)} : ${inner(v, disableQuoting)}"
             }
             .mkString(", ")
           s"{$m2}"
-        case TAT.ExprObject(value, _, _) =>
+        case TAT.ExprObject(value, _) =>
           val m2 = value
             .map {
               case (k, v) =>
@@ -397,7 +397,7 @@ object TypeUtils {
           s"object {$m2}"
 
         // ~{true="--yes" false="--no" boolean_value}
-        case TAT.ExprPlaceholder(t, f, sep, default, value, _, _) =>
+        case TAT.ExprPlaceholder(t, f, sep, default, value, _) =>
           val optStr = Vector(
               t.map(e => s"true=${inner(e, disableQuoting)}"),
               f.map(e => s"false=${inner(e, disableQuoting)}"),
@@ -407,31 +407,29 @@ object TypeUtils {
           s"{${optStr} ${inner(value, disableQuoting)}}"
 
         // Access an array element at [index]
-        case TAT.ExprAt(array, index, _, _) =>
+        case TAT.ExprAt(array, index, _) =>
           s"${inner(array, disableQuoting)}[${inner(index, disableQuoting)}]"
 
         // conditional:
         // if (x == 1) then "Sunday" else "Weekday"
-        case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
+        case TAT.ExprIfThenElse(cond, tBranch, fBranch, _) =>
           s"if (${inner(cond, disableQuoting)}) then ${inner(tBranch, disableQuoting)} else ${inner(fBranch, disableQuoting)}"
 
         // Apply a builtin unary operator
-        case TAT.ExprApply(oper: String, _, Vector(unaryValue), _, _)
-            if Operator.All.contains(oper) =>
+        case TAT.ExprApply(oper: String, _, Vector(unaryValue), _) if Operator.All.contains(oper) =>
           val symbol = Operator.All(oper).symbol
           s"${symbol}${inner(unaryValue, disableQuoting)}"
         // Apply a buildin binary operator
-        case TAT.ExprApply(oper: String, _, Vector(lhs, rhs), _, _)
-            if Operator.All.contains(oper) =>
+        case TAT.ExprApply(oper: String, _, Vector(lhs, rhs), _) if Operator.All.contains(oper) =>
           val symbol = Operator.All(oper).symbol
           s"${inner(lhs, disableQuoting)} ${symbol} ${inner(rhs, disableQuoting)}"
         // Apply a standard library function to arguments. For example:
         //   read_int("4")
-        case TAT.ExprApply(funcName, _, elements, _, _) =>
+        case TAT.ExprApply(funcName, _, elements, _) =>
           val args = elements.map(x => inner(x, disableQuoting)).mkString(", ")
           s"${funcName}(${args})"
 
-        case TAT.ExprGetName(e, id: String, _, _) =>
+        case TAT.ExprGetName(e, id: String, _) =>
           s"${inner(e, disableQuoting)}.${id}"
       }
     }
@@ -440,11 +438,11 @@ object TypeUtils {
 
   def prettyFormatInput(input: TAT.InputParameter, indent: String = ""): String = {
     input match {
-      case TAT.RequiredInputParameter(name, wdlType, _) =>
+      case TAT.RequiredInputParameter(name, wdlType) =>
         s"${indent}${prettyFormatType(wdlType)} ${name}"
-      case TAT.OverridableInputParameterWithDefault(name, wdlType, defaultExpr, _) =>
+      case TAT.OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>
         s"${indent}${prettyFormatType(wdlType)} ${name} = ${prettyFormatExpr(defaultExpr)}"
-      case TAT.OptionalInputParameter(name, wdlType, _) =>
+      case TAT.OptionalInputParameter(name, wdlType) =>
         s"${indent}${prettyFormatType(wdlType)} ${name}"
     }
   }
@@ -474,41 +472,41 @@ object TypeUtils {
         Map.empty
       case _: TAT.ValueNone =>
         Map.empty
-      case TAT.ExprIdentifier(id, wdlType, _) =>
+      case TAT.ExprIdentifier(id, wdlType) =>
         Map(id -> wdlType)
-      case TAT.ExprCompoundString(valArr, _, _) =>
+      case TAT.ExprCompoundString(valArr, _) =>
         valArr.flatMap(elem => exprDependencies(elem)).toMap
-      case TAT.ExprPair(l, r, _, _) =>
+      case TAT.ExprPair(l, r, _) =>
         exprDependencies(l) ++ exprDependencies(r)
-      case TAT.ExprArray(arrVal, _, _) =>
+      case TAT.ExprArray(arrVal, _) =>
         arrVal.flatMap(elem => exprDependencies(elem)).toMap
-      case TAT.ExprMap(valMap, _, _) =>
+      case TAT.ExprMap(valMap, _) =>
         valMap.flatMap { case (k, v) => exprDependencies(k) ++ exprDependencies(v) }
-      case TAT.ExprObject(fields, _, _) =>
+      case TAT.ExprObject(fields, _) =>
         fields.flatMap { case (_, v) => exprDependencies(v) }
-      case TAT.ExprPlaceholder(t, f, sep, default, value: TAT.Expr, _, _) =>
+      case TAT.ExprPlaceholder(t, f, sep, default, value: TAT.Expr, _) =>
         Vector(t.map(exprDependencies),
                f.map(exprDependencies),
                sep.map(exprDependencies),
                default.map(exprDependencies)).flatten.flatten.toMap ++ exprDependencies(value)
       // Access an array element at [index]
-      case TAT.ExprAt(value, index, _, _) =>
+      case TAT.ExprAt(value, index, _) =>
         exprDependencies(value) ++ exprDependencies(index)
       // conditional:
-      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, _) =>
+      case TAT.ExprIfThenElse(cond, tBranch, fBranch, _) =>
         exprDependencies(cond) ++ exprDependencies(tBranch) ++ exprDependencies(fBranch)
       // Apply a standard library function to arguments.
       //
       // TODO: some arguments may be _optional_ we need to take that
       // into account. We need to look into the function type
       // and figure out which arguments are optional.
-      case TAT.ExprApply(_, _, elements, _, _) =>
+      case TAT.ExprApply(_, _, elements, _) =>
         elements.flatMap(exprDependencies).toMap
       // Access a field in a call
       //   Int z = eliminateDuplicate.fields
-      case TAT.ExprGetName(TAT.ExprIdentifier(id, wdlType, _), _, _, _) =>
+      case TAT.ExprGetName(TAT.ExprIdentifier(id, wdlType), _, _) =>
         Map(id -> wdlType)
-      case TAT.ExprGetName(expr, _, _, _) =>
+      case TAT.ExprGetName(expr, _, _) =>
         exprDependencies(expr)
     }
   }

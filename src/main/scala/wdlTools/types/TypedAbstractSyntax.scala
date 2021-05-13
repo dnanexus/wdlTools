@@ -24,27 +24,30 @@ object TypedAbstractSyntax {
   }
 
   // values
-  case class ValueNull(wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueNone(wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueBoolean(value: Boolean, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueInt(value: Long, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueFloat(value: Double, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueString(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueFile(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ValueDirectory(value: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ExprIdentifier(id: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ValueNull(wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueNone(wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueBoolean(value: Boolean, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueInt(value: Long, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueFloat(value: Double, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueString(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueFile(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueDirectory(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation)
+      extends Expr
+  case class ExprIdentifier(id: String, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
 
   // represents strings with interpolation. These occur only in command blocks.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr], wdlType: WdlTypes.T, loc: SourceLocation)
+  case class ExprCompoundString(value: Vector[Expr], wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
 
-  case class ExprPair(l: Expr, r: Expr, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ExprArray(value: Vector[Expr], wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
-  case class ExprMap(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T, loc: SourceLocation)
+  case class ExprPair(left: Expr, right: Expr, wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
-  case class ExprObject(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T, loc: SourceLocation)
+  case class ExprArray(value: Vector[Expr], wdlType: WdlTypes.T)(val loc: SourceLocation)
+      extends Expr
+  case class ExprMap(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T)(val loc: SourceLocation)
+      extends Expr
+  case class ExprObject(value: SeqMap[Expr, Expr], wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
 
   // These are expressions of kind:
@@ -53,39 +56,36 @@ object TypedAbstractSyntax {
   // ~{default="foo" optional_value}
   // ~{sep=", " array_value}
   //
-  case class ExprPlaceholder(t: Option[Expr],
-                             f: Option[Expr],
-                             sep: Option[Expr],
-                             default: Option[Expr],
+  case class ExprPlaceholder(trueOpt: Option[Expr],
+                             falseOpt: Option[Expr],
+                             sepOpt: Option[Expr],
+                             defaultOpt: Option[Expr],
                              value: Expr,
-                             wdlType: WdlTypes.T,
-                             loc: SourceLocation)
+                             wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
 
   // Access an array element at [index]
-  case class ExprAt(array: Expr, index: Expr, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ExprAt(array: Expr, index: Expr, wdlType: WdlTypes.T)(val loc: SourceLocation)
+      extends Expr
 
   // conditional:
   // if (x == 1) then "Sunday" else "Weekday"
-  case class ExprIfThenElse(cond: Expr,
-                            tBranch: Expr,
-                            fBranch: Expr,
-                            wdlType: WdlTypes.T,
-                            loc: SourceLocation)
-      extends Expr
+  case class ExprIfThenElse(cond: Expr, trueExpr: Expr, falseExpr: Expr, wdlType: WdlTypes.T)(
+      val loc: SourceLocation
+  ) extends Expr
 
   // Apply a standard library function to arguments. For example:
   //   read_int("4")
   case class ExprApply(funcName: String,
                        funcWdlType: T_Function,
                        elements: Vector[Expr],
-                       wdlType: WdlTypes.T,
-                       loc: SourceLocation)
+                       wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
 
   // Access a field in a struct or an object. For example:
   //   Int z = x.a
-  case class ExprGetName(e: Expr, id: String, wdlType: WdlTypes.T, loc: SourceLocation) extends Expr
+  case class ExprGetName(expr: Expr, id: String, wdlType: WdlTypes.T)(val loc: SourceLocation)
+      extends Expr
 
   sealed trait Variable extends Element {
     val name: String
@@ -104,7 +104,7 @@ object TypedAbstractSyntax {
   sealed trait InputParameter extends Variable
 
   // A compulsory input that has no default, and must be provided by the caller
-  case class RequiredInputParameter(name: String, wdlType: WdlTypes.T, loc: SourceLocation)
+  case class RequiredInputParameter(name: String, wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends InputParameter
 
   /**
@@ -112,25 +112,25 @@ object TypedAbstractSyntax {
     */
   case class OverridableInputParameterWithDefault(name: String,
                                                   wdlType: WdlTypes.T,
-                                                  defaultExpr: Expr,
-                                                  loc: SourceLocation)
+                                                  defaultExpr: Expr)(val loc: SourceLocation)
       extends InputParameter
 
   /**
     * An input that may be omitted by the caller. In that case the value will
     * be null (or None).
     */
-  case class OptionalInputParameter(name: String, wdlType: WdlTypes.T_Optional, loc: SourceLocation)
-      extends InputParameter
+  case class OptionalInputParameter(name: String, wdlType: WdlTypes.T_Optional)(
+      val loc: SourceLocation
+  ) extends InputParameter
 
-  case class OutputParameter(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
+  case class OutputParameter(name: String, wdlType: WdlTypes.T, expr: Expr)(val loc: SourceLocation)
       extends Variable
 
   /**
     * A variable definition and assignment that does not appear in the input or output section,
     * i.e. it is private to the task/workflow.
     */
-  case class PrivateVariable(name: String, wdlType: WdlTypes.T, expr: Expr, loc: SourceLocation)
+  case class PrivateVariable(name: String, wdlType: WdlTypes.T, expr: Expr)(val loc: SourceLocation)
       extends WorkflowElement
       with Variable
 
@@ -155,40 +155,37 @@ object TypedAbstractSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandSection(parts: Vector[Expr], loc: SourceLocation) extends Element
-  case class RuntimeSection(kvs: SeqMap[String, Expr], loc: SourceLocation) extends Element
+  case class CommandSection(parts: Vector[Expr])(val loc: SourceLocation) extends Element
+  case class RuntimeSection(kvs: SeqMap[String, Expr])(val loc: SourceLocation) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
-  case class MetaValueNull(loc: SourceLocation) extends MetaValue
-  case class MetaValueBoolean(value: Boolean, loc: SourceLocation) extends MetaValue
-  case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
-  case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
-  case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
-  case class MetaValueObject(value: SeqMap[String, MetaValue], loc: SourceLocation)
+  case class MetaValueNull()(val loc: SourceLocation) extends MetaValue
+  case class MetaValueBoolean(value: Boolean)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueInt(value: Long)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueFloat(value: Double)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueString(value: String)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueObject(value: SeqMap[String, MetaValue])(val loc: SourceLocation)
       extends MetaValue
-  case class MetaValueArray(value: Vector[MetaValue], loc: SourceLocation) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue])(val loc: SourceLocation) extends MetaValue
 
   // the parameter sections have mappings from keys to json-like objects
-  case class MetaSection(kvs: SeqMap[String, MetaValue], loc: SourceLocation) extends Element
+  case class MetaSection(kvs: SeqMap[String, MetaValue])(val loc: SourceLocation) extends Element
 
-  case class Version(value: WdlVersion, loc: SourceLocation) extends Element
+  case class Version(value: WdlVersion)(val loc: SourceLocation) extends Element
 
   // import statement with the typed-AST for the referenced document
-  case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct, loc: SourceLocation)
-      extends Element
-  case class ImportDoc(namespace: String,
-                       aliases: Vector[ImportAlias],
-                       addr: String,
-                       doc: Document,
-                       loc: SourceLocation)
-      extends DocumentElement
+  case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct)(
+      val loc: SourceLocation
+  ) extends Element
+  case class ImportDoc(namespace: String, aliases: Vector[ImportAlias], addr: String, doc: Document)(
+      val loc: SourceLocation
+  ) extends DocumentElement
 
   // a definition of a struct
   case class StructDefinition(name: String,
                               wdlType: WdlTypes.T_Struct,
-                              members: SeqMap[String, WdlTypes.T],
-                              loc: SourceLocation)
+                              members: SeqMap[String, WdlTypes.T])(val loc: SourceLocation)
       extends DocumentElement
 
   // A task
@@ -201,12 +198,11 @@ object TypedAbstractSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[MetaSection],
                   runtime: Option[RuntimeSection],
-                  hints: Option[MetaSection],
-                  loc: SourceLocation)
+                  hints: Option[MetaSection])(val loc: SourceLocation)
       extends DocumentElement
       with Callable
 
-  case class CallAfter(name: String, loc: SourceLocation) extends Element
+  case class CallAfter(name: String)(val loc: SourceLocation) extends Element
 
   // A call has three names - a fully-qualified name (FQN), an unqualified name
   // (UQN), and an "actual" name. The UQN is the callee name without any namespace.
@@ -227,8 +223,7 @@ object TypedAbstractSyntax {
                   alias: Option[String],
                   afters: Vector[WdlTypes.T_Call],
                   actualName: String,
-                  inputs: SeqMap[String, Expr],
-                  loc: SourceLocation)
+                  inputs: SeqMap[String, Expr])(val loc: SourceLocation)
       extends WorkflowElement
 
   sealed trait BlockElement extends WorkflowElement {
@@ -236,13 +231,11 @@ object TypedAbstractSyntax {
     val body: Vector[WorkflowElement]
   }
 
-  case class Scatter(identifier: String,
-                     expr: Expr,
-                     body: Vector[WorkflowElement],
-                     loc: SourceLocation)
-      extends BlockElement
+  case class Scatter(identifier: String, expr: Expr, body: Vector[WorkflowElement])(
+      val loc: SourceLocation
+  ) extends BlockElement
 
-  case class Conditional(expr: Expr, body: Vector[WorkflowElement], loc: SourceLocation)
+  case class Conditional(expr: Expr, body: Vector[WorkflowElement])(val loc: SourceLocation)
       extends BlockElement
 
   // A workflow
@@ -253,8 +246,7 @@ object TypedAbstractSyntax {
                       outputs: Vector[OutputParameter],
                       meta: Option[MetaSection],
                       parameterMeta: Option[MetaSection],
-                      body: Vector[WorkflowElement],
-                      loc: SourceLocation)
+                      body: Vector[WorkflowElement])(val loc: SourceLocation)
       extends Element
       with Callable
 
@@ -262,7 +254,6 @@ object TypedAbstractSyntax {
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
-                      loc: SourceLocation,
-                      comments: CommentMap)
+                      comments: CommentMap)(val loc: SourceLocation)
       extends Element
 }

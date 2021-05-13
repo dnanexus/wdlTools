@@ -19,37 +19,37 @@ object SyntaxUtils {
         return callbackValue.get
       }
       innerExpr match {
-        case ValueNone(_)                    => "None"
-        case ValueString(value, _)           => value
-        case ValueBoolean(value: Boolean, _) => value.toString
-        case ValueInt(value, _)              => value.toString
-        case ValueFloat(value, _)            => value.toString
-        case ExprIdentifier(id: String, _)   => id
+        case ValueNone()                  => "None"
+        case ValueString(value)           => value
+        case ValueBoolean(value: Boolean) => value.toString
+        case ValueInt(value)              => value.toString
+        case ValueFloat(value)            => value.toString
+        case ExprIdentifier(id: String)   => id
 
-        case ExprCompoundString(value: Vector[Expr], _) =>
+        case ExprCompoundString(value: Vector[Expr]) =>
           val vec = value.map(x => inner(x)).mkString(", ")
           s"CompoundString(${vec})"
-        case ExprPair(l, r, _) => s"(${inner(l)}, ${inner(r)})"
-        case ExprArray(value: Vector[Expr], _) =>
+        case ExprPair(l, r) => s"(${inner(l)}, ${inner(r)})"
+        case ExprArray(value: Vector[Expr]) =>
           "[" + value.map(x => inner(x)).mkString(", ") + "]"
-        case ExprMember(key, value, _) =>
+        case ExprMember(key, value) =>
           s"${inner(key)} : ${inner(value)}"
-        case ExprMap(value: Vector[ExprMember], _) =>
+        case ExprMap(value: Vector[ExprMember]) =>
           val m = value
             .map(x => inner(x))
             .mkString(", ")
           "{ " + m + " }"
-        case ExprObject(value: Vector[ExprMember], _) =>
+        case ExprObject(value: Vector[ExprMember]) =>
           val m = value
             .map(x => inner(x))
             .mkString(", ")
           s"object {$m}"
-        case ExprStruct(name, members: Vector[ExprMember], _) =>
+        case ExprStruct(name, members: Vector[ExprMember]) =>
           val m = members
             .map(x => inner(x))
             .mkString(", ")
           s"${name} {$m}"
-        case ExprPlaceholder(t, f, sep, default, value, _) =>
+        case ExprPlaceholder(t, f, sep, default, value) =>
           val optStr = Vector(
               t.map(e => s"true=${inner(e)}"),
               f.map(e => s"false=${inner(e)}"),
@@ -59,31 +59,30 @@ object SyntaxUtils {
           s"{${optStr} ${inner(value)}"
 
         // Access an array element at [index]
-        case ExprAt(array: Expr, index: Expr, _) =>
+        case ExprAt(array: Expr, index: Expr) =>
           s"${inner(array)}[${index}]"
 
         // conditional:
         // if (x == 1) then "Sunday" else "Weekday"
-        case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, _) =>
+        case ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr) =>
           s"if (${inner(cond)}) then ${inner(tBranch)} else ${inner(fBranch)}"
 
         // Apply a builtin unary operator
-        case ExprApply(funcName: String, Vector(unaryValue), _)
-            if Operator.All.contains(funcName) =>
+        case ExprApply(funcName: String, Vector(unaryValue)) if Operator.All.contains(funcName) =>
           val symbol = Operator.All(funcName).symbol
           s"${symbol}${inner(unaryValue)}"
         // Apply a buildin binary operator
-        case ExprApply(funcName: String, Vector(lhs, rhs), _) if Operator.All.contains(funcName) =>
+        case ExprApply(funcName: String, Vector(lhs, rhs)) if Operator.All.contains(funcName) =>
           val symbol = Operator.All(funcName).symbol
           s"${inner(lhs)} ${symbol} ${inner(rhs)}"
 
         // Apply a standard library function to arguments. For example:
         //   read_int("4")
-        case ExprApply(funcName: String, elements: Vector[Expr], _) =>
+        case ExprApply(funcName: String, elements: Vector[Expr]) =>
           val args = elements.map(x => inner(x)).mkString(", ")
           s"${funcName}(${args})"
 
-        case ExprGetName(e: Expr, id: String, _) =>
+        case ExprGetName(e: Expr, id: String) =>
           s"${inner(e)}.${id}"
       }
     }
@@ -99,14 +98,14 @@ object SyntaxUtils {
       }
     }
     value match {
-      case MetaValueNull(_)                    => "null"
-      case MetaValueString(value, _)           => value
-      case MetaValueBoolean(value: Boolean, _) => value.toString
-      case MetaValueInt(value, _)              => value.toString
-      case MetaValueFloat(value, _)            => value.toString
-      case MetaValueArray(value, _) =>
+      case MetaValueNull()                  => "null"
+      case MetaValueString(value)           => value
+      case MetaValueBoolean(value: Boolean) => value.toString
+      case MetaValueInt(value)              => value.toString
+      case MetaValueFloat(value)            => value.toString
+      case MetaValueArray(value) =>
         "[" + value.map(x => prettyFormatMetaValue(x, callback)).mkString(", ") + "]"
-      case MetaValueObject(value, _) =>
+      case MetaValueObject(value) =>
         val m = value
           .map(x => s"${x.id} : ${prettyFormatMetaValue(x.value, callback)}")
           .mkString(", ")

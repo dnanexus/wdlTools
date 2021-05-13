@@ -24,131 +24,134 @@ case class ParseAll(followImports: Boolean = false,
     extends WdlParser(followImports, fileResolver, logger) {
 
   private case class Translator(docSource: FileNode) {
-    def translateType(t: CST.Type): AST.Type = {
-      t match {
-        case CST.TypeOptional(t, srcText) =>
-          AST.TypeOptional(translateType(t), srcText)
-        case CST.TypeArray(t, nonEmpty, srcText) =>
-          AST.TypeArray(translateType(t), nonEmpty, srcText)
-        case CST.TypeMap(k, v, srcText) =>
-          AST.TypeMap(translateType(k), translateType(v), srcText)
-        case CST.TypePair(l, r, srcText) =>
-          AST.TypePair(translateType(l), translateType(r), srcText)
-        case CST.TypeString(srcText)         => AST.TypeString(srcText)
-        case CST.TypeFile(srcText)           => AST.TypeFile(srcText)
-        case CST.TypeBoolean(srcText)        => AST.TypeBoolean(srcText)
-        case CST.TypeInt(srcText)            => AST.TypeInt(srcText)
-        case CST.TypeFloat(srcText)          => AST.TypeFloat(srcText)
-        case CST.TypeIdentifier(id, srcText) => AST.TypeIdentifier(id, srcText)
-        case CST.TypeObject(srcText)         => AST.TypeObject(srcText)
+    def translateType(cstType: CST.Type): AST.Type = {
+      cstType match {
+        case t: CST.TypeOptional =>
+          AST.TypeOptional(translateType(t.t))(t.loc)
+        case t: CST.TypeArray =>
+          AST.TypeArray(translateType(t.t), t.nonEmpty)(t.loc)
+        case t: CST.TypeMap =>
+          AST.TypeMap(translateType(t.k), translateType(t.v))(t.loc)
+        case t: CST.TypePair =>
+          AST.TypePair(translateType(t.l), translateType(t.r))(t.loc)
+        case t: CST.TypeString     => AST.TypeString()(t.loc)
+        case t: CST.TypeFile       => AST.TypeFile()(t.loc)
+        case t: CST.TypeBoolean    => AST.TypeBoolean()(t.loc)
+        case t: CST.TypeInt        => AST.TypeInt()(t.loc)
+        case t: CST.TypeFloat      => AST.TypeFloat()(t.loc)
+        case t: CST.TypeIdentifier => AST.TypeIdentifier(t.id)(t.loc)
+        case t: CST.TypeObject     => AST.TypeObject()(t.loc)
       }
     }
 
-    def translateExpr(e: CST.Expr): AST.Expr = {
-      e match {
+    def translateExpr(cstExpr: CST.Expr): AST.Expr = {
+      cstExpr match {
         // values
-        case CST.ExprString(value, srcText)  => AST.ValueString(value, srcText)
-        case CST.ExprBoolean(value, srcText) => AST.ValueBoolean(value, srcText)
-        case CST.ExprInt(value, srcText)     => AST.ValueInt(value, srcText)
-        case CST.ExprFloat(value, srcText)   => AST.ValueFloat(value, srcText)
+        case e: CST.ExprString  => AST.ValueString(e.value)(e.loc)
+        case e: CST.ExprBoolean => AST.ValueBoolean(e.value)(e.loc)
+        case e: CST.ExprInt     => AST.ValueInt(e.value)(e.loc)
+        case e: CST.ExprFloat   => AST.ValueFloat(e.value)(e.loc)
 
         // compound values
-        case CST.ExprIdentifier(id, srcText) => AST.ExprIdentifier(id, srcText)
-        case CST.ExprCompoundString(vec, srcText) =>
-          AST.ExprCompoundString(vec.map(translateExpr), srcText)
-        case CST.ExprPair(l, r, srcText) =>
-          AST.ExprPair(translateExpr(l), translateExpr(r), srcText)
-        case CST.ExprArrayLiteral(vec, srcText) =>
-          AST.ExprArray(vec.map(translateExpr), srcText)
-        case CST.ExprMapLiteral(m, srcText) =>
-          AST.ExprMap(m.map { item =>
-            AST.ExprMember(translateExpr(item.key), translateExpr(item.value), item.loc)
-          }, srcText)
-        case CST.ExprObjectLiteral(m, srcText) =>
-          AST.ExprObject(m.map { member =>
-            AST.ExprMember(translateExpr(member.key), translateExpr(member.value), member.loc)
-          }, srcText)
+        case e: CST.ExprIdentifier => AST.ExprIdentifier(e.id)(e.loc)
+        case e: CST.ExprCompoundString =>
+          AST.ExprCompoundString(e.value.map(translateExpr))(e.loc)
+        case e: CST.ExprPair =>
+          AST.ExprPair(translateExpr(e.l), translateExpr(e.r))(e.loc)
+        case e: CST.ExprArrayLiteral =>
+          AST.ExprArray(e.value.map(translateExpr))(e.loc)
+        case e: CST.ExprMapLiteral =>
+          AST.ExprMap(e.value.map { item =>
+            AST.ExprMember(translateExpr(item.key), translateExpr(item.value))(item.loc)
+          })(e.loc)
+        case e: CST.ExprObjectLiteral =>
+          AST.ExprObject(e.value.map { member =>
+            AST.ExprMember(translateExpr(member.key), translateExpr(member.value))(member.loc)
+          })(e.loc)
 
         // string place holders
-        case CST.ExprPlaceholder(t, f, sep, default, value, srcText) =>
-          AST.ExprPlaceholder(t.map(translateExpr),
-                              f.map(translateExpr),
-                              sep.map(translateExpr),
-                              default.map(translateExpr),
-                              translateExpr(value),
-                              srcText)
+        case e: CST.ExprPlaceholder =>
+          AST.ExprPlaceholder(e.trueOpt.map(translateExpr),
+                              e.falseOpt.map(translateExpr),
+                              e.sepOpt.map(translateExpr),
+                              e.defaultOpt.map(translateExpr),
+                              translateExpr(e.value))(e.loc)
 
         // operators on one argument
-        case CST.ExprUnaryPlus(value, srcText) =>
-          AST.ExprApply(Operator.UnaryPlus.name, Vector(translateExpr(value)), srcText)
-        case CST.ExprUnaryMinus(value, srcText) =>
-          AST.ExprApply(Operator.UnaryMinus.name, Vector(translateExpr(value)), srcText)
-        case CST.ExprNegate(value, srcText) =>
-          AST.ExprApply(Operator.LogicalNot.name, Vector(translateExpr(value)), srcText)
+        case e: CST.ExprUnaryPlus =>
+          AST.ExprApply(Operator.UnaryPlus.name, Vector(translateExpr(e.value)))(e.loc)
+        case e: CST.ExprUnaryMinus =>
+          AST.ExprApply(Operator.UnaryMinus.name, Vector(translateExpr(e.value)))(e.loc)
+        case e: CST.ExprNegate =>
+          AST.ExprApply(Operator.LogicalNot.name, Vector(translateExpr(e.value)))(e.loc)
 
         // operators on two arguments
-        case CST.ExprLor(a, b, srcText) =>
-          AST.ExprApply(Operator.LogicalOr.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprLand(a, b, srcText) =>
-          AST.ExprApply(Operator.LogicalAnd.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprEqeq(a, b, srcText) =>
-          AST.ExprApply(Operator.Equality.name, Vector(translateExpr(a), translateExpr(b)), srcText)
-        case CST.ExprNeq(a, b, srcText) =>
-          AST.ExprApply(Operator.Inequality.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprLt(a, b, srcText) =>
-          AST.ExprApply(Operator.LessThan.name, Vector(translateExpr(a), translateExpr(b)), srcText)
-        case CST.ExprLte(a, b, srcText) =>
+        case e: CST.ExprLor =>
+          AST.ExprApply(Operator.LogicalOr.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprLand =>
+          AST.ExprApply(Operator.LogicalAnd.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprEqeq =>
+          AST.ExprApply(Operator.Equality.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprNeq =>
+          AST.ExprApply(Operator.Inequality.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprLt =>
+          AST.ExprApply(Operator.LessThan.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprLte =>
           AST.ExprApply(Operator.LessThanOrEqual.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprGt(a, b, srcText) =>
-          AST.ExprApply(Operator.GreaterThan.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprGte(a, b, srcText) =>
+                        Vector(translateExpr(e.a), translateExpr(e.b)))(e.loc)
+        case e: CST.ExprGt =>
+          AST.ExprApply(Operator.GreaterThan.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprGte =>
           AST.ExprApply(Operator.GreaterThanOrEqual.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprAdd(a, b, srcText) =>
-          AST.ExprApply(Operator.Addition.name, Vector(translateExpr(a), translateExpr(b)), srcText)
-        case CST.ExprSub(a, b, srcText) =>
-          AST.ExprApply(Operator.Subtraction.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprMul(a, b, srcText) =>
+                        Vector(translateExpr(e.a), translateExpr(e.b)))(e.loc)
+        case e: CST.ExprAdd =>
+          AST.ExprApply(Operator.Addition.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprSub =>
+          AST.ExprApply(Operator.Subtraction.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprMul =>
           AST.ExprApply(Operator.Multiplication.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
-        case CST.ExprDivide(a, b, srcText) =>
-          AST.ExprApply(Operator.Division.name, Vector(translateExpr(a), translateExpr(b)), srcText)
-        case CST.ExprMod(a, b, srcText) =>
-          AST.ExprApply(Operator.Remainder.name,
-                        Vector(translateExpr(a), translateExpr(b)),
-                        srcText)
+                        Vector(translateExpr(e.a), translateExpr(e.b)))(e.loc)
+        case e: CST.ExprDivide =>
+          AST.ExprApply(Operator.Division.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
+        case e: CST.ExprMod =>
+          AST.ExprApply(Operator.Remainder.name, Vector(translateExpr(e.a), translateExpr(e.b)))(
+              e.loc
+          )
 
         // Access an array element at [index]
-        case CST.ExprAt(array, index, srcText) =>
-          AST.ExprAt(translateExpr(array), translateExpr(index), srcText)
+        case e: CST.ExprAt =>
+          AST.ExprAt(translateExpr(e.array), translateExpr(e.index))(e.loc)
 
-        case CST.ExprIfThenElse(cond, tBranch, fBranch, srcText) =>
-          AST.ExprIfThenElse(translateExpr(cond),
-                             translateExpr(tBranch),
-                             translateExpr(fBranch),
-                             srcText)
-        case CST.ExprApply(funcName, elements, srcText) =>
-          if (Operator.All.contains(funcName)) {
-            throw new SyntaxException(s"${funcName} is reserved and not a valid function name",
-                                      srcText)
+        case e: CST.ExprIfThenElse =>
+          AST.ExprIfThenElse(translateExpr(e.cond),
+                             translateExpr(e.tBranch),
+                             translateExpr(e.fBranch))(e.loc)
+        case e: CST.ExprApply =>
+          if (Operator.All.contains(e.funcName)) {
+            throw new SyntaxException(s"${e.funcName} is reserved and not a valid function name",
+                                      e.loc)
           }
-          AST.ExprApply(funcName, elements.map(translateExpr), srcText)
-        case CST.ExprGetName(e, id, srcText) =>
-          AST.ExprGetName(translateExpr(e), id, srcText)
+          AST.ExprApply(e.funcName, e.elements.map(translateExpr))(e.loc)
+        case e: CST.ExprGetName =>
+          AST.ExprGetName(translateExpr(e.expr), e.id)(e.loc)
 
         case other =>
           throw new Exception(s"invalid concrete syntax element ${other}")
@@ -160,14 +163,14 @@ case class ParseAll(followImports: Boolean = false,
       kvs
         .foldLeft(TreeSeqMap.empty[String, AST.MetaKV]) {
           case (accu, kv) =>
-            val metaValue = AST.MetaValueString(kv.value, kv.loc)
+            val metaValue = AST.MetaValueString(kv.value)(kv.loc)
             if (accu.contains(kv.id)) {
               logger.warning(
                   s"""duplicate ${sectionName} key ${kv.id}: earlier value ${accu(kv.id)} 
                      |is overridden by later value ${metaValue}""".stripMargin.replaceAll("\n", " ")
               )
             }
-            accu + (kv.id -> AST.MetaKV(kv.id, metaValue, kv.loc))
+            accu + (kv.id -> AST.MetaKV(kv.id, metaValue)(kv.loc))
         }
         .values
         .toVector
@@ -176,36 +179,35 @@ case class ParseAll(followImports: Boolean = false,
     private def translateInputSection(
         inp: CST.InputSection
     ): AST.InputSection = {
-      AST.InputSection(inp.declarations.map(translateDeclaration), inp.loc)
+      AST.InputSection(inp.declarations.map(translateDeclaration))(inp.loc)
     }
 
     private def translateOutputSection(
         output: CST.OutputSection
     ): AST.OutputSection = {
-      AST.OutputSection(output.declarations.map(translateDeclaration), output.loc)
+      AST.OutputSection(output.declarations.map(translateDeclaration))(output.loc)
     }
 
     private def translateCommandSection(
         cs: CST.CommandSection
     ): AST.CommandSection = {
-      AST.CommandSection(cs.parts.map(translateExpr), cs.loc)
+      AST.CommandSection(cs.parts.map(translateExpr))(cs.loc)
     }
 
     private def translateDeclaration(decl: CST.Declaration): AST.Declaration = {
-      AST.Declaration(decl.name,
-                      translateType(decl.wdlType),
-                      decl.expr.map(translateExpr),
-                      decl.loc)
+      AST.Declaration(decl.name, translateType(decl.wdlType), decl.expr.map(translateExpr))(
+          decl.loc
+      )
     }
 
     private def translateMetaSection(meta: CST.MetaSection): AST.MetaSection = {
-      AST.MetaSection(translateMetaKVs(meta.kvs, "meta"), meta.loc)
+      AST.MetaSection(translateMetaKVs(meta.kvs, "meta"))(meta.loc)
     }
 
     private def translateParameterMetaSection(
         paramMeta: CST.ParameterMetaSection
     ): AST.ParameterMetaSection = {
-      AST.ParameterMetaSection(translateMetaKVs(paramMeta.kvs, "parameter_meta"), paramMeta.loc)
+      AST.ParameterMetaSection(translateMetaKVs(paramMeta.kvs, "parameter_meta"))(paramMeta.loc)
     }
 
     private def translateRuntimeSection(
@@ -214,17 +216,18 @@ case class ParseAll(followImports: Boolean = false,
       AST.RuntimeSection(
           runtime.kvs
             .foldLeft(TreeSeqMap.empty[String, AST.RuntimeKV]) {
-              case (accu, CST.RuntimeKV(id, expr, text)) =>
-                val tExpr = translateExpr(expr)
-                if (accu.contains(id)) {
+              case (accu, kv: CST.RuntimeKV) =>
+                val tExpr = translateExpr(kv.expr)
+                if (accu.contains(kv.id)) {
                   logger.warning(
-                      s"duplicate runtime key ${id}: earlier value ${accu(id)} is overridden by later value ${tExpr}"
+                      s"duplicate runtime key ${kv.id}: earlier value ${accu(kv.id)} is overridden by later value ${tExpr}"
                   )
                 }
-                accu + (id -> AST.RuntimeKV(id, tExpr, text))
+                accu + (kv.id -> AST.RuntimeKV(kv.id, tExpr)(kv.loc))
             }
             .values
-            .toVector,
+            .toVector
+      )(
           runtime.loc
       )
     }
@@ -233,31 +236,34 @@ case class ParseAll(followImports: Boolean = false,
         elem: CST.WorkflowElement
     ): AST.WorkflowElement = {
       elem match {
-        case CST.Declaration(name, wdlType, expr, text) =>
-          AST.Declaration(name, translateType(wdlType), expr.map(translateExpr), text)
-
-        case CST.Call(name, alias, inputs, text) =>
-          AST.Call(
-              name,
-              alias.map {
-                case CST.CallAlias(callName, callText) =>
-                  AST.CallAlias(callName, callText)
-              },
-              Vector.empty,
-              inputs.map {
-                case CST.CallInputs(inputsVec, inputsText) =>
-                  AST.CallInputs(inputsVec.map { inp =>
-                    AST.CallInput(inp.name, translateExpr(inp.expr), inp.loc)
-                  }, inputsText)
-              },
-              text
+        case decl: CST.Declaration =>
+          AST.Declaration(decl.name, translateType(decl.wdlType), decl.expr.map(translateExpr))(
+              decl.loc
           )
 
-        case CST.Scatter(identifier, expr, body, text) =>
-          AST.Scatter(identifier, translateExpr(expr), body.map(translateWorkflowElement), text)
+        case call: CST.Call =>
+          AST.Call(
+              call.name,
+              call.alias.map { alias: CST.CallAlias =>
+                AST.CallAlias(alias.name)(alias.loc)
+              },
+              Vector.empty,
+              call.inputs.map { inputs: CST.CallInputs =>
+                AST.CallInputs(inputs.value.map { inp =>
+                  AST.CallInput(inp.name, translateExpr(inp.expr))(inp.loc)
+                })(inputs.loc)
+              }
+          )(call.loc)
 
-        case CST.Conditional(expr, body, text) =>
-          AST.Conditional(translateExpr(expr), body.map(translateWorkflowElement), text)
+        case scatter: CST.Scatter =>
+          AST.Scatter(scatter.identifier,
+                      translateExpr(scatter.expr),
+                      scatter.body.map(translateWorkflowElement))(scatter.loc)
+
+        case cond: CST.Conditional =>
+          AST.Conditional(translateExpr(cond.expr), cond.body.map(translateWorkflowElement))(
+              cond.loc
+          )
       }
     }
 
@@ -268,20 +274,21 @@ case class ParseAll(followImports: Boolean = false,
           wf.output.map(translateOutputSection),
           wf.meta.map(translateMetaSection),
           wf.parameterMeta.map(translateParameterMetaSection),
-          wf.body.map(translateWorkflowElement),
+          wf.body.map(translateWorkflowElement)
+      )(
           wf.loc
       )
     }
 
     private def translateImportDoc(importDoc: CST.ImportDoc,
                                    importedDoc: Option[AST.Document]): AST.ImportDoc = {
-      val addrAbst = AST.ImportAddr(importDoc.addr.value, importDoc.addr.loc)
-      val nameAbst = importDoc.name.map {
-        case CST.ImportName(value, text) => AST.ImportName(value, text)
+      val addrAbst = AST.ImportAddr(importDoc.addr.value)(importDoc.addr.loc)
+      val nameAbst = importDoc.name.map { impName: CST.ImportName =>
+        AST.ImportName(impName.value)(impName.loc)
       }
 
       // Replace the original statement with a new one
-      AST.ImportDoc(nameAbst, Vector.empty, addrAbst, importedDoc, importDoc.loc)
+      AST.ImportDoc(nameAbst, Vector.empty, addrAbst, importedDoc)(importDoc.loc)
     }
 
     private def translateTask(task: CST.Task): AST.Task = {
@@ -294,7 +301,8 @@ case class ParseAll(followImports: Boolean = false,
           task.meta.map(translateMetaSection),
           task.parameterMeta.map(translateParameterMetaSection),
           task.runtime.map(translateRuntimeSection),
-          None,
+          None
+      )(
           task.loc
       )
     }
@@ -319,8 +327,8 @@ case class ParseAll(followImports: Boolean = false,
         case other                     => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
-      val version = AST.Version(WdlVersion.Draft_2, SourceLocation.empty)
-      AST.Document(doc.source, version, elems, aWf, doc.loc, doc.comments)
+      val version = AST.Version(WdlVersion.Draft_2)(SourceLocation.empty)
+      AST.Document(doc.source, version, elems, aWf, doc.comments)(doc.loc)
     }
   }
 

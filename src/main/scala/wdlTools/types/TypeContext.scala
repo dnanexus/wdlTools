@@ -139,7 +139,7 @@ case class TypeContext(
         val fqn = namespace + "." + name
         fqn -> wfSig.copy(name = fqn)
       case other =>
-        throw new RuntimeException(s"sanity: ${other.getClass}")
+        throw new RuntimeException(s"unrecognized callable: ${other.getClass}")
     }
 
     // rename the imported structs according to the aliases
@@ -150,7 +150,7 @@ case class TypeContext(
     //     alias GrandChild as GrandChild2
     //
     val aliasMapping: Map[String, String] = typeAliases.map {
-      case AST.ImportAlias(src, dest, _) => src -> dest
+      case AST.ImportAlias(src, dest) => src -> dest
     }.toMap
     val importAliases: Map[String, T_Struct] = importContext.aliases.toMap.map {
       case (name, importedStruct: T_Struct) =>
