@@ -9,19 +9,19 @@ object TestsGenerator {
 
     def getExampleValue(value: Type): JsValue = {
       value match {
-        case _: TypeString      => JsString("foo")
-        case _: TypeFile        => JsObject(Map("url" -> JsString("http://url/of/data/file")))
-        case _: TypeInt         => JsNumber(0)
-        case _: TypeFloat       => JsNumber(1.0)
-        case _: TypeBoolean     => JsBoolean(true)
-        case TypeArray(t, _, _) => JsArray(getExampleValue(t))
-        case TypeMap(k, v, _)   => JsObject(k.toString -> getExampleValue(v))
-        case _: TypeObject      => JsObject("foo" -> JsString("bar"))
-        case TypePair(l, r, _) =>
+        case _: TypeString   => JsString("foo")
+        case _: TypeFile     => JsObject(Map("url" -> JsString("http://url/of/data/file")))
+        case _: TypeInt      => JsNumber(0)
+        case _: TypeFloat    => JsNumber(1.0)
+        case _: TypeBoolean  => JsBoolean(true)
+        case TypeArray(t, _) => JsArray(getExampleValue(t))
+        case TypeMap(k, v)   => JsObject(k.toString -> getExampleValue(v))
+        case _: TypeObject   => JsObject("foo" -> JsString("bar"))
+        case TypePair(l, r) =>
           JsObject("left" -> getExampleValue(l), "right" -> getExampleValue(r))
-        case TypeStruct(_, members, _) =>
+        case TypeStruct(_, members) =>
           JsObject(members.collect {
-            case StructMember(name, dataType, _) if !dataType.isInstanceOf[TypeOptional] =>
+            case StructMember(name, dataType) if !dataType.isInstanceOf[TypeOptional] =>
               name -> getExampleValue(dataType)
           }.toMap)
         case other => throw new Exception(s"Unrecognized type ${other}")
@@ -30,7 +30,7 @@ object TestsGenerator {
 
     def addData(declarations: Vector[Declaration]): JsObject = {
       JsObject(declarations.collect {
-        case Declaration(name, wdlType, expr, _)
+        case Declaration(name, wdlType, expr)
             if expr.isEmpty && !wdlType.isInstanceOf[TypeOptional] && !data.contains(name) =>
           val dataName = s"input_${name}"
           data += (dataName -> getExampleValue(wdlType))

@@ -785,37 +785,37 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
     def fromWdlType(wdlType: Type, quantifiers: Vector[Span] = Vector.empty): Span = {
       wdlType match {
-        case TypeOptional(inner, loc) =>
-          fromWdlType(inner, quantifiers = Vector(Literal.fromEnd(Symbols.Optional, loc)))
-        case TypeArray(inner, nonEmpty, loc) =>
+        case TypeOptional(inner) =>
+          fromWdlType(inner, quantifiers = Vector(Literal.fromEnd(Symbols.Optional, wdlType.loc)))
+        case TypeArray(inner, nonEmpty) =>
           val quant: Vector[Span] = (nonEmpty, quantifiers) match {
             case (true, quant) if quant.nonEmpty =>
               Vector(Literal.fromNext(Symbols.NonEmpty, quantifiers.head)) ++ quant
-            case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, loc))
+            case (true, _)  => Vector(Literal.fromEnd(Symbols.NonEmpty, wdlType.loc))
             case (false, _) => quantifiers
           }
-          buildDataType(Symbols.ArrayType, quant, loc, Some(fromWdlType(inner)))
-        case TypeMap(keyType, valueType, loc) if isPrimitiveType(keyType) =>
+          buildDataType(Symbols.ArrayType, quant, wdlType.loc, Some(fromWdlType(inner)))
+        case TypeMap(keyType, valueType) if isPrimitiveType(keyType) =>
           buildDataType(Symbols.MapType,
                         quantifiers,
-                        loc,
+                        wdlType.loc,
                         Some(fromWdlType(keyType)),
                         Some(fromWdlType(valueType)))
-        case TypePair(left, right, loc) =>
+        case TypePair(left, right) =>
           buildDataType(Symbols.PairType,
                         quantifiers,
-                        loc,
+                        wdlType.loc,
                         Some(fromWdlType(left)),
                         Some(fromWdlType(right)))
-        case TypeStruct(name, _, loc) => buildDataType(name, quantifiers, loc)
-        case TypeObject(loc)          => buildDataType(Symbols.ObjectType, quantifiers, loc)
-        case TypeString(loc)          => buildDataType(Symbols.StringType, quantifiers, loc)
-        case TypeBoolean(loc)         => buildDataType(Symbols.BooleanType, quantifiers, loc)
-        case TypeInt(loc)             => buildDataType(Symbols.IntType, quantifiers, loc)
-        case TypeFloat(loc)           => buildDataType(Symbols.FloatType, quantifiers, loc)
-        case TypeFile(loc)            => buildDataType(Symbols.FileType, quantifiers, loc)
-        case TypeDirectory(loc) =>
-          buildDataType(Symbols.DirectoryType, quantifiers, loc)
+        case TypeStruct(name, _) => buildDataType(name, quantifiers, wdlType.loc)
+        case TypeObject()        => buildDataType(Symbols.ObjectType, quantifiers, wdlType.loc)
+        case TypeString()        => buildDataType(Symbols.StringType, quantifiers, wdlType.loc)
+        case TypeBoolean()       => buildDataType(Symbols.BooleanType, quantifiers, wdlType.loc)
+        case TypeInt()           => buildDataType(Symbols.IntType, quantifiers, wdlType.loc)
+        case TypeFloat()         => buildDataType(Symbols.FloatType, quantifiers, wdlType.loc)
+        case TypeFile()          => buildDataType(Symbols.FileType, quantifiers, wdlType.loc)
+        case TypeDirectory() =>
+          buildDataType(Symbols.DirectoryType, quantifiers, wdlType.loc)
         case other => throw new Exception(s"Unrecognized type $other")
       }
     }
@@ -938,8 +938,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
     expr match {
       // literal values
-      case ValueNone(loc) => Literal.fromStart(Symbols.None, loc)
-      case ValueString(value, loc) =>
+      case ValueNone() => Literal.fromStart(Symbols.None, expr.loc)
+      case ValueString(value) =>
         val v = if (stringModifier.isDefined) {
           stringModifier.get(value)
         } else {
@@ -950,60 +950,60 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         } else {
           v
         }
-        Literal.fromStart(escaped, loc, quoting = inPlaceholder || !(inString || inCommand))
-      case ValueBoolean(value, loc) => Literal.fromStart(value, loc)
-      case ValueInt(value, loc)     => Literal.fromStart(value, loc)
-      case ValueFloat(value, loc)   => Literal.fromStart(value, loc)
-      case ExprArray(value, loc) =>
+        Literal.fromStart(escaped, expr.loc, quoting = inPlaceholder || !(inString || inCommand))
+      case ValueBoolean(value) => Literal.fromStart(value, expr.loc)
+      case ValueInt(value)     => Literal.fromStart(value, expr.loc)
+      case ValueFloat(value)   => Literal.fromStart(value, expr.loc)
+      case ExprArray(value) =>
         BoundedContainer(
             value.map(nested(_)),
-            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, loc),
-                 Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
+            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, expr.loc),
+                 Literal.fromEnd(Symbols.ArrayLiteralClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
-            loc,
+            expr.loc,
             wrapping = Wrapping.AllOrNone
         )
-      case ExprPair(left, right, loc) =>
+      case ExprPair(left, right) =>
         BoundedContainer(
             Vector(nested(left), nested(right)),
-            Some(Literal.fromStart(Symbols.GroupOpen, loc),
-                 Literal.fromEnd(Symbols.GroupClose, loc)),
+            Some(Literal.fromStart(Symbols.GroupOpen, expr.loc),
+                 Literal.fromEnd(Symbols.GroupClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
-            loc
+            expr.loc
         )
-      case ExprMap(value, loc) =>
+      case ExprMap(value) =>
         BoundedContainer(
-            value.map {
-              case ExprMember(k, v, itemText) =>
-                KeyValue(nested(k), nested(v), bounds = itemText)
+            value.map { member: ExprMember =>
+              KeyValue(nested(member.key), nested(member.value), bounds = member.loc)
             },
-            Some(Literal.fromStart(Symbols.MapOpen, loc), Literal.fromEnd(Symbols.MapClose, loc)),
+            Some(Literal.fromStart(Symbols.MapOpen, expr.loc),
+                 Literal.fromEnd(Symbols.MapClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
-            loc,
+            expr.loc,
             Wrapping.Always,
             continue = false
         )
-      case ExprObject(value, loc) =>
+      case ExprObject(value) =>
         BoundedContainer(
             value.map {
-              case ExprMember(ValueString(k, loc), v, memberText) =>
-                KeyValue(Literal.fromStart(k, loc), nested(v), bounds = memberText)
+              case member @ ExprMember(key: ValueString, value) =>
+                KeyValue(Literal.fromStart(key.value, key.loc), nested(value), bounds = member.loc)
               case other =>
                 throw new Exception(s"invalid object member ${other}")
             },
             Some(
                 SpanSequence(
-                    Literal.chainFromStart(Vector(Symbols.Object, Symbols.ObjectOpen), loc),
+                    Literal.chainFromStart(Vector(Symbols.Object, Symbols.ObjectOpen), expr.loc),
                     spacing = Spacing.On
                 ),
-                Literal.fromEnd(Symbols.ObjectClose, loc)
+                Literal.fromEnd(Symbols.ObjectClose, expr.loc)
             ),
             Some(Symbols.ArrayDelimiter),
-            bounds = loc,
+            bounds = expr.loc,
             Wrapping.Always,
             continue = false
         )
-      case ExprStruct(name, members, loc) =>
+      case ExprStruct(name, members) =>
         val literalPrefix = if (targetVersion.exists(_ >= WdlVersion.V2)) {
           name
         } else {
@@ -1011,25 +1011,25 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         }
         BoundedContainer(
             members.map {
-              case ExprMember(ValueString(k, loc), v, memberText) =>
-                KeyValue(Literal.fromStart(k, loc), nested(v), bounds = memberText)
+              case member @ ExprMember(key: ValueString, value) =>
+                KeyValue(Literal.fromStart(key.value, key.loc), nested(value), bounds = member.loc)
               case other =>
                 throw new Exception(s"invalid object member ${other}")
             },
             Some(
                 SpanSequence(
-                    Literal.chainFromStart(Vector(literalPrefix, Symbols.ObjectOpen), loc),
+                    Literal.chainFromStart(Vector(literalPrefix, Symbols.ObjectOpen), expr.loc),
                     spacing = Spacing.On
                 ),
-                Literal.fromEnd(Symbols.ObjectClose, loc)
+                Literal.fromEnd(Symbols.ObjectClose, expr.loc)
             ),
             Some(Symbols.ArrayDelimiter),
-            bounds = loc,
+            bounds = expr.loc,
             Wrapping.Always,
             continue = false
         )
       // placeholders
-      case ExprPlaceholder(t, f, sep, default, value, loc) =>
+      case ExprPlaceholder(t, f, sep, default, value) =>
         Placeholder(
             nested(value, inPlaceholder = true),
             placeholderOpen,
@@ -1042,37 +1042,37 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                 ).flatten
             ),
             inString = inString || inCommand,
-            bounds = loc
+            bounds = expr.loc
         )
-      case ExprCompoundString(value, loc) =>
+      case ExprCompoundString(value) =>
         CompoundString(value.map(nested(_, inString = true)),
                        quoting = !(inString || inCommand),
-                       loc)
+                       expr.loc)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
         val span = other match {
-          case ExprIdentifier(id, loc) => Literal.fromStart(id, loc)
-          case ExprAt(array, index, loc) =>
+          case ExprIdentifier(id) => Literal.fromStart(id, expr.loc)
+          case ExprAt(array, index) =>
             val arraySpan = nested(array, inPlaceholder = inString || inCommand)
             val prefix = SpanSequence(
                 Vector(arraySpan, Literal.fromPrev(Symbols.IndexOpen, arraySpan))
             )
-            val suffix = Literal.fromEnd(Symbols.IndexClose, loc)
+            val suffix = Literal.fromEnd(Symbols.IndexClose, expr.loc)
             BoundedContainer(
                 Vector(nested(index, inPlaceholder = inString || inCommand)),
                 Some(prefix, suffix),
                 // TODO: shouldn't need a delimiter - index must be exactly length 1
                 Some(Symbols.ArrayDelimiter),
-                bounds = loc
+                bounds = expr.loc
             )
-          case ExprIfThenElse(cond, tBranch, fBranch, loc) =>
+          case ExprIfThenElse(cond, tBranch, fBranch) =>
             val condSpan = nested(cond, inOperation = false, inPlaceholder = inString || inCommand)
             val tSpan = nested(tBranch, inOperation = false, inPlaceholder = inString || inCommand)
             val fSpan = nested(fBranch, inOperation = false, inPlaceholder = inString || inCommand)
             BoundedContainer(
                 Vector(
-                    Literal.fromStart(Symbols.If, loc),
+                    Literal.fromStart(Symbols.If, expr.loc),
                     condSpan,
                     Literal.between(Symbols.Then, condSpan, tSpan),
                     tSpan,
@@ -1080,13 +1080,13 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                     fSpan
                 ),
                 wrapping = Wrapping.AsNeeded,
-                bounds = loc
+                bounds = expr.loc
             )
-          case ExprApply(oper, Vector(value), loc) if Operator.All.contains(oper) =>
+          case ExprApply(oper, Vector(value)) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
-            val operSpan = Literal.fromStart(symbol, loc)
+            val operSpan = Literal.fromStart(symbol, expr.loc)
             SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
-          case ExprApply(oper, Vector(lhs, rhs), loc) if Operator.All.contains(oper) =>
+          case ExprApply(oper, Vector(lhs, rhs)) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             Operation(
                 symbol,
@@ -1100,22 +1100,22 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                        parentOperation = Some(oper)),
                 grouped = inOperation && !parentOperation.contains(oper),
                 inString = inString || inCommand,
-                loc
+                expr.loc
             )
-          case ExprApply(funcName, elements, loc) =>
+          case ExprApply(funcName, elements) =>
             val prefix = SpanSequence(
-                Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), loc)
+                Literal.chainFromStart(Vector(funcName, Symbols.FunctionCallOpen), expr.loc)
             )
-            val suffix = Literal.fromEnd(Symbols.FunctionCallClose, loc)
+            val suffix = Literal.fromEnd(Symbols.FunctionCallClose, expr.loc)
             BoundedContainer(
                 elements.map(nested(_, inPlaceholder = inString || inCommand)),
                 Some(prefix, suffix),
                 Some(Symbols.ArrayDelimiter),
-                loc
+                expr.loc
             )
-          case ExprGetName(e, id, loc) =>
+          case ExprGetName(e, id) =>
             val exprSpan = nested(e, inPlaceholder = inString || inCommand)
-            val idLiteral = Literal.fromEnd(id, loc)
+            val idLiteral = Literal.fromEnd(id, expr.loc)
             SpanSequence(
                 Vector(exprSpan, Literal.between(Symbols.Access, exprSpan, idLiteral), idLiteral)
             )
@@ -1418,32 +1418,31 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   private def buildMeta(metaValue: MetaValue): Span = {
     metaValue match {
       // literal values
-      case MetaValueNull(loc) => Literal.fromStart(Symbols.Null, loc)
-      case MetaValueString(value, loc) =>
-        Literal.fromStart(value, loc, quoting = true)
-      case MetaValueBoolean(value, loc) => Literal.fromStart(value, loc)
-      case MetaValueInt(value, loc)     => Literal.fromStart(value, loc)
-      case MetaValueFloat(value, loc)   => Literal.fromStart(value, loc)
-      case MetaValueArray(value, loc) =>
+      case MetaValueNull() => Literal.fromStart(Symbols.Null, metaValue.loc)
+      case MetaValueString(value) =>
+        Literal.fromStart(value, metaValue.loc, quoting = true)
+      case MetaValueBoolean(value) => Literal.fromStart(value, metaValue.loc)
+      case MetaValueInt(value)     => Literal.fromStart(value, metaValue.loc)
+      case MetaValueFloat(value)   => Literal.fromStart(value, metaValue.loc)
+      case MetaValueArray(value) =>
         BoundedContainer(
             value.map(buildMeta),
-            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, loc),
-                 Literal.fromEnd(Symbols.ArrayLiteralClose, loc)),
+            Some(Literal.fromStart(Symbols.ArrayLiteralOpen, metaValue.loc),
+                 Literal.fromEnd(Symbols.ArrayLiteralClose, metaValue.loc)),
             Some(Symbols.ArrayDelimiter),
-            loc,
+            metaValue.loc,
             wrapping = Wrapping.AllOrNone,
             continue = false
         )
-      case MetaValueObject(value, loc) =>
+      case MetaValueObject(value) =>
         BoundedContainer(
-            value.map {
-              case MetaKV(k, v, memberText) =>
-                KeyValue(Literal.fromStart(k, memberText), buildMeta(v), bounds = memberText)
+            value.map { kv: MetaKV =>
+              KeyValue(Literal.fromStart(kv.id, kv.loc), buildMeta(kv.value), bounds = kv.loc)
             },
-            Some(Literal.fromStart(Symbols.ObjectOpen, loc),
-                 Literal.fromEnd(Symbols.ObjectClose, loc)),
+            Some(Literal.fromStart(Symbols.ObjectOpen, metaValue.loc),
+                 Literal.fromEnd(Symbols.ObjectClose, metaValue.loc)),
             Some(Symbols.ArrayDelimiter),
-            bounds = loc,
+            bounds = metaValue.loc,
             Wrapping.Always,
             continue = false
         )
@@ -1696,8 +1695,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     // check whether there is at least one non-whitespace command part
     private def hasCommand: Boolean = {
       command.parts.exists {
-        case ValueString(value, _) => value.trim.nonEmpty
-        case _                     => true
+        case ValueString(value) => value.trim.nonEmpty
+        case _                  => true
       }
     }
 
@@ -1710,7 +1709,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately.
         val (headExpr: Expr, indent, comment) = command.parts.head match {
-          case ValueString(value, loc) =>
+          case expr @ ValueString(value) =>
             value match {
               case commandStartRegexp(first, rest) =>
                 first.trim match {
@@ -1719,7 +1718,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (ValueString("", loc), None, Some(s))
+                    (ValueString("")(expr.loc), None, Some(s))
                   case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment - we don't want to break
                     // anything so we'll just format the whole block as-is
@@ -1731,16 +1730,16 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                       case _                                        => (None, rest)
                     }
                     // the first line will be indented, so we need to trim the indent from `rest`
-                    (ValueString(trimmedRest, loc), ws, Some(s))
+                    (ValueString(trimmedRest)(expr.loc), ws, Some(s))
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (ValueString(s, loc), None, None)
+                    (ValueString(s)(expr.loc), None, None)
                   case s =>
                     // opening line has some real content, so just trim any leading whitespace
                     val ws = leadingWhitespaceRegexp
                       .findFirstMatchIn(rest)
                       .map(m => m.group(1))
-                    (ValueString(s"${s}\n${rest}", loc), ws, None)
+                    (ValueString(s"${s}\n${rest}")(expr.loc), ws, None)
                 }
               case other =>
                 throw new RuntimeException(s"unexpected command part ${other}")
@@ -1751,9 +1750,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
         def trimLast(last: Expr): Expr = {
           last match {
-            case ValueString(s, loc) =>
+            case ValueString(s) =>
               // If the last part is just the whitespace before the close block, throw it out
-              ValueString(commandEndRegexp.replaceFirstIn(s, ""), loc)
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""))(last.loc)
             case other =>
               other
           }

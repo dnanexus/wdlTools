@@ -14,72 +14,75 @@ object ConcreteSyntax {
 
   // type system
   sealed trait Type extends Element
-  case class TypeOptional(t: Type, loc: SourceLocation) extends Type
-  case class TypeArray(t: Type, nonEmpty: Boolean, loc: SourceLocation) extends Type
-  case class TypeMap(k: Type, v: Type, loc: SourceLocation) extends Type
-  case class TypePair(l: Type, r: Type, loc: SourceLocation) extends Type
-  case class TypeString(loc: SourceLocation) extends Type
-  case class TypeFile(loc: SourceLocation) extends Type
-  case class TypeDirectory(loc: SourceLocation) extends Type
-  case class TypeBoolean(loc: SourceLocation) extends Type
-  case class TypeInt(loc: SourceLocation) extends Type
-  case class TypeFloat(loc: SourceLocation) extends Type
-  case class TypeIdentifier(id: String, loc: SourceLocation) extends Type
-  case class StructMember(name: String, wdlType: Type, loc: SourceLocation) extends Element
-  case class TypeStruct(name: String, members: Vector[StructMember], loc: SourceLocation)
+  case class TypeOptional(t: Type)(val loc: SourceLocation) extends Type
+  case class TypeArray(t: Type, nonEmpty: Boolean)(val loc: SourceLocation) extends Type
+  case class TypeMap(k: Type, v: Type)(val loc: SourceLocation) extends Type
+  case class TypePair(l: Type, r: Type)(val loc: SourceLocation) extends Type
+  case class TypeString()(val loc: SourceLocation) extends Type
+  case class TypeFile()(val loc: SourceLocation) extends Type
+  case class TypeDirectory()(val loc: SourceLocation) extends Type
+  case class TypeBoolean()(val loc: SourceLocation) extends Type
+  case class TypeInt()(val loc: SourceLocation) extends Type
+  case class TypeFloat()(val loc: SourceLocation) extends Type
+  case class TypeIdentifier(id: String)(val loc: SourceLocation) extends Type
+  case class StructMember(name: String, wdlType: Type)(val loc: SourceLocation) extends Element
+  case class TypeStruct(name: String, members: Vector[StructMember])(val loc: SourceLocation)
       extends Type
       with DocumentElement
 
   // expressions
   sealed trait Expr extends Element
-  case class ExprNone(loc: SourceLocation) extends Expr
-  case class ExprString(value: String, loc: SourceLocation) extends Expr
-  case class ExprBoolean(value: Boolean, loc: SourceLocation) extends Expr
-  case class ExprInt(value: Long, loc: SourceLocation) extends Expr
-  case class ExprFloat(value: Double, loc: SourceLocation) extends Expr
+  case class ExprNone()(val loc: SourceLocation) extends Expr
+  case class ExprString(value: String)(val loc: SourceLocation) extends Expr
+  case class ExprBoolean(value: Boolean)(val loc: SourceLocation) extends Expr
+  case class ExprInt(value: Long)(val loc: SourceLocation) extends Expr
+  case class ExprFloat(value: Double)(val loc: SourceLocation) extends Expr
 
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr], loc: SourceLocation) extends Expr
-  case class ExprMember(key: Expr, value: Expr, loc: SourceLocation) extends Expr
-  case class ExprMapLiteral(value: Vector[ExprMember], loc: SourceLocation) extends Expr
-  case class ExprObjectLiteral(value: Vector[ExprMember], loc: SourceLocation) extends Expr
-  case class ExprStructLiteral(name: String, members: Vector[ExprMember], loc: SourceLocation)
+  case class ExprCompoundString(value: Vector[Expr])(val loc: SourceLocation) extends Expr
+  case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprMapLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
+  case class ExprObjectLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
+  case class ExprStructLiteral(name: String, members: Vector[ExprMember])(val loc: SourceLocation)
       extends Expr
-  case class ExprArrayLiteral(value: Vector[Expr], loc: SourceLocation) extends Expr
+  case class ExprArrayLiteral(value: Vector[Expr])(val loc: SourceLocation) extends Expr
 
-  case class ExprIdentifier(id: String, loc: SourceLocation) extends Expr
+  case class ExprIdentifier(id: String)(val loc: SourceLocation) extends Expr
 
-  case class ExprUnaryPlus(value: Expr, loc: SourceLocation) extends Expr
-  case class ExprUnaryMinus(value: Expr, loc: SourceLocation) extends Expr
-  case class ExprLor(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLand(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprNegate(value: Expr, loc: SourceLocation) extends Expr
-  case class ExprEqeq(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLt(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprGte(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprNeq(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprLte(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprGt(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprAdd(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprSub(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprMod(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprMul(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprDivide(a: Expr, b: Expr, loc: SourceLocation) extends Expr
-  case class ExprPair(l: Expr, r: Expr, loc: SourceLocation) extends Expr
-  case class ExprAt(array: Expr, index: Expr, loc: SourceLocation) extends Expr
-  case class ExprApply(funcName: String, elements: Vector[Expr], loc: SourceLocation) extends Expr
-  case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr, loc: SourceLocation)
+  case class ExprUnaryPlus(value: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprUnaryMinus(value: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprLor(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprLand(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprNegate(value: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprEqeq(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprLt(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprGte(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprNeq(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprLte(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprGt(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprAdd(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprSub(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprMod(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprMul(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprDivide(a: Expr, b: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprPair(l: Expr, r: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprAt(array: Expr, index: Expr)(val loc: SourceLocation) extends Expr
+  case class ExprApply(funcName: String, elements: Vector[Expr])(val loc: SourceLocation)
       extends Expr
-  case class ExprGetName(e: Expr, id: String, loc: SourceLocation) extends Expr
+  case class ExprIfThenElse(cond: Expr, tBranch: Expr, fBranch: Expr)(val loc: SourceLocation)
+      extends Expr
+  case class ExprGetName(expr: Expr, id: String)(val loc: SourceLocation) extends Expr
 
-  case class Declaration(name: String, wdlType: Type, expr: Option[Expr], loc: SourceLocation)
+  case class Declaration(name: String, wdlType: Type, expr: Option[Expr])(val loc: SourceLocation)
       extends WorkflowElement
 
   // sections
-  case class InputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element
-  case class OutputSection(declarations: Vector[Declaration], loc: SourceLocation) extends Element
+  case class InputSection(declarations: Vector[Declaration])(val loc: SourceLocation)
+      extends Element
+  case class OutputSection(declarations: Vector[Declaration])(val loc: SourceLocation)
+      extends Element
 
   // A command can be simple, with just one continuous string:
   //
@@ -94,38 +97,36 @@ object ConcreteSyntax {
   //     ls ~{input_file}
   //     echo ~{input_string}
   // >>>
-  case class CommandSection(parts: Vector[Expr], loc: SourceLocation) extends Element
+  case class CommandSection(parts: Vector[Expr])(val loc: SourceLocation) extends Element
 
-  case class RuntimeKV(id: String, expr: Expr, loc: SourceLocation) extends Element
-  case class RuntimeSection(kvs: Vector[RuntimeKV], loc: SourceLocation) extends Element
+  case class RuntimeKV(id: String, expr: Expr)(val loc: SourceLocation) extends Element
+  case class RuntimeSection(kvs: Vector[RuntimeKV])(val loc: SourceLocation) extends Element
 
   // A specialized JSON-like object language for meta values only.
   sealed trait MetaValue extends Element
-  case class MetaValueNull(loc: SourceLocation) extends MetaValue
-  case class MetaValueBoolean(value: Boolean, loc: SourceLocation) extends MetaValue
-  case class MetaValueInt(value: Long, loc: SourceLocation) extends MetaValue
-  case class MetaValueFloat(value: Double, loc: SourceLocation) extends MetaValue
-  case class MetaValueString(value: String, loc: SourceLocation) extends MetaValue
-  case class MetaValueObject(value: Vector[MetaKV], loc: SourceLocation) extends MetaValue
-  case class MetaValueArray(value: Vector[MetaValue], loc: SourceLocation) extends MetaValue
+  case class MetaValueNull()(val loc: SourceLocation) extends MetaValue
+  case class MetaValueBoolean(value: Boolean)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueInt(value: Long)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueFloat(value: Double)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueString(value: String)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueObject(value: Vector[MetaKV])(val loc: SourceLocation) extends MetaValue
+  case class MetaValueArray(value: Vector[MetaValue])(val loc: SourceLocation) extends MetaValue
   // meta section
-  case class MetaKV(id: String, value: MetaValue, loc: SourceLocation) extends Element
-  case class ParameterMetaSection(kvs: Vector[MetaKV], loc: SourceLocation) extends Element
-  case class MetaSection(kvs: Vector[MetaKV], loc: SourceLocation) extends Element
+  case class MetaKV(id: String, value: MetaValue)(val loc: SourceLocation) extends Element
+  case class ParameterMetaSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element
+  case class MetaSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element
   // hints section
-  case class HintsSection(kvs: Vector[MetaKV], loc: SourceLocation) extends Element
+  case class HintsSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element
 
   // imports
-  case class ImportAddr(value: String, loc: SourceLocation) extends Element
-  case class ImportName(value: String, loc: SourceLocation) extends Element
-  case class ImportAlias(id1: String, id2: String, loc: SourceLocation) extends Element
+  case class ImportAddr(value: String)(val loc: SourceLocation) extends Element
+  case class ImportName(value: String)(val loc: SourceLocation) extends Element
+  case class ImportAlias(id1: String, id2: String)(val loc: SourceLocation) extends Element
 
   // import statement as read from the document
-  case class ImportDoc(name: Option[ImportName],
-                       aliases: Vector[ImportAlias],
-                       addr: ImportAddr,
-                       loc: SourceLocation)
-      extends DocumentElement
+  case class ImportDoc(name: Option[ImportName], aliases: Vector[ImportAlias], addr: ImportAddr)(
+      val loc: SourceLocation
+  ) extends DocumentElement
 
   // top level definitions
   case class Task(name: String,
@@ -136,26 +137,22 @@ object ConcreteSyntax {
                   meta: Option[MetaSection],
                   parameterMeta: Option[ParameterMetaSection],
                   runtime: Option[RuntimeSection],
-                  hints: Option[HintsSection],
-                  loc: SourceLocation)
+                  hints: Option[HintsSection])(val loc: SourceLocation)
       extends DocumentElement
 
-  case class CallAlias(name: String, loc: SourceLocation) extends Element
-  case class CallAfter(name: String, loc: SourceLocation) extends Element
-  case class CallInput(name: String, expr: Expr, loc: SourceLocation) extends Element
-  case class CallInputs(value: Vector[CallInput], loc: SourceLocation) extends Element
+  case class CallAlias(name: String)(val loc: SourceLocation) extends Element
+  case class CallAfter(name: String)(val loc: SourceLocation) extends Element
+  case class CallInput(name: String, expr: Expr)(val loc: SourceLocation) extends Element
+  case class CallInputs(value: Vector[CallInput])(val loc: SourceLocation) extends Element
   case class Call(name: String,
                   alias: Option[CallAlias],
                   afters: Vector[CallAfter],
-                  inputs: Option[CallInputs],
-                  loc: SourceLocation)
+                  inputs: Option[CallInputs])(val loc: SourceLocation)
       extends WorkflowElement
-  case class Scatter(identifier: String,
-                     expr: Expr,
-                     body: Vector[WorkflowElement],
-                     loc: SourceLocation)
-      extends WorkflowElement
-  case class Conditional(expr: Expr, body: Vector[WorkflowElement], loc: SourceLocation)
+  case class Scatter(identifier: String, expr: Expr, body: Vector[WorkflowElement])(
+      val loc: SourceLocation
+  ) extends WorkflowElement
+  case class Conditional(expr: Expr, body: Vector[WorkflowElement])(val loc: SourceLocation)
       extends WorkflowElement
 
   case class Workflow(name: String,
@@ -163,16 +160,14 @@ object ConcreteSyntax {
                       output: Option[OutputSection],
                       meta: Option[MetaSection],
                       parameterMeta: Option[ParameterMetaSection],
-                      body: Vector[WorkflowElement],
-                      loc: SourceLocation)
+                      body: Vector[WorkflowElement])(val loc: SourceLocation)
       extends Element
 
-  case class Version(value: WdlVersion = WdlVersion.V2, loc: SourceLocation) extends Element
+  case class Version(value: WdlVersion = WdlVersion.V2)(val loc: SourceLocation) extends Element
   case class Document(source: FileNode,
                       version: Version,
                       elements: Vector[DocumentElement],
                       workflow: Option[Workflow],
-                      loc: SourceLocation,
-                      comments: CommentMap)
+                      comments: CommentMap)(val loc: SourceLocation)
       extends Element
 }

@@ -1,12 +1,11 @@
 package wdlTools.generators.project
 
 import java.nio.file.Paths
-
 import wdlTools.generators.{Renderer, code}
 import wdlTools.generators.code.WdlFormatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{CommentMap, Parsers, WdlParser, WdlVersion}
+import wdlTools.syntax.{CommentMap, Parsers, SourceLocation, WdlParser, WdlVersion}
 import dx.util.{FileUtils, InteractiveConsole}
 
 import scala.util.control.Breaks._
@@ -50,25 +49,25 @@ case class ProjectGenerator(name: String,
 
   def containsFile(dataType: Type): Boolean = {
     dataType match {
-      case _: TypeFile               => true
-      case TypeArray(t, _, _)        => containsFile(t)
-      case TypeMap(k, v, _)          => containsFile(k) || containsFile(v)
-      case TypePair(l, r, _)         => containsFile(l) || containsFile(r)
-      case TypeStruct(_, members, _) => members.exists(x => containsFile(x.wdlType))
-      case _                         => false
+      case _: TypeFile            => true
+      case TypeArray(t, _)        => containsFile(t)
+      case TypeMap(k, v)          => containsFile(k) || containsFile(v)
+      case TypePair(l, r)         => containsFile(l) || containsFile(r)
+      case TypeStruct(_, members) => members.exists(x => containsFile(x.wdlType))
+      case _                      => false
     }
   }
 
   def requiresEvaluation(expr: Expr): Boolean = {
     expr match {
       case _: ValueString | _: ValueBoolean | _: ValueInt | _: ValueFloat => false
-      case ExprPair(l, r, _)                                              => requiresEvaluation(l) || requiresEvaluation(r)
-      case ExprArray(value, _)                                            => value.exists(requiresEvaluation)
-      case ExprMap(value, _) =>
+      case ExprPair(l, r)                                                 => requiresEvaluation(l) || requiresEvaluation(r)
+      case ExprArray(value)                                               => value.exists(requiresEvaluation)
+      case ExprMap(value) =>
         value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
-      case ExprObject(members, _)    => members.exists(member => requiresEvaluation(member.value))
-      case ExprStruct(_, members, _) => members.exists(member => requiresEvaluation(member.value))
-      case _                         => true
+      case ExprObject(members)    => members.exists(member => requiresEvaluation(member.value))
+      case ExprStruct(_, members) => members.exists(member => requiresEvaluation(member.value))
+      case _                      => true
     }
   }
 
@@ -77,22 +76,21 @@ case class ProjectGenerator(name: String,
       throw new Exception("Cannot use an expression that requires evaluation")
     }
     expr match {
-      case ValueString(value, text)  => MetaValueString(value, text)
-      case ValueInt(value, text)     => MetaValueInt(value, text)
-      case ValueFloat(value, text)   => MetaValueFloat(value, text)
-      case ValueBoolean(value, text) => MetaValueBoolean(value, text)
-      case ExprArray(value, text)    => MetaValueArray(value.map(exprToMetaValue), text)
-      case ExprObject(value, text) =>
-        MetaValueObject(
-            value.map {
-              case ExprMember(key, value, text) =>
-                val keyStr = exprToMetaValue(key) match {
-                  case MetaValueString(s, _) => s
-                  case _                     => throw new Exception(s"Invalid meta object key ${key}")
-                }
-                MetaKV(keyStr, exprToMetaValue(value), text)
-            },
-            text
+      case ValueString(value)  => MetaValueString(value)(expr.loc)
+      case ValueInt(value)     => MetaValueInt(value)(expr.loc)
+      case ValueFloat(value)   => MetaValueFloat(value)(expr.loc)
+      case ValueBoolean(value) => MetaValueBoolean(value)(expr.loc)
+      case ExprArray(value)    => MetaValueArray(value.map(exprToMetaValue))(expr.loc)
+      case ExprObject(value) =>
+        MetaValueObject(value.map {
+          case ExprMember(key, value) =>
+            val keyStr = exprToMetaValue(key) match {
+              case MetaValueString(s) => s
+              case _                  => throw new Exception(s"Invalid meta object key ${key}")
+            }
+            MetaKV(keyStr, exprToMetaValue(value))(expr.loc)
+        })(
+            expr.loc
         )
       case other => throw new Exception(s"Invalid meta value ${other}")
     }
@@ -284,11 +282,10 @@ case class ProjectGenerator(name: String,
     }
 
     val doc = Document(null,
-                       Version(wdlVersion, null),
+                       Version(wdlVersion)(SourceLocation.empty),
                        tasksAndLinkedInputs.map(_._1),
                        workflowModel.map(_.toWorkflow(tasksAndLinkedInputs)),
-                       null,
-                       CommentMap.empty)
+                       CommentMap.empty)(SourceLocation.empty)
     val wdlName = s"${name}.wdl"
     val wdlFile = Map(
         wdlName -> FileUtils.linesToString(formatter.formatDocument(doc), trailingNewline = true)
@@ -337,35 +334,37 @@ object ProjectGenerator {
                         choices: Seq[MetaValue] = Vector.empty,
                         linked: Boolean = false) {
     def toDeclaration: Declaration = {
-      Declaration(name, dataType, None, null)
+      Declaration(name, dataType, None)(SourceLocation.empty)
     }
 
     def toMeta: Option[MetaKV] = {
       val metaMap: Vector[MetaKV] = Map(
-          "label" -> label.map(MetaValueString(_, null)),
-          "help" -> help.map(MetaValueString(_, null)),
+          "label" -> label.map(MetaValueString(_)(SourceLocation.empty)),
+          "help" -> help.map(MetaValueString(_)(SourceLocation.empty)),
           "patterns" -> (if (patterns.isEmpty) {
                            None
                          } else {
                            Some(
-                               MetaValueArray(patterns.map(MetaValueString(_, null)).toVector, null)
+                               MetaValueArray(
+                                   patterns.map(MetaValueString(_)(SourceLocation.empty)).toVector
+                               )(SourceLocation.empty)
                            )
                          }),
           "default" -> default,
           "choices" -> (if (choices.isEmpty) {
                           None
                         } else {
-                          Some(MetaValueArray(choices.toVector, null))
+                          Some(MetaValueArray(choices.toVector)(SourceLocation.empty))
                         })
       ).collect {
           case (key, Some(value)) => key -> value
         }
-        .map(item => MetaKV(item._1, item._2, null))
+        .map(item => MetaKV(item._1, item._2)(SourceLocation.empty))
         .toVector
       if (metaMap.isEmpty) {
         None
       } else {
-        Some(MetaKV(name, MetaValueObject(metaMap, null), null))
+        Some(MetaKV(name, MetaValueObject(metaMap)(SourceLocation.empty))(SourceLocation.empty))
       }
     }
   }
@@ -374,7 +373,7 @@ object ProjectGenerator {
     if (inputs.isEmpty) {
       (None, Set.empty)
     } else {
-      val inputSection = InputSection(inputs.map(_.toDeclaration), null)
+      val inputSection = InputSection(inputs.map(_.toDeclaration))(SourceLocation.empty)
       val linkedInputs = inputs.collect {
         case f: FieldModel if f.linked => f.name
       }.toSet
@@ -386,7 +385,7 @@ object ProjectGenerator {
     if (outputs.isEmpty) {
       None
     } else {
-      Some(OutputSection(outputs.map(_.toDeclaration), null))
+      Some(OutputSection(outputs.map(_.toDeclaration))(SourceLocation.empty))
     }
   }
 
@@ -396,8 +395,9 @@ object ProjectGenerator {
     } else {
       Some(
           MetaSection(items.map {
-            case (key, value) => MetaKV(key, MetaValueString(value, null), null)
-          }.toVector, null)
+            case (key, value) =>
+              MetaKV(key, MetaValueString(value)(SourceLocation.empty))(SourceLocation.empty)
+          }.toVector)(SourceLocation.empty)
       )
     }
   }
@@ -410,7 +410,7 @@ object ProjectGenerator {
       if (inputMetaKVs.isEmpty) {
         None
       } else {
-        Some(ParameterMetaSection(inputMetaKVs, null))
+        Some(ParameterMetaSection(inputMetaKVs)(SourceLocation.empty))
       }
     }
   }
@@ -428,7 +428,7 @@ object ProjectGenerator {
           name.get,
           inputSection,
           getOutput(outputs),
-          CommandSection(Vector.empty, null),
+          CommandSection(Vector.empty)(SourceLocation.empty),
           Vector.empty,
           getMeta(
               Map("title" -> title, "summary" -> summary, description -> "description").collect {
@@ -437,11 +437,16 @@ object ProjectGenerator {
           ),
           getParameterMeta(inputs),
           Some(
-              RuntimeSection(Vector(RuntimeKV("docker", ValueString(docker.get, null), null)), null)
+              RuntimeSection(
+                  Vector(
+                      RuntimeKV("docker", ValueString(docker.get)(SourceLocation.empty))(
+                          SourceLocation.empty
+                      )
+                  )
+              )(SourceLocation.empty)
           ),
-          None,
-          null
-      )
+          None
+      )(SourceLocation.empty)
       (task, linkedInputs)
     }
   }
@@ -459,18 +464,26 @@ object ProjectGenerator {
           val callInputs: Option[CallInputs] = if (task.input.isDefined) {
             def getInputValue(inp: Declaration): Option[CallInput] = {
               if (linkedInputs.contains(inp.name)) {
-                Some(CallInput(inp.name, ExprIdentifier(inp.name, null), null))
+                Some(
+                    CallInput(inp.name, ExprIdentifier(inp.name)(SourceLocation.empty))(
+                        SourceLocation.empty
+                    )
+                )
               } else if (inp.wdlType.isInstanceOf[TypeOptional]) {
                 None
               } else {
-                Some(CallInput(inp.name, ValueString("set my value!", null), null))
+                Some(
+                    CallInput(inp.name, ValueString("set my value!")(SourceLocation.empty))(
+                        SourceLocation.empty
+                    )
+                )
               }
             }
-            Some(CallInputs(task.input.get.parameters.flatMap(getInputValue), null))
+            Some(CallInputs(task.input.get.parameters.flatMap(getInputValue))(SourceLocation.empty))
           } else {
             None
           }
-          Call(task.name, None, Vector.empty, callInputs, null)
+          Call(task.name, None, Vector.empty, callInputs)(SourceLocation.empty)
       }
 
       val (wfInputSection, _) = getInput(inputs)
@@ -484,9 +497,8 @@ object ProjectGenerator {
               }
           ),
           getParameterMeta(inputs),
-          calls,
-          null
-      )
+          calls
+      )(SourceLocation.empty)
     }
   }
 }
