@@ -203,65 +203,70 @@ wdl_type
     | SQUOTE string_part string_expr_with_string_part* SQUOTE
     ;
    */
-  private def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
-    val (quoting, stringParts, stringExprWithStringPart) = ctx match {
-      case sq: WdlDraft2Parser.Squote_stringContext =>
-        (Quoting.Single, sq.string_parts(), sq.string_expr_with_string_part())
-      case dq: WdlDraft2Parser.Dquote_stringContext =>
-        (Quoting.Double, dq.string_parts(), dq.string_expr_with_string_part())
-    }
+  private def visitString(
+      quoting: Quoting.Quoting,
+      stringParts: WdlDraft2Parser.String_partsContext,
+      stringExprWithStringPart: scala.collection.Seq[
+          WdlDraft2Parser.String_expr_with_string_partContext
+      ],
+      ctx: WdlDraft2Parser.StringContext
+  ): Expr = {
     val stringPart = visitString_parts(stringParts)
-    val exprPart: Vector[Expr] = stringExprWithStringPart.asScala
+    val exprPart: Vector[Expr] = stringExprWithStringPart
       .map(visitString_expr_with_string_part)
       .toVector
       .flatMap(_.value)
     (stringPart, exprPart) match {
-      case (s: ExprString, Vector()) => s.copy(quoting = Some(quoting))(s.loc)
+      case (s: ExprString, Vector()) => s.copy(quoting = quoting)(s.loc)
       case (ExprString(s, _), parts) if s.isEmpty =>
-        ExprCompoundString(parts, quoting = Some(quoting))(
+        ExprCompoundString(parts, quoting = quoting)(
             getSourceLocation(grammar.docSource, ctx)
         )
       case (s, parts) =>
-        ExprCompoundString(s +: parts, quoting = Some(quoting))(
+        ExprCompoundString(s +: parts, quoting = quoting)(
             getSourceLocation(grammar.docSource, ctx)
         )
     }
   }
 
+  override def visitSquote_string(ctx: WdlDraft2Parser.Squote_stringContext): Expr = {
+    visitString(Quoting.Single, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
+  override def visitDquote_string(ctx: WdlDraft2Parser.Dquote_stringContext): Expr = {
+    visitString(Quoting.Double, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
   /* expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
-  | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
-  ; */
+    : BoolLiteral EQUAL string
+    | DEFAULT EQUAL expr
+    | SEP EQUAL string
+    ; */
   private def parse_placeholder_option(
       ctx: WdlDraft2Parser.Expression_placeholder_optionContext
   ): (String, Expr) = {
-    val expr: Expr =
-      try {
-        visitString(ctx.string())
-      } catch {
-        case _: NullPointerException =>
-          val loc = getSourceLocation(grammar.docSource, ctx)
-          if (ctx.number() != null) {
-            grammar.logger.warning(
-                s"""A placeholder option at ${loc} has a numeric value;
-                   |only string values are allowed.""".stripMargin
-            )
-            visitNumber(ctx.number())
-          } else {
-            throw new SyntaxException("Placeholder options must be strings", loc)
-          }
+    if (ctx.DEFAULT() != null) {
+      ("default", visitExpr(ctx.expr()))
+    } else {
+      val optionType = if (ctx.BoolLiteral() != null) {
+        ctx.BoolLiteral().getText.toLowerCase()
+      } else if (ctx.SEP() != null) {
+        "sep"
+      } else {
+        throw new SyntaxException(s"unrecognized placeholder option",
+                                  getSourceLocation(grammar.docSource, ctx))
+      }
+      val expr: Expr = if (ctx.string() != null) {
+        ctx.string() match {
+          case sq: WdlDraft2Parser.Squote_stringContext => visitSquote_string(sq)
+          case dq: WdlDraft2Parser.Dquote_stringContext => visitDquote_string(dq)
+        }
+      } else {
+        throw new SyntaxException(s"${optionType} placeholder option value must be a string",
+                                  getSourceLocation(grammar.docSource, ctx))
       }
 
-    if (ctx.BoolLiteral() != null) {
-      (ctx.BoolLiteral().getText.toLowerCase(), expr)
-    } else if (ctx.DEFAULT() != null) {
-      ("default", expr)
-    } else if (ctx.SEP() != null) {
-      ("sep", expr)
-    } else {
-      throw new SyntaxException(s"Not one of three known variants of a placeholder",
-                                getSourceLocation(grammar.docSource, ctx))
+      (optionType, expr)
     }
   }
 
@@ -289,7 +294,8 @@ wdl_type
       // according to the spec, only one of true/false, sep, or default is allowed; however,
       // some "industry standard" workflows are not spec compliant and mix default with either
       // sep or true/false, so we are compelled to allow it
-      if (placeholder.trueOpt.isDefined != placeholder.falseOpt.isDefined || placeholder.trueOpt.isDefined && placeholder.sepOpt.isDefined) {
+      if (placeholder.trueOpt.isDefined != placeholder.falseOpt.isDefined ||
+          placeholder.trueOpt.isDefined && placeholder.sepOpt.isDefined) {
         throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
       }
       placeholder
@@ -309,7 +315,10 @@ wdl_type
     } else if (ctx.number() != null) {
       visitNumber(ctx.number())
     } else if (ctx.string() != null) {
-      visitString(ctx.string())
+      ctx.string() match {
+        case sq: WdlDraft2Parser.Squote_stringContext => visitSquote_string(sq)
+        case dq: WdlDraft2Parser.Dquote_stringContext => visitDquote_string(dq)
+      }
     } else if (ctx.Identifier() != null) {
       ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
     } else {
@@ -820,8 +829,8 @@ any_decls
         ctx.task_command_string_parts()
     )
     (exprPart, stringPart) match {
-      case (e, ExprString(s, None)) if s.isEmpty => e
-      case (ExprString(e, None), s) if e.isEmpty => s
+      case (e, ExprString(s, Quoting.None)) if s.isEmpty => e
+      case (ExprString(e, Quoting.None), s) if e.isEmpty => s
       case (e, s) =>
         ExprCompoundString(Vector(e, s))(getSourceLocation(grammar.docSource, ctx))
     }
@@ -840,9 +849,9 @@ any_decls
       .toVector
     // discard empty strings, and flatten compound vectors of strings
     val cleanedParts = (start +: parts).flatMap {
-      case ExprString(x, _) if x.isEmpty => Vector.empty
-      case ExprCompoundString(v, None)   => v
-      case other                         => Vector(other)
+      case ExprString(x, _) if x.isEmpty       => Vector.empty
+      case ExprCompoundString(v, Quoting.None) => v
+      case other                               => Vector(other)
     }
     CommandSection(cleanedParts)(getSourceLocation(grammar.docSource, ctx))
   }

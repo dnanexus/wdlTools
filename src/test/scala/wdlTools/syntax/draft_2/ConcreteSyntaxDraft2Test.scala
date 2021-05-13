@@ -1,11 +1,10 @@
 package wdlTools.syntax.draft_2
 
 import java.nio.file.Paths
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
-import wdlTools.syntax.{Comment, SourceLocation, SyntaxException}
+import wdlTools.syntax.{Comment, Quoting, SourceLocation, SyntaxException}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
@@ -89,13 +88,13 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
       case Declaration("i", _: TypeInt, Some(ExprInt(3))) =>
     }
     task.input.get.declarations(1) should matchPattern {
-      case Declaration("s", _: TypeString, Some(ExprString("hello world"))) =>
+      case Declaration("s", _: TypeString, Some(ExprString("hello world", Quoting.Double))) =>
     }
     task.input.get.declarations(2) should matchPattern {
       case Declaration("x", _: TypeFloat, Some(ExprFloat(4.3))) =>
     }
     task.input.get.declarations(3) should matchPattern {
-      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt"))) =>
+      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt", Quoting.Double))) =>
     }
     task.input.get.declarations(4) should matchPattern {
       case Declaration("b", _: TypeBoolean, Some(ExprBoolean(false))) =>
@@ -125,7 +124,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     task.input.get.declarations(9) should matchPattern {
       case Declaration("twenty_threes",
                        TypePair(TypeInt(), TypeString()),
-                       Some(ExprPair(ExprInt(23), ExprString("twenty-three")))) =>
+                       Some(ExprPair(ExprInt(23), ExprString("twenty-three", Quoting.Double)))) =>
     }
 
     // Logical expressions
@@ -291,7 +290,8 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     task.command shouldBe a[CommandSection]
     task.command.parts.size shouldBe 3
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ") =>
+      case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ",
+                      Quoting.Double) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprIdentifier("inp_file") =>
@@ -301,14 +301,14 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", "Robin Hood") =>
+      case MetaKV("author", "Robin Hood", Quoting.Double) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", "just because") =>
+      case MetaKV("inp_file", "just because", Quoting.Double) =>
     }
   }
 
@@ -338,12 +338,12 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
 
     task.command shouldBe a[CommandSection]
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    echo ") =>
+      case ExprString("\n    echo ", Quoting.Double) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprPlaceholder(None,
                            None,
-                           Some(ExprString(",")),
+                           Some(ExprString(",", Quoting.Double)),
                            None,
                            ExprIdentifier("min_std_max_min")) =>
     }
@@ -403,7 +403,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     wf.meta.get.kvs.size shouldEqual 1
     wf.meta.get.kvs.head.value shouldEqual "Robert Heinlein"
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", "Robert Heinlein")) =>
+      case Vector(MetaKV("author", "Robert Heinlein", Quoting.Double)) =>
     }
   }
 

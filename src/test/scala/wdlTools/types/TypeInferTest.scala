@@ -82,7 +82,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
           case TAT.ExprObject(members, WdlTypes.T_Struct("Name", types)) =>
             types shouldBe typesMap
             val objMembers = members.map {
-              case (TAT.ValueString(key, WdlTypes.T_String), value) => key -> value
+              case (TAT.ValueString(key, WdlTypes.T_String, _), value) => key -> value
               case other =>
                 throw new Exception(s"invalid object key ${other}")
             }

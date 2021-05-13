@@ -46,6 +46,10 @@ class AllParseTreeListener
   def exitNumber(ctx: ParserRuleContext): Unit = {}
   def enterExpression_placeholder_option(ctx: ParserRuleContext): Unit = {}
   def exitExpression_placeholder_option(ctx: ParserRuleContext): Unit = {}
+  def enterSquote_string(ctx: ParserRuleContext): Unit = {}
+  def exitSquote_string(ctx: ParserRuleContext): Unit = {}
+  def enterDquote_string(ctx: ParserRuleContext): Unit = {}
+  def exitDquote_string(ctx: ParserRuleContext): Unit = {}
   def enterString_part(ctx: ParserRuleContext): Unit = {}
   def exitString_part(ctx: ParserRuleContext): Unit = {}
   def enterString_parts(ctx: ParserRuleContext): Unit = {}
@@ -308,6 +312,18 @@ class AllParseTreeListener
   ): Unit = {
     exitExpression_placeholder_option(ctx.asInstanceOf[ParserRuleContext])
   }
+  override def enterDquote_string(ctx: WdlDraft2Parser.Dquote_stringContext): Unit = {
+    enterDquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitDquote_string(ctx: WdlDraft2Parser.Dquote_stringContext): Unit = {
+    exitDquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterSquote_string(ctx: WdlDraft2Parser.Squote_stringContext): Unit = {
+    enterSquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitSquote_string(ctx: WdlDraft2Parser.Squote_stringContext): Unit = {
+    exitSquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
   override def enterString_part(ctx: WdlDraft2Parser.String_partContext): Unit = {
     enterString_part(ctx.asInstanceOf[ParserRuleContext])
   }
@@ -335,12 +351,6 @@ class AllParseTreeListener
       ctx: WdlDraft2Parser.String_expr_with_string_partContext
   ): Unit = {
     exitString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
-  }
-  override def enterString(ctx: WdlDraft2Parser.StringContext): Unit = {
-    enterString(ctx.asInstanceOf[ParserRuleContext])
-  }
-  override def exitString(ctx: WdlDraft2Parser.StringContext): Unit = {
-    exitString(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPrimitive_literal(ctx: WdlDraft2Parser.Primitive_literalContext): Unit = {
     enterPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])

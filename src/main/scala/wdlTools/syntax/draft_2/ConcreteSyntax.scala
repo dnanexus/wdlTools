@@ -32,7 +32,7 @@ object ConcreteSyntax {
 
   // expressions
   sealed trait Expr extends Element
-  case class ExprString(value: String, quoting: Option[Quoting.Quoting] = None)(
+  case class ExprString(value: String, quoting: Quoting.Quoting = Quoting.None)(
       val loc: SourceLocation
   ) extends Expr
   case class ExprBoolean(value: Boolean)(val loc: SourceLocation) extends Expr
@@ -42,7 +42,7 @@ object ConcreteSyntax {
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr], quoting: Option[Quoting.Quoting] = None)(
+  case class ExprCompoundString(value: Vector[Expr], quoting: Quoting.Quoting = Quoting.None)(
       val loc: SourceLocation
   ) extends Expr
   case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
@@ -121,7 +121,7 @@ object ConcreteSyntax {
   case class RuntimeSection(kvs: Vector[RuntimeKV])(val loc: SourceLocation) extends Element
 
   // meta section
-  case class MetaKV(id: String, value: String, quoting: Quoting.Quoting)(
+  case class MetaKV(id: String, value: String, quoting: Quoting.Quoting = Quoting.None)(
       val loc: SourceLocation
   ) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element

@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.syntax.Operator
+import wdlTools.syntax.{Operator, Quoting}
 import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import dx.util.AbstractBindings
@@ -364,8 +364,10 @@ object TypeUtils {
         case TAT.ValueFloat(value, _)            => value.toString
 
         // add double quotes around string-like value unless disableQuoting = true
-        case TAT.ValueString(value, _) =>
-          if (disableQuoting) value else s""""$value""""
+        case TAT.ValueString(value, _, _) if disableQuoting => value
+        case TAT.ValueString(value, _, Quoting.None)        => value
+        case TAT.ValueString(value, _, Quoting.Single)      => s"""'$value'"""
+        case TAT.ValueString(value, _, Quoting.Double)      => s""""$value""""
         case TAT.ValueFile(value, _) =>
           if (disableQuoting) value else s""""$value""""
         case TAT.ValueDirectory(value, _) =>
@@ -373,9 +375,9 @@ object TypeUtils {
 
         case TAT.ExprIdentifier(id: String, _) => id
 
-        case TAT.ExprCompoundString(value, _) =>
+        case TAT.ExprCompoundString(value, _, quoting) =>
           val vec = value.map(x => inner(x, disableQuoting)).mkString(", ")
-          s"ExprCompoundString(${vec})"
+          s"ExprCompoundString(${vec}; quoting=${quoting})"
         case TAT.ExprPair(l, r, _) =>
           s"(${inner(l, disableQuoting)}, ${inner(r, disableQuoting)})"
         case TAT.ExprArray(value, _) =>
@@ -474,7 +476,7 @@ object TypeUtils {
         Map.empty
       case TAT.ExprIdentifier(id, wdlType) =>
         Map(id -> wdlType)
-      case TAT.ExprCompoundString(valArr, _) =>
+      case TAT.ExprCompoundString(valArr, _, _) =>
         valArr.flatMap(elem => exprDependencies(elem)).toMap
       case TAT.ExprPair(l, r, _) =>
         exprDependencies(l) ++ exprDependencies(r)

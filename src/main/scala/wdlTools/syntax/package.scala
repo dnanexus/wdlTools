@@ -186,5 +186,5 @@ object CommentMap {
 
 object Quoting extends Enum {
   type Quoting = Value
-  val Single, Double = Value
+  val None, Single, Double = Value
 }

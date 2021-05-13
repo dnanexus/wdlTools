@@ -40,7 +40,7 @@ The following commands are currently available. They should be considered "beta"
   * Note: this command is not yet full-featured. You may want to also use [miniwdl](https://github.com/chanzuckerberg/miniwdl) `lint`.
 * [new](doc/Commands/New.md): generate a new WDL project
 * [printTree](doc/Commands/PrintTree.md): print the Abstract Syntax Tree for a WDL document
-* [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxWDL](https://github.com/dnanexus/dxWDL)
+* [readmes](doc/Commands/Readmes.md): generate README files for the tasks/workflows in a WDL file - these files are named so that they will be recognized when building DNAnexus apps/workflows using [dxCompiler](https://github.com/dnanexus/dxCompiler)
 * [upgrade](doc/Commands/Upgrade.md): upgrade a WDL file to a newer version; currently only draft-2 -> [1.0, 1.1] is supported
 
 

@@ -250,7 +250,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               val (e2, t2) = nestedStringExpr(subExpr, nextState, t, initialType)
               (v :+ e2, t2)
           }
-          TAT.ExprCompoundString(vec2, wdlType)(e.loc)
+          TAT.ExprCompoundString(vec2, wdlType, e.quoting)(e.loc)
         case _ =>
           // the next state for any other nested expression - if we're already in a String,
           // then any nested expression must occur within a placeholder
@@ -265,7 +265,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ValueBoolean => TAT.ValueBoolean(e.value, T_Boolean)(e.loc)
             case e: AST.ValueInt     => TAT.ValueInt(e.value, T_Int)(e.loc)
             case e: AST.ValueFloat   => TAT.ValueFloat(e.value, T_Float)(e.loc)
-            case e: AST.ValueString  => TAT.ValueString(e.value, T_String)(e.loc)
+            case e: AST.ValueString  => TAT.ValueString(e.value, T_String, e.quoting)(e.loc)
 
             // complex types
             case e: AST.ExprPair =>
@@ -729,7 +729,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case v: AST.MetaValueBoolean => TAT.MetaValueBoolean(v.value)(v.loc)
       case v: AST.MetaValueInt     => TAT.MetaValueInt(v.value)(v.loc)
       case v: AST.MetaValueFloat   => TAT.MetaValueFloat(v.value)(v.loc)
-      case v: AST.MetaValueString  => TAT.MetaValueString(v.value)(v.loc)
+      case v: AST.MetaValueString  => TAT.MetaValueString(v.value, v.quoting)(v.loc)
       case v: AST.MetaValueArray =>
         TAT.MetaValueArray(v.value.map(applyMetaValue(_, ctx)))(v.loc)
       case v: AST.MetaValueObject =>

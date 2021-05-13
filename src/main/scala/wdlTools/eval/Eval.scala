@@ -272,7 +272,7 @@ case class Eval(paths: EvalPaths,
           throw new EvalException(s"identifier ${id} not found")
 
         // interpolation
-        case TAT.ExprCompoundString(value, _) =>
+        case TAT.ExprCompoundString(value, _, _) =>
           // concatenate an array of strings inside an expression/command block
           val strArray: Vector[String] = value.map { expr =>
             val v = inner(expr, updatedCtx.advanceState(Some(ExprState.InString)))
