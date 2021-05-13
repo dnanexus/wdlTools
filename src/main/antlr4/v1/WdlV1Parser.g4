@@ -67,8 +67,8 @@ string_expr_with_string_part
   ;
 
 string
-  : DQUOTE string_parts string_expr_with_string_part* DQUOTE
-  | SQUOTE string_parts string_expr_with_string_part* SQUOTE
+  : DQUOTE string_parts string_expr_with_string_part* DQUOTE #dquote_string
+  | SQUOTE string_parts string_expr_with_string_part* SQUOTE #squote_string
   ;
 
 primitive_literal
@@ -183,8 +183,8 @@ meta_string_parts
   ;
 
 meta_string
-  : MetaDquote meta_string_parts MetaDquote
-  | MetaSquote meta_string_parts MetaSquote
+  : MetaDquote meta_string_parts MetaDquote #meta_dquote_string
+  | MetaSquote meta_string_parts MetaSquote #meta_squote_string
   ;
 
 meta_array

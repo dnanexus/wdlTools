@@ -1,6 +1,6 @@
 package wdlTools.syntax.v2
 
-import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, WdlVersion}
 import dx.util.FileNode
 
 // A concrete syntax for the Workflow Description Language (WDL). This shouldn't be used
@@ -33,7 +33,9 @@ object ConcreteSyntax {
   // expressions
   sealed trait Expr extends Element
   case class ExprNone()(val loc: SourceLocation) extends Expr
-  case class ExprString(value: String)(val loc: SourceLocation) extends Expr
+  case class ExprString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Expr
   case class ExprBoolean(value: Boolean)(val loc: SourceLocation) extends Expr
   case class ExprInt(value: Long)(val loc: SourceLocation) extends Expr
   case class ExprFloat(value: Double)(val loc: SourceLocation) extends Expr
@@ -41,7 +43,9 @@ object ConcreteSyntax {
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr])(val loc: SourceLocation) extends Expr
+  case class ExprCompoundString(value: Vector[Expr], quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Expr
   case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
   case class ExprMapLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
   case class ExprObjectLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
@@ -108,7 +112,9 @@ object ConcreteSyntax {
   case class MetaValueBoolean(value: Boolean)(val loc: SourceLocation) extends MetaValue
   case class MetaValueInt(value: Long)(val loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double)(val loc: SourceLocation) extends MetaValue
-  case class MetaValueString(value: String)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends MetaValue
   case class MetaValueObject(value: Vector[MetaKV])(val loc: SourceLocation) extends MetaValue
   case class MetaValueArray(value: Vector[MetaValue])(val loc: SourceLocation) extends MetaValue
   // meta section

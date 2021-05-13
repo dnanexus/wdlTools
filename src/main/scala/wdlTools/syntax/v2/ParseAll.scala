@@ -43,7 +43,7 @@ case class ParseAll(followImports: Boolean = false,
       e match {
         // value
         case e: CST.ExprNone    => AST.ValueNone()(e.loc)
-        case e: CST.ExprString  => AST.ValueString(e.value)(e.loc)
+        case e: CST.ExprString  => AST.ValueString(e.value, e.quoting)(e.loc)
         case e: CST.ExprBoolean => AST.ValueBoolean(e.value)(e.loc)
         case e: CST.ExprInt     => AST.ValueInt(e.value)(e.loc)
         case e: CST.ExprFloat   => AST.ValueFloat(e.value)(e.loc)
@@ -51,7 +51,7 @@ case class ParseAll(followImports: Boolean = false,
         // compound values
         case e: CST.ExprIdentifier => AST.ExprIdentifier(e.id)(e.loc)
         case e: CST.ExprCompoundString =>
-          AST.ExprCompoundString(e.value.map(translateExpr))(e.loc)
+          AST.ExprCompoundString(e.value.map(translateExpr), e.quoting)(e.loc)
         case e: CST.ExprPair =>
           AST.ExprPair(translateExpr(e.l), translateExpr(e.r))(e.loc)
         case e: CST.ExprArrayLiteral =>
@@ -161,7 +161,7 @@ case class ParseAll(followImports: Boolean = false,
     private def translateMetaValue(value: CST.MetaValue): AST.MetaValue = {
       value match {
         // values
-        case v: CST.MetaValueString  => AST.MetaValueString(v.value)(v.loc)
+        case v: CST.MetaValueString  => AST.MetaValueString(v.value, v.quoting)(v.loc)
         case v: CST.MetaValueBoolean => AST.MetaValueBoolean(v.value)(v.loc)
         case v: CST.MetaValueInt     => AST.MetaValueInt(v.value)(v.loc)
         case v: CST.MetaValueFloat   => AST.MetaValueFloat(v.value)(v.loc)
