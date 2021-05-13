@@ -269,7 +269,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i2") shouldBe V_Int(13)
   }
 
-  private def evalCommand(file: Path): String = {
+  private def evalCommand(file: Path,
+                          bindings: WdlValueBindings = WdlValueBindings.empty): String = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -280,7 +281,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
+    val ctx = evaluator.applyPrivateVariables(task.privateVariables, bindings)
     evaluator.applyCommand(task.command, ctx)
   }
 

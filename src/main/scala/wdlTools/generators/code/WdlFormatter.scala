@@ -215,7 +215,7 @@ object WdlFormatter {
       if (!atLineStart) {
         // the line could have trailing whitespace, such as from a comment or
         // when a space was added prior to a line-wrap - trim it off
-        lines.append(currentLine.toString.replaceAll("""(?m)\s+$""", ""))
+        lines.append(currentLine.toString.replaceAll("""(?m)[ \t]+$""", ""))
         if (continue) {
           dent(indenting)
         } else {
@@ -1686,7 +1686,6 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     // of indent used on the first non-empty line and remove that from every line and replace
     // it by the lineFormatter's current indent level.
     private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
-    private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
     private val commandEndRegexp = "\\s+$".r
     private val commentRegexp = "#+\\s*(.+)".r
     //private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
@@ -1708,7 +1707,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         // The parser swallows anyting after the opening token ('{' or '<<<')
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately.
-        val (headExpr: Expr, indent, comment) = command.parts.head match {
+        val (headExpr: Expr, comment, indent) = command.parts.head match {
           case expr @ ValueString(value) =>
             value match {
               case commandStartRegexp(first, rest) =>
@@ -1718,34 +1717,25 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (ValueString("")(expr.loc), None, Some(s))
+                    (ValueString("")(expr.loc), Some(s), false)
                   case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment - we don't want to break
                     // anything so we'll just format the whole block as-is
-                    (s, None, None)
-                  case s if s.isEmpty || s.startsWith(Symbols.Comment) =>
-                    // opening line was empty or a comment
-                    val (ws, trimmedRest) = rest match {
-                      case leadingWhitespaceRegexp(ws, trimmedRest) => (Some(ws), trimmedRest)
-                      case _                                        => (None, rest)
-                    }
-                    // the first line will be indented, so we need to trim the indent from `rest`
-                    (ValueString(trimmedRest)(expr.loc), ws, Some(s))
+                    (expr, None, false)
+                  case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
+                    // the first is empty or a WDL comment, so we ignore it
+                    (ValueString(rest)(expr.loc), Some(s), false)
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (ValueString(s)(expr.loc), None, None)
-                  case s =>
-                    // opening line has some real content, so just trim any leading whitespace
-                    val ws = leadingWhitespaceRegexp
-                      .findFirstMatchIn(rest)
-                      .map(m => m.group(1))
-                    (ValueString(s"${s}\n${rest}")(expr.loc), ws, None)
+                    (ValueString(s)(expr.loc), None, true)
+                  case _ =>
+                    // opening line has some real content, so leave as-is
+                    (expr, None, false)
                 }
               case other =>
                 throw new RuntimeException(s"unexpected command part ${other}")
             }
-          case other =>
-            (other, None, None)
+          case other => (other, None, false)
         }
 
         def trimLast(last: Expr): Expr = {
@@ -1753,8 +1743,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             case ValueString(s) =>
               // If the last part is just the whitespace before the close block, throw it out
               ValueString(commandEndRegexp.replaceFirstIn(s, ""))(last.loc)
-            case other =>
-              other
+            case other => other
           }
         }
 
@@ -1776,28 +1765,25 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             lineFormatter.addInlineComment(command.loc.line, commentContent)
           case _ => ()
         }
-        lineFormatter.endLine()
 
-        val bodyFormatter = lineFormatter.derive(increaseIndent = true,
-                                                 newSpacing = Spacing.Off,
-                                                 newWrapping = Wrapping.Never)
-
-        val replaceIndent = indent.map { ws =>
-          // Function to replace indenting in command block expressions with the current
-          // indent level of the formatter
-          val indentRegexp = s"\n${ws}".r
-          val replacement = s"\n${bodyFormatter.getIndent()}"
-          (s: String) => indentRegexp.replaceAllIn(s, replacement)
+        val bodyFormatter = if (indent) {
+          lineFormatter.derive(newIndentSteps = Some(1),
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
+        } else {
+          lineFormatter.derive(newIndenting = Indenting.Never,
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
         }
 
+        bodyFormatter.endLine(continue = true)
         bodyFormatter.beginLine()
         newParts.foreach { expr =>
           bodyFormatter.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inCommand = true,
-                  stringModifier = replaceIndent
+                  inCommand = true
               )
           )
         }
