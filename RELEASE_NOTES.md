@@ -5,6 +5,8 @@
 * **Breaking changes**:
     * `loc` is moved from the first to second parameter section in all AST case classes to prevent it from being included in the `equals` and `hashCode` implementations
     * Some fields of AST case classes are renamed for greater clarity
+* Allows concatenation of `String` and non-`String` variables in draft2 and 1.x
+* Captures type of quotes used in strings (single or double) so they can be recapitulated by the code formatter/generator
 
 ## 0.12.11 (2021-05-07)
 

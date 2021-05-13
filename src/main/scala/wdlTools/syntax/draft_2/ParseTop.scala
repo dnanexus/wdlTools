@@ -820,8 +820,8 @@ any_decls
         ctx.task_command_string_parts()
     )
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => e
-      case (ExprString(e), s) if e.isEmpty => s
+      case (e, ExprString(s, None)) if s.isEmpty => e
+      case (ExprString(e, None), s) if e.isEmpty => s
       case (e, s) =>
         ExprCompoundString(Vector(e, s))(getSourceLocation(grammar.docSource, ctx))
     }
@@ -840,9 +840,9 @@ any_decls
       .toVector
     // discard empty strings, and flatten compound vectors of strings
     val cleanedParts = (start +: parts).flatMap {
-      case ExprString(x) if x.isEmpty => Vector.empty
-      case ExprCompoundString(v)      => v
-      case other                      => Vector(other)
+      case ExprString(x, _) if x.isEmpty => Vector.empty
+      case ExprCompoundString(v, None)   => v
+      case other                         => Vector(other)
     }
     CommandSection(cleanedParts)(getSourceLocation(grammar.docSource, ctx))
   }
