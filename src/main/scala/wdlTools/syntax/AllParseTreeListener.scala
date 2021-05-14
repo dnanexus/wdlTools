@@ -146,8 +146,10 @@ class AllParseTreeListener
   def exitMeta_string_part(ctx: ParserRuleContext): Unit = {}
   def enterMeta_string_parts(ctx: ParserRuleContext): Unit = {}
   def exitMeta_string_parts(ctx: ParserRuleContext): Unit = {}
-  def enterMeta_string(ctx: ParserRuleContext): Unit = {}
-  def exitMeta_string(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_squote_string(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_squote_string(ctx: ParserRuleContext): Unit = {}
+  def enterMeta_dquote_string(ctx: ParserRuleContext): Unit = {}
+  def exitMeta_dquote_string(ctx: ParserRuleContext): Unit = {}
   def enterMeta_array(ctx: ParserRuleContext): Unit = {}
   def exitMeta_array(ctx: ParserRuleContext): Unit = {}
   def enterMeta_object(ctx: ParserRuleContext): Unit = {}
@@ -920,11 +922,17 @@ class AllParseTreeListener
   ): Unit = {
     exitString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterString(ctx: WdlV1Parser.StringContext): Unit = {
-    enterString(ctx.asInstanceOf[ParserRuleContext])
+  override def enterDquote_string(ctx: WdlV1Parser.Dquote_stringContext): Unit = {
+    enterDquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitString(ctx: WdlV1Parser.StringContext): Unit = {
-    exitString(ctx.asInstanceOf[ParserRuleContext])
+  override def exitDquote_string(ctx: WdlV1Parser.Dquote_stringContext): Unit = {
+    exitDquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterSquote_string(ctx: WdlV1Parser.Squote_stringContext): Unit = {
+    enterSquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitSquote_string(ctx: WdlV1Parser.Squote_stringContext): Unit = {
+    exitSquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPrimitive_literal(ctx: WdlV1Parser.Primitive_literalContext): Unit = {
     enterPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1190,11 +1198,17 @@ class AllParseTreeListener
   override def exitMeta_string_parts(ctx: WdlV1Parser.Meta_string_partsContext): Unit = {
     exitMeta_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterMeta_string(ctx: WdlV1Parser.Meta_stringContext): Unit = {
-    enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def enterMeta_dquote_string(ctx: WdlV1Parser.Meta_dquote_stringContext): Unit = {
+    enterMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitMeta_string(ctx: WdlV1Parser.Meta_stringContext): Unit = {
-    exitMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def exitMeta_dquote_string(ctx: WdlV1Parser.Meta_dquote_stringContext): Unit = {
+    exitMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_squote_string(ctx: WdlV1Parser.Meta_squote_stringContext): Unit = {
+    enterMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_squote_string(ctx: WdlV1Parser.Meta_squote_stringContext): Unit = {
+    exitMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMeta_array(ctx: WdlV1Parser.Meta_arrayContext): Unit = {
     enterMeta_array(ctx.asInstanceOf[ParserRuleContext])
@@ -1521,11 +1535,17 @@ class AllParseTreeListener
   ): Unit = {
     exitString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterString(ctx: WdlV1_1Parser.StringContext): Unit = {
-    enterString(ctx.asInstanceOf[ParserRuleContext])
+  override def enterDquote_string(ctx: WdlV1_1Parser.Dquote_stringContext): Unit = {
+    enterDquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitString(ctx: WdlV1_1Parser.StringContext): Unit = {
-    exitString(ctx.asInstanceOf[ParserRuleContext])
+  override def exitDquote_string(ctx: WdlV1_1Parser.Dquote_stringContext): Unit = {
+    exitDquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterSquote_string(ctx: WdlV1_1Parser.Squote_stringContext): Unit = {
+    enterSquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitSquote_string(ctx: WdlV1_1Parser.Squote_stringContext): Unit = {
+    exitSquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPrimitive_literal(ctx: WdlV1_1Parser.Primitive_literalContext): Unit = {
     enterPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1797,11 +1817,17 @@ class AllParseTreeListener
   override def exitMeta_string_parts(ctx: WdlV1_1Parser.Meta_string_partsContext): Unit = {
     exitMeta_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterMeta_string(ctx: WdlV1_1Parser.Meta_stringContext): Unit = {
-    enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def enterMeta_dquote_string(ctx: WdlV1_1Parser.Meta_dquote_stringContext): Unit = {
+    enterMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitMeta_string(ctx: WdlV1_1Parser.Meta_stringContext): Unit = {
-    exitMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def exitMeta_dquote_string(ctx: WdlV1_1Parser.Meta_dquote_stringContext): Unit = {
+    exitMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_squote_string(ctx: WdlV1_1Parser.Meta_squote_stringContext): Unit = {
+    enterMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_squote_string(ctx: WdlV1_1Parser.Meta_squote_stringContext): Unit = {
+    exitMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMeta_array(ctx: WdlV1_1Parser.Meta_arrayContext): Unit = {
     enterMeta_array(ctx.asInstanceOf[ParserRuleContext])
@@ -2135,11 +2161,17 @@ class AllParseTreeListener
   ): Unit = {
     exitString_expr_with_string_part(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterString(ctx: WdlV2Parser.StringContext): Unit = {
-    enterString(ctx.asInstanceOf[ParserRuleContext])
+  override def enterDquote_string(ctx: WdlV2Parser.Dquote_stringContext): Unit = {
+    enterDquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitString(ctx: WdlV2Parser.StringContext): Unit = {
-    exitString(ctx.asInstanceOf[ParserRuleContext])
+  override def exitDquote_string(ctx: WdlV2Parser.Dquote_stringContext): Unit = {
+    exitDquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterSquote_string(ctx: WdlV2Parser.Squote_stringContext): Unit = {
+    enterSquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitSquote_string(ctx: WdlV2Parser.Squote_stringContext): Unit = {
+    exitSquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPrimitive_literal(ctx: WdlV2Parser.Primitive_literalContext): Unit = {
     enterPrimitive_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -2411,11 +2443,17 @@ class AllParseTreeListener
   override def exitMeta_string_parts(ctx: WdlV2Parser.Meta_string_partsContext): Unit = {
     exitMeta_string_parts(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterMeta_string(ctx: WdlV2Parser.Meta_stringContext): Unit = {
-    enterMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def enterMeta_dquote_string(ctx: WdlV2Parser.Meta_dquote_stringContext): Unit = {
+    enterMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitMeta_string(ctx: WdlV2Parser.Meta_stringContext): Unit = {
-    exitMeta_string(ctx.asInstanceOf[ParserRuleContext])
+  override def exitMeta_dquote_string(ctx: WdlV2Parser.Meta_dquote_stringContext): Unit = {
+    exitMeta_dquote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterMeta_squote_string(ctx: WdlV2Parser.Meta_squote_stringContext): Unit = {
+    enterMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitMeta_squote_string(ctx: WdlV2Parser.Meta_squote_stringContext): Unit = {
+    exitMeta_squote_string(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMeta_array(ctx: WdlV2Parser.Meta_arrayContext): Unit = {
     enterMeta_array(ctx.asInstanceOf[ParserRuleContext])

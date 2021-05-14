@@ -1,11 +1,10 @@
 package wdlTools.syntax.v1
 
 import java.nio.file.Paths
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
-import wdlTools.syntax.{Comment, SourceLocation, SyntaxException, WdlVersion}
+import wdlTools.syntax.{Comment, Quoting, SourceLocation, SyntaxException, WdlVersion}
 import wdlTools.syntax.v1.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
@@ -96,13 +95,13 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       case Declaration("i", _: TypeInt, Some(ExprInt(3))) =>
     }
     task.declarations(1) should matchPattern {
-      case Declaration("s", _: TypeString, Some(ExprString("hello world"))) =>
+      case Declaration("s", _: TypeString, Some(ExprString("hello world", Quoting.Double))) =>
     }
     task.declarations(2) should matchPattern {
       case Declaration("x", _: TypeFloat, Some(ExprFloat(4.3))) =>
     }
     task.declarations(3) should matchPattern {
-      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt"))) =>
+      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt", Quoting.Double))) =>
     }
     task.declarations(4) should matchPattern {
       case Declaration("b", _: TypeBoolean, Some(ExprBoolean(false))) =>
@@ -207,7 +206,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     task.declarations(27) should matchPattern {
       case Declaration("twenty_threes",
                        TypePair(TypeInt(_), TypeString(_)),
-                       Some(ExprPair(ExprInt(23), ExprString("twenty-three")))) =>
+                       Some(ExprPair(ExprInt(23), ExprString("twenty-three", Quoting.Double)))) =>
     }
   }
 
@@ -297,7 +296,8 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     task.command shouldBe a[CommandSection]
     task.command.parts.size shouldBe 3
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ") =>
+      case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ",
+                      Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprIdentifier("inp_file") =>
@@ -307,14 +307,14 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", MetaValueString("Robin Hood")) =>
+      case MetaKV("author", MetaValueString("Robin Hood", Quoting.Double)) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", MetaValueString("just because")) =>
+      case MetaKV("inp_file", MetaValueString("just because", Quoting.Double)) =>
     }
 
     task.declarations(0) should matchPattern {
@@ -349,12 +349,12 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     task.command shouldBe a[CommandSection]
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    echo ") =>
+      case ExprString("\n    echo ", Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprPlaceholder(None,
                            None,
-                           Some(ExprString(",")),
+                           Some(ExprString(",", Quoting.Single)),
                            None,
                            ExprIdentifier("min_std_max_min")) =>
     }
@@ -437,7 +437,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     wf.meta.get shouldBe a[MetaSection]
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", MetaValueString("Robert Heinlein"))) =>
+      case Vector(MetaKV("author", MetaValueString("Robert Heinlein", Quoting.Double))) =>
     }
   }
 
@@ -593,7 +593,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     val metaKvs = task.meta.get.kvs
     metaKvs.size shouldBe 1
     metaKvs.head should matchPattern {
-      case MetaKV("version", MetaValueString("1.1")) =>
+      case MetaKV("version", MetaValueString("1.1", Quoting.Double)) =>
     }
     task.parameterMeta shouldBe defined
     val paramMetaKvs = task.parameterMeta.get.kvs
@@ -603,7 +603,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
           "i",
           MetaValueObject(
               Vector(
-                  MetaKV("description", MetaValueString("An int")),
+                  MetaKV("description", MetaValueString("An int", Quoting.Double)),
                   MetaKV("default", MetaValueInt(3)),
                   MetaKV("array_of_objs",
                          MetaValueArray(
@@ -652,7 +652,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
           TypeMap(TypeString(_), TypeInt(_)),
           Some(
               ExprMapLiteral(
-                  Vector(ExprMember(ExprString("hello"), ExprInt(1)))
+                  Vector(ExprMember(ExprString("hello", Quoting.Double), ExprInt(1)))
               )
           )
           ) =>
@@ -663,13 +663,15 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
           TypeObject(_),
           Some(
               ExprObjectLiteral(
-                  Vector(ExprMember(ExprString("foo"), ExprInt(2)))
+                  Vector(ExprMember(ExprString("foo", Quoting.None), ExprInt(2)))
               )
           )
           ) =>
     }
     wf.body(3) should matchPattern {
-      case Call("baz", None, Some(CallInputs(Vector(CallInput("s", ExprString("hi")))))) =>
+      case Call("baz",
+                None,
+                Some(CallInputs(Vector(CallInput("s", ExprString("hi", Quoting.Double)))))) =>
     }
 
     wf.meta shouldBe defined
@@ -677,8 +679,8 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     meta.size shouldBe 5
     meta should matchPattern {
       case Vector(
-          MetaKV("x", MetaValueString("'")),
-          MetaKV("y", MetaValueString("\"")),
+          MetaKV("x", MetaValueString("'", Quoting.Double)),
+          MetaKV("y", MetaValueString("\"", Quoting.Single)),
           MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1))))),
           MetaKV("baz", MetaValueArray(Vector(MetaValueInt(1), MetaValueInt(2), MetaValueInt(3)))),
           MetaKV("blorf", MetaValueArray(Vector()))
@@ -700,11 +702,11 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
   private def getString(expr: Expr): String = {
     expr match {
-      case ExprString(value) => value
-      case ExprCompoundString(parts) =>
+      case ExprString(value, _) => value
+      case ExprCompoundString(parts, _) =>
         parts
           .flatMap {
-            case ExprString(s)          => Vector(s)
+            case ExprString(s, _)       => Vector(s)
             case cs: ExprCompoundString => getString(cs)
             case ExprIdentifier(name)   => Vector(s"$${${name}}")
             case other =>

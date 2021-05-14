@@ -7,8 +7,7 @@ import org.antlr.v4.runtime.tree.TerminalNode
 import org.openwdl.wdl.parser.v1_1.{WdlV1_1Parser, WdlV1_1ParserBaseVisitor}
 import wdlTools.syntax.Antlr4Util.getSourceLocation
 import wdlTools.syntax.v1_1.ConcreteSyntax._
-import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException, WdlVersion}
-import dx.util.Logger
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, SyntaxException, WdlVersion}
 
 import scala.jdk.CollectionConverters._
 
@@ -217,32 +216,27 @@ wdl_type
   private def parse_placeholder_option(
       ctx: WdlV1_1Parser.Expression_placeholder_optionContext
   ): (String, Expr) = {
-    val expr: Expr =
-      try {
-        visitString(ctx.string())
-      } catch {
-        case _: NullPointerException =>
-          val loc = getSourceLocation(grammar.docSource, ctx)
-          if (ctx.number() != null) {
-            grammar.logger.warning(
-                s"""A placeholder option at ${loc} has a numeric value;
-                   |only string values are allowed.""".stripMargin
-            )
-            visitNumber(ctx.number())
-          } else {
-            throw new SyntaxException("Placeholder options must be strings", loc)
-          }
-      }
-
-    if (ctx.BoolLiteral() != null) {
-      (ctx.BoolLiteral().getText.toLowerCase(), expr)
-    } else if (ctx.DEFAULTEQUAL() != null) {
-      ("default", expr)
-    } else if (ctx.SEPEQUAL() != null) {
-      ("sep", expr)
+    if (ctx.DEFAULTEQUAL() != null) {
+      ("default", visitExpr(ctx.expr))
     } else {
-      throw new SyntaxException(s"unrecognized placeholder",
-                                getSourceLocation(grammar.docSource, ctx))
+      val optionType = if (ctx.BoolLiteral() != null) {
+        ctx.BoolLiteral().getText.toLowerCase()
+      } else if (ctx.SEPEQUAL() != null) {
+        "sep"
+      } else {
+        throw new SyntaxException(s"unrecognized placeholder option",
+                                  getSourceLocation(grammar.docSource, ctx))
+      }
+      val expr: Expr = if (ctx.string() != null) {
+        ctx.string() match {
+          case sq: WdlV1_1Parser.Squote_stringContext => visitSquote_string(sq)
+          case dq: WdlV1_1Parser.Dquote_stringContext => visitDquote_string(dq)
+        }
+      } else {
+        throw new SyntaxException(s"${optionType} placeholder option value must be a string",
+                                  getSourceLocation(grammar.docSource, ctx))
+      }
+      (optionType, expr)
     }
   }
 
@@ -295,13 +289,13 @@ wdl_type
   ; */
   override def visitString_expr_with_string_part(
       ctx: WdlV1_1Parser.String_expr_with_string_partContext
-  ): Expr = {
+  ): ExprCompoundString = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val stringPart = visitString_parts(ctx.string_parts())
     val loc = getSourceLocation(grammar.docSource, ctx)
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
-      case (e, s)                          => ExprCompoundString(Vector(e, s))(loc)
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s))(loc)
     }
   }
 
@@ -311,33 +305,41 @@ string
   | SQUOTE string_part string_expr_with_string_part* SQUOTE
   ;
    */
-  override def visitString(ctx: WdlV1_1Parser.StringContext): Expr = {
-    val stringPart = visitString_parts(ctx.string_parts())
-    val exprPart: Vector[Expr] = ctx
-      .string_expr_with_string_part()
-      .asScala
+  private def visitString(quoting: Quoting.Quoting,
+                          stringParts: WdlV1_1Parser.String_partsContext,
+                          stringExprWithStringPart: scala.collection.Seq[
+                              WdlV1_1Parser.String_expr_with_string_partContext
+                          ],
+                          ctx: WdlV1_1Parser.StringContext): Expr = {
+    val stringPart = visitString_parts(stringParts)
+    val exprPart: Vector[Expr] = stringExprWithStringPart
       .map(visitString_expr_with_string_part)
       .toVector
-      .flatMap {
-        case ExprCompoundString(v) => v
-        case e                     => Vector(e)
-      }
+      .flatMap(_.value)
     (stringPart, exprPart) match {
-      case (s: ExprString, Vector()) => s
-      case (ExprString(s), parts) if s.isEmpty =>
-        ExprCompoundString(parts)(getSourceLocation(grammar.docSource, ctx))
+      case (s: ExprString, Vector()) => s.copy(quoting = quoting)(s.loc)
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, quoting = quoting)(getSourceLocation(grammar.docSource, ctx))
       case (s, parts) =>
-        ExprCompoundString(s +: parts)(getSourceLocation(grammar.docSource, ctx))
+        ExprCompoundString(s +: parts, quoting = quoting)(getSourceLocation(grammar.docSource, ctx))
     }
   }
 
+  override def visitSquote_string(ctx: WdlV1_1Parser.Squote_stringContext): Expr = {
+    visitString(Quoting.Single, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
+  override def visitDquote_string(ctx: WdlV1_1Parser.Dquote_stringContext): Expr = {
+    visitString(Quoting.Double, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
   /* primitive_literal
-	: None
-	| BoolLiteral
-	| number
-	| string
-	| Identifier
-	; */
+    : None
+    | BoolLiteral
+    | number
+    | string
+    | Identifier
+    ; */
   override def visitPrimitive_literal(ctx: WdlV1_1Parser.Primitive_literalContext): Expr = {
     if (ctx.NONELITERAL() != null) {
       ExprNone()(getSourceLocation(grammar.docSource, ctx))
@@ -347,7 +349,10 @@ string
     } else if (ctx.number() != null) {
       visitNumber(ctx.number())
     } else if (ctx.string() != null) {
-      visitString(ctx.string())
+      ctx.string() match {
+        case sq: WdlV1_1Parser.Squote_stringContext => visitSquote_string(sq)
+        case dq: WdlV1_1Parser.Dquote_stringContext => visitDquote_string(dq)
+      }
     } else if (ctx.Identifier() != null) {
       ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
     } else {
@@ -783,7 +788,10 @@ any_decls
           getSourceLocation(grammar.docSource, ctx)
       )
     } else if (ctx.meta_string() != null) {
-      visitMeta_string(ctx.meta_string())
+      ctx.meta_string() match {
+        case sq: WdlV1_1Parser.Meta_squote_stringContext => visitMeta_squote_string(sq)
+        case dq: WdlV1_1Parser.Meta_dquote_stringContext => visitMeta_dquote_string(dq)
+      }
     } else if (ctx.meta_array() != null) {
       visitMeta_array(ctx.meta_array())
     } else if (ctx.meta_object() != null) {
@@ -823,12 +831,18 @@ any_decls
     )
   }
 
-  /* meta_string
-      : DQUOTE string_part DQUOTE
-      | SQUOTE string_part SQUOTE
-      ; */
-  override def visitMeta_string(ctx: WdlV1_1Parser.Meta_stringContext): MetaValueString = {
-    visitMeta_string_parts(ctx.meta_string_parts())
+  override def visitMeta_squote_string(
+      ctx: WdlV1_1Parser.Meta_squote_stringContext
+  ): MetaValueString = {
+    val s = visitMeta_string_parts(ctx.meta_string_parts())
+    s.copy(quoting = Quoting.Single)(s.loc)
+  }
+
+  override def visitMeta_dquote_string(
+      ctx: WdlV1_1Parser.Meta_dquote_stringContext
+  ): MetaValueString = {
+    val s = visitMeta_string_parts(ctx.meta_string_parts())
+    s.copy(quoting = Quoting.Double)(s.loc)
   }
 
   /* meta_array: LBRACK (meta_value (COMMA meta_value)*)* RBRACK;
@@ -981,8 +995,8 @@ task_input
         ctx.task_command_string_parts()
     )
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => e
-      case (ExprString(e), s) if e.isEmpty => s
+      case (e, ExprString(s, Quoting.None)) if s.isEmpty => e
+      case (ExprString(e, Quoting.None), s) if e.isEmpty => s
       case (e, s) =>
         ExprCompoundString(Vector(e, s))(getSourceLocation(grammar.docSource, ctx))
     }
@@ -1001,9 +1015,9 @@ task_input
       .toVector
     // discard empty strings, and flatten compound vectors of strings
     val cleanedParts = (start +: parts).flatMap {
-      case ExprString(x) if x.isEmpty => Vector.empty
-      case ExprCompoundString(v)      => v
-      case other                      => Vector(other)
+      case ExprString(x, _) if x.isEmpty       => Vector.empty
+      case ExprCompoundString(v, Quoting.None) => v
+      case other                               => Vector(other)
     }
     CommandSection(cleanedParts)(getSourceLocation(grammar.docSource, ctx))
   }
@@ -1037,46 +1051,6 @@ task_input
     }
   }
 
-  // check that the parameter meta section references only has variables declared in
-  // the input or output sections.
-  private def validateParamMeta(paramMeta: ParameterMetaSection,
-                                inputSection: Option[InputSection],
-                                outputSection: Option[OutputSection],
-                                ctx: ParserRuleContext): Unit = {
-    val inputVarNames: Set[String] =
-      inputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-    val outputVarNames: Set[String] =
-      outputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-
-    // make sure the input and output sections to not intersect
-    val both = inputVarNames intersect outputVarNames
-    if (both.nonEmpty) {
-      for (varName <- both) {
-        // issue a warning with the exact text where this occurs
-        val decl: Declaration = inputSection.get.declarations.find(decl => decl.name == varName).get
-        val text = decl.loc
-        Logger.get.warning(
-            s"'${varName}' appears in both input and output sections at ${text} in ${grammar.docSource}"
-        )
-      }
-    }
-
-    val ioVarNames = inputVarNames ++ outputVarNames
-
-    paramMeta.kvs.foreach {
-      case MetaKV(k, _) =>
-        if (!(ioVarNames contains k))
-          throw new SyntaxException(
-              s"parameter ${k} does not appear in the input or output sections",
-              getSourceLocation(grammar.docSource, ctx)
-          )
-    }
-  }
-
   /* task
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
@@ -1105,8 +1079,6 @@ task_input
     val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
       case x: RuntimeSection => x
     }, "runtime", ctx)
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
-
     Task(name, input, output, command, decls, meta, parameterMeta, runtime)(
         getSourceLocation(grammar.docSource, ctx)
     )
@@ -1351,9 +1323,6 @@ workflow
       case x: WdlV1_1Parser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
-
     Workflow(name, input, output, meta, parameterMeta, wfElems)(
         getSourceLocation(grammar.docSource, ctx)
     )

@@ -291,7 +291,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     task.command.parts.size shouldBe 3
     task.command.parts(0) should matchPattern {
       case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ",
-                      Quoting.Double) =>
+                      Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprIdentifier("inp_file") =>
@@ -338,12 +338,12 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
 
     task.command shouldBe a[CommandSection]
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    echo ", Quoting.Double) =>
+      case ExprString("\n    echo ", Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprPlaceholder(None,
                            None,
-                           Some(ExprString(",", Quoting.Double)),
+                           Some(ExprString(",", Quoting.Single)),
                            None,
                            ExprIdentifier("min_std_max_min")) =>
     }

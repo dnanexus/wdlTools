@@ -885,37 +885,6 @@ any_decls
     }
   }
 
-  // check that the parameter meta section references only has variables declared in
-  // the input or output sections.
-  private def validateParamMeta(paramMeta: ParameterMetaSection,
-                                inputSection: Option[InputSection],
-                                outputSection: Option[OutputSection],
-                                ctx: ParserRuleContext): Unit = {
-    val inputVarNames: Set[String] =
-      inputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-    val outputVarNames: Set[String] =
-      outputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-
-    // make sure the input and output sections to not intersect
-    val both = inputVarNames.intersect(outputVarNames)
-    if (both.nonEmpty) {
-      throw new SyntaxException(s"${both} appears in both input and output sections",
-                                getSourceLocation(grammar.docSource, ctx))
-    }
-
-    val undefined = paramMeta.kvs.map(_.id).toSet.diff(inputVarNames ++ outputVarNames)
-    if (undefined.nonEmpty) {
-      throw new SyntaxException(
-          s"parameter(s) ${undefined.mkString(",")} do not appear in the input or output sections",
-          getSourceLocation(grammar.docSource, ctx)
-      )
-    }
-  }
-
   def requiresEvaluation(expr: Expr): Boolean = {
     expr match {
       case _: ExprString | _: ExprBoolean | _: ExprInt | _: ExprFloat => false
@@ -987,8 +956,6 @@ any_decls
     } else {
       None
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Task(name,
          input = input,
@@ -1221,8 +1188,6 @@ scatter
     } else {
       None
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Workflow(name, input, output, meta, parameterMeta, wfBody)(
         getSourceLocation(grammar.docSource, ctx)

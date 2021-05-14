@@ -304,12 +304,12 @@ string
   | SQUOTE string_part string_expr_with_string_part* SQUOTE
   ;
    */
-  def visitString(quoting: Quoting.Quoting,
-                  stringParts: WdlV1Parser.String_partsContext,
-                  stringExprWithStringPart: scala.collection.Seq[
-                      WdlV1Parser.String_expr_with_string_partContext
-                  ],
-                  ctx: WdlV1Parser.StringContext): Expr = {
+  private def visitString(quoting: Quoting.Quoting,
+                          stringParts: WdlV1Parser.String_partsContext,
+                          stringExprWithStringPart: scala.collection.Seq[
+                              WdlV1Parser.String_expr_with_string_partContext
+                          ],
+                          ctx: WdlV1Parser.StringContext): Expr = {
     val stringPart = visitString_parts(stringParts)
     val exprPart: Vector[Expr] = stringExprWithStringPart
       .map(visitString_expr_with_string_part)
@@ -1035,39 +1035,6 @@ task_input
     }
   }
 
-  // check that the parameter meta section references only has variables declared in
-  // the input or output sections.
-  private def validateParamMeta(paramMeta: ParameterMetaSection,
-                                inputSection: Option[InputSection],
-                                outputSection: Option[OutputSection],
-                                ctx: ParserRuleContext): Unit = {
-    val inputVarNames: Set[String] =
-      inputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-    val outputVarNames: Set[String] =
-      outputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-
-    // make sure the input and output sections to not intersect
-    val both = inputVarNames.intersect(outputVarNames)
-    if (both.nonEmpty) {
-      throw new SyntaxException(
-          s"variable name(s) ${both.mkString(",")} appear in both input and output sections",
-          getSourceLocation(grammar.docSource, ctx)
-      )
-    }
-
-    val undefined = paramMeta.kvs.map(_.id).toSet.diff(inputVarNames ++ outputVarNames)
-    if (undefined.nonEmpty) {
-      throw new SyntaxException(
-          s"parameter(s) ${undefined.mkString(",")} do not appear in the input or output sections",
-          getSourceLocation(grammar.docSource, ctx)
-      )
-    }
-  }
-
   /* task
 	: TASK Identifier LBRACE (task_element)+ RBRACE
 	;  */
@@ -1096,8 +1063,6 @@ task_input
     val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
       case x: RuntimeSection => x
     }, "runtime", ctx)
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Task(name, input, output, command, decls, meta, parameterMeta, runtime)(
         getSourceLocation(grammar.docSource, ctx)
@@ -1329,8 +1294,6 @@ workflow
       case x: WdlV1Parser.Inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Workflow(name, input, output, meta, parameterMeta, wfElems)(
         getSourceLocation(grammar.docSource, ctx)

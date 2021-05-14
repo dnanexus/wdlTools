@@ -16,7 +16,7 @@ task foo {
   command <<<
     echo ~{x}
     echo ~{i * i}
-    echo ~{if true then "a" else "b"}
+    echo ~{if true then 'a' else 'b'}
   >>>
 
   output {
