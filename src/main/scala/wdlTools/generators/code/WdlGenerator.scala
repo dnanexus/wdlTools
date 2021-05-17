@@ -118,7 +118,7 @@ object WdlGenerator {
       if (!atLineStart) {
         // the line could have trailing whitespace, such as from a comment or
         // when a space was added prior to a line-wrap - trim it off
-        lines.append(currentLine.toString.replaceAll("""(?m)\s+$""", ""))
+        lines.append(currentLine.toString.replaceAll("""(?m)[ \t]+$""", ""))
         if (continue) {
           dent(indenting)
         } else {
@@ -1092,11 +1092,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
   private case class CommandBlock(command: CommandSection) extends BaseStatement {
     // The command block is considered "preformatted" in that we don't try to reformat it.
-    // However, we do need to try to indent it correclty. We do this by detecting the amount
-    // of indent used on the first non-empty line and remove that from every line and replace
-    // it by the lineGenerator's current indent level.
     private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
-    private val leadingWhitespaceRegexp = "(?s)^([ \t]*)(.*)$".r
     private val commandEndRegexp = "\n*\\s*$".r
 
     // check whether there is at least one non-whitespace command part
@@ -1112,11 +1108,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           Vector(Literal(Symbols.Command), Literal(Symbols.CommandOpen))
       )
       if (hasCommand) {
-        lineGenerator.endLine()
-
-        // The parser swallows anyting after the opening token ('{' or '<<<') as part of the comment
-        // block, so we need to parse out any in-line comment. Also determine whether we should try
-        // to trim off leading whitespace or just leave as-is.
+        // The parser swallows anyting after the opening token ('{' or '<<<') as part of the
+        // command block, so we need to parse out any in-line WDL comment on the first line.
         val (headExpr: Expr, indent) = command.parts.head match {
           case v: ValueString =>
             v.value match {
@@ -1127,35 +1120,26 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (v.copy(value = "")(v.loc), None)
+                    (v.copy(value = "")(v.loc), false)
                   case s if s.startsWith(Symbols.Comment) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment -
                     // we don't want to break anything so we'll just format the whole
                     // block as-is
-                    (v, None)
-                  case s if s.isEmpty || s.startsWith(Symbols.Comment) =>
-                    // opening line was empty or a comment
-                    val (ws, trimmedRest) = rest match {
-                      case leadingWhitespaceRegexp(ws, trimmedRest) => (Some(ws), trimmedRest)
-                      case _                                        => (None, rest)
-                    }
-                    // the first line will be indented, so we need to trim the indent from `rest`
-                    (v.copy(value = trimmedRest)(v.loc), ws)
+                    (v, false)
+                  case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
+                    // the first is empty or a WDL comment so we ignore it
+                    (v.copy(value = rest)(v.loc), false)
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (v.copy(value = s)(v.loc), None)
-                  case s =>
-                    // opening line has some real content, so just trim any leading whitespace
-                    val ws = leadingWhitespaceRegexp
-                      .findFirstMatchIn(rest)
-                      .map(m => m.group(1))
-                    (v.copy(value = s"${s}\n${rest}")(v.loc), ws)
+                    (v.copy(value = s)(v.loc), true)
+                  case _ =>
+                    // opening line has some real content, so leave as-is
+                    (v, false)
                 }
               case other =>
                 throw new RuntimeException(s"unexpected command part ${other}")
             }
-          case other =>
-            (other, None)
+          case other => (other, false)
         }
 
         def trimLast(last: Expr): Expr = {
@@ -1163,8 +1147,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             case ValueString(s, wdlType) =>
               // If the last part is just the whitespace before the close block, throw it out
               ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType)(last.loc)
-            case other =>
-              other
+            case other => other
           }
         }
 
@@ -1181,26 +1164,24 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           )
         }
 
-        val bodyGenerator = lineGenerator.derive(increaseIndent = true,
-                                                 newSpacing = Spacing.Off,
-                                                 newWrapping = Wrapping.Never)
-
-        val replaceIndent = indent.map { ws =>
-          // Function to replace indenting in command block expressions with the current
-          // indent level of the formatter
-          val indentRegexp = s"\n${ws}".r
-          val replacement = s"\n${bodyGenerator.getIndent()}"
-          (s: String) => indentRegexp.replaceAllIn(s, replacement)
+        val bodyGenerator = if (indent) {
+          lineGenerator.derive(newIndentSteps = Some(1),
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
+        } else {
+          lineGenerator.derive(newIndenting = Indenting.Never,
+                               newSpacing = Spacing.Off,
+                               newWrapping = Wrapping.Never)
         }
 
+        bodyGenerator.endLine(continue = true)
         bodyGenerator.beginLine()
         newParts.foreach { expr =>
           bodyGenerator.append(
               buildExpression(
                   expr,
                   placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inCommand = true,
-                  stringModifier = replaceIndent
+                  inCommand = true
               )
           )
         }
