@@ -151,6 +151,7 @@ object Symbols extends BuiltinSymbols {
       ObjectOpen -> ObjectClose,
       PlaceholderOpenTilde -> PlaceholderClose,
       PlaceholderOpenDollar -> PlaceholderClose,
+      SingleQuoteOpen -> SingleQuoteClose,
       DoubleQuoteOpen -> DoubleQuoteClose,
       TypeParamOpen -> TypeParamClose
   )
