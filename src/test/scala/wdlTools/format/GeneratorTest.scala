@@ -50,7 +50,7 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
     val (tDoc, _) = TypeInfer.instance.apply(doc)
     val generator = WdlGenerator(Some(wdlVersion))
     val gLines = LinesFileNode(generator.generateDocument(tDoc))
-    println(gLines.readLines.mkString("\n"))
+    //println(gLines.readLines.mkString("\n"))
     if (validateContentSelf) {
       gLines.readLines.mkString("\n") shouldBe beforeSrc.readLines.mkString("\n")
     } else if (validateContentFile) {

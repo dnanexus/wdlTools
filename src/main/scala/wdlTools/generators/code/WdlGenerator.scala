@@ -6,7 +6,7 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Operator, WdlVersion}
+import wdlTools.syntax.{Operator, Quoting, WdlVersion}
 
 import scala.collection.mutable
 
@@ -226,14 +226,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     throw new Exception(s"WDL version ${targetVersion.get} is not supported")
   }
 
-  private case class Literal(value: Any, quoting: Boolean = false) extends Sized {
+  private case class Literal(value: Any, quoting: Quoting.Quoting = Quoting.None) extends Sized {
     override lazy val length: Int = toString.length
 
     override lazy val toString: String = {
-      if (quoting) {
-        s"${'"'}${value}${'"'}"
-      } else {
-        value.toString
+      quoting match {
+        case Quoting.Single => s"'${value}'"
+        case Quoting.Double => s"${'"'}${value}${'"'}"
+        case _              => value.toString
       }
     }
   }
@@ -494,24 +494,26 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     )
   }
 
-  private case class CompoundString(sizeds: Vector[Sized], quoting: Boolean) extends Composite {
+  private case class CompoundString(sizeds: Vector[Sized], quoting: Quoting.Quoting)
+      extends Composite {
     override lazy val length: Int = sizeds
       .map(_.length)
-      .sum + (if (quoting) 2 else 0)
+      .sum + (if (quoting == Quoting.None) 0 else 2)
 
     override def generateContents(lineGenerator: LineGenerator): Unit = {
       val unspacedFormatter =
         lineGenerator.derive(newWrapping = Wrapping.Never, newSpacing = Spacing.Off)
-      if (quoting) {
-        unspacedFormatter.appendPrefix(
-            Literal(Symbols.QuoteOpen)
-        )
+      if (quoting == Quoting.None) {
         unspacedFormatter.appendAll(sizeds)
-        unspacedFormatter.appendSuffix(
-            Literal(Symbols.QuoteClose)
-        )
       } else {
+        val (open, close) = quoting match {
+          case Quoting.Single => (Symbols.SingleQuoteOpen, Symbols.SingleQuoteClose)
+          case Quoting.Double => (Symbols.DoubleQuoteOpen, Symbols.DoubleQuoteClose)
+          case _              => throw new Exception("unreachable")
+        }
+        unspacedFormatter.appendPrefix(Literal(open))
         unspacedFormatter.appendAll(sizeds)
+        unspacedFormatter.appendSuffix(Literal(close))
       }
     }
   }
@@ -557,7 +559,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       )
     }
 
-    def string(value: String): Literal = {
+    def string(value: String, quoting: Quoting.Quoting = Quoting.Double): Literal = {
       val v = if (stringModifier.isDefined) {
         stringModifier.get(value)
       } else {
@@ -568,7 +570,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       } else {
         v
       }
-      Literal(escaped, quoting = inPlaceholder || !(inString || inCommand))
+      val actualQuoting = if (inPlaceholder || !(inString || inCommand)) {
+        quoting
+      } else {
+        Quoting.None
+      }
+      Literal(escaped, quoting = actualQuoting)
     }
 
     def option(name: String, value: Expr): Sized = {
@@ -580,13 +587,13 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
     expr match {
       // literal values
-      case ValueNone(_)             => Literal(Symbols.None)
-      case ValueString(value, _)    => string(value)
-      case ValueFile(value, _)      => string(value)
-      case ValueDirectory(value, _) => string(value)
-      case ValueBoolean(value, _)   => Literal(value)
-      case ValueInt(value, _)       => Literal(value)
-      case ValueFloat(value, _)     => Literal(value)
+      case ValueNone(_)                   => Literal(Symbols.None)
+      case ValueString(value, _, quoting) => string(value, quoting)
+      case ValueFile(value, _)            => string(value)
+      case ValueDirectory(value, _)       => string(value)
+      case ValueBoolean(value, _)         => Literal(value)
+      case ValueInt(value, _)             => Literal(value)
+      case ValueFloat(value, _)           => Literal(value)
       case ExprArray(value, _) =>
         Container(
             value.map(nested(_)),
@@ -621,7 +628,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         }
         Container(
             value.map {
-              case (ValueString(k, _), v) =>
+              case (ValueString(k, _, _), v) =>
                 KeyValue(Literal(k), nested(v))
               case other =>
                 throw new Exception(s"invalid object member ${other}")
@@ -647,16 +654,20 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             ),
             inString = inString || inCommand
         )
-      case ExprCompoundString(value, _) =>
+      case ExprCompoundString(value, _, quoting) =>
         // Often/always an ExprCompoundString contains one or more empty
         // ValueStrings that we want to get rid of because they're useless
         // and can mess up formatting
         val filteredExprs = value.filter {
-          case ValueString(s, _) => s.nonEmpty
-          case _                 => true
+          case ValueString(s, _, _) => s.nonEmpty
+          case _                    => true
         }
-        CompoundString(filteredExprs.map(nested(_, inString = true)),
-                       quoting = !(inString || inCommand))
+        val actualQuoting = if (inString || inCommand) {
+          Quoting.None
+        } else {
+          quoting
+        }
+        CompoundString(filteredExprs.map(nested(_, inString = true)), quoting = actualQuoting)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
@@ -883,8 +894,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     metaValue match {
       // literal values
       case MetaValueNull() => Literal(Symbols.Null)
-      case MetaValueString(value) =>
-        Literal(value, quoting = true)
+      case MetaValueString(value, quoting) =>
+        Literal(value, quoting = quoting)
       case MetaValueBoolean(value) => Literal(value)
       case MetaValueInt(value)     => Literal(value)
       case MetaValueFloat(value)   => Literal(value)
@@ -1098,8 +1109,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     // check whether there is at least one non-whitespace command part
     private def hasCommand: Boolean = {
       command.parts.exists {
-        case ValueString(value, _) => value.trim.nonEmpty
-        case _                     => true
+        case ValueString(value, _, _) => value.trim.nonEmpty
+        case _                        => true
       }
     }
 
@@ -1144,9 +1155,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
         def trimLast(last: Expr): Expr = {
           last match {
-            case ValueString(s, wdlType) =>
+            case v @ ValueString(s, _, _) =>
               // If the last part is just the whitespace before the close block, throw it out
-              ValueString(commandEndRegexp.replaceFirstIn(s, ""), wdlType)(last.loc)
+              v.copy(commandEndRegexp.replaceFirstIn(s, ""))(v.loc)
             case other => other
           }
         }

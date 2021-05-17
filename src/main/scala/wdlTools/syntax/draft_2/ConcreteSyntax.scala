@@ -1,6 +1,6 @@
 package wdlTools.syntax.draft_2
 
-import wdlTools.syntax.{CommentMap, SourceLocation}
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation}
 import dx.util.FileNode
 
 // A parser based on a WDL grammar written by Patrick Magee. The tool
@@ -32,7 +32,9 @@ object ConcreteSyntax {
 
   // expressions
   sealed trait Expr extends Element
-  case class ExprString(value: String)(val loc: SourceLocation) extends Expr
+  case class ExprString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Expr
   case class ExprBoolean(value: Boolean)(val loc: SourceLocation) extends Expr
   case class ExprInt(value: Long)(val loc: SourceLocation) extends Expr
   case class ExprFloat(value: Double)(val loc: SourceLocation) extends Expr
@@ -40,7 +42,9 @@ object ConcreteSyntax {
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr])(val loc: SourceLocation) extends Expr
+  case class ExprCompoundString(value: Vector[Expr], quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Expr
   case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
   case class ExprMapLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
   case class ExprObjectLiteral(value: Vector[ExprMember])(val loc: SourceLocation) extends Expr
@@ -117,7 +121,9 @@ object ConcreteSyntax {
   case class RuntimeSection(kvs: Vector[RuntimeKV])(val loc: SourceLocation) extends Element
 
   // meta section
-  case class MetaKV(id: String, value: String)(val loc: SourceLocation) extends Element
+  case class MetaKV(id: String, value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Element
   case class ParameterMetaSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element
   case class MetaSection(kvs: Vector[MetaKV])(val loc: SourceLocation) extends Element
 

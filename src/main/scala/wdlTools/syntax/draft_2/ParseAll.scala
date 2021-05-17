@@ -47,7 +47,7 @@ case class ParseAll(followImports: Boolean = false,
     def translateExpr(cstExpr: CST.Expr): AST.Expr = {
       cstExpr match {
         // values
-        case e: CST.ExprString  => AST.ValueString(e.value)(e.loc)
+        case e: CST.ExprString  => AST.ValueString(e.value, e.quoting)(e.loc)
         case e: CST.ExprBoolean => AST.ValueBoolean(e.value)(e.loc)
         case e: CST.ExprInt     => AST.ValueInt(e.value)(e.loc)
         case e: CST.ExprFloat   => AST.ValueFloat(e.value)(e.loc)
@@ -55,7 +55,7 @@ case class ParseAll(followImports: Boolean = false,
         // compound values
         case e: CST.ExprIdentifier => AST.ExprIdentifier(e.id)(e.loc)
         case e: CST.ExprCompoundString =>
-          AST.ExprCompoundString(e.value.map(translateExpr))(e.loc)
+          AST.ExprCompoundString(e.value.map(translateExpr), e.quoting)(e.loc)
         case e: CST.ExprPair =>
           AST.ExprPair(translateExpr(e.l), translateExpr(e.r))(e.loc)
         case e: CST.ExprArrayLiteral =>
@@ -163,7 +163,7 @@ case class ParseAll(followImports: Boolean = false,
       kvs
         .foldLeft(TreeSeqMap.empty[String, AST.MetaKV]) {
           case (accu, kv) =>
-            val metaValue = AST.MetaValueString(kv.value)(kv.loc)
+            val metaValue = AST.MetaValueString(kv.value, kv.quoting)(kv.loc)
             if (accu.contains(kv.id)) {
               logger.warning(
                   s"""duplicate ${sectionName} key ${kv.id}: earlier value ${accu(kv.id)} 

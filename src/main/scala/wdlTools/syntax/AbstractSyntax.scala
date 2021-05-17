@@ -35,7 +35,9 @@ object AbstractSyntax {
   // values
   sealed trait Value extends Expr
   case class ValueNone()(val loc: SourceLocation) extends Value
-  case class ValueString(value: String)(val loc: SourceLocation) extends Value
+  case class ValueString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Value
   case class ValueBoolean(value: Boolean)(val loc: SourceLocation) extends Value
   case class ValueInt(value: Long)(val loc: SourceLocation) extends Value
   case class ValueFloat(value: Double)(val loc: SourceLocation) extends Value
@@ -45,7 +47,9 @@ object AbstractSyntax {
   // represents strings with interpolation.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr])(val loc: SourceLocation) extends Expr
+  case class ExprCompoundString(value: Vector[Expr], quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends Expr
   case class ExprPair(left: Expr, right: Expr)(val loc: SourceLocation) extends Expr
   case class ExprArray(value: Vector[Expr])(val loc: SourceLocation) extends Expr
   case class ExprMember(key: Expr, value: Expr)(val loc: SourceLocation) extends Expr
@@ -118,7 +122,9 @@ object AbstractSyntax {
   case class MetaValueBoolean(value: Boolean)(val loc: SourceLocation) extends MetaValue
   case class MetaValueInt(value: Long)(val loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double)(val loc: SourceLocation) extends MetaValue
-  case class MetaValueString(value: String)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends MetaValue
   case class MetaValueObject(value: Vector[MetaKV])(val loc: SourceLocation) extends MetaValue
   case class MetaValueArray(value: Vector[MetaValue])(val loc: SourceLocation) extends MetaValue
   // meta section

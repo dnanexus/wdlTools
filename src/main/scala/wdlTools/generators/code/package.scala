@@ -109,6 +109,8 @@ object Symbols extends BuiltinSymbols {
   val ClauseOpen: String = "("
   val ClauseClose: String = ")"
   val DefaultOption: String = "default"
+  val DoubleQuoteOpen: String = "\""
+  val DoubleQuoteClose: String = "\""
   val FalseOption: String = "false"
   val FunctionCallOpen: String = "("
   val FunctionCallClose: String = ")"
@@ -127,9 +129,9 @@ object Symbols extends BuiltinSymbols {
   val PlaceholderOpenTilde: String = "~{"
   val PlaceholderOpenDollar: String = "${"
   val PlaceholderClose: String = "}"
-  val QuoteOpen: String = "\""
-  val QuoteClose: String = "\""
   val SepOption: String = "sep"
+  val SingleQuoteOpen: String = "'"
+  val SingleQuoteClose: String = "'"
   val TrueOption: String = "true"
   val TypeParamOpen: String = "["
   val TypeParamClose: String = "]"
@@ -149,7 +151,8 @@ object Symbols extends BuiltinSymbols {
       ObjectOpen -> ObjectClose,
       PlaceholderOpenTilde -> PlaceholderClose,
       PlaceholderOpenDollar -> PlaceholderClose,
-      QuoteOpen -> QuoteClose,
+      SingleQuoteOpen -> SingleQuoteClose,
+      DoubleQuoteOpen -> DoubleQuoteClose,
       TypeParamOpen -> TypeParamClose
   )
 }

@@ -15,7 +15,7 @@ import org.openwdl.wdl.parser.draft_2.WdlDraft2Parser.{
 import org.openwdl.wdl.parser.draft_2._
 import wdlTools.syntax.Antlr4Util.getSourceLocation
 import wdlTools.syntax.draft_2.ConcreteSyntax._
-import wdlTools.syntax.{CommentMap, SourceLocation, SyntaxException}
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, SyntaxException}
 
 case class ParseTop(grammar: WdlDraft2Grammar) extends WdlDraft2ParserBaseVisitor[Element] {
   private def getIdentifierText(identifier: TerminalNode, ctx: ParserRuleContext): String = {
@@ -187,76 +187,86 @@ wdl_type
   ; */
   override def visitString_expr_with_string_part(
       ctx: WdlDraft2Parser.String_expr_with_string_partContext
-  ): Expr = {
+  ): ExprCompoundString = {
     val exprPart = visitString_expr_part(ctx.string_expr_part())
     val stringPart = visitString_parts(ctx.string_parts())
     val loc = getSourceLocation(grammar.docSource, ctx)
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
-      case (e, s)                          => ExprCompoundString(Vector(e, s))(loc)
+      case (e, ExprString(s, _)) if s.isEmpty => ExprCompoundString(Vector(e))(loc)
+      case (e, s)                             => ExprCompoundString(Vector(e, s))(loc)
     }
   }
 
   /*
-string
-  : DQUOTE string_part string_expr_with_string_part* DQUOTE
-  | SQUOTE string_part string_expr_with_string_part* SQUOTE
-  ;
+  string
+    : DQUOTE string_part string_expr_with_string_part* DQUOTE
+    | SQUOTE string_part string_expr_with_string_part* SQUOTE
+    ;
    */
-  override def visitString(ctx: WdlDraft2Parser.StringContext): Expr = {
-    val stringPart = visitString_parts(ctx.string_parts())
-    val exprPart: Vector[Expr] = ctx
-      .string_expr_with_string_part()
-      .asScala
+  private def visitString(
+      quoting: Quoting.Quoting,
+      stringParts: WdlDraft2Parser.String_partsContext,
+      stringExprWithStringPart: scala.collection.Seq[
+          WdlDraft2Parser.String_expr_with_string_partContext
+      ],
+      ctx: WdlDraft2Parser.StringContext
+  ): Expr = {
+    val stringPart = visitString_parts(stringParts)
+    val exprPart: Vector[Expr] = stringExprWithStringPart
       .map(visitString_expr_with_string_part)
       .toVector
-      .flatMap {
-        case ExprCompoundString(v) => v
-        case e                     => Vector(e)
-      }
+      .flatMap(_.value)
     (stringPart, exprPart) match {
-      case (s: ExprString, Vector()) => s
-      case (ExprString(s), parts) if s.isEmpty =>
-        ExprCompoundString(parts)(getSourceLocation(grammar.docSource, ctx))
+      case (s: ExprString, Vector()) => s.copy(quoting = quoting)(s.loc)
+      case (ExprString(s, _), parts) if s.isEmpty =>
+        ExprCompoundString(parts, quoting = quoting)(
+            getSourceLocation(grammar.docSource, ctx)
+        )
       case (s, parts) =>
-        ExprCompoundString(s +: parts)(getSourceLocation(grammar.docSource, ctx))
+        ExprCompoundString(s +: parts, quoting = quoting)(
+            getSourceLocation(grammar.docSource, ctx)
+        )
     }
   }
 
+  override def visitSquote_string(ctx: WdlDraft2Parser.Squote_stringContext): Expr = {
+    visitString(Quoting.Single, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
+  override def visitDquote_string(ctx: WdlDraft2Parser.Dquote_stringContext): Expr = {
+    visitString(Quoting.Double, ctx.string_parts(), ctx.string_expr_with_string_part().asScala, ctx)
+  }
+
   /* expression_placeholder_option
-  : BoolLiteral EQUAL (string | number)
-  | DEFAULT EQUAL (string | number)
-  | SEP EQUAL (string | number)
-  ; */
+    : BoolLiteral EQUAL string
+    | DEFAULT EQUAL expr
+    | SEP EQUAL string
+    ; */
   private def parse_placeholder_option(
       ctx: WdlDraft2Parser.Expression_placeholder_optionContext
   ): (String, Expr) = {
-    val expr: Expr =
-      try {
-        visitString(ctx.string())
-      } catch {
-        case _: NullPointerException =>
-          val loc = getSourceLocation(grammar.docSource, ctx)
-          if (ctx.number() != null) {
-            grammar.logger.warning(
-                s"""A placeholder option at ${loc} has a numeric value;
-                   |only string values are allowed.""".stripMargin
-            )
-            visitNumber(ctx.number())
-          } else {
-            throw new SyntaxException("Placeholder options must be strings", loc)
-          }
+    if (ctx.DEFAULT() != null) {
+      ("default", visitExpr(ctx.expr()))
+    } else {
+      val optionType = if (ctx.BoolLiteral() != null) {
+        ctx.BoolLiteral().getText.toLowerCase()
+      } else if (ctx.SEP() != null) {
+        "sep"
+      } else {
+        throw new SyntaxException(s"unrecognized placeholder option",
+                                  getSourceLocation(grammar.docSource, ctx))
+      }
+      val expr: Expr = if (ctx.string() != null) {
+        ctx.string() match {
+          case sq: WdlDraft2Parser.Squote_stringContext => visitSquote_string(sq)
+          case dq: WdlDraft2Parser.Dquote_stringContext => visitDquote_string(dq)
+        }
+      } else {
+        throw new SyntaxException(s"${optionType} placeholder option value must be a string",
+                                  getSourceLocation(grammar.docSource, ctx))
       }
 
-    if (ctx.BoolLiteral() != null) {
-      (ctx.BoolLiteral().getText.toLowerCase(), expr)
-    } else if (ctx.DEFAULT() != null) {
-      ("default", expr)
-    } else if (ctx.SEP() != null) {
-      ("sep", expr)
-    } else {
-      throw new SyntaxException(s"Not one of three known variants of a placeholder",
-                                getSourceLocation(grammar.docSource, ctx))
+      (optionType, expr)
     }
   }
 
@@ -284,7 +294,8 @@ string
       // according to the spec, only one of true/false, sep, or default is allowed; however,
       // some "industry standard" workflows are not spec compliant and mix default with either
       // sep or true/false, so we are compelled to allow it
-      if (placeholder.trueOpt.isDefined != placeholder.falseOpt.isDefined || placeholder.trueOpt.isDefined && placeholder.sepOpt.isDefined) {
+      if (placeholder.trueOpt.isDefined != placeholder.falseOpt.isDefined ||
+          placeholder.trueOpt.isDefined && placeholder.sepOpt.isDefined) {
         throw new SyntaxException("invalid place holder", getSourceLocation(grammar.docSource, ctx))
       }
       placeholder
@@ -304,7 +315,10 @@ string
     } else if (ctx.number() != null) {
       visitNumber(ctx.number())
     } else if (ctx.string() != null) {
-      visitString(ctx.string())
+      ctx.string() match {
+        case sq: WdlDraft2Parser.Squote_stringContext => visitSquote_string(sq)
+        case dq: WdlDraft2Parser.Dquote_stringContext => visitDquote_string(dq)
+      }
     } else if (ctx.Identifier() != null) {
       ExprIdentifier(ctx.getText)(getSourceLocation(grammar.docSource, ctx))
     } else {
@@ -710,8 +724,14 @@ any_decls
    ; */
   override def visitMeta_kv(ctx: WdlDraft2Parser.Meta_kvContext): MetaKV = {
     val id = getIdentifierText(ctx.Identifier(), ctx)
-    val value = visitString_parts(ctx.string().string_parts()).value
-    MetaKV(id, value)(getSourceLocation(grammar.docSource, ctx))
+    val (quoting, stringParts) = ctx.string() match {
+      case sq: WdlDraft2Parser.Squote_stringContext =>
+        (Quoting.Single, sq.string_parts())
+      case dq: WdlDraft2Parser.Dquote_stringContext =>
+        (Quoting.Double, dq.string_parts())
+    }
+    val value = visitString_parts(stringParts).value
+    MetaKV(id, value, quoting)(getSourceLocation(grammar.docSource, ctx))
   }
 
   //  PARAMETERMETA LBRACE meta_kv* RBRACE #parameter_meta
@@ -809,8 +829,8 @@ any_decls
         ctx.task_command_string_parts()
     )
     (exprPart, stringPart) match {
-      case (e, ExprString(s)) if s.isEmpty => e
-      case (ExprString(e), s) if e.isEmpty => s
+      case (e, ExprString(s, Quoting.None)) if s.isEmpty => e
+      case (ExprString(e, Quoting.None), s) if e.isEmpty => s
       case (e, s) =>
         ExprCompoundString(Vector(e, s))(getSourceLocation(grammar.docSource, ctx))
     }
@@ -829,9 +849,9 @@ any_decls
       .toVector
     // discard empty strings, and flatten compound vectors of strings
     val cleanedParts = (start +: parts).flatMap {
-      case ExprString(x) if x.isEmpty => Vector.empty
-      case ExprCompoundString(v)      => v
-      case other                      => Vector(other)
+      case ExprString(x, _) if x.isEmpty       => Vector.empty
+      case ExprCompoundString(v, Quoting.None) => v
+      case other                               => Vector(other)
     }
     CommandSection(cleanedParts)(getSourceLocation(grammar.docSource, ctx))
   }
@@ -862,39 +882,6 @@ any_decls
             s"section ${sectionName} appears ${n} times, it must appear exactly once",
             getSourceLocation(grammar.docSource, ctx)
         )
-    }
-  }
-
-  // check that the parameter meta section references only has variables declared in
-  // the input or output sections.
-  private def validateParamMeta(paramMeta: ParameterMetaSection,
-                                inputSection: Option[InputSection],
-                                outputSection: Option[OutputSection],
-                                ctx: ParserRuleContext): Unit = {
-    val inputVarNames: Set[String] =
-      inputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-    val outputVarNames: Set[String] =
-      outputSection
-        .map(_.declarations.map(_.name).toSet)
-        .getOrElse(Set.empty)
-
-    // make sure the input and output sections to not intersect
-    val both = inputVarNames intersect outputVarNames
-    if (both.nonEmpty)
-      throw new SyntaxException(s"${both} appears in both input and output sections",
-                                getSourceLocation(grammar.docSource, ctx))
-
-    val ioVarNames = inputVarNames ++ outputVarNames
-
-    paramMeta.kvs.foreach {
-      case MetaKV(k, _) =>
-        if (!(ioVarNames contains k))
-          throw new SyntaxException(
-              s"parameter ${k} does not appear in the input or output sections",
-              getSourceLocation(grammar.docSource, ctx)
-          )
     }
   }
 
@@ -969,8 +956,6 @@ any_decls
     } else {
       None
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Task(name,
          input = input,
@@ -1203,8 +1188,6 @@ scatter
     } else {
       None
     }
-
-    parameterMeta.foreach(validateParamMeta(_, input, output, ctx))
 
     Workflow(name, input, output, meta, parameterMeta, wfBody)(
         getSourceLocation(grammar.docSource, ctx)

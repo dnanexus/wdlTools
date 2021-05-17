@@ -5,7 +5,7 @@ import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.WdlFormatter._
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, SourceLocation, WdlVersion}
+import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, Quoting, SourceLocation, WdlVersion}
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
 import scala.collection.{BufferedIterator, mutable}
@@ -447,7 +447,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class Literal(value: Any,
-                             quoting: Boolean = false,
+                             quoting: Quoting.Quoting = Quoting.None,
                              override val line: Int,
                              columns: (Option[Int], Option[Int]) = (None, None))
       extends Atom {
@@ -474,49 +474,53 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     override lazy val length: Int = toString.length
 
     override lazy val toString: String = {
-      if (quoting) {
-        s"${'"'}${value}${'"'}"
-      } else {
-        value.toString
+      quoting match {
+        case Quoting.Single => s"'${value}'"
+        case Quoting.Double => s"${'"'}${value}${'"'}"
+        case _              => value.toString
       }
     }
   }
 
   private object Literal {
-    def fromStart(value: Any, loc: SourceLocation, quoting: Boolean = false): Literal = {
+    def fromStart(value: Any,
+                  loc: SourceLocation,
+                  quoting: Quoting.Quoting = Quoting.None): Literal = {
       Literal(value, quoting, loc.line, (Some(loc.col), None))
     }
 
     def fromStartPosition(value: Any,
                           line: Int,
                           column: Int = 1,
-                          quoting: Boolean = false): Literal = {
+                          quoting: Quoting.Quoting = Quoting.None): Literal = {
       Literal(value, quoting, line, (Some(column), None))
     }
 
-    def fromEnd(value: Any, loc: SourceLocation, quoted: Boolean = false): Literal = {
-      Literal(value, quoted, loc.endLine, (None, Some(loc.endCol)))
+    def fromEnd(value: Any,
+                loc: SourceLocation,
+                quoting: Quoting.Quoting = Quoting.None): Literal = {
+      Literal(value, quoting, loc.endLine, (None, Some(loc.endCol)))
     }
 
     def fromEndPosition(value: Any,
                         line: Int,
                         column: Int = Span.TERMINAL,
-                        quoted: Boolean = false): Literal = {
-      Literal(value, quoted, line, (None, Some(column)))
+                        quoting: Quoting.Quoting = Quoting.None): Literal = {
+      Literal(value, quoting, line, (None, Some(column)))
     }
 
-    def fromPrev(value: Any, prev: Span, quoting: Boolean = false): Literal = {
+    def fromPrev(value: Any, prev: Span, quoting: Quoting.Quoting = Quoting.None): Literal = {
       Literal(value, quoting, prev.endLine, (Some(prev.endColumn), None))
     }
 
-    def fromNext(value: Any, next: Span, quoting: Boolean = false): Literal = {
+    def fromNext(value: Any, next: Span, quoting: Quoting.Quoting = Quoting.None): Literal = {
       Literal(value, quoting, next.line, (None, Some(next.column)))
     }
 
     def between(value: String,
                 prev: Span,
                 next: Span,
-                quoting: Boolean = false,
+                quoting: Quoting.Quoting = Quoting.None,
                 preferPrev: Boolean = false): Literal = {
       if (prev.line == next.line) {
         require(prev.endColumn < next.column)
@@ -864,26 +868,27 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class CompoundString(spans: Vector[Span],
-                                    quoting: Boolean,
+                                    quoting: Quoting.Quoting,
                                     override val bounds: SourceLocation)
       extends BoundedComposite {
     override lazy val length: Int = spans
       .map(_.length)
-      .sum + (if (quoting) 2 else 0)
+      .sum + (if (quoting == Quoting.None) 0 else 2)
 
     override def formatContents(lineFormatter: LineFormatter): Unit = {
       val unspacedFormatter =
         lineFormatter.derive(newWrapping = Wrapping.Never, newSpacing = Spacing.Off)
-      if (quoting) {
-        unspacedFormatter.appendPrefix(
-            Literal.fromStartPosition(Symbols.QuoteOpen, line, column)
-        )
+      if (quoting == Quoting.None) {
         unspacedFormatter.appendAll(spans)
-        unspacedFormatter.appendSuffix(
-            Literal.fromEndPosition(Symbols.QuoteClose, line, endColumn)
-        )
       } else {
+        val (open, close) = quoting match {
+          case Quoting.Single => (Symbols.SingleQuoteOpen, Symbols.SingleQuoteClose)
+          case Quoting.Double => (Symbols.DoubleQuoteOpen, Symbols.DoubleQuoteClose)
+          case _              => throw new Exception("unreachable")
+        }
+        unspacedFormatter.appendPrefix(Literal.fromStartPosition(open, line, column))
         unspacedFormatter.appendAll(spans)
+        unspacedFormatter.appendSuffix(Literal.fromEndPosition(close, line, endColumn))
       }
     }
   }
@@ -939,7 +944,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     expr match {
       // literal values
       case ValueNone() => Literal.fromStart(Symbols.None, expr.loc)
-      case ValueString(value) =>
+      case ValueString(value, quoting) =>
         val v = if (stringModifier.isDefined) {
           stringModifier.get(value)
         } else {
@@ -950,7 +955,12 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         } else {
           v
         }
-        Literal.fromStart(escaped, expr.loc, quoting = inPlaceholder || !(inString || inCommand))
+        val actualQuoting = if (inPlaceholder || !(inString || inCommand)) {
+          quoting
+        } else {
+          Quoting.None
+        }
+        Literal.fromStart(escaped, expr.loc, quoting = actualQuoting)
       case ValueBoolean(value) => Literal.fromStart(value, expr.loc)
       case ValueInt(value)     => Literal.fromStart(value, expr.loc)
       case ValueFloat(value)   => Literal.fromStart(value, expr.loc)
@@ -1044,10 +1054,13 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             inString = inString || inCommand,
             bounds = expr.loc
         )
-      case ExprCompoundString(value) =>
-        CompoundString(value.map(nested(_, inString = true)),
-                       quoting = !(inString || inCommand),
-                       expr.loc)
+      case ExprCompoundString(value, quoting) =>
+        val actualQuoting = if (inString || inCommand) {
+          Quoting.None
+        } else {
+          quoting
+        }
+        CompoundString(value.map(nested(_, inString = true)), quoting = actualQuoting, expr.loc)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
@@ -1419,8 +1432,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     metaValue match {
       // literal values
       case MetaValueNull() => Literal.fromStart(Symbols.Null, metaValue.loc)
-      case MetaValueString(value) =>
-        Literal.fromStart(value, metaValue.loc, quoting = true)
+      case MetaValueString(value, quoting) =>
+        Literal.fromStart(value, metaValue.loc, quoting = quoting)
       case MetaValueBoolean(value) => Literal.fromStart(value, metaValue.loc)
       case MetaValueInt(value)     => Literal.fromStart(value, metaValue.loc)
       case MetaValueFloat(value)   => Literal.fromStart(value, metaValue.loc)
@@ -1694,8 +1707,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     // check whether there is at least one non-whitespace command part
     private def hasCommand: Boolean = {
       command.parts.exists {
-        case ValueString(value) => value.trim.nonEmpty
-        case _                  => true
+        case ValueString(value, _) => value.trim.nonEmpty
+        case _                     => true
       }
     }
 
@@ -1708,7 +1721,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately.
         val (headExpr: Expr, comment, indent) = command.parts.head match {
-          case expr @ ValueString(value) =>
+          case expr @ ValueString(value, _) =>
             value match {
               case commandStartRegexp(first, rest) =>
                 first.trim match {
@@ -1717,17 +1730,17 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                           s.isEmpty || s.startsWith(Symbols.Comment)
                       ) && rest.trim.isEmpty && command.parts.size == 1 =>
                     // command block is empty
-                    (ValueString("")(expr.loc), Some(s), false)
+                    (expr.copy(value = "")(expr.loc), Some(s), false)
                   case s if (s.isEmpty || s.startsWith(Symbols.Comment)) && rest.trim.isEmpty =>
                     // weird case, like there is a placeholder in the comment - we don't want to break
                     // anything so we'll just format the whole block as-is
                     (expr, None, false)
                   case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
                     // the first is empty or a WDL comment, so we ignore it
-                    (ValueString(rest)(expr.loc), Some(s), false)
+                    (expr.copy(value = rest)(expr.loc), Some(s), false)
                   case s if rest.trim.isEmpty =>
                     // single-line expression
-                    (ValueString(s)(expr.loc), None, true)
+                    (expr.copy(value = s)(expr.loc), None, true)
                   case _ =>
                     // opening line has some real content, so leave as-is
                     (expr, None, false)
@@ -1740,9 +1753,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
         def trimLast(last: Expr): Expr = {
           last match {
-            case ValueString(s) =>
+            case ValueString(s, quoting) =>
               // If the last part is just the whitespace before the close block, throw it out
-              ValueString(commandEndRegexp.replaceFirstIn(s, ""))(last.loc)
+              ValueString(commandEndRegexp.replaceFirstIn(s, ""), quoting)(last.loc)
             case other => other
           }
         }

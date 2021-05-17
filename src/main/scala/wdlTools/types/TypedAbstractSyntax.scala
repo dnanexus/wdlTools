@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import wdlTools.syntax.{CommentMap, SourceLocation, WdlVersion}
+import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, WdlVersion}
 import dx.util.FileNode
 
 // Use SeqMap for all map attributes, which maintains insert
@@ -29,7 +29,10 @@ object TypedAbstractSyntax {
   case class ValueBoolean(value: Boolean, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
   case class ValueInt(value: Long, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
   case class ValueFloat(value: Double, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
-  case class ValueString(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
+  case class ValueString(value: String,
+                         wdlType: WdlTypes.T,
+                         quoting: Quoting.Quoting = Quoting.None)(val loc: SourceLocation)
+      extends Expr
   case class ValueFile(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation) extends Expr
   case class ValueDirectory(value: String, wdlType: WdlTypes.T)(val loc: SourceLocation)
       extends Expr
@@ -38,7 +41,9 @@ object TypedAbstractSyntax {
   // represents strings with interpolation. These occur only in command blocks.
   // For example:
   //  "some string part ~{ident + ident} some string part after"
-  case class ExprCompoundString(value: Vector[Expr], wdlType: WdlTypes.T)(val loc: SourceLocation)
+  case class ExprCompoundString(value: Vector[Expr],
+                                wdlType: WdlTypes.T,
+                                quoting: Quoting.Quoting = Quoting.None)(val loc: SourceLocation)
       extends Expr
 
   case class ExprPair(left: Expr, right: Expr, wdlType: WdlTypes.T)(val loc: SourceLocation)
@@ -164,7 +169,9 @@ object TypedAbstractSyntax {
   case class MetaValueBoolean(value: Boolean)(val loc: SourceLocation) extends MetaValue
   case class MetaValueInt(value: Long)(val loc: SourceLocation) extends MetaValue
   case class MetaValueFloat(value: Double)(val loc: SourceLocation) extends MetaValue
-  case class MetaValueString(value: String)(val loc: SourceLocation) extends MetaValue
+  case class MetaValueString(value: String, quoting: Quoting.Quoting = Quoting.None)(
+      val loc: SourceLocation
+  ) extends MetaValue
   case class MetaValueObject(value: SeqMap[String, MetaValue])(val loc: SourceLocation)
       extends MetaValue
   case class MetaValueArray(value: Vector[MetaValue])(val loc: SourceLocation) extends MetaValue

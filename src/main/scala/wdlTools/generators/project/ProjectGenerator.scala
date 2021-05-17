@@ -76,17 +76,17 @@ case class ProjectGenerator(name: String,
       throw new Exception("Cannot use an expression that requires evaluation")
     }
     expr match {
-      case ValueString(value)  => MetaValueString(value)(expr.loc)
-      case ValueInt(value)     => MetaValueInt(value)(expr.loc)
-      case ValueFloat(value)   => MetaValueFloat(value)(expr.loc)
-      case ValueBoolean(value) => MetaValueBoolean(value)(expr.loc)
-      case ExprArray(value)    => MetaValueArray(value.map(exprToMetaValue))(expr.loc)
+      case ValueString(value, quoting) => MetaValueString(value, quoting)(expr.loc)
+      case ValueInt(value)             => MetaValueInt(value)(expr.loc)
+      case ValueFloat(value)           => MetaValueFloat(value)(expr.loc)
+      case ValueBoolean(value)         => MetaValueBoolean(value)(expr.loc)
+      case ExprArray(value)            => MetaValueArray(value.map(exprToMetaValue))(expr.loc)
       case ExprObject(value) =>
         MetaValueObject(value.map {
           case ExprMember(key, value) =>
             val keyStr = exprToMetaValue(key) match {
-              case MetaValueString(s) => s
-              case _                  => throw new Exception(s"Invalid meta object key ${key}")
+              case MetaValueString(s, _) => s
+              case _                     => throw new Exception(s"Invalid meta object key ${key}")
             }
             MetaKV(keyStr, exprToMetaValue(value))(expr.loc)
         })(
