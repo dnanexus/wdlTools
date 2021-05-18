@@ -1,12 +1,11 @@
 package wdlTools.format
 
 import java.nio.file.{Path, Paths}
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.eval.{DefaultEvalPaths, Eval, WdlValueBindings}
 import wdlTools.generators.code.WdlGenerator
-import wdlTools.syntax.{Parsers, WdlVersion}
+import wdlTools.syntax.{Parsers, SyntaxException, WdlVersion}
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
 import dx.util.{FileNode, FileSourceResolver, LinesFileNode}
 
@@ -58,7 +57,14 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
       gLines.readLines.mkString("\n") shouldBe afterSrc.readLines.mkString("\n")
     }
     val gtDoc = if (validateParse) {
-      val gDoc = Parsers.default.parseDocument(gLines)
+      val gDoc =
+        try {
+          Parsers.default.parseDocument(gLines)
+        } catch {
+          case ex: SyntaxException =>
+            println(s"Generated WDL has invalid syntax\n${gLines.readLines.mkString("\n")}")
+            throw ex
+        }
       Some(TypeInfer.instance.apply(gDoc)._1)
     } else {
       None
