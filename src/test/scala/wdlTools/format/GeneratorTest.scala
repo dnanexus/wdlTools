@@ -147,4 +147,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "include quotes for strings in placeholders" in {
     generate("sum_array.wdl", validateContentSelf = true)
   }
+
+  it should "handle strings with nested quotes" in {
+    generate("nested_quotes.wdl", validateContentFile = true)
+  }
 }
