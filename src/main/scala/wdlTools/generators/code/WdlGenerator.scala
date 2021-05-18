@@ -615,8 +615,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
           case ValueString(s, _, Quoting.None) => s.nonEmpty
           case _                               => true
         }
-        CompoundString(filteredExprs.map(buildExpression(_, ctx.advanceTo(InStringState(quoting)))),
-                       quoting = quoting)
+        val strCtx = ctx.advanceTo(InStringState(quoting))
+        CompoundString(filteredExprs.map(buildExpression(_, strCtx)), quoting = quoting)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
@@ -651,9 +651,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             )
           case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
-            val operands = args.map(
-                buildExpression(_, nextCtx.advanceTo(InOperationState(Some(oper))))
-            )
+            val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
+            val operands = args.map(buildExpression(_, operCtx))
             Operation(oper, operands, vectorizable = true, ctx)
           case ExprApply(oper, _, Vector(value), _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
