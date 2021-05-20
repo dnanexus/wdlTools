@@ -828,33 +828,31 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   private case class Operation(oper: String,
                                lhs: Span,
                                rhs: Span,
-                               grouped: Boolean = false,
-                               inString: Boolean,
+                               ctx: ExpressionContext,
                                override val bounds: SourceLocation)
-      extends Group(ends = if (grouped) {
+      extends Group(ends = if (ctx.groupOperation(oper)) {
         Some(Literal.fromStart(Symbols.GroupOpen, bounds),
              Literal.fromEnd(Symbols.GroupClose, bounds))
       } else {
         None
-      }, wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded)
+      }, wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
       with BoundedComposite {
 
     override lazy val body: Option[Composite] = {
-      val operLiteral = Literal.between(oper, lhs, rhs)
+      val operLiteral = Literal.between(Operator.All(oper).symbol, lhs, rhs)
       Some(SpanSequence(Vector(lhs, operLiteral, rhs), wrapping = wrapping, spacing = Spacing.On))
     }
   }
 
   private case class Placeholder(value: Span,
-                                 open: String = Symbols.PlaceholderOpenDollar,
-                                 close: String = Symbols.PlaceholderClose,
+                                 ctx: ExpressionContext,
                                  options: Option[Vector[Span]] = None,
-                                 inString: Boolean,
                                  override val bounds: SourceLocation)
       extends Group(
-          ends = Some(Literal.fromStart(open, bounds), Literal.fromEnd(close, bounds)),
-          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
-          spacing = if (inString) Spacing.Off else Spacing.On
+          ends = Some(Literal.fromStart(ctx.placeholderOpen, bounds),
+                      Literal.fromEnd(Symbols.PlaceholderClose, bounds)),
+          wrapping = if (ctx.inString(quoted = true)) Wrapping.Never else Wrapping.AsNeeded,
+          spacing = if (ctx.inString()) Spacing.Off else Spacing.On
       )
       with BoundedComposite {
 
@@ -895,47 +893,11 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
   private def buildExpression(
       expr: Expr,
-      placeholderOpen: String = Symbols.PlaceholderOpenDollar,
-      inString: Boolean = false,
-      inCommand: Boolean = false,
-      inPlaceholder: Boolean = false,
-      inOperation: Boolean = false,
-      parentOperation: Option[String] = None,
-      stringModifier: Option[String => String] = None
+      ctx: ExpressionContext = ExpressionContext.default
   ): Span = {
 
-    /*
-     * Builds an expression that occurs nested within another expression. By default, passes
-     * all the current parameter values to the nested call.
-     * @param nestedExpression the nested Expr
-     * @param placeholderOpen  override the current value of `placeholderOpen`
-     * @param inString         override the current value of `inString`
-     * @param inPlaceholder    override the current value of `inPlaceholder`
-     * @param inOperation      override the current value of `inOperation`
-     * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-     *                         same operations are not grouped.
-     * @return a Span
-     */
-    def nested(nestedExpression: Expr,
-               placeholderOpen: String = placeholderOpen,
-               inString: Boolean = inString,
-               inPlaceholder: Boolean = inPlaceholder,
-               inOperation: Boolean = inOperation,
-               parentOperation: Option[String] = None): Span = {
-      buildExpression(
-          nestedExpression,
-          placeholderOpen = placeholderOpen,
-          inString = inString,
-          inCommand = inCommand,
-          inPlaceholder = inPlaceholder,
-          inOperation = inOperation,
-          parentOperation = parentOperation,
-          stringModifier = stringModifier
-      )
-    }
-
-    def option(name: String, value: Expr): Span = {
-      val exprSpan = nested(value, inPlaceholder = true)
+    def placeholderOption(name: String, value: Expr): Span = {
+      val exprSpan = buildExpression(value, ctx.advanceTo(InPlaceholderState))
       val eqLiteral = Literal.fromNext(Symbols.Assignment, exprSpan)
       val nameLiteral = Literal.fromNext(name, eqLiteral)
       SpanSequence(Vector(nameLiteral, eqLiteral, exprSpan))
@@ -945,28 +907,19 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       // literal values
       case ValueNone() => Literal.fromStart(Symbols.None, expr.loc)
       case ValueString(value, quoting) =>
-        val v = if (stringModifier.isDefined) {
-          stringModifier.get(value)
-        } else {
-          value
-        }
-        val escaped = if (!inCommand) {
-          Utils.escape(v)
-        } else {
-          v
-        }
-        val actualQuoting = if (inPlaceholder || !(inString || inCommand)) {
-          quoting
-        } else {
-          Quoting.None
-        }
-        Literal.fromStart(escaped, expr.loc, quoting = actualQuoting)
+        val escaped =
+          if (quoting != Quoting.None || ctx.inString(quoted = true, resetInPlaceholder = true)) {
+            Utils.escape(value)
+          } else {
+            value
+          }
+        Literal.fromStart(escaped, expr.loc, quoting = quoting)
       case ValueBoolean(value) => Literal.fromStart(value, expr.loc)
       case ValueInt(value)     => Literal.fromStart(value, expr.loc)
       case ValueFloat(value)   => Literal.fromStart(value, expr.loc)
       case ExprArray(value) =>
         BoundedContainer(
-            value.map(nested(_)),
+            value.map(buildExpression(_, ctx)),
             Some(Literal.fromStart(Symbols.ArrayLiteralOpen, expr.loc),
                  Literal.fromEnd(Symbols.ArrayLiteralClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
@@ -975,7 +928,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         )
       case ExprPair(left, right) =>
         BoundedContainer(
-            Vector(nested(left), nested(right)),
+            Vector(buildExpression(left, ctx), buildExpression(right, ctx)),
             Some(Literal.fromStart(Symbols.GroupOpen, expr.loc),
                  Literal.fromEnd(Symbols.GroupClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
@@ -984,7 +937,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       case ExprMap(value) =>
         BoundedContainer(
             value.map { member: ExprMember =>
-              KeyValue(nested(member.key), nested(member.value), bounds = member.loc)
+              KeyValue(buildExpression(member.key, ctx),
+                       buildExpression(member.value, ctx),
+                       bounds = member.loc)
             },
             Some(Literal.fromStart(Symbols.MapOpen, expr.loc),
                  Literal.fromEnd(Symbols.MapClose, expr.loc)),
@@ -997,7 +952,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         BoundedContainer(
             value.map {
               case member @ ExprMember(key: ValueString, value) =>
-                KeyValue(Literal.fromStart(key.value, key.loc), nested(value), bounds = member.loc)
+                KeyValue(Literal.fromStart(key.value, key.loc),
+                         buildExpression(value, ctx),
+                         bounds = member.loc)
               case other =>
                 throw new Exception(s"invalid object member ${other}")
             },
@@ -1022,7 +979,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         BoundedContainer(
             members.map {
               case member @ ExprMember(key: ValueString, value) =>
-                KeyValue(Literal.fromStart(key.value, key.loc), nested(value), bounds = member.loc)
+                KeyValue(Literal.fromStart(key.value, key.loc),
+                         buildExpression(value, ctx),
+                         bounds = member.loc)
               case other =>
                 throw new Exception(s"invalid object member ${other}")
             },
@@ -1041,48 +1000,45 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       // placeholders
       case ExprPlaceholder(t, f, sep, default, value) =>
         Placeholder(
-            nested(value, inPlaceholder = true),
-            placeholderOpen,
-            options = Some(
+            buildExpression(value, ctx.advanceTo(InPlaceholderState)),
+            ctx,
+            Some(
                 Vector(
-                    t.map(e => option(Symbols.TrueOption, e)),
-                    f.map(e => option(Symbols.FalseOption, e)),
-                    sep.map(e => option(Symbols.SepOption, e)),
-                    default.map(e => option(Symbols.DefaultOption, e))
+                    t.map(e => placeholderOption(Symbols.TrueOption, e)),
+                    f.map(e => placeholderOption(Symbols.FalseOption, e)),
+                    sep.map(e => placeholderOption(Symbols.SepOption, e)),
+                    default.map(e => placeholderOption(Symbols.DefaultOption, e))
                 ).flatten
             ),
-            inString = inString || inCommand,
             bounds = expr.loc
         )
       case ExprCompoundString(value, quoting) =>
-        val actualQuoting = if (inString || inCommand) {
-          Quoting.None
-        } else {
-          quoting
-        }
-        CompoundString(value.map(nested(_, inString = true)), quoting = actualQuoting, expr.loc)
+        val strCtx = ctx.advanceTo(InStringState(quoting))
+        CompoundString(value.map(buildExpression(_, strCtx)), quoting = quoting, expr.loc)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
+        val nextCtx =
+          if (ctx.inString(resetInPlaceholder = true)) ctx.advanceTo(InPlaceholderState) else ctx
         val span = other match {
           case ExprIdentifier(id) => Literal.fromStart(id, expr.loc)
           case ExprAt(array, index) =>
-            val arraySpan = nested(array, inPlaceholder = inString || inCommand)
+            val arraySpan = buildExpression(array, nextCtx)
             val prefix = SpanSequence(
                 Vector(arraySpan, Literal.fromPrev(Symbols.IndexOpen, arraySpan))
             )
             val suffix = Literal.fromEnd(Symbols.IndexClose, expr.loc)
             BoundedContainer(
-                Vector(nested(index, inPlaceholder = inString || inCommand)),
+                Vector(buildExpression(index, nextCtx)),
                 Some(prefix, suffix),
                 // TODO: shouldn't need a delimiter - index must be exactly length 1
                 Some(Symbols.ArrayDelimiter),
                 bounds = expr.loc
             )
           case ExprIfThenElse(cond, tBranch, fBranch) =>
-            val condSpan = nested(cond, inOperation = false, inPlaceholder = inString || inCommand)
-            val tSpan = nested(tBranch, inOperation = false, inPlaceholder = inString || inCommand)
-            val fSpan = nested(fBranch, inOperation = false, inPlaceholder = inString || inCommand)
+            val condSpan = buildExpression(cond, nextCtx)
+            val tSpan = buildExpression(tBranch, nextCtx)
+            val fSpan = buildExpression(fBranch, nextCtx)
             BoundedContainer(
                 Vector(
                     Literal.fromStart(Symbols.If, expr.loc),
@@ -1098,21 +1054,16 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
           case ExprApply(oper, Vector(value)) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
             val operSpan = Literal.fromStart(symbol, expr.loc)
-            SpanSequence(Vector(operSpan, nested(value, inOperation = true)))
+            SpanSequence(
+                Vector(operSpan, buildExpression(value, nextCtx.advanceTo(InOperationState())))
+            )
           case ExprApply(oper, Vector(lhs, rhs)) if Operator.All.contains(oper) =>
-            val symbol = Operator.All(oper).symbol
+            val nextCtx2 = nextCtx.advanceTo(InOperationState(Some(oper)))
             Operation(
-                symbol,
-                nested(lhs,
-                       inPlaceholder = inString || inCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
-                nested(rhs,
-                       inPlaceholder = inString || inCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper)),
-                grouped = inOperation && !parentOperation.contains(oper),
-                inString = inString || inCommand,
+                oper,
+                buildExpression(lhs, nextCtx2),
+                buildExpression(rhs, nextCtx2),
+                ctx,
                 expr.loc
             )
           case ExprApply(funcName, elements) =>
@@ -1121,21 +1072,21 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             )
             val suffix = Literal.fromEnd(Symbols.FunctionCallClose, expr.loc)
             BoundedContainer(
-                elements.map(nested(_, inPlaceholder = inString || inCommand)),
+                elements.map(buildExpression(_, nextCtx)),
                 Some(prefix, suffix),
                 Some(Symbols.ArrayDelimiter),
                 expr.loc
             )
           case ExprGetName(e, id) =>
-            val exprSpan = nested(e, inPlaceholder = inString || inCommand)
+            val exprSpan = buildExpression(e, nextCtx)
             val idLiteral = Literal.fromEnd(id, expr.loc)
             SpanSequence(
                 Vector(exprSpan, Literal.between(Symbols.Access, exprSpan, idLiteral), idLiteral)
             )
           case other => throw new Exception(s"Unrecognized expression $other")
         }
-        if ((inString || inCommand) && !inPlaceholder) {
-          Placeholder(span, placeholderOpen, inString = inString || inCommand, bounds = other.loc)
+        if (ctx.inString(resetInPlaceholder = true)) {
+          Placeholder(span, ctx, bounds = other.loc)
         } else {
           span
         }
@@ -1793,11 +1744,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
         bodyFormatter.beginLine()
         newParts.foreach { expr =>
           bodyFormatter.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inCommand = true
-              )
+              buildExpression(expr, ExpressionContext.command)
           )
         }
         bodyFormatter.endLine()

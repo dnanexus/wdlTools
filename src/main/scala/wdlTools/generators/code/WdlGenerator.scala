@@ -453,17 +453,18 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
   private case class Operation(oper: String,
                                operands: Vector[Sized],
-                               grouped: Boolean = false,
-                               inString: Boolean)
-      extends Group(ends = if (grouped) {
+                               vectorizable: Boolean,
+                               ctx: ExpressionContext)
+      extends Group(ends = if (ctx.groupOperation(oper)) {
         Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
       } else {
         None
-      }, wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded)
+      }, wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
       with Composite {
 
     override lazy val body: Option[Composite] = {
-      val operLiteral = Literal(oper)
+      val symbolTable = if (vectorizable) Operator.Vectorizable else Operator.All
+      val operLiteral = Literal(symbolTable(oper).symbol)
       val seq: Vector[Sized] = operands.head +: Iterator
         .continually(operLiteral)
         .zip(operands.tail)
@@ -474,14 +475,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   }
 
   private case class Placeholder(value: Sized,
-                                 open: String = Symbols.PlaceholderOpenDollar,
-                                 close: String = Symbols.PlaceholderClose,
-                                 options: Option[Vector[Sized]] = None,
-                                 inString: Boolean)
+                                 ctx: ExpressionContext,
+                                 options: Option[Vector[Sized]] = None)
       extends Group(
-          ends = Some(Literal(open), Literal(close)),
-          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
-          spacing = if (inString) Spacing.Off else Spacing.On
+          ends = Some(Literal(ctx.placeholderOpen), Literal(Symbols.PlaceholderClose)),
+          wrapping = if (ctx.inString(quoted = true)) Wrapping.Never else Wrapping.AsNeeded,
+          spacing = if (ctx.inString()) Spacing.Off else Spacing.On
       )
       with Composite {
 
@@ -520,68 +519,23 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
 
   private def buildExpression(
       expr: Expr,
-      placeholderOpen: String = Symbols.PlaceholderOpenDollar,
-      inString: Boolean = false,
-      inCommand: Boolean = false,
-      inPlaceholder: Boolean = false,
-      inOperation: Boolean = false,
-      parentOperation: Option[String] = None,
-      stringModifier: Option[String => String] = None
+      ctx: ExpressionContext = ExpressionContext.default
   ): Sized = {
 
-    /*
-     * Builds an expression that occurs nested within another expression. By default, passes
-     * all the current parameter values to the nested call.
-     * @param nestedExpression the nested Expr
-     * @param placeholderOpen  override the current value of `placeholderOpen`
-     * @param inString         override the current value of `inString`
-     * @param inPlaceholder    override the current value of `inPlaceholder`
-     * @param inOperation      override the current value of `inOperation`
-     * @param parentOperation  if `inOperation` is true, this is the parent operation - nested
-     *                         same operations are not grouped.
-     * @return a Sized
-     */
-    def nested(nestedExpression: Expr,
-               placeholderOpen: String = placeholderOpen,
-               inString: Boolean = inString,
-               inPlaceholder: Boolean = inPlaceholder,
-               inOperation: Boolean = inOperation,
-               parentOperation: Option[String] = None): Sized = {
-      buildExpression(
-          nestedExpression,
-          placeholderOpen = placeholderOpen,
-          inString = inString,
-          inCommand = inCommand,
-          inPlaceholder = inPlaceholder,
-          inOperation = inOperation,
-          parentOperation = parentOperation,
-          stringModifier = stringModifier
-      )
-    }
-
     def string(value: String, quoting: Quoting.Quoting = Quoting.Double): Literal = {
-      val v = if (stringModifier.isDefined) {
-        stringModifier.get(value)
-      } else {
-        value
-      }
-      val escaped = if (!inCommand) {
-        Utils.escape(v)
-      } else {
-        v
-      }
-      val actualQuoting = if (inPlaceholder || !(inString || inCommand)) {
-        quoting
-      } else {
-        Quoting.None
-      }
-      Literal(escaped, quoting = actualQuoting)
+      val escaped =
+        if (quoting != Quoting.None || ctx.inString(quoted = true, resetInPlaceholder = true)) {
+          Utils.escape(value)
+        } else {
+          value
+        }
+      Literal(escaped, quoting = quoting)
     }
 
-    def option(name: String, value: Expr): Sized = {
+    def placeholderOption(name: String, value: Expr): Sized = {
       val nameLiteral = Literal(name)
       val eqLiteral = Literal(Symbols.Assignment)
-      val exprSized = nested(value, inPlaceholder = true)
+      val exprSized = buildExpression(value, ctx.advanceTo(InPlaceholderState))
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
@@ -596,21 +550,21 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       case ValueFloat(value, _)           => Literal(value)
       case ExprArray(value, _) =>
         Container(
-            value.map(nested(_)),
+            value.map(buildExpression(_, ctx)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
             wrapping = Wrapping.AllOrNone
         )
       case ExprPair(left, right, _) =>
         Container(
-            Vector(nested(left), nested(right)),
+            Vector(buildExpression(left, ctx), buildExpression(right, ctx)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
         )
       case ExprMap(value, _) =>
         Container(
             value.map {
-              case (k, v) => KeyValue(nested(k), nested(v))
+              case (k, v) => KeyValue(buildExpression(k, ctx), buildExpression(v, ctx))
             }.toVector,
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.MapOpen), Literal(Symbols.MapClose)),
@@ -629,7 +583,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         Container(
             value.map {
               case (ValueString(k, _, _), v) =>
-                KeyValue(Literal(k), nested(v))
+                KeyValue(Literal(k), buildExpression(v, ctx))
               case other =>
                 throw new Exception(s"invalid object member ${other}")
             }.toVector,
@@ -642,52 +596,49 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       // placeholders
       case ExprPlaceholder(t, f, sep, default, value, _) =>
         Placeholder(
-            nested(value, inPlaceholder = true),
-            placeholderOpen,
-            options = Some(
+            buildExpression(value, ctx.advanceTo(InPlaceholderState)),
+            ctx,
+            Some(
                 Vector(
-                    t.map(e => option(Symbols.TrueOption, e)),
-                    f.map(e => option(Symbols.FalseOption, e)),
-                    sep.map(e => option(Symbols.SepOption, e)),
-                    default.map(e => option(Symbols.DefaultOption, e))
+                    t.map(e => placeholderOption(Symbols.TrueOption, e)),
+                    f.map(e => placeholderOption(Symbols.FalseOption, e)),
+                    sep.map(e => placeholderOption(Symbols.SepOption, e)),
+                    default.map(e => placeholderOption(Symbols.DefaultOption, e))
                 ).flatten
-            ),
-            inString = inString || inCommand
+            )
         )
       case ExprCompoundString(value, _, quoting) =>
         // Often/always an ExprCompoundString contains one or more empty
         // ValueStrings that we want to get rid of because they're useless
         // and can mess up formatting
         val filteredExprs = value.filter {
-          case ValueString(s, _, _) => s.nonEmpty
-          case _                    => true
+          case ValueString(s, _, Quoting.None) => s.nonEmpty
+          case _                               => true
         }
-        val actualQuoting = if (inString || inCommand) {
-          Quoting.None
-        } else {
-          quoting
-        }
-        CompoundString(filteredExprs.map(nested(_, inString = true)), quoting = actualQuoting)
+        val strCtx = ctx.advanceTo(InStringState(quoting))
+        CompoundString(filteredExprs.map(buildExpression(_, strCtx)), quoting = quoting)
       // other expressions need to be wrapped in a placeholder if they
       // appear in a string or command block
       case other =>
+        val nextCtx =
+          if (ctx.inString(resetInPlaceholder = true)) ctx.advanceTo(InPlaceholderState) else ctx
         val sized = other match {
           case ExprIdentifier(id, _) => Literal(id)
           case ExprAt(array, index, _) =>
-            val arraySized = nested(array, inPlaceholder = inString || inCommand)
+            val arraySized = buildExpression(array, nextCtx)
             val prefix = Sequence(
                 Vector(arraySized, Literal(Symbols.IndexOpen))
             )
             val suffix = Literal(Symbols.IndexClose)
             Container(
-                Vector(nested(index, inPlaceholder = inString || inCommand)),
+                Vector(buildExpression(index, nextCtx)),
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
           case ExprIfThenElse(cond, tBranch, fBranch, _) =>
-            val condSized = nested(cond, inOperation = false, inPlaceholder = inString || inCommand)
-            val tSized = nested(tBranch, inOperation = false, inPlaceholder = inString || inCommand)
-            val fSized = nested(fBranch, inOperation = false, inPlaceholder = inString || inCommand)
+            val condSized = buildExpression(cond, nextCtx)
+            val tSized = buildExpression(tBranch, nextCtx)
+            val fSized = buildExpression(fBranch, nextCtx)
             Container(
                 Vector(
                     Literal(Symbols.If),
@@ -700,57 +651,39 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             )
           case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
-            val symbol = Operator.Vectorizable(oper).symbol
-            val operands = args.map(
-                nested(_,
-                       inPlaceholder = inString || inCommand,
-                       inOperation = true,
-                       parentOperation = Some(oper))
-            )
-            Operation(symbol,
-                      operands,
-                      grouped = inOperation && !parentOperation.contains(oper),
-                      inString = inString || inCommand)
+            val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
+            val operands = args.map(buildExpression(_, operCtx))
+            Operation(oper, operands, vectorizable = true, ctx)
           case ExprApply(oper, _, Vector(value), _) if Operator.All.contains(oper) =>
             val symbol = Operator.All(oper).symbol
-            Sequence(Vector(Literal(symbol), nested(value, inOperation = true)))
-          case ExprApply(oper, _, Vector(lhs, rhs), _) if Operator.All.contains(oper) =>
-            val symbol = Operator.All(oper).symbol
-            Operation(
-                symbol,
-                Vector(
-                    nested(lhs,
-                           inPlaceholder = inString || inCommand,
-                           inOperation = true,
-                           parentOperation = Some(oper)),
-                    nested(rhs,
-                           inPlaceholder = inString || inCommand,
-                           inOperation = true,
-                           parentOperation = Some(oper))
-                ),
-                grouped = inOperation && !parentOperation.contains(oper),
-                inString = inString || inCommand
+            Sequence(
+                Vector(Literal(symbol),
+                       buildExpression(value, nextCtx.advanceTo(InOperationState())))
             )
+          case ExprApply(oper, _, Vector(lhs, rhs), _) if Operator.All.contains(oper) =>
+            val nextCtx2 = nextCtx.advanceTo(InOperationState(Some(oper)))
+            val operands = Vector(buildExpression(lhs, nextCtx2), buildExpression(rhs, nextCtx2))
+            Operation(oper, operands, vectorizable = false, ctx)
           case ExprApply(funcName, _, elements, _) =>
             val prefix = Sequence(
                 Vector(Literal(funcName), Literal(Symbols.FunctionCallOpen))
             )
             val suffix = Literal(Symbols.FunctionCallClose)
             Container(
-                elements.map(nested(_, inPlaceholder = inString || inCommand)),
+                elements.map(buildExpression(_, nextCtx)),
                 Some(Symbols.ArrayDelimiter),
                 Some(prefix, suffix)
             )
           case ExprGetName(e, id, _) =>
-            val exprSized = nested(e, inPlaceholder = inString || inCommand)
+            val exprSized = buildExpression(e, nextCtx)
             val idLiteral = Literal(id)
             Sequence(
                 Vector(exprSized, Literal(Symbols.Access), idLiteral)
             )
           case other => throw new Exception(s"Unrecognized expression $other")
         }
-        if ((inString || inCommand) && !inPlaceholder) {
-          Placeholder(sized, placeholderOpen, inString = inString || inCommand)
+        if (ctx.inString(resetInPlaceholder = true)) {
+          Placeholder(sized, ctx)
         } else {
           sized
         }
@@ -1188,13 +1121,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
         bodyGenerator.endLine(continue = true)
         bodyGenerator.beginLine()
         newParts.foreach { expr =>
-          bodyGenerator.append(
-              buildExpression(
-                  expr,
-                  placeholderOpen = Symbols.PlaceholderOpenTilde,
-                  inCommand = true
-              )
-          )
+          bodyGenerator.append(buildExpression(expr, ExpressionContext.command))
         }
         bodyGenerator.endLine()
 
