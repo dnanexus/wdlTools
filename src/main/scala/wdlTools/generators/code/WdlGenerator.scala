@@ -221,7 +221,14 @@ object WdlGenerator {
   }
 }
 
-case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs: Boolean = true) {
+/**
+  * Generates WDL source code from a TypedAbstractSyntax document.
+  * @param targetVersion WDL version to generate
+  * @param omitNullCallInputs whether to omit any call inputs that can be
+  *                           determined statically to be null
+  */
+case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
+                        omitNullCallInputs: Boolean = true) {
   if (targetVersion.exists(_ < WdlVersion.V1)) {
     throw new Exception(s"WDL version ${targetVersion.get} is not supported")
   }
@@ -924,7 +931,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   private case class CallInputsStatement(inputs: Map[String, Expr]) extends BaseStatement {
     private val key = Literal(Symbols.Input)
     private val value = inputs.flatMap {
-      case (_, ValueNone(_)) if omitNullInputs => None
+      case (_, ValueNone(_)) if omitNullCallInputs => None
       case (name, expr) =>
         val nameToken = Literal(name)
         val exprSized = buildExpression(expr)

@@ -1,11 +1,8 @@
 package wdlTools.cli
 
-import java.nio.file.Files
-
 import wdlTools.generators.code.WdlFormatter
-import dx.util.{FileSourceResolver, LocalFileSource}
+import dx.util.{FileSourceResolver, FileUtils, LocalFileSource}
 
-import scala.jdk.CollectionConverters._
 import scala.language.reflectiveCalls
 
 case class Format(conf: WdlToolsConf) extends Command {
@@ -17,9 +14,13 @@ case class Format(conf: WdlToolsConf) extends Command {
     val documents = formatter.formatDocuments(docSource)
     documents.foreach {
       case (source, lines) if outputDir.isDefined =>
-        Files.write(outputDir.get.resolve(source.name), lines.asJava)
+        FileUtils.writeFileContent(outputDir.get.resolve(source.name),
+                                   lines.mkString(System.lineSeparator()),
+                                   overwrite = overwrite)
       case (localSource: LocalFileSource, lines) if overwrite =>
-        Files.write(localSource.canonicalPath, lines.asJava)
+        FileUtils.writeFileContent(localSource.canonicalPath,
+                                   lines.mkString(System.lineSeparator()),
+                                   overwrite = true)
       case (_, lines) =>
         println(lines.mkString(System.lineSeparator()))
     }

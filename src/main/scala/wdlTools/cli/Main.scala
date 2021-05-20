@@ -20,6 +20,7 @@ object Main extends App {
             case conf.format    => Format(conf)
             case conf.lint      => Lint(conf)
             case conf.upgrade   => Upgrade(conf)
+            case conf.fix       => Fix(conf)
             case conf.generate  => Generate(conf)
             case conf.readmes   => Readmes(conf)
             case conf.printTree => PrintTree(conf)

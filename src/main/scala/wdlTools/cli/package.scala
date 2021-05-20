@@ -85,12 +85,12 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     }
   }
 
-  private def getParent(pathOrUri: String): Path = {
-    (getUriScheme(pathOrUri) match {
-      case Some(FileScheme) => Paths.get(URI.create(pathOrUri))
-      case None             => Paths.get(pathOrUri)
-      case _                => throw new Exception(s"${pathOrUri} is not a path or file:// URI")
-    }).getParent
+  private def getParent(pathOrUri: String): Option[Path] = {
+    getUriScheme(pathOrUri) match {
+      case Some(FileScheme) => Some(Paths.get(URI.create(pathOrUri)).getParent)
+      case None             => Some(Paths.get(pathOrUri).getParent)
+      case _                => None
+    }
   }
 
   /**
@@ -101,8 +101,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   private def localDirectories(pathOrUri: String,
                                localDirs: ScallopOption[List[Path]]): Vector[Path] = {
     localDirs.toOption match {
-      case None        => Vector(getParent(pathOrUri))
-      case Some(paths) => (paths.toSet ++ Set(getParent(pathOrUri))).toVector
+      case None        => getParent(pathOrUri).toVector
+      case Some(paths) => (paths.toSet ++ getParent(pathOrUri).toSet).toVector
     }
   }
 
@@ -197,8 +197,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         descr = "WDL version to generate; currently only v1.0 is supported",
         default = Some(WdlVersion.V1)
     )
+    val supportedVersions: Set[WdlVersion] = Set(WdlVersion.V1, WdlVersion.V1_1)
     validateOpt(wdlVersion) {
-      case Some(version) if version != WdlVersion.V1 =>
+      case Some(version) if !supportedVersions.contains(version) =>
         Left("Only WDL v1.0 is supported currently")
       case _ => Right(())
     }
@@ -283,6 +284,31 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     )
   }
   addSubcommand(upgrade)
+
+  val fix = new FollowOptionalParserSubcommand(
+      name = "fix",
+      description = "Fix specification incompatibilities in WDL file and all its dependencies."
+  ) {
+    val srcVersion: ScallopOption[WdlVersion] = opt[WdlVersion](
+        descr = "WDL version of the document being upgraded",
+        default = None
+    )
+    val baseUri: ScallopOption[String] = opt[String](
+        descr =
+          "Base URI for imports; output directories will be relative to this URI; defaults to the parent directory of the main WDL file",
+        default = None
+    )
+    val outputDir: ScallopOption[Path] = opt[Path](
+        descr = "Directory in which to output fixed WDL files; defaults to current directory",
+        short = 'O'
+    )
+    val overwrite: ScallopOption[Boolean] = toggle(
+        descrYes = "Overwrite existing files",
+        descrNo = "(Default) Do not overwrite existing files",
+        default = Some(false)
+    )
+  }
+  addSubcommand(fix)
 
   val exec = new WdlToolsSubcommand(
       name = "exec",
