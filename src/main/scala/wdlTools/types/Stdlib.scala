@@ -1,6 +1,6 @@
 package wdlTools.types
 
-import WdlTypes.{T_Function2, T_Function3, T_Var, _}
+import WdlTypes.{T_Function1, T_Function2, T_Function3, T_Var, _}
 import wdlTools.syntax.{Operator, WdlVersion}
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
@@ -142,7 +142,9 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
           T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
           T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
-          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Any), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_Any)), T_String)
       ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),
@@ -248,7 +250,9 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
           T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
           T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
-          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Any), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_Any)), T_String)
       ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),
@@ -346,7 +350,9 @@ case class Stdlib(regime: TypeCheckingRegime,
           T_Function2(Operator.Addition.name, T_Int, T_String, T_String),
           T_Function2(Operator.Addition.name, T_String, T_Int, T_String),
           T_Function2(Operator.Addition.name, T_Float, T_String, T_String),
-          T_Function2(Operator.Addition.name, T_String, T_Float, T_String)
+          T_Function2(Operator.Addition.name, T_String, T_Float, T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Any), T_String),
+          T_Function1(Operator.Addition.name, T_Array(T_Optional(T_Any)), T_String)
       ),
       // binary numeric operators
       vectorNumericPrototypes(Operator.Addition.name),

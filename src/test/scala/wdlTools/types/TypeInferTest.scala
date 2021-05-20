@@ -72,14 +72,14 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     }.head
     task.outputs.size shouldBe 1
     task.outputs.head match {
-      case TAT.OutputParameter("name", WdlTypes.T_Struct("Name", types), expr, _) =>
+      case TAT.OutputParameter("name", WdlTypes.T_Struct("Name", types), expr) =>
         val typesMap = Map(
             "first" -> WdlTypes.T_String,
             "last" -> WdlTypes.T_String
         )
         types shouldBe typesMap
         expr match {
-          case TAT.ExprObject(members, WdlTypes.T_Struct("Name", types), _) =>
+          case TAT.ExprObject(members, WdlTypes.T_Struct("Name", types)) =>
             types shouldBe typesMap
             val objMembers = members.map {
               case (TAT.ValueString(key, WdlTypes.T_String, _), value) => key -> value
@@ -88,10 +88,10 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
             }
             objMembers.keySet shouldBe Set("first", "last")
             objMembers("first") should matchPattern {
-              case TAT.ExprIdentifier("first", WdlTypes.T_String, _) =>
+              case TAT.ExprIdentifier("first", WdlTypes.T_String) =>
             }
             objMembers("last") should matchPattern {
-              case TAT.ExprIdentifier("last", WdlTypes.T_String, _) =>
+              case TAT.ExprIdentifier("last", WdlTypes.T_String) =>
             }
           case _ =>
             throw new Exception("invalid expression for output 'name'")
@@ -104,11 +104,11 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   it should "compare identical callables as equal" in {
     val tDoc = check(v1Dir, "top_level.wdl")
     val topImports = tDoc.elements.collect {
-      case TAT.ImportDoc(namespace, _, _, doc, _) => namespace -> doc
+      case TAT.ImportDoc(namespace, _, _, doc) => namespace -> doc
     }.toMap
     topImports.size shouldBe 2
     val subImports = topImports("sub").elements.collect {
-      case TAT.ImportDoc(namespace, _, _, doc, _) => namespace -> doc
+      case TAT.ImportDoc(namespace, _, _, doc) => namespace -> doc
     }.toMap
     subImports.size shouldBe 1
     val topTasks = topImports("tasks").elements.collect {

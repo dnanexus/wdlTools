@@ -9,7 +9,7 @@
 package wdlTools.generators.code
 
 import scala.reflect.runtime.universe._
-import wdlTools.syntax.BuiltinSymbols
+import wdlTools.syntax.{BuiltinSymbols, Quoting}
 
 object Indenting extends Enumeration {
   type Indenting = Value
@@ -42,6 +42,94 @@ trait Sized {
     * The length of the element's first line, if it were formatted with line-wrapping.
     */
   def firstLineLength: Int = length
+}
+
+trait ExpressionState {
+  def canAdvanceTo(state: ExpressionState): Boolean
+}
+
+trait InitialState extends ExpressionState {
+  override def canAdvanceTo(state: ExpressionState): Boolean = {
+    state match {
+      case _: InStringState | _: InOperationState => true
+      case _                                      => false
+    }
+  }
+}
+
+/**
+  * The initial expression state.
+  */
+object StartState extends InitialState
+
+/**
+  * The state of being within a string expression but not within a placeholder.
+  * @param quoting the type of quoting for the string
+  */
+case class InStringState(quoting: Quoting.Quoting) extends ExpressionState {
+  override def canAdvanceTo(state: ExpressionState): Boolean = {
+    state match {
+      case _: InStringState   => true
+      case InPlaceholderState => true
+      case _                  => false
+    }
+  }
+}
+
+/**
+  * The state of being within a placeholder.
+  */
+object InPlaceholderState extends InitialState
+
+/**
+  * The state of being within a built-in operation.
+  * @param oper the operation
+  */
+case class InOperationState(oper: Option[String] = None) extends InitialState
+
+case class ExpressionContext(inCommand: Boolean, states: List[ExpressionState]) {
+  lazy val placeholderOpen: String = if (inCommand) {
+    Symbols.PlaceholderOpenTilde
+  } else {
+    Symbols.PlaceholderOpenDollar
+  }
+
+  def advanceTo(nextState: ExpressionState): ExpressionContext = {
+    if (states.head.canAdvanceTo(nextState)) {
+      copy(states = nextState :: states)
+    } else {
+      throw new Exception(s"cannot advance from ${states.head} to ${nextState}")
+    }
+  }
+
+  def getStringQuoting(resetInPlaceholder: Boolean = false): Option[Quoting.Quoting] = {
+    states.collectFirst {
+      case InStringState(quoting)                   => Some(quoting)
+      case InPlaceholderState if resetInPlaceholder => None
+    }.flatten
+  }
+
+  def inString(quoted: Boolean = false, resetInPlaceholder: Boolean = false): Boolean = {
+    getStringQuoting(resetInPlaceholder) match {
+      case Some(Quoting.Single | Quoting.Double) => true
+      case Some(_) if !quoted                    => true
+      case _                                     => false
+    }
+  }
+
+  def groupOperation(oper: String): Boolean = {
+    states.headOption match {
+      case Some(InOperationState(Some(parentOper))) if parentOper != oper => true
+      case _                                                              => false
+    }
+  }
+}
+
+object ExpressionContext {
+  lazy val default: ExpressionContext =
+    ExpressionContext(inCommand = false, List(StartState))
+  lazy val command: ExpressionContext =
+    ExpressionContext(inCommand = true, List(InStringState(Quoting.None), StartState))
 }
 
 object Utils {
@@ -109,6 +197,8 @@ object Symbols extends BuiltinSymbols {
   val ClauseOpen: String = "("
   val ClauseClose: String = ")"
   val DefaultOption: String = "default"
+  val DoubleQuoteOpen: String = "\""
+  val DoubleQuoteClose: String = "\""
   val FalseOption: String = "false"
   val FunctionCallOpen: String = "("
   val FunctionCallClose: String = ")"
@@ -127,9 +217,9 @@ object Symbols extends BuiltinSymbols {
   val PlaceholderOpenTilde: String = "~{"
   val PlaceholderOpenDollar: String = "${"
   val PlaceholderClose: String = "}"
-  val QuoteOpen: String = "\""
-  val QuoteClose: String = "\""
   val SepOption: String = "sep"
+  val SingleQuoteOpen: String = "'"
+  val SingleQuoteClose: String = "'"
   val TrueOption: String = "true"
   val TypeParamOpen: String = "["
   val TypeParamClose: String = "]"
@@ -149,7 +239,8 @@ object Symbols extends BuiltinSymbols {
       ObjectOpen -> ObjectClose,
       PlaceholderOpenTilde -> PlaceholderClose,
       PlaceholderOpenDollar -> PlaceholderClose,
-      QuoteOpen -> QuoteClose,
+      SingleQuoteOpen -> SingleQuoteClose,
+      DoubleQuoteOpen -> DoubleQuoteClose,
       TypeParamOpen -> TypeParamClose
   )
 }

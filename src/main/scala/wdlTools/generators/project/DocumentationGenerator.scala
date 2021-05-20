@@ -128,18 +128,21 @@ object DocumentationGenerator {
         }
       }
 
-      def getMetaValueDocumentation(value: MetaValue, parentLine: Int): ValueDocumentation = {
-        val comment = if (value.loc.line > parentLine) {
-          getDocumentationComment(value)
+      def getMetaValueDocumentation(metaValue: MetaValue, parentLine: Int): ValueDocumentation = {
+        val comment = if (metaValue.loc.line > parentLine) {
+          getDocumentationComment(metaValue)
         } else {
           None
         }
-        value match {
-          case MetaValueArray(value, text) =>
-            ListValueDocumentation(value.map(v => getMetaValueDocumentation(v, text.line)), comment)
-          case MetaValueObject(value, text) =>
+        metaValue match {
+          case MetaValueArray(value) =>
+            ListValueDocumentation(value.map(v => getMetaValueDocumentation(v, metaValue.loc.line)),
+                                   comment)
+          case MetaValueObject(value) =>
             MapValueDocumentation(
-                value.map(v => v.id -> getMetaValueDocumentation(v.value, text.line)).toMap,
+                value
+                  .map(v => v.id -> getMetaValueDocumentation(v.value, metaValue.loc.line))
+                  .toMap,
                 None,
                 comment
             )
@@ -148,46 +151,49 @@ object DocumentationGenerator {
       }
 
       def getValueDocumentation(
-          value: Expr,
+          expr: Expr,
           parentLine: Int
       ): ValueDocumentation = {
-        val comment = if (value.loc.line > parentLine) {
-          getDocumentationComment(value)
+        val comment = if (expr.loc.line > parentLine) {
+          getDocumentationComment(expr)
         } else {
           None
         }
-        value match {
-          case ExprObject(value, text) =>
+        expr match {
+          case ExprObject(value) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
+                  )
                   .toMap,
                 None,
                 comment
             )
-          case ExprStruct(name, members, text) =>
+          case ExprStruct(name, members) =>
             DocumentationGenerator.MapValueDocumentation(
                 members
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
+                  )
                   .toMap,
                 Some(name),
                 comment
             )
-          case ExprMap(value, text) =>
+          case ExprMap(value) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, text.line))
+                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
+                  )
                   .toMap,
                 None,
                 comment
             )
-          case ExprArray(value, text) =>
-            ListValueDocumentation(value.map(v => getValueDocumentation(v, text.line)), comment)
-          case ExprPair(left, right, text) =>
+          case ExprArray(value) =>
+            ListValueDocumentation(value.map(v => getValueDocumentation(v, expr.loc.line)), comment)
+          case ExprPair(left, right) =>
             DocumentationGenerator.ListValueDocumentation(
                 Vector(
-                    getValueDocumentation(left, text.line),
-                    getValueDocumentation(right, text.line)
+                    getValueDocumentation(left, expr.loc.line),
+                    getValueDocumentation(right, expr.loc.line)
                 ),
                 comment
             )
@@ -205,20 +211,20 @@ object DocumentationGenerator {
 
       def wdlTypeToString(wdlType: Type): String = {
         wdlType match {
-          case TypeOptional(t, _) => s"${wdlTypeToString(t)}?"
-          case TypeArray(t, nonEmpty, _) =>
+          case TypeOptional(t) => s"${wdlTypeToString(t)}?"
+          case TypeArray(t, nonEmpty) =>
             s"Array[${wdlTypeToString(t)}]${if (nonEmpty) "+" else ""}"
-          case TypeMap(k, v, _)       => s"Map[${wdlTypeToString(k)}, ${wdlTypeToString(v)}]"
-          case TypePair(l, r, _)      => s"Pair[${wdlTypeToString(l)}, ${wdlTypeToString(r)}]"
-          case TypeString(_)          => "String"
-          case TypeFile(_)            => "File"
-          case TypeDirectory(_)       => "Directory"
-          case TypeBoolean(_)         => "Boolean"
-          case TypeInt(_)             => "Int"
-          case TypeFloat(_)           => "Float"
-          case TypeIdentifier(id, _)  => s"[${id}](#${id})"
-          case TypeObject(_)          => "Object"
-          case TypeStruct(name, _, _) => s"[${name}](#${name})"
+          case TypeMap(k, v)       => s"Map[${wdlTypeToString(k)}, ${wdlTypeToString(v)}]"
+          case TypePair(l, r)      => s"Pair[${wdlTypeToString(l)}, ${wdlTypeToString(r)}]"
+          case TypeString()        => "String"
+          case TypeFile()          => "File"
+          case TypeDirectory()     => "Directory"
+          case TypeBoolean()       => "Boolean"
+          case TypeInt()           => "Int"
+          case TypeFloat()         => "Float"
+          case TypeIdentifier(id)  => s"[${id}](#${id})"
+          case TypeObject()        => "Object"
+          case TypeStruct(name, _) => s"[${name}](#${name})"
         }
       }
 

@@ -66,7 +66,7 @@ abstract class WdlParser(followImports: Boolean = false,
   case class Walker[T](fileSource: FileNode, start: T) extends DocumentWalker[T] {
     def extractDependencies(document: Document): Map[FileNode, Document] = {
       document.elements.flatMap {
-        case ImportDoc(_, _, addr, doc, _) if doc.isDefined =>
+        case ImportDoc(_, _, addr, doc) if doc.isDefined =>
           Some(FileSourceResolver.get.resolve(addr.value) -> doc.get)
         case _ => None
       }.toMap

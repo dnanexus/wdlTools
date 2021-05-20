@@ -153,9 +153,9 @@ case class Eval(paths: EvalPaths,
     // builds a Vector of name components
     def inner(innerExpr: TAT.Expr, innerFieldName: String): Option[Vector[String]] = {
       innerExpr match {
-        case TAT.ExprIdentifier(id, wdlType, _) if canResolveField(wdlType, innerFieldName) =>
+        case TAT.ExprIdentifier(id, wdlType) if canResolveField(wdlType, innerFieldName) =>
           Some(Vector(id, innerFieldName))
-        case TAT.ExprGetName(e, fieldName, _, _) =>
+        case TAT.ExprGetName(e, fieldName, _) =>
           inner(e, fieldName).map(v => v :+ innerFieldName)
         case _ => None
       }
@@ -237,17 +237,17 @@ case class Eval(paths: EvalPaths,
         case x: TAT.ValueDirectory => V_Directory(x.value)
 
         // complex types
-        case TAT.ExprPair(left, right, _, _) =>
+        case TAT.ExprPair(left, right, _) =>
           V_Pair(inner(left, updatedCtx), inner(right, updatedCtx))
-        case TAT.ExprArray(value, _, _) =>
+        case TAT.ExprArray(value, _) =>
           V_Array(value.map { x =>
             inner(x, updatedCtx)
           })
-        case TAT.ExprMap(value, _, _) =>
+        case TAT.ExprMap(value, _) =>
           V_Map(value.map {
             case (k, v) => inner(k, updatedCtx) -> inner(v, updatedCtx)
           })
-        case TAT.ExprObject(value, _, _) =>
+        case TAT.ExprObject(value, _) =>
           V_Object(
               value
                 .map {
@@ -266,9 +266,9 @@ case class Eval(paths: EvalPaths,
                 .to(TreeSeqMap)
           )
 
-        case TAT.ExprIdentifier(id, _, _) if updatedCtx.bindings.contains(id) =>
+        case TAT.ExprIdentifier(id, _) if updatedCtx.bindings.contains(id) =>
           updatedCtx.bindings(id)
-        case TAT.ExprIdentifier(id, _, _) =>
+        case TAT.ExprIdentifier(id, _) =>
           throw new EvalException(s"identifier ${id} not found")
 
         // interpolation
@@ -279,7 +279,7 @@ case class Eval(paths: EvalPaths,
             interpolationValueToString(v, expr.loc)
           }
           V_String(strArray.mkString(""))
-        case TAT.ExprPlaceholder(t, f, sep, default, expr, _, _) =>
+        case TAT.ExprPlaceholder(t, f, sep, default, expr, _) =>
           val ctxInPlaceholder = updatedCtx.advanceState(Some(ExprState.InPlaceholder))
           val exprValue = inner(expr, ctxInPlaceholder)
           (exprValue, t, f, sep, default) match {
@@ -305,16 +305,16 @@ case class Eval(paths: EvalPaths,
               )
           }
 
-        case TAT.ExprIfThenElse(cond, tBranch, fBranch, _, loc) =>
+        case TAT.ExprIfThenElse(cond, tBranch, fBranch, _) =>
           // if (x == 1) then "Sunday" else "Weekday"
           inner(cond, updatedCtx) match {
             case V_Boolean(true)  => inner(tBranch, updatedCtx)
             case V_Boolean(false) => inner(fBranch, updatedCtx)
             case _ =>
-              throw new EvalException(s"condition is not boolean", loc)
+              throw new EvalException(s"condition is not boolean", nestedExpr.loc)
           }
 
-        case TAT.ExprAt(collection, index, _, loc) =>
+        case TAT.ExprAt(collection, index, _) =>
           // Access an array element at [index: Int] or map value at [key: K]
           val collectionVal = inner(collection, updatedCtx)
           val indexVal = inner(index, updatedCtx)
@@ -325,10 +325,11 @@ case class Eval(paths: EvalPaths,
               val arraySize = av.size
               throw new EvalException(
                   s"array access out of bounds (size=${arraySize}, element accessed=${n})",
-                  loc
+                  nestedExpr.loc
               )
             case (_: V_Array, _) =>
-              throw new EvalException(s"array access requires an array and an integer", loc)
+              throw new EvalException(s"array access requires an array and an integer",
+                                      nestedExpr.loc)
             case (V_Map(value), key) =>
               value
                 .collectFirst {
@@ -337,7 +338,7 @@ case class Eval(paths: EvalPaths,
                 .getOrElse(
                     throw new EvalException(
                         s"map ${value} does not contain key ${key}",
-                        loc
+                        nestedExpr.loc
                     )
                 )
             case _ =>
@@ -346,7 +347,7 @@ case class Eval(paths: EvalPaths,
               )
           }
 
-        case TAT.ExprGetName(e: TAT.Expr, fieldName, _, loc) =>
+        case TAT.ExprGetName(e: TAT.Expr, fieldName, _) =>
           Option
             .when(updatedCtx.hasFullyQualifiedBindings) {
               // if the context has fully-qualified identifiers, try to
@@ -358,16 +359,16 @@ case class Eval(paths: EvalPaths,
             .getOrElse {
               // evaluate the LHS expression, then access the RHS field
               val ev = inner(e, updatedCtx)
-              exprGetName(ev, fieldName, loc)
+              exprGetName(ev, fieldName, nestedExpr.loc)
             }
 
-        case TAT.ExprApply(funcName, _, elements, _, loc) =>
+        case TAT.ExprApply(funcName, _, elements, _) =>
           // Apply a standard library function (including built-in operators)
           // to arguments. For example:
           //   1 + 1
           //   read_int("4")
           val funcArgs = elements.map(e => inner(e, updatedCtx))
-          standardLibrary.call(funcName, funcArgs, loc, updatedCtx.exprState)
+          standardLibrary.call(funcName, funcArgs, nestedExpr.loc, updatedCtx.exprState)
 
         case other =>
           throw new Exception(s"expression ${other} not implemented")
@@ -412,11 +413,11 @@ case class Eval(paths: EvalPaths,
       bindings: Bindings[String, V] = WdlValueBindings.empty
   ): Bindings[String, V] = {
     decls.foldLeft(bindings) {
-      case (accu: Bindings[String, V], TAT.PrivateVariable(name, wdlType, expr, loc)) =>
+      case (accu: Bindings[String, V], pv: TAT.PrivateVariable) =>
         val ctx = Context(accu)
-        val value = apply(expr, ctx)
-        val coerced = Coercion.coerceTo(wdlType, value, loc, allowNonstandardCoercions)
-        accu.add(name, coerced)
+        val value = apply(pv.expr, ctx)
+        val coerced = Coercion.coerceTo(pv.wdlType, value, pv.loc, allowNonstandardCoercions)
+        accu.add(pv.name, coerced)
       case (_, ast) =>
         throw new Exception(s"Cannot evaluate element ${ast.getClass}")
     }

@@ -7,7 +7,7 @@ task add {
   }
 
   command <<<
-    echo $((~{a} + ~{b}))
+        echo $((~{a} + ~{b}))
   >>>
 
   output {

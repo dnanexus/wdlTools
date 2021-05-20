@@ -9,13 +9,13 @@ class MetaMap(values: Map[String, TAT.MetaValue]) {
                         value: TAT.MetaValue,
                         wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
     val wdlValue = value match {
-      case TAT.MetaValueNull(_)       => V_Null
-      case TAT.MetaValueString(s, _)  => V_String(s)
-      case TAT.MetaValueInt(i, _)     => V_Int(i)
-      case TAT.MetaValueFloat(f, _)   => V_Float(f)
-      case TAT.MetaValueBoolean(b, _) => V_Boolean(b)
-      case TAT.MetaValueArray(a, _)   => V_Array(a.map(x => applyKv(id, x)))
-      case TAT.MetaValueObject(m, _) =>
+      case TAT.MetaValueNull()       => V_Null
+      case TAT.MetaValueString(s, _) => V_String(s)
+      case TAT.MetaValueInt(i)       => V_Int(i)
+      case TAT.MetaValueFloat(f)     => V_Float(f)
+      case TAT.MetaValueBoolean(b)   => V_Boolean(b)
+      case TAT.MetaValueArray(a)     => V_Array(a.map(x => applyKv(id, x)))
+      case TAT.MetaValueObject(m) =>
         V_Object(m.map {
           case (k, v) => k -> applyKv(k, v)
         })

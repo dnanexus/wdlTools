@@ -1,11 +1,10 @@
 package wdlTools.syntax.draft_2
 
 import java.nio.file.Paths
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.Edge
-import wdlTools.syntax.{Comment, SourceLocation, SyntaxException}
+import wdlTools.syntax.{Comment, Quoting, SourceLocation, SyntaxException}
 import wdlTools.syntax.draft_2.ConcreteSyntax._
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
@@ -36,44 +35,44 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     elem shouldBe a[Task]
     val task = elem.asInstanceOf[Task]
 
-    val InputSection(decls, _) = task.input.get
-    decls(0) should matchPattern { case Declaration("i", TypeInt(_), None, _)     => }
-    decls(1) should matchPattern { case Declaration("s", TypeString(_), None, _)  => }
-    decls(2) should matchPattern { case Declaration("x", TypeFloat(_), None, _)   => }
-    decls(3) should matchPattern { case Declaration("b", TypeBoolean(_), None, _) => }
-    decls(4) should matchPattern { case Declaration("f", TypeFile(_), None, _)    => }
+    val InputSection(decls) = task.input.get
+    decls(0) should matchPattern { case Declaration("i", TypeInt(), None)     => }
+    decls(1) should matchPattern { case Declaration("s", TypeString(), None)  => }
+    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None)   => }
+    decls(3) should matchPattern { case Declaration("b", TypeBoolean(), None) => }
+    decls(4) should matchPattern { case Declaration("f", TypeFile(), None)    => }
     decls(5) should matchPattern {
-      case Declaration("p1", TypePair(_: TypeInt, _: TypeString, _), None, _) =>
+      case Declaration("p1", TypePair(_: TypeInt, _: TypeString), None) =>
     }
     decls(6) should matchPattern {
-      case Declaration("p2", TypePair(_: TypeFloat, _: TypeFile, _), None, _) =>
+      case Declaration("p2", TypePair(_: TypeFloat, _: TypeFile), None) =>
     }
     decls(7) should matchPattern {
-      case Declaration("p3", TypePair(_: TypeBoolean, _: TypeBoolean, _), None, _) =>
+      case Declaration("p3", TypePair(_: TypeBoolean, _: TypeBoolean), None) =>
     }
     decls(8) should matchPattern {
-      case Declaration("ia", TypeArray(_: TypeInt, false, _), None, _) =>
+      case Declaration("ia", TypeArray(_: TypeInt, false), None) =>
     }
     decls(9) should matchPattern {
-      case Declaration("sa", TypeArray(_: TypeString, false, _), None, _) =>
+      case Declaration("sa", TypeArray(_: TypeString, false), None) =>
     }
     decls(10) should matchPattern {
-      case Declaration("xa", TypeArray(_: TypeFloat, false, _), None, _) =>
+      case Declaration("xa", TypeArray(_: TypeFloat, false), None) =>
     }
     decls(11) should matchPattern {
-      case Declaration("ba", TypeArray(_: TypeBoolean, false, _), None, _) =>
+      case Declaration("ba", TypeArray(_: TypeBoolean, false), None) =>
     }
     decls(12) should matchPattern {
-      case Declaration("fa", TypeArray(_: TypeFile, false, _), None, _) =>
+      case Declaration("fa", TypeArray(_: TypeFile, false), None) =>
     }
     decls(13) should matchPattern {
-      case Declaration("m_si", TypeMap(_: TypeInt, _: TypeString, _), None, _) =>
+      case Declaration("m_si", TypeMap(_: TypeInt, _: TypeString), None) =>
     }
     decls(14) should matchPattern {
-      case Declaration("m_ff", TypeMap(_: TypeFile, _: TypeFile, _), None, _) =>
+      case Declaration("m_ff", TypeMap(_: TypeFile, _: TypeFile), None) =>
     }
     decls(15) should matchPattern {
-      case Declaration("m_bf", TypeMap(_: TypeBoolean, _: TypeFloat, _), None, _) =>
+      case Declaration("m_bf", TypeMap(_: TypeBoolean, _: TypeFloat), None) =>
     }
   }
 
@@ -86,135 +85,122 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val task = elem.asInstanceOf[Task]
 
     task.input.get.declarations(0) should matchPattern {
-      case Declaration("i", _: TypeInt, Some(ExprInt(3, _)), _) =>
+      case Declaration("i", _: TypeInt, Some(ExprInt(3))) =>
     }
     task.input.get.declarations(1) should matchPattern {
-      case Declaration("s", _: TypeString, Some(ExprString("hello world", _)), _) =>
+      case Declaration("s", _: TypeString, Some(ExprString("hello world", Quoting.Double))) =>
     }
     task.input.get.declarations(2) should matchPattern {
-      case Declaration("x", _: TypeFloat, Some(ExprFloat(4.3, _)), _) =>
+      case Declaration("x", _: TypeFloat, Some(ExprFloat(4.3))) =>
     }
     task.input.get.declarations(3) should matchPattern {
-      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt", _)), _) =>
+      case Declaration("f", _: TypeFile, Some(ExprString("/dummy/x.txt", Quoting.Double))) =>
     }
     task.input.get.declarations(4) should matchPattern {
-      case Declaration("b", _: TypeBoolean, Some(ExprBoolean(false, _)), _) =>
+      case Declaration("b", _: TypeBoolean, Some(ExprBoolean(false))) =>
     }
     task.input.get.declarations(5) should matchPattern {
       case Declaration(
           "ia",
-          TypeArray(_: TypeInt, false, _),
-          Some(ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _)),
-          _
+          TypeArray(_: TypeInt, false),
+          Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
     task.input.get.declarations(6) should matchPattern {
       case Declaration("ia",
-                       TypeArray(_: TypeInt, true, _),
-                       Some(ExprArrayLiteral(Vector(ExprInt(10, _)), _)),
-                       _) =>
+                       TypeArray(_: TypeInt, true),
+                       Some(ExprArrayLiteral(Vector(ExprInt(10))))) =>
     }
     task.input.get.declarations(7) should matchPattern {
-      case Declaration("m", TypeMap(TypeInt(_), TypeString(_), _), Some(ExprMapLiteral(_, _)), _) =>
+      case Declaration("m", TypeMap(TypeInt(), TypeString()), Some(ExprMapLiteral(_))) =>
     }
     task.input.get.declarations(8) should matchPattern {
-      case Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_, _)), _) =>
+      case Declaration("o", _: TypeObject, Some(ExprObjectLiteral(_))) =>
     }
-    /*(Map("A" -> ExprInt(1, _),
+    /*(Map("A" -> ExprInt(1),
      "B" -> ExprInt(2, _,
-     _))), _)) */
+     _))))) */
 
     task.input.get.declarations(9) should matchPattern {
       case Declaration("twenty_threes",
-                       TypePair(TypeInt(_), TypeString(_), _),
-                       Some(ExprPair(ExprInt(23, _), ExprString("twenty-three", _), _)),
-                       _) =>
+                       TypePair(TypeInt(), TypeString()),
+                       Some(ExprPair(ExprInt(23), ExprString("twenty-three", Quoting.Double)))) =>
     }
 
     // Logical expressions
     task.declarations(0) should matchPattern {
       case Declaration("b2",
                        _: TypeBoolean,
-                       Some(ExprLor(ExprBoolean(true, _), ExprBoolean(false, _), _)),
-                       _) =>
+                       Some(ExprLor(ExprBoolean(true), ExprBoolean(false)))) =>
     }
     task.declarations(1) should matchPattern {
       case Declaration("b3",
                        _: TypeBoolean,
-                       Some(ExprLand(ExprBoolean(true, _), ExprBoolean(false, _), _)),
-                       _) =>
+                       Some(ExprLand(ExprBoolean(true), ExprBoolean(false)))) =>
     }
     task.declarations(2) should matchPattern {
-      case Declaration("b4", _: TypeBoolean, Some(ExprEqeq(ExprInt(3, _), ExprInt(5, _), _)), _) =>
+      case Declaration("b4", _: TypeBoolean, Some(ExprEqeq(ExprInt(3), ExprInt(5)))) =>
     }
     task.declarations(3) should matchPattern {
-      case Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+      case Declaration("b5", _: TypeBoolean, Some(ExprLt(ExprInt(4), ExprInt(5)))) =>
     }
     task.declarations(4) should matchPattern {
-      case Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+      case Declaration("b6", _: TypeBoolean, Some(ExprGte(ExprInt(4), ExprInt(5)))) =>
     }
     task.declarations(5) should matchPattern {
-      case Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+      case Declaration("b7", _: TypeBoolean, Some(ExprNeq(ExprInt(6), ExprInt(7)))) =>
     }
     task.declarations(6) should matchPattern {
-      case Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+      case Declaration("b8", _: TypeBoolean, Some(ExprLte(ExprInt(6), ExprInt(7)))) =>
     }
     task.declarations(7) should matchPattern {
-      case Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6, _), ExprInt(7, _), _)), _) =>
+      case Declaration("b9", _: TypeBoolean, Some(ExprGt(ExprInt(6), ExprInt(7)))) =>
     }
     task.declarations(8) should matchPattern {
-      case Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2", _), _)), _) =>
+      case Declaration("b10", _: TypeBoolean, Some(ExprNegate(ExprIdentifier("b2")))) =>
     }
 
     // Arithmetic
     task.declarations(9) should matchPattern {
-      case Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _) =>
+      case Declaration("j", _: TypeInt, Some(ExprAdd(ExprInt(4), ExprInt(5)))) =>
     }
     task.declarations(10) should matchPattern {
-      case Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4, _), ExprInt(10, _), _)), _) =>
+      case Declaration("j1", _: TypeInt, Some(ExprMod(ExprInt(4), ExprInt(10)))) =>
     }
     task.declarations(11) should matchPattern {
-      case Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10, _), ExprInt(7, _), _)), _) =>
+      case Declaration("j2", _: TypeInt, Some(ExprDivide(ExprInt(10), ExprInt(7)))) =>
     }
     task.declarations(12) should matchPattern {
-      case Declaration("j3", _: TypeInt, Some(ExprIdentifier("j", _)), _) =>
+      case Declaration("j3", _: TypeInt, Some(ExprIdentifier("j"))) =>
     }
     task.declarations(13) should matchPattern {
-      case Declaration("j4",
-                       _: TypeInt,
-                       Some(ExprAdd(ExprIdentifier("j", _), ExprInt(19, _), _)),
-                       _) =>
+      case Declaration("j4", _: TypeInt, Some(ExprAdd(ExprIdentifier("j"), ExprInt(19)))) =>
     }
 
     task.declarations(14) should matchPattern {
-      case Declaration("k",
-                       _: TypeInt,
-                       Some(ExprAt(ExprIdentifier("ia", _), ExprInt(3, _), _)),
-                       _) =>
+      case Declaration("k", _: TypeInt, Some(ExprAt(ExprIdentifier("ia"), ExprInt(3)))) =>
     }
     task.declarations(15) should matchPattern {
       case Declaration(
           "k2",
           _: TypeInt,
-          Some(ExprApply("f", Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _)),
-          _
+          Some(ExprApply("f", Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
 
     /*    val m = task.declarations(23).expr
     m should matchPattern {
-      case Map(ExprInt(1, _) -> ExprString("a", _),
-                                      ExprInt(2, _) -> ExprString("b", _)),
+      case Map(ExprInt(1) -> ExprString("a"),
+                                      ExprInt(2) -> ExprString("b")),
     _)),*/
 
     task.declarations(16) should matchPattern {
       case Declaration("k3",
                        _: TypeInt,
-                       Some(ExprIfThenElse(ExprBoolean(true, _), ExprInt(1, _), ExprInt(2, _), _)),
-                       _) =>
+                       Some(ExprIfThenElse(ExprBoolean(true), ExprInt(1), ExprInt(2)))) =>
     }
     task.declarations(17) should matchPattern {
-      case Declaration("k4", _: TypeInt, Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
+      case Declaration("k4", _: TypeInt, Some(ExprGetName(ExprIdentifier("x"), "a"))) =>
     }
   }
 
@@ -228,11 +214,11 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
 
     task.name shouldBe "district"
     task.declarations(0) should matchPattern {
-      case Declaration("k", TypeInt(_), Some(ExprGetName(ExprIdentifier("x", _), "a", _)), _) =>
+      case Declaration("k", TypeInt(), Some(ExprGetName(ExprIdentifier("x"), "a"))) =>
     }
     task.output shouldBe None
     task.command should matchPattern {
-      case CommandSection(Vector(), _) =>
+      case CommandSection(Vector()) =>
     }
     task.meta shouldBe None
     task.parameterMeta shouldBe None
@@ -254,7 +240,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.output.get should matchPattern {
-      case OutputSection(Vector(Declaration("num_lines", TypeInt(_), Some(ExprInt(3, _)), _)), _) =>
+      case OutputSection(Vector(Declaration("num_lines", TypeInt(), Some(ExprInt(3))))) =>
     }
   }
 
@@ -291,38 +277,38 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
 
     task.name shouldBe "wc"
     task.input.get should matchPattern {
-      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None, _)), _) =>
+      case InputSection(Vector(Declaration("inp_file", _: TypeFile, None))) =>
     }
     task.declarations should matchPattern {
       case Vector(
-          Declaration("i", TypeInt(_), Some(ExprAdd(ExprInt(4, _), ExprInt(5, _), _)), _)
+          Declaration("i", TypeInt(), Some(ExprAdd(ExprInt(4), ExprInt(5))))
           ) =>
     }
     task.output.get should matchPattern {
-      case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3, _)), _)), _) =>
+      case OutputSection(Vector(Declaration("num_lines", _: TypeInt, Some(ExprInt(3))))) =>
     }
     task.command shouldBe a[CommandSection]
     task.command.parts.size shouldBe 3
     task.command.parts(0) should matchPattern {
       case ExprString("\n    # this is inside the command and so not a WDL comment\n    wc -l ",
-                      _) =>
+                      Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
-      case ExprIdentifier("inp_file", _) =>
+      case ExprIdentifier("inp_file") =>
     }
 
     task.meta.get shouldBe a[MetaSection]
     task.meta.get.kvs.size shouldBe 1
     val mkv = task.meta.get.kvs.head
     mkv should matchPattern {
-      case MetaKV("author", "Robin Hood", _) =>
+      case MetaKV("author", "Robin Hood", Quoting.Double) =>
     }
 
     task.parameterMeta.get shouldBe a[ParameterMetaSection]
     task.parameterMeta.get.kvs.size shouldBe 1
     val mpkv = task.parameterMeta.get.kvs.head
     mpkv should matchPattern {
-      case MetaKV("inp_file", "just because", _) =>
+      case MetaKV("inp_file", "just because", Quoting.Double) =>
     }
   }
 
@@ -344,23 +330,22 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     task.input.get shouldBe a[InputSection]
     task.input.get.declarations.size shouldBe 2
     task.input.get.declarations(0) should matchPattern {
-      case Declaration("min_std_max_min", TypeInt(_), None, _) =>
+      case Declaration("min_std_max_min", TypeInt(), None) =>
     }
     task.input.get.declarations(1) should matchPattern {
-      case Declaration("prefix", TypeString(_), None, _) =>
+      case Declaration("prefix", TypeString(), None) =>
     }
 
     task.command shouldBe a[CommandSection]
     task.command.parts(0) should matchPattern {
-      case ExprString("\n    echo ", _) =>
+      case ExprString("\n    echo ", Quoting.None) =>
     }
     task.command.parts(1) should matchPattern {
       case ExprPlaceholder(None,
                            None,
-                           Some(ExprString(",", _)),
+                           Some(ExprString(",", Quoting.Single)),
                            None,
-                           ExprIdentifier("min_std_max_min", _),
-                           _) =>
+                           ExprIdentifier("min_std_max_min")) =>
     }
   }
 
@@ -379,10 +364,10 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
     calls.size shouldBe 1
     calls(0) should matchPattern {
-      case Call("bar", Some(CallAlias("boz", _)), _, _) =>
+      case Call("bar", Some(CallAlias("boz")), _) =>
     }
     calls(0).inputs.get.value should matchPattern {
-      case Vector(CallInput("i", ExprIdentifier("s", _), _)) =>
+      case Vector(CallInput("i", ExprIdentifier("s"))) =>
     }
 
     val scatters = wf.body.collect {
@@ -391,15 +376,15 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     scatters.size shouldBe 1
     scatters(0).identifier shouldBe "i"
     scatters(0).expr should matchPattern {
-      case ExprArrayLiteral(Vector(ExprInt(1, _), ExprInt(2, _), ExprInt(3, _)), _) =>
+      case ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))) =>
     }
     scatters(0).body.size shouldBe 1
     scatters(0).body(0) should matchPattern {
-      case Call("add", None, _, _) =>
+      case Call("add", None, _) =>
     }
     val call = scatters(0).body(0).asInstanceOf[Call]
     call.inputs.get.value should matchPattern {
-      case Vector(CallInput("x", ExprIdentifier("i", _), _)) =>
+      case Vector(CallInput("x", ExprIdentifier("i"))) =>
     }
 
     val conditionals = wf.body.collect {
@@ -407,10 +392,10 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
     conditionals.size shouldBe 1
     conditionals(0).expr should matchPattern {
-      case ExprEqeq(ExprBoolean(true, _), ExprBoolean(false, _), _) =>
+      case ExprEqeq(ExprBoolean(true), ExprBoolean(false)) =>
     }
     conditionals(0).body should matchPattern {
-      case Vector(Call("sub", None, _, _)) =>
+      case Vector(Call("sub", None, _)) =>
     }
     conditionals(0).body(0).asInstanceOf[Call].inputs.size shouldBe 0
 
@@ -418,7 +403,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     wf.meta.get.kvs.size shouldEqual 1
     wf.meta.get.kvs.head.value shouldEqual "Robert Heinlein"
     wf.meta.get.kvs should matchPattern {
-      case Vector(MetaKV("author", "Robert Heinlein", _)) =>
+      case Vector(MetaKV("author", "Robert Heinlein", Quoting.Double)) =>
     }
   }
 
@@ -456,9 +441,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val decl = task.declarations.head
     decl.name shouldBe "j"
     decl.expr.get should matchPattern {
-      case ExprAdd(ExprAdd(ExprIdentifier("i", _), ExprIdentifier("i", _), _),
-                   ExprIdentifier("i", _),
-                   _) =>
+      case ExprAdd(ExprAdd(ExprIdentifier("i"), ExprIdentifier("i")), ExprIdentifier("i")) =>
     }
   }
 
@@ -473,7 +456,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val decl = wf.body.head.asInstanceOf[Declaration]
     decl.name shouldBe "b"
     decl.expr.get should matchPattern {
-      case ExprAdd(ExprAdd(ExprInt(1, _), ExprInt(2, _), _), ExprInt(3, _), _) =>
+      case ExprAdd(ExprAdd(ExprInt(1), ExprInt(2)), ExprInt(3)) =>
     }
   }
 
@@ -488,13 +471,12 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val decl = wf.body.head.asInstanceOf[Declaration]
     decl.name shouldBe "a"
     decl.expr.get should matchPattern {
-      case ExprApply("select_first",
-                     Vector(
-                         ExprArrayLiteral(Vector(ExprInt(3, _),
-                                                 ExprApply("round", Vector(ExprInt(100, _)), _)),
-                                          _)
-                     ),
-                     _) =>
+      case ExprApply(
+          "select_first",
+          Vector(
+              ExprArrayLiteral(Vector(ExprInt(3), ExprApply("round", Vector(ExprInt(100)))))
+          )
+          ) =>
         ()
     }
   }

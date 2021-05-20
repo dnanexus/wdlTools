@@ -269,7 +269,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i2") shouldBe V_Int(13)
   }
 
-  private def evalCommand(file: Path): String = {
+  private def evalCommand(file: Path,
+                          bindings: WdlValueBindings = WdlValueBindings.empty): String = {
     val tDoc = parseAndTypeCheck(file)
     val evaluator =
       Eval(evalPaths,
@@ -280,7 +281,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
-    val ctx = evaluator.applyPrivateVariables(task.privateVariables, WdlValueBindings.empty)
+    val ctx = evaluator.applyPrivateVariables(task.privateVariables, bindings)
     evaluator.applyCommand(task.command, ctx)
   }
 
@@ -425,7 +426,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(v1Dir.resolve("constants.wdl"))
 
     decls.foreach {
-      case TAT.PrivateVariable(id, wdlType, expr, _) =>
+      case TAT.PrivateVariable(id, wdlType, expr) =>
         val expected: Option[WdlValues.V] = allExpectedResults(id)
         expected match {
           case None =>
@@ -444,7 +445,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   it should "not be able to access unsupported file protocols" in {
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(v1Dir.resolve("bad_protocol.wdl"))
     decls match {
-      case Vector(TAT.PrivateVariable(_, wdlType, expr, _)) =>
+      case Vector(TAT.PrivateVariable(_, wdlType, expr)) =>
         assertThrows[EvalException] {
           evaluator.applyConstAndCoerce(expr, wdlType)
         }
@@ -481,13 +482,15 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         T_Function1("select_first", T_Array(T_Int, nonEmpty = true), T_Int),
         Vector(
             TAT.ExprArray(
-                Vector(TAT.ExprIdentifier("x", T_Optional(T_Int), SourceLocation.empty),
-                       TAT.ValueInt(5, T_Int, SourceLocation.empty)),
-                T_Array(T_Optional(T_Int), nonEmpty = true),
+                Vector(TAT.ExprIdentifier("x", T_Optional(T_Int))(SourceLocation.empty),
+                       TAT.ValueInt(5, T_Int)(SourceLocation.empty)),
+                T_Array(T_Optional(T_Int), nonEmpty = true)
+            )(
                 SourceLocation.empty
             )
         ),
-        T_Int,
+        T_Int
+    )(
         SourceLocation.empty
     )
     val evaluator = createEvaluator()
@@ -518,7 +521,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     )
     val env: Map[String, V] =
       task.privateVariables.foldLeft(inputs) {
-        case (env, TAT.PrivateVariable(name, wdlType, expr, _)) =>
+        case (env, TAT.PrivateVariable(name, wdlType, expr)) =>
           val wdlValue =
             evaluator.applyExprAndCoerce(expr, wdlType, WdlValueBindings(env))
           env + (name -> wdlValue)
