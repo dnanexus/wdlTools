@@ -1,5 +1,9 @@
 # Change log
 
+## 0.13.1
+
+* Fixes handling of relative imports for WDL specified using non-file URIs (e.g. http(s))
+
 ## 0.13.0
 
 * **Breaking changes**:
