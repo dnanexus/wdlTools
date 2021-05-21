@@ -8,6 +8,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, Quoting, SourceLocation, WdlVersion}
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
+import java.net.URI
 import scala.collection.{BufferedIterator, mutable}
 
 object WdlFormatter {
@@ -1149,7 +1150,13 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   private case class ImportStatement(importDoc: ImportDoc) extends BoundedStatement(importDoc.loc) {
     private val keywordToken = Literal.fromStart(Symbols.Import, importDoc.loc)
     // assuming URI comes directly after keyword
-    private val uriLiteral = Literal.fromPrev(importDoc.addr.value, keywordToken)
+    val (escaped, quoting) =
+      try {
+        (URI.create(importDoc.addr.value).toString, Quoting.Double)
+      } catch {
+        case _: Throwable => Utils.quoteString(importDoc.addr.value)
+      }
+    private val uriLiteral = Literal.fromPrev(escaped, keywordToken, quoting)
     // assuming namespace comes directly after uri
     private val nameTokens = importDoc.name.map { name =>
       Literal.chainFromPrev(Vector(Symbols.As, name.value), uriLiteral)
