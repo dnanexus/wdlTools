@@ -8,6 +8,7 @@ import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
 import wdlTools.syntax.{Operator, Quoting, WdlVersion}
 
+import java.net.URI
 import scala.collection.mutable
 
 object WdlGenerator {
@@ -242,6 +243,13 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
         case Quoting.Double => s"${'"'}${value}${'"'}"
         case _              => value.toString
       }
+    }
+  }
+
+  object Literal {
+    def quoted(s: String): Literal = {
+      val (escaped, quoting) = Utils.quoteString(s)
+      Literal(escaped, quoting)
     }
   }
 
@@ -741,7 +749,15 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
   private case class ImportStatement(importDoc: ImportDoc) extends BaseStatement {
     private val keywordToken = Literal(Symbols.Import)
-    private val uriLiteral = Literal(importDoc.addr)
+    private val uriLiteral = {
+      val (escaped, quoting) =
+        try {
+          (URI.create(importDoc.addr).toString, Quoting.Double)
+        } catch {
+          case _: Throwable => Utils.quoteString(importDoc.addr)
+        }
+      Literal(escaped, quoting)
+    }
     private val nameTokens = Vector(Literal(Symbols.As), Literal(importDoc.namespace))
     private val aliasTokens = importDoc.aliases.map { alias =>
       Vector(Literal(Symbols.Alias), Literal(alias.id1), Literal(Symbols.As), Literal(alias.id2))
@@ -801,8 +817,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
     private val clauseSized: Option[Sized] = clause
     // assume the open brace is on the same line as the keyword/clause
-    private val openLiteral =
-      Literal(Symbols.BlockOpen)
+    private val openLiteral = Literal(Symbols.BlockOpen)
     private val bodyStatement: Option[Statement] = body
     private val closeLiteral = Literal(Symbols.BlockClose)
 
@@ -861,9 +876,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class StructBlock(struct: StructDefinition) extends BlockStatement(Symbols.Struct) {
-    override def clause: Option[Sized] = Some(
-        Literal(struct.name)
-    )
+    override def clause: Option[Sized] = Some(Literal(struct.name))
 
     override def body: Option[Statement] =
       Some(Section(struct.members.map {

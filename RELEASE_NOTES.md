@@ -1,8 +1,10 @@
 # Change log
 
-## 0.13.1
+## in develop
 
+* Adds `fix` tool to automatically fix some non-compliant WDL syntax
 * Fixes handling of relative imports for WDL specified using non-file URIs (e.g. http(s))
+* Fixes quoting and escaping of import URIs by code formatter/generator
 
 ## 0.13.0
 
