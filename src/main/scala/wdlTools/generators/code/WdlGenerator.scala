@@ -246,13 +246,6 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     }
   }
 
-  object Literal {
-    def quoted(s: String): Literal = {
-      val (escaped, quoting) = Utils.quoteString(s)
-      Literal(escaped, quoting)
-    }
-  }
-
   private case class Sequence(sizeds: Vector[Sized],
                               wrapping: Wrapping = Wrapping.Never,
                               spacing: Spacing = Spacing.Off,
