@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Fixes quoting and escaping of import URIs by code formatter/generator
+
 ## 0.13.0
 
 * **Breaking changes**:
