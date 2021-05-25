@@ -6,7 +6,8 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Operator, Quoting, WdlVersion}
+import wdlTools.syntax.{Operator, Quoting, SourceLocation, WdlVersion}
+import wdlTools.types.TypeUtils
 
 import java.net.URI
 import scala.collection.mutable
@@ -227,9 +228,16 @@ object WdlGenerator {
   * @param targetVersion WDL version to generate
   * @param omitNullCallInputs whether to omit any call inputs that can be
   *                           determined statically to be null
+  * @param rewriteNonstandardUsages whether to check for and re-write common
+  *                                 non-standard WDL usages. This is intended
+  *                                 to fix usages that are only allowed by
+  *                                 setting the type-checking regime to "lenient",
+  *                                 such that the generated WDL could be successfully
+  *                                 re-checked under "moderate".
   */
 case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
-                        omitNullCallInputs: Boolean = true) {
+                        omitNullCallInputs: Boolean = true,
+                        rewriteNonstandardUsages: Boolean = false) {
   if (targetVersion.exists(_ < WdlVersion.V1)) {
     throw new Exception(s"WDL version ${targetVersion.get} is not supported")
   }
@@ -657,6 +665,28 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                     fSized
                 )
             )
+          case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), T_String)
+              if rewriteNonstandardUsages && args
+                .exists(t => TypeUtils.unwrapOptional(t.wdlType) != T_String) =>
+            // nonstandard usage: "foo " + bar + " baz"
+            // re-write as "foo ${bar} baz"
+            val (newArgs, quotings) = args.map {
+              case s @ ValueString(_, _, quoting) if quoting != Quoting.None =>
+                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+              case s @ ExprCompoundString(_, _, quoting) if quoting != Quoting.None =>
+                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+              case arg => (arg, None)
+            }.unzip
+            val quoting = quotings.flatten.distinct match {
+              case Vector()        => Quoting.Double
+              case Vector(quoting) => quoting
+              case _ =>
+                throw new Exception(
+                    s"Cannot re-write non-standard expression ${expr}: sub-expressions use different quoting"
+                )
+            }
+            val loc = SourceLocation.merge(newArgs.map(_.loc))
+            buildExpression(ExprCompoundString(newArgs, T_String, quoting)(loc))
           case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
             val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))

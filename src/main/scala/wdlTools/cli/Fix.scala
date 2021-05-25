@@ -50,7 +50,7 @@ case class Fix(conf: WdlToolsConf) extends Command {
         val msgStream = new ByteArrayOutputStream()
         errorHandler.printErrors(new PrintStream(msgStream), effects = true)
         throw new Exception(
-            s"Failed to type-check WDL document; these error(s) cannot be fixed automatically:\n${msgStream.toString()}"
+            s"Failed to type-check ${source}; ${message}:\n${msgStream.toString()}"
         )
       }
       document
@@ -61,7 +61,8 @@ case class Fix(conf: WdlToolsConf) extends Command {
                                  TypeCheckingRegime.Lenient)
 
     // use a SeqMap so that the first entry will be the file generated from the source document
-    val generator = WdlGenerator(Some(wdlVersion), omitNullCallInputs = false)
+    val generator =
+      WdlGenerator(Some(wdlVersion), omitNullCallInputs = false, rewriteNonstandardUsages = true)
     var results: SeqMap[Path, Iterable[String]] = SeqMap.empty
     var visited: Set[String] = Set.empty
 
