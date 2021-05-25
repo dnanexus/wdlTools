@@ -26,16 +26,18 @@ case class Fix(conf: WdlToolsConf) extends Command {
     val outputDir = conf.fix.outputDir.toOption.getOrElse(Paths.get("."))
     val overwrite = conf.fix.overwrite()
     val wdlVersion = srcVersion.getOrElse(Parsers.default.getWdlVersion(docSource))
-    val parsers = Parsers(conf.fix.followImports())
-    val parser = parsers.getParser(wdlVersion)
 
     def parseAndCheck(
         source: FileNode,
         message: String,
-        regime: TypeCheckingRegime.TypeCheckingRegime = TypeCheckingRegime.Moderate
+        regime: TypeCheckingRegime.TypeCheckingRegime,
+        fileResolver: FileSourceResolver
     ): Document = {
       val errorHandler = new ErrorHandler()
-      val checker = TypeInfer(regime, errorHandler = Some(errorHandler.apply))
+      val parsers = Parsers(conf.fix.followImports(), fileResolver = fileResolver)
+      val parser = parsers.getParser(wdlVersion)
+      val checker =
+        TypeInfer(regime, fileResolver = fileResolver, errorHandler = Some(errorHandler.apply))
       val document =
         try {
           val (document, _) = checker.apply(parser.parseDocument(source))
@@ -58,7 +60,8 @@ case class Fix(conf: WdlToolsConf) extends Command {
 
     val document = parseAndCheck(docSource,
                                  "this error cannot be fixed automatically",
-                                 TypeCheckingRegime.Lenient)
+                                 TypeCheckingRegime.Lenient,
+                                 fileResolver)
 
     // use a SeqMap so that the first entry will be the file generated from the source document
     val generator =
@@ -108,10 +111,14 @@ case class Fix(conf: WdlToolsConf) extends Command {
 
     // Validate that the fixed versions type-check correctly - we can't do this until
     // after we write out the documents because otherwise import resolution won't work -
-    // this should only fail if there is a bug in the code generator
+    // this should only fail if there is a bug in the code generator. Prepend the output
+    // dir to the search path.
+    val rewrittenFileResolver = fileResolver.addToLocalSearchPath(Vector(outputDir), append = false)
     parseAndCheck(
-        fileResolver.fromPath(results.head._1),
-        "this is likely due to a bug in the WDL code generator - please report this issue"
+        rewrittenFileResolver.fromPath(results.head._1),
+        "this is likely due to a bug in the WDL code generator - please report this issue",
+        TypeCheckingRegime.Moderate,
+        rewrittenFileResolver
     )
   }
 }

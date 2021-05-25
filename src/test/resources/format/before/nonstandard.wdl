@@ -5,8 +5,10 @@ task nonstandard {
     Int disk_size_gb = 100
   }
 
+  String twoXsize = disk_size_gb * 2
+
   command <<<
-  echo hi
+  echo ~{twoXsize}
   >>>
 
   output {}

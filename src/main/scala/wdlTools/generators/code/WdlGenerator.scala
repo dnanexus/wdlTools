@@ -7,7 +7,7 @@ import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
 import wdlTools.syntax.{Operator, Quoting, SourceLocation, WdlVersion}
-import wdlTools.types.TypeUtils
+import wdlTools.types.{TypeCheckingRegime, Unification, UnificationContext}
 
 import java.net.URI
 import scala.collection.mutable
@@ -555,6 +555,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
+    def anyNotCoercibleTo(exprs: Vector[Expr], t: T): Boolean = {
+      val unify = Unification(TypeCheckingRegime.Moderate)
+      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
+      exprs.exists(e => !unify.isCoercibleTo(t, e.wdlType, unifyCtx))
+    }
+
     expr match {
       // literal values
       case ValueNone(_)                   => Literal(Symbols.None)
@@ -666,8 +672,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                 )
             )
           case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), T_String)
-              if rewriteNonstandardUsages && args
-                .exists(t => TypeUtils.unwrapOptional(t.wdlType) != T_String) =>
+              if rewriteNonstandardUsages && anyNotCoercibleTo(args, T_String) =>
             // nonstandard usage: "foo " + bar + " baz"
             // re-write as "foo ${bar} baz"
             val (newArgs, quotings) = args.map {
@@ -811,10 +816,25 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     }
   }
 
+  private def notCoercibleTo(expr: Expr, wdlType: T): Boolean = {
+    val unify = Unification(TypeCheckingRegime.Moderate)
+    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext.empty)
+  }
+
   private case class DeclarationStatement(name: String, wdlType: T, expr: Option[Expr] = None)
       extends BaseStatement {
 
-    private val typeSized = DataType.fromWdlType(wdlType)
+    private val typeSized = {
+      val newType = wdlType match {
+        case T_String | T_Optional(T_String)
+            if rewriteNonstandardUsages && expr.exists(notCoercibleTo(_, T_String)) =>
+          // non-standard usage: String foo = 1 + 1
+          // re-write to: Int foo = 1 + 1
+          expr.get.wdlType
+        case _ => wdlType
+      }
+      DataType.fromWdlType(newType)
+    }
     private val nameLiteral = Literal(name)
     private val lhs = Vector(typeSized, nameLiteral)
     private val rhs = expr.map { e =>
