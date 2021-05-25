@@ -141,6 +141,16 @@ object Utils {
     val quoted = Literal(Constant(raw)).toString
     quoted.substring(1, quoted.length - 1)
   }
+
+  def quoteString(raw: String): (String, Quoting.Quoting) = {
+    if (raw.contains("'") && raw.contains('"')) {
+      (escape(raw), Quoting.Double)
+    } else if (raw.contains('"')) {
+      (raw, Quoting.Single)
+    } else {
+      (raw, Quoting.Double)
+    }
+  }
 }
 
 /**
