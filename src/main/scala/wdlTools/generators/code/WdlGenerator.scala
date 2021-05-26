@@ -1016,7 +1016,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             Vector(Literal(call.fullyQualifiedName), Literal(Symbols.As), Literal(alias))
           Container(tokens)
         } else {
-          Literal(call.actualName)
+          Literal(call.fullyQualifiedName)
         }
     )
 
