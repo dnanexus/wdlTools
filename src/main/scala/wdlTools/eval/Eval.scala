@@ -210,7 +210,8 @@ case class Eval(paths: EvalPaths,
         case _                 => ()
       }
     } catch {
-      case t: Throwable => throw new EvalException(t.getMessage, loc)
+      case t: Throwable =>
+        throw new EvalException(s"error evaluating default value ${value}", loc, t)
     }
   }
 
@@ -432,7 +433,8 @@ case class Eval(paths: EvalPaths,
           case _                 => None
         }
       } catch {
-        case t: Throwable => throw new EvalException(t.getMessage, loc)
+        case t: Throwable =>
+          throw new EvalException(s"error evaluating constant value ${value}", loc, t)
       }
     fs.foreach {
       case _: LocalFileSource =>
@@ -466,8 +468,9 @@ case class Eval(paths: EvalPaths,
     } catch {
       case t: Throwable =>
         throw new EvalException(
-            s"Expression cannot be evaluated without the runtime context: ${t.getMessage}",
-            expr.loc
+            s"Expression cannot be evaluated without the runtime context: ${expr}",
+            expr.loc,
+            t
         )
     }
   }
