@@ -3,8 +3,9 @@
 ## in develop
 
 * Fixes quoting and escaping of import URIs by code formatter/generator
+* Disables wrapping of expressions within placeholders
 
-## 0.13.0
+## 0.13.0 (2021-05-20)
 
 * **Breaking changes**:
     * `loc` is moved from the first to second parameter section in all AST case classes to prevent it from being included in the `equals` and `hashCode` implementations
