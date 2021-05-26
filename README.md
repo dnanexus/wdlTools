@@ -34,6 +34,7 @@ The following commands are currently available. They should be considered "beta"
 * [check](doc/Commands/Check.md): type-check a WDL file
 * [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
 * [exec](doc/Commands/Exec.md): execute a WDL task (workflow execution is not yet supported)
+* [fix](doc/Commands/Fix.md): attempts to fix non-standard WDL files with specification incompatibilities
 * [format](doc/Commands/Format.md): reformat a WDL file
   * Note: draft-2 is not yet supported.
 * [lint](doc/Commands/Lint.md): detect "lint" (i.e. incorrect style or potentially problematic code) in a WDL file
