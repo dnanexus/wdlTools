@@ -5,6 +5,7 @@
 * Adds `fix` tool to automatically fix some non-compliant WDL syntax
 * Fixes handling of relative imports for WDL specified using non-file URIs (e.g. http(s))
 * Fixes quoting and escaping of import URIs by code formatter/generator
+* Improve error messages in expression evaluator
 
 ## 0.13.0 (2021-05-20)
 

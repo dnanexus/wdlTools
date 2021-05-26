@@ -1,6 +1,7 @@
 # SBT artifacts
 project/project
 project/target
+classes/
 target/
 
 *.tmp
