@@ -151,4 +151,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "handle strings with nested quotes" in {
     generate("nested_quotes.wdl", validateContentFile = true)
   }
+
+  it should "handle struct field access" in {
+    generate("struct_field.wdl", validateContentSelf = true)
+  }
 }

@@ -8,6 +8,13 @@ case class Upgrader(followImports: Boolean = false,
                     logger: Logger = Logger.get) {
   private val parsers = Parsers(followImports, fileResolver, logger = logger)
 
+  /**
+    * Upgrades a WDL file from one version to a later version.
+    * @param docSource WDL source file
+    * @param sourceVersion source version; autodetected by default
+    * @param targetVersion target version; V1 by default
+    * @return
+    */
   def upgrade(docSource: FileNode,
               sourceVersion: Option[WdlVersion] = None,
               targetVersion: WdlVersion = WdlVersion.V1): Map[FileNode, Seq[String]] = {

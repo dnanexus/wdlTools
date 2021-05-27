@@ -6,7 +6,8 @@ import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Operator, Quoting, WdlVersion}
+import wdlTools.syntax.{Operator, Quoting, SourceLocation, WdlVersion}
+import wdlTools.types.{TypeCheckingRegime, Unification, UnificationContext}
 
 import java.net.URI
 import scala.collection.mutable
@@ -222,7 +223,21 @@ object WdlGenerator {
   }
 }
 
-case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs: Boolean = true) {
+/**
+  * Generates WDL source code from a TypedAbstractSyntax document.
+  * @param targetVersion WDL version to generate
+  * @param omitNullCallInputs whether to omit any call inputs that can be
+  *                           determined statically to be null
+  * @param rewriteNonstandardUsages whether to check for and re-write common
+  *                                 non-standard WDL usages. This is intended
+  *                                 to fix usages that are only allowed by
+  *                                 setting the type-checking regime to "lenient",
+  *                                 such that the generated WDL could be successfully
+  *                                 re-checked under "moderate".
+  */
+case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
+                        omitNullCallInputs: Boolean = true,
+                        rewriteNonstandardUsages: Boolean = false) {
   if (targetVersion.exists(_ < WdlVersion.V1)) {
     throw new Exception(s"WDL version ${targetVersion.get} is not supported")
   }
@@ -541,6 +556,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
+    def anyNotCoercibleTo(exprs: Vector[Expr], t: T): Boolean = {
+      val unify = Unification(TypeCheckingRegime.Moderate)
+      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
+      exprs.exists(e => !unify.isCoercibleTo(t, e.wdlType, unifyCtx))
+    }
+
     expr match {
       // literal values
       case ValueNone(_)                   => Literal(Symbols.None)
@@ -655,6 +676,27 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
                 ),
                 wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
+          case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), T_String)
+              if rewriteNonstandardUsages && anyNotCoercibleTo(args, T_String) =>
+            // nonstandard usage: "foo " + bar + " baz"
+            // re-write as "foo ${bar} baz"
+            val (newArgs, quotings) = args.map {
+              case s @ ValueString(_, _, quoting) if quoting != Quoting.None =>
+                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+              case s @ ExprCompoundString(_, _, quoting) if quoting != Quoting.None =>
+                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+              case arg => (arg, None)
+            }.unzip
+            val quoting = quotings.flatten.distinct match {
+              case Vector()        => Quoting.Double
+              case Vector(quoting) => quoting
+              case _ =>
+                throw new Exception(
+                    s"Cannot re-write non-standard expression ${expr}: sub-expressions use different quoting"
+                )
+            }
+            val loc = SourceLocation.merge(newArgs.map(_.loc))
+            buildExpression(ExprCompoundString(newArgs, T_String, quoting)(loc))
           case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
             val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
@@ -780,10 +822,25 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
     }
   }
 
+  private def notCoercibleTo(expr: Expr, wdlType: T): Boolean = {
+    val unify = Unification(TypeCheckingRegime.Moderate)
+    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext.empty)
+  }
+
   private case class DeclarationStatement(name: String, wdlType: T, expr: Option[Expr] = None)
       extends BaseStatement {
 
-    private val typeSized = DataType.fromWdlType(wdlType)
+    private val typeSized = {
+      val newType = wdlType match {
+        case T_String | T_Optional(T_String)
+            if rewriteNonstandardUsages && expr.exists(notCoercibleTo(_, T_String)) =>
+          // non-standard usage: String foo = 1 + 1
+          // re-write to: Int foo = 1 + 1
+          expr.get.wdlType
+        case _ => wdlType
+      }
+      DataType.fromWdlType(newType)
+    }
     private val nameLiteral = Literal(name)
     private val lhs = Vector(typeSized, nameLiteral)
     private val rhs = expr.map { e =>
@@ -936,7 +993,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
   private case class CallInputsStatement(inputs: Map[String, Expr]) extends BaseStatement {
     private val key = Literal(Symbols.Input)
     private val value = inputs.flatMap {
-      case (_, ValueNone(_)) if omitNullInputs => None
+      case (_, ValueNone(_)) if omitNullCallInputs => None
       case (name, expr) =>
         val nameToken = Literal(name)
         val exprSized = buildExpression(expr)
@@ -965,7 +1022,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None, omitNullInputs
             Vector(Literal(call.fullyQualifiedName), Literal(Symbols.As), Literal(alias))
           Container(tokens)
         } else {
-          Literal(call.actualName)
+          Literal(call.fullyQualifiedName)
         }
     )
 

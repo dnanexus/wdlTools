@@ -14,6 +14,7 @@ import TypeCheckingRegime._
 import wdlTools.types.ExprState.ExprState
 import wdlTools.types.Section.Section
 import dx.util.{
+  AddressableFileSource,
   Bindings,
   DuplicateBindingException,
   FileNode,
@@ -1195,6 +1196,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   private def applyDoc(doc: AST.Document): (TAT.Document, TypeContext) = {
     val emptyCtx = TypeContext.createFromDoc(doc, regime, userDefinedFunctions, logger)
 
+    val importDocParent = doc.source match {
+      case parent: AddressableFileSource => Some(parent)
+      case _                             => None
+    }
+
     // translate each of the elements in the document
     val (elements, elementCtx) =
       doc.elements.foldLeft((Vector.empty[TAT.DocumentElement], emptyCtx)) {
@@ -1228,7 +1234,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               // will be named:
               //    stdlib
               //    C
-              UUtil.changeFileExt(fileResolver.resolve(addr).name, dropExt = ".wdl")
+              UUtil.changeFileExt(fileResolver.resolve(addr, importDocParent).name,
+                                  dropExt = ".wdl")
             case Some(x) => x
           }
 
