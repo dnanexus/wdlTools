@@ -491,12 +491,13 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class Placeholder(value: Sized,
-                                 ctx: ExpressionContext,
+                                 open: String,
+                                 inString: Boolean,
                                  options: Option[Vector[Sized]] = None)
       extends Group(
-          ends = Some(Literal(ctx.placeholderOpen), Literal(Symbols.PlaceholderClose)),
-          wrapping = if (ctx.inString(quoted = true)) Wrapping.Never else Wrapping.AsNeeded,
-          spacing = if (ctx.inString()) Spacing.Off else Spacing.On
+          ends = Some(Literal(open), Literal(Symbols.PlaceholderClose)),
+          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
+          spacing = if (inString) Spacing.Off else Spacing.On
       )
       with Composite {
 
@@ -575,13 +576,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             value.map(buildExpression(_, ctx)),
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.ArrayLiteralOpen), Literal(Symbols.ArrayLiteralClose)),
-            wrapping = Wrapping.AllOrNone
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AllOrNone
         )
       case ExprPair(left, right, _) =>
         Container(
             Vector(buildExpression(left, ctx), buildExpression(right, ctx)),
             Some(Symbols.ArrayDelimiter),
-            Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
+            Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose)),
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
         )
       case ExprMap(value, _) =>
         Container(
@@ -590,7 +592,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             }.toVector,
             Some(Symbols.ArrayDelimiter),
             Some(Literal(Symbols.MapOpen), Literal(Symbols.MapClose)),
-            Wrapping.Always,
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.Always,
             continue = false
         )
       case ExprObject(value, wdlType) =>
@@ -612,14 +614,15 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             Some(Symbols.ArrayDelimiter),
             Some(Sequence(Vector(Literal(name), Literal(Symbols.ObjectOpen)), spacing = Spacing.On),
                  Literal(Symbols.ObjectClose)),
-            Wrapping.Always,
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.Always,
             continue = false
         )
       // placeholders
       case ExprPlaceholder(t, f, sep, default, value, _) =>
         Placeholder(
             buildExpression(value, ctx.advanceTo(InPlaceholderState)),
-            ctx,
+            ctx.placeholderOpen,
+            ctx.inString(),
             Some(
                 Vector(
                     t.map(e => placeholderOption(Symbols.TrueOption, e)),
@@ -655,7 +658,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             Container(
                 Vector(buildExpression(index, nextCtx)),
                 Some(Symbols.ArrayDelimiter),
-                Some(prefix, suffix)
+                Some(prefix, suffix),
+                wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
           case ExprIfThenElse(cond, tBranch, fBranch, _) =>
             val condSized = buildExpression(cond, nextCtx)
@@ -669,7 +673,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                     tSized,
                     Literal(Symbols.Else),
                     fSized
-                )
+                ),
+                wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
           case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), T_String)
               if rewriteNonstandardUsages && anyNotCoercibleTo(args, T_String) =>
@@ -715,7 +720,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
             Container(
                 elements.map(buildExpression(_, nextCtx)),
                 Some(Symbols.ArrayDelimiter),
-                Some(prefix, suffix)
+                Some(prefix, suffix),
+                wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
           case ExprGetName(e, id, _) =>
             val exprSized = buildExpression(e, nextCtx)
@@ -726,7 +732,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
           case other => throw new Exception(s"Unrecognized expression $other")
         }
         if (ctx.inString(resetInPlaceholder = true)) {
-          Placeholder(sized, ctx)
+          Placeholder(sized, ctx.placeholderOpen, ctx.inString())
         } else {
           sized
         }

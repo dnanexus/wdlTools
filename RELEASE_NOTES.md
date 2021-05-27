@@ -3,9 +3,13 @@
 ## in develop
 
 * Adds `fix` tool to automatically fix some non-compliant WDL syntax
+* Improve error messages in expression evaluator
+
+## 0.13.1 (2021-05-27)
+
 * Fixes handling of relative imports for WDL specified using non-file URIs (e.g. http(s))
 * Fixes quoting and escaping of import URIs by code formatter/generator
-* Improve error messages in expression evaluator
+* Disables wrapping of expressions within placeholders
 
 ## 0.13.0 (2021-05-20)
 
