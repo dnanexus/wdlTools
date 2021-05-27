@@ -1,6 +1,29 @@
 # Fix
 
-The `fix` command attempts to automatically fix WDL files with specification incompatibilities.
+The `fix` command attempts to automatically fix WDL files with the following specification incompatibilities:
+
+* `String`/non-`String` concatenations are re-written as string interpolations, .e.g.
+    ```wdl
+    runtime {
+      disks: "local-disk " + disk_size_gb + " SSD"
+    }
+    ```
+    becomes
+    ```wdl
+    runtime {
+      disks: "local-disk ${disk_size_gb} SSD"
+    }
+    ```
+* Declarations with type mismatches, e.g.
+    ```wdl
+    String x = ceil(size(myfile))
+    ```
+    becomes
+    ```wdl
+    Int x = ceil(size(myfile))
+    ```
+
+Additional fixes will be added as needed. Please request them by opening an [issue](https://github.com/dnanexus-rnd/wdlTools/issues).
 
 ## Example
 
