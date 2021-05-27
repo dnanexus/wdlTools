@@ -8,6 +8,7 @@ import wdlTools.syntax.AbstractSyntax._
 import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, Quoting, SourceLocation, WdlVersion}
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
+import java.net.URI
 import scala.collection.{BufferedIterator, mutable}
 
 object WdlFormatter {
@@ -845,14 +846,15 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   }
 
   private case class Placeholder(value: Span,
-                                 ctx: ExpressionContext,
+                                 open: String,
+                                 inString: Boolean,
                                  options: Option[Vector[Span]] = None,
                                  override val bounds: SourceLocation)
       extends Group(
-          ends = Some(Literal.fromStart(ctx.placeholderOpen, bounds),
+          ends = Some(Literal.fromStart(open, bounds),
                       Literal.fromEnd(Symbols.PlaceholderClose, bounds)),
-          wrapping = if (ctx.inString(quoted = true)) Wrapping.Never else Wrapping.AsNeeded,
-          spacing = if (ctx.inString()) Spacing.Off else Spacing.On
+          wrapping = if (inString) Wrapping.Never else Wrapping.AsNeeded,
+          spacing = if (inString) Spacing.Off else Spacing.On
       )
       with BoundedComposite {
 
@@ -924,7 +926,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                  Literal.fromEnd(Symbols.ArrayLiteralClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
             expr.loc,
-            wrapping = Wrapping.AllOrNone
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AllOrNone
         )
       case ExprPair(left, right) =>
         BoundedContainer(
@@ -945,7 +947,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                  Literal.fromEnd(Symbols.MapClose, expr.loc)),
             Some(Symbols.ArrayDelimiter),
             expr.loc,
-            Wrapping.Always,
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.Always,
             continue = false
         )
       case ExprObject(value) =>
@@ -967,7 +969,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             ),
             Some(Symbols.ArrayDelimiter),
             bounds = expr.loc,
-            Wrapping.Always,
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.Always,
             continue = false
         )
       case ExprStruct(name, members) =>
@@ -994,14 +996,15 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
             ),
             Some(Symbols.ArrayDelimiter),
             bounds = expr.loc,
-            Wrapping.Always,
+            wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.Always,
             continue = false
         )
       // placeholders
       case ExprPlaceholder(t, f, sep, default, value) =>
         Placeholder(
             buildExpression(value, ctx.advanceTo(InPlaceholderState)),
-            ctx,
+            ctx.placeholderOpen,
+            ctx.inString(),
             Some(
                 Vector(
                     t.map(e => placeholderOption(Symbols.TrueOption, e)),
@@ -1048,7 +1051,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                     Literal.between(Symbols.Else, tSpan, fSpan),
                     fSpan
                 ),
-                wrapping = Wrapping.AsNeeded,
+                wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded,
                 bounds = expr.loc
             )
           case ExprApply(oper, Vector(value)) if Operator.All.contains(oper) =>
@@ -1086,7 +1089,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
           case other => throw new Exception(s"Unrecognized expression $other")
         }
         if (ctx.inString(resetInPlaceholder = true)) {
-          Placeholder(span, ctx, bounds = other.loc)
+          Placeholder(span, ctx.placeholderOpen, ctx.inString(), bounds = other.loc)
         } else {
           span
         }
@@ -1149,7 +1152,13 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
   private case class ImportStatement(importDoc: ImportDoc) extends BoundedStatement(importDoc.loc) {
     private val keywordToken = Literal.fromStart(Symbols.Import, importDoc.loc)
     // assuming URI comes directly after keyword
-    private val uriLiteral = Literal.fromPrev(importDoc.addr.value, keywordToken)
+    val (escaped, quoting) =
+      try {
+        (URI.create(importDoc.addr.value).toString, Quoting.Double)
+      } catch {
+        case _: Throwable => Utils.quoteString(importDoc.addr.value)
+      }
+    private val uriLiteral = Literal.fromPrev(escaped, keywordToken, quoting)
     // assuming namespace comes directly after uri
     private val nameTokens = importDoc.name.map { name =>
       Literal.chainFromPrev(Vector(Symbols.As, name.value), uriLiteral)

@@ -621,4 +621,16 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val command = evalCommand(v1_1Dir.resolve("apps_579_string_substitution_expr.wdl"))
     command shouldBe "echo aa"
   }
+
+  it should "evaluate write_lines correctly" in {
+    val command =
+      evalCommand(v1Dir.resolve("write_lines.wdl"),
+                  WdlValueBindings(Map("x" -> V_String("hello"), "y" -> V_String("buddy"))))
+    val commandRegexp = "cat (.*)".r
+    val path = command match {
+      case commandRegexp(path) => path
+      case _                   => throw new Exception(s"unexpected command ${command}")
+    }
+    FileUtils.readFileContent(Paths.get(path)) shouldBe "hello buddy\n"
+  }
 }
