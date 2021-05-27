@@ -117,6 +117,13 @@ case class ExpressionContext(inCommand: Boolean, states: List[ExpressionState]) 
     }
   }
 
+  def inPlaceholder: Boolean = {
+    states.exists {
+      case InPlaceholderState => true
+      case _                  => false
+    }
+  }
+
   def groupOperation(oper: String): Boolean = {
     states.headOption match {
       case Some(InOperationState(Some(parentOper))) if parentOper != oper => true

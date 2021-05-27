@@ -217,11 +217,11 @@ object TypedAbstractSyntax {
   // name is the alias if there is one, else the UQN.
   // Examples:
   //
-  // fully-qualified-name      actual-name
-  // -----                     ---
-  // call lib.concat as foo    foo
-  // call add                  add
-  // call a.b.c                c
+  // fully-qualified-name      unqualified name   actual-name
+  // -----                     -----              ---
+  // call lib.concat as foo    concat             foo
+  // call add                  add                add
+  // call a.b.c                c                  c
   //
   case class Call(unqualifiedName: String,
                   fullyQualifiedName: String,

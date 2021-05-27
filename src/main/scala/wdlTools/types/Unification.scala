@@ -458,16 +458,17 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     assert(to.size == from.size)
     if (to.isEmpty) {
       (output, Priority.Exact)
+    } else {
+      val init: Bindings[Int, T] = VarTypeBindings.empty
+      val (priority, newVarTypes) =
+        to.zip(from).foldLeft((Priority.Exact, init)) {
+          case ((priority, vt), (lt, rt)) =>
+            val (_, vt2, priority2) = unify(lt, rt, ctx, vt, reversible = false)
+            (Enum.max(priority, priority2), vt2)
+        }
+      val unifiedType = substitute(output, newVarTypes)
+      (unifiedType, priority)
     }
-    val init: Bindings[Int, T] = VarTypeBindings.empty
-    val (priority, newVarTypes) =
-      to.zip(from).foldLeft((Priority.Exact, init)) {
-        case ((priority, vt), (lt, rt)) =>
-          val (_, vt2, priority2) = unify(lt, rt, ctx, vt, reversible = false)
-          (Enum.max(priority, priority2), vt2)
-      }
-    val unifiedType = substitute(output, newVarTypes)
-    (unifiedType, priority)
   }
 
   /**
