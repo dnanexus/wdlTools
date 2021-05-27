@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.13.1 (2021-05-27)
 
 * Fixes quoting and escaping of import URIs by code formatter/generator
 * Disables wrapping of expressions within placeholders
