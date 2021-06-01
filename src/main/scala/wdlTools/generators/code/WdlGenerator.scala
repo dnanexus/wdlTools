@@ -556,10 +556,10 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
-    def anyNotCoercibleTo(exprs: Vector[Expr], t: T): Boolean = {
+    def isMixedStringAndNonString(exprs: Vector[Expr]): Boolean = {
       val unify = Unification(TypeCheckingRegime.Moderate)
       val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
-      exprs.exists(e => !unify.isCoercibleTo(t, e.wdlType, unifyCtx))
+      exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
     }
 
     expr match {
@@ -676,9 +676,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                 ),
                 wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
-          case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), T_String)
-              if rewriteNonstandardUsages && anyNotCoercibleTo(args, T_String) =>
-            // nonstandard usage: "foo " + bar + " baz"
+          case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), _)
+              if rewriteNonstandardUsages && isMixedStringAndNonString(args) =>
+            // nonstandard usage: "foo " + bar + " baz", where bar is a non-String type
             // re-write as "foo ${bar} baz"
             val (newArgs, quotings) = args.map {
               case s @ ValueString(_, _, quoting) if quoting != Quoting.None =>

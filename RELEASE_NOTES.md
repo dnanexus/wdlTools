@@ -1,10 +1,14 @@
 # Change log
 
+## in develop
+
+* Allows automatic coersion of `read_*` return values from `String` to other primitive types
+* Fixes handling of relative imports that are not in a subdirectory of the main WDL's parent directory
+
 ## 0.14.0 (2021-05-27)
 
 * Adds `fix` tool to automatically fix some non-compliant WDL syntax
 * Improve error messages in expression evaluator
-
 
 ## 0.13.1 (2021-05-27)
 

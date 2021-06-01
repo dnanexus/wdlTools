@@ -74,7 +74,8 @@ package object cli {
         fs -> rootPath.relativize(Paths.get(fs.folder).resolve(fs.name))
       }.toMap
       val pathComponents = sourceToRelPath.values.map(_.iterator().asScala.toVector)
-      val shortestPathSize = pathComponents.map(_.size).min
+      // don't include the file name in the path components
+      val shortestPathSize = pathComponents.map(_.size - 1).min
       val commonPathComponents = pathComponents
         .map(_.slice(0, shortestPathSize))
         .transpose
