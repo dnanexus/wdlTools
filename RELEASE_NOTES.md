@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.14.0 (2021-05-27)
 
 * Adds `fix` tool to automatically fix some non-compliant WDL syntax
 * Improve error messages in expression evaluator
