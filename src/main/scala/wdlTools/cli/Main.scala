@@ -2,6 +2,13 @@ package wdlTools.cli
 
 import dx.util.Logger
 
+/**
+  * Base class for wdlTools CLI commands.
+  */
+trait Command {
+  def apply(): Unit
+}
+
 object Main extends App {
   val conf = new WdlToolsConf(args.toVector)
 
