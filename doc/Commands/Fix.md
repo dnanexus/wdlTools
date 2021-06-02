@@ -25,6 +25,49 @@ The `fix` command attempts to automatically fix WDL files with the following spe
 
 Additional fixes will be added as needed. Please request them by opening an [issue](https://github.com/dnanexus-rnd/wdlTools/issues).
 
+## Issues that cannot be fixed (partial list)
+
+* Re-usage of variable names within the same scope, e.g.
+    ```wdl
+    task bad_juju {
+      input {
+        String foo
+      }
+      ...
+      output {
+        Int foo
+      }
+    }
+    ```
+* Coercions from `String` to non-`String` values are allowed within the context of `read_*` return values, but not otherwise. For example, this is legal:
+    ```wdl
+    task ok {
+      command <<<
+      echo "1\n2\n3" > ints.txt
+      >>>
+      output {
+        Array[Int] ints = read_lines("ints.txt")
+      }
+    }
+    ```
+    but this is illegal:
+    ```wdl
+    workflow not_ok {
+      call ints_to_strings
+      output {
+        Array[Int] ints = ints_to_strings.strings
+      }
+    }
+    task ints_to_strings {
+      command <<<
+      echo "1\n2\n3" > ints.txt
+      >>>
+      output {
+        Array[String] strings = read_lines("ints.txt")
+      }
+    }
+    ```
+
 ## Example
 
 ```bash

@@ -574,6 +574,13 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     }
   }
 
+  private def isReadFunction(expr: AST.Expr): Boolean = {
+    expr match {
+      case AST.ExprApply(funcName, _) if funcName.startsWith("read_") => true
+      case _                                                          => false
+    }
+  }
+
   private def translateDeclaration(
       decl: AST.Declaration,
       section: Section,
@@ -588,7 +595,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(expr) =>
         val e = applyExpr(expr, ctx, bindings, section = section)
         val rhsType = e.wdlType
-        val unifyCtx = UnificationContext(section)
+        val unifyCtx = UnificationContext(section, inReadFunction = isReadFunction(expr))
         val wdlType = if (unify.isCoercibleTo(lhsType, rhsType, unifyCtx)) {
           lhsType
         } else {

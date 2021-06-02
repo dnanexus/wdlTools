@@ -386,6 +386,13 @@ case class Eval(paths: EvalPaths,
     apply(expr, Context(bindings))
   }
 
+  private def isReadExpression(expr: TAT.Expr): Boolean = {
+    expr match {
+      case TAT.ExprApply(funcName, _, _, _) => funcName.startsWith("read_")
+      case _                                => false
+    }
+  }
+
   /**
     * Coerces the result value to the correct type.
     * For example, an expression like:
@@ -398,14 +405,18 @@ case class Eval(paths: EvalPaths,
     */
   def applyExprAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T, bindings: Bindings[String, V]): V = {
     val value = applyExpr(expr, bindings)
-    Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions)
+    Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions, isReadExpression(expr))
   }
 
   def applyExprAndCoerce(expr: TAT.Expr,
                          wdlTypes: Vector[WdlTypes.T],
                          bindings: Bindings[String, V]): V = {
     val value = applyExpr(expr, bindings)
-    Coercion.coerceToFirst(wdlTypes, value, expr.loc, allowNonstandardCoercions)
+    Coercion.coerceToFirst(wdlTypes,
+                           value,
+                           expr.loc,
+                           allowNonstandardCoercions,
+                           isReadExpression(expr))
   }
 
   // Evaluate all the declarations and return a Context
@@ -417,7 +428,11 @@ case class Eval(paths: EvalPaths,
       case (accu: Bindings[String, V], pv: TAT.PrivateVariable) =>
         val ctx = Context(accu)
         val value = apply(pv.expr, ctx)
-        val coerced = Coercion.coerceTo(pv.wdlType, value, pv.loc, allowNonstandardCoercions)
+        val coerced = Coercion.coerceTo(pv.wdlType,
+                                        value,
+                                        pv.loc,
+                                        allowNonstandardCoercions,
+                                        isReadExpression(pv.expr))
         accu.add(pv.name, coerced)
       case (_, ast) =>
         throw new Exception(s"Cannot evaluate element ${ast.getClass}")
@@ -486,14 +501,19 @@ case class Eval(paths: EvalPaths,
     */
   def applyConstAndCoerce(expr: TAT.Expr, wdlType: WdlTypes.T): V = {
     val value = applyConst(expr)
-    val coerced = Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions)
+    val coerced =
+      Coercion.coerceTo(wdlType, value, expr.loc, allowNonstandardCoercions, isReadExpression(expr))
     validateConst(coerced, expr.loc)
     coerced
   }
 
   def applyConstAndCoerce(expr: TAT.Expr, wdlTypes: Vector[WdlTypes.T]): V = {
     val value = applyConst(expr)
-    val coerced = Coercion.coerceToFirst(wdlTypes, value, expr.loc, allowNonstandardCoercions)
+    val coerced = Coercion.coerceToFirst(wdlTypes,
+                                         value,
+                                         expr.loc,
+                                         allowNonstandardCoercions,
+                                         isReadExpression(expr))
     validateConst(coerced, expr.loc)
     coerced
   }

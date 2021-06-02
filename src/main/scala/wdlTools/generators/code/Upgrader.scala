@@ -3,6 +3,8 @@ package wdlTools.generators.code
 import wdlTools.syntax.{Parsers, WdlVersion}
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
+import scala.collection.immutable.SeqMap
+
 case class Upgrader(followImports: Boolean = false,
                     fileResolver: FileSourceResolver = FileSourceResolver.get,
                     logger: Logger = Logger.get) {
@@ -17,7 +19,7 @@ case class Upgrader(followImports: Boolean = false,
     */
   def upgrade(docSource: FileNode,
               sourceVersion: Option[WdlVersion] = None,
-              targetVersion: WdlVersion = WdlVersion.V1): Map[FileNode, Seq[String]] = {
+              targetVersion: WdlVersion = WdlVersion.V1): SeqMap[FileNode, Seq[String]] = {
     val parser = if (sourceVersion.isDefined) {
       parsers.getParser(sourceVersion.get)
     } else {
@@ -28,7 +30,7 @@ case class Upgrader(followImports: Boolean = false,
     val formatter = WdlFormatter(Some(targetVersion), followImports)
 
     // parse and format the document (and any imports)
-    parser.Walker[Map[FileNode, Seq[String]]](docSource, Map.empty).walk { (doc, results) =>
+    parser.Walker[SeqMap[FileNode, Seq[String]]](docSource, SeqMap.empty).walk { (doc, results) =>
       if (doc.version.value >= targetVersion) {
         throw new Exception(s"Cannot convert WDL version ${doc.version} to ${targetVersion}")
       }
