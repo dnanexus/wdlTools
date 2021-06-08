@@ -83,9 +83,6 @@ Fix specification incompatibilities in WDL file and all its dependencies.
 Options:
 
   -a, --antlr4-trace          enable trace logging of the ANTLR4 parser
-  -b, --base-uri  <arg>       Base URI for imports; output directories will be
-                              relative to this URI; defaults to the parent
-                              directory of the main WDL file
   -f, --follow-imports        (Default) format imported files in addition to the
                               main file
       --nofollow-imports      only format the main file
