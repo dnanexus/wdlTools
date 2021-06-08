@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.14.1 (2021-06-08)
 
 * Allows automatic coersion of `read_*` return values from `String` to other primitive types
 * Allows automatic coercion of optional-typed expressions to String within placeholders
