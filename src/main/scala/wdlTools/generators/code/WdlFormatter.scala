@@ -9,6 +9,7 @@ import wdlTools.syntax.{Comment, CommentMap, Operator, Parsers, Quoting, SourceL
 import dx.util.{FileNode, FileSourceResolver, Logger}
 
 import java.net.URI
+import scala.collection.immutable.SeqMap
 import scala.collection.{BufferedIterator, mutable}
 
 object WdlFormatter {
@@ -1904,9 +1905,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     formatElement(document, document.comments)
   }
 
-  def formatDocuments(docSource: FileNode): Map[FileNode, Vector[String]] = {
+  def formatDocuments(docSource: FileNode): SeqMap[FileNode, Vector[String]] = {
     Parsers(followImports, fileResolver, logger = logger)
-      .getDocumentWalker[Map[FileNode, Vector[String]]](docSource, Map.empty)
+      .getDocumentWalker[SeqMap[FileNode, Vector[String]]](docSource, SeqMap.empty)
       .walk { (doc, results) =>
         results + (doc.source -> formatDocument(doc))
       }

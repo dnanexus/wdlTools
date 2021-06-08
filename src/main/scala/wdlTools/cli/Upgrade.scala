@@ -1,7 +1,7 @@
 package wdlTools.cli
 
 import wdlTools.generators.code.Upgrader
-import dx.util.{FileSourceResolver, FileUtils, LocalFileSource}
+import dx.util.{FileNode, FileSourceResolver}
 
 import scala.language.reflectiveCalls
 
@@ -12,20 +12,21 @@ case class Upgrade(conf: WdlToolsConf) extends Command {
     val destVersion = conf.upgrade.destVersion()
     val outputDir = conf.upgrade.outputDir.toOption
     val overwrite = conf.upgrade.overwrite()
-    val upgrader = Upgrader(conf.upgrade.followImports())
+    val followImports = conf.upgrade.followImports()
+    val upgrader = Upgrader(followImports)
     // write out upgraded versions
     val documents = upgrader.upgrade(docSource, srcVersion, destVersion)
-    documents.foreach {
-      case (source, lines) if outputDir.isDefined =>
-        FileUtils.writeFileContent(outputDir.get.resolve(source.name),
-                                   lines.mkString(System.lineSeparator()),
-                                   overwrite = overwrite)
-      case (localSource: LocalFileSource, lines) if overwrite =>
-        FileUtils.writeFileContent(localSource.canonicalPath,
-                                   lines.mkString(System.lineSeparator()),
-                                   overwrite = overwrite)
-      case (_, lines) =>
-        println(lines.mkString(System.lineSeparator()))
+    val upgraded = writeDocuments(documents, outputDir, overwrite)
+    if (conf.upgrade.check() && upgraded.nonEmpty) {
+      upgraded.head._1 match {
+        case fn: FileNode =>
+          parseAndCheck(
+              fn,
+              destVersion,
+              followImports,
+              "this is likely due to a bug in the WDL code generator - please report this issue"
+          )
+      }
     }
   }
 }

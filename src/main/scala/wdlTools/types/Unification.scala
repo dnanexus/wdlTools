@@ -23,7 +23,8 @@ object Section extends Enum {
 }
 
 case class UnificationContext(section: Section.Section = Section.Other,
-                              inPlaceholder: Boolean = false)
+                              inPlaceholder: Boolean = false,
+                              inReadFunction: Boolean = false)
 
 object UnificationContext {
   def empty: UnificationContext = UnificationContext()
@@ -121,12 +122,22 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         // Other coercions are not generally allowed, but are either allowed
         // in specific contexts or are used often and so allowed under less
         // strict regimes
+        case (T_String, T_Optional(r)) if ctx.inPlaceholder =>
+          // Within a placeholder, an optional value can be coerced to a String -
+          // None values result in the empty string
+          inner(innerTo, r, Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
           Some(Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
           logger.trace(s"lenient coercion from ${innerFrom} to T_String",
                        minLevel = TraceLevel.VVerbose)
           Some(Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_Boolean | T_Int | T_Float, T_String) if ctx.inReadFunction =>
+          // coercion from String to Int|Float|Boolean is specifically allowed
+          // in the context of read_* functions, for example:
+          //  Array[Int] = read_string("ints.txt")
+          //  Map[String, Int] = read_map("string_to_int.tsv")
+          Some(Enum.max(minPriority, Priority.ContextAllowed))
         case (T_Int, T_Float | T_String) if regime <= Lenient =>
           // we can allow this coercion assuming 1) a Float value that coerces
           // exactly to an int, or 2) a String value that can be parsed to an Int -

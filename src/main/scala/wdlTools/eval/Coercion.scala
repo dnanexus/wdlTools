@@ -11,7 +11,9 @@ object Coercion {
   private def coerceToStruct(structName: String,
                              fieldTypes: SeqMap[String, WdlTypes.T],
                              fieldValues: SeqMap[String, V],
-                             loc: SourceLocation): V_Struct = {
+                             loc: SourceLocation,
+                             allowNonstandardCoercions: Boolean,
+                             isReadResult: Boolean): V_Struct = {
     if (fieldTypes.keys.toSet != fieldValues.keys.toSet) {
       throw new EvalException(s"struct ${structName} has wrong fields", loc)
     }
@@ -19,7 +21,7 @@ object Coercion {
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
       case (name, t) =>
-        name -> coerceTo(t, fieldValues(name), loc)
+        name -> coerceTo(t, fieldValues(name), loc, allowNonstandardCoercions, isReadResult)
     }
 
     V_Struct(structName, coercedValues)
@@ -28,7 +30,8 @@ object Coercion {
   def coerceTo(wdlType: WdlTypes.T,
                value: V,
                loc: SourceLocation = SourceLocation.empty,
-               allowNonstandardCoercions: Boolean = false): V = {
+               allowNonstandardCoercions: Boolean = false,
+               isReadResult: Boolean = false): V = {
     def inner(innerType: WdlTypes.T, innerValue: V): V = {
       (innerType, innerValue) match {
         // basic coercion of primitive types
@@ -115,7 +118,7 @@ object Coercion {
           }
           V_Map(mapFields)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Object(fields)) =>
-          coerceToStruct(name, fieldTypes, fields, loc)
+          coerceToStruct(name, fieldTypes, fields, loc, allowNonstandardCoercions, isReadResult)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Map(fields)) =>
           // this should probably be considered non-standard
           // convert into a mapping from string to WdlValue
@@ -127,13 +130,15 @@ object Coercion {
                   loc
               )
           }
-          coerceToStruct(name, fieldTypes, fields2, loc)
+          coerceToStruct(name, fieldTypes, fields2, loc, allowNonstandardCoercions, isReadResult)
 
         // non-standard coercions
         case (WdlTypes.T_String, V_Directory(s)) => V_String(s)
-        case (WdlTypes.T_Boolean, V_String(s)) if allowNonstandardCoercions && s == "true" =>
+        case (WdlTypes.T_Boolean, V_String(s))
+            if (allowNonstandardCoercions || isReadResult) && s == "true" =>
           V_Boolean(true)
-        case (WdlTypes.T_Boolean, V_String(s)) if allowNonstandardCoercions && s == "false" =>
+        case (WdlTypes.T_Boolean, V_String(s))
+            if (allowNonstandardCoercions || isReadResult) && s == "false" =>
           V_Boolean(false)
         case (WdlTypes.T_Int, V_String(s)) =>
           val n =
@@ -186,10 +191,11 @@ object Coercion {
   def coerceToFirst(wdlTypes: Vector[WdlTypes.T],
                     value: V,
                     loc: SourceLocation = SourceLocation.empty,
-                    allowNonstandardCoercions: Boolean = false): WdlValues.V = {
+                    allowNonstandardCoercions: Boolean = false,
+                    isReadResult: Boolean = false): WdlValues.V = {
     val coerced: WdlValues.V = wdlTypes
       .collectFirst { t =>
-        Try(Coercion.coerceTo(t, value, loc, allowNonstandardCoercions)) match {
+        Try(Coercion.coerceTo(t, value, loc, allowNonstandardCoercions, isReadResult)) match {
           case Success(v) => v
         }
       }
