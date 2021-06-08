@@ -3,6 +3,7 @@
 ## in develop
 
 * Allows automatic coersion of `read_*` return values from `String` to other primitive types
+* Allows automatic coercion of optional-typed expressions to String within placeholders
 * Fixes handling of relative imports that are not in a subdirectory of the main WDL's parent directory
 
 ## 0.14.0 (2021-05-27)

@@ -122,6 +122,10 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         // Other coercions are not generally allowed, but are either allowed
         // in specific contexts or are used often and so allowed under less
         // strict regimes
+        case (T_String, T_Optional(r)) if ctx.inPlaceholder =>
+          // Within a placeholder, an optional value can be coerced to a String -
+          // None values result in the empty string
+          inner(innerTo, r, Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
           Some(Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
