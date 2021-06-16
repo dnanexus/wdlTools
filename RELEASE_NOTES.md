@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Updates to dxCommon 0.4.2, which fixes the output of the `printTree` command
+
 ## 0.14.1 (2021-06-08)
 
 * Allows automatic coersion of `read_*` return values from `String` to other primitive types
