@@ -15,6 +15,7 @@ import scala.collection.immutable.SeqMap
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
+  private val draft2Dir = Paths.get(getClass.getResource("/types/draft2").getPath)
   private val v1Dir = Paths.get(getClass.getResource("/types/v1").getPath)
   private val v2Dir = Paths.get(getClass.getResource("/types/v2").getPath)
   private val v1StructsDir =
@@ -39,6 +40,10 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     val doc = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
       .parseDocument(sourceFile)
     checker.apply(doc)._1
+  }
+
+  it should "handle a conditional in draft2 workflow" in {
+    check(draft2Dir, "conditional.wdl")
   }
 
   it should "handle several struct definitions" taggedAs Edge in {
@@ -185,5 +190,9 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     say_hello_task.wdlType.function shouldBe Some(
         (WdlTypes.T_Function1("say_hello", WdlTypes.T_String, WdlTypes.T_String), Vector("name"))
     )
+  }
+
+  it should "ensure we don't have nested optionals" in {
+    check(v1Dir, "nested_optional.wdl")
   }
 }

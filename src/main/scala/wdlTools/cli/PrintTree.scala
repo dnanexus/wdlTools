@@ -9,8 +9,10 @@ import scala.language.reflectiveCalls
 case class PrintTree(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.printTree.uri())
-    val document = Parsers.default.parseDocument(docSource)
     if (conf.printTree.typed()) {
+      // it is necessary to follow imports when type-checking even though we
+      // will ignore them
+      val document = Parsers(followImports = true).parseDocument(docSource)
       def ignoreImports(p: Product): Option[String] = {
         p match {
           case d: TypedAbstractSyntax.Document if d.source != document.source => Some("...")
@@ -22,6 +24,7 @@ case class PrintTree(conf: WdlToolsConf) extends Command {
           prettyFormat(typeChecker.apply(document)._1, callback = Some(ignoreImports))
       )
     } else {
+      val document = Parsers.default.parseDocument(docSource)
       def ignoreImports(p: Product): Option[String] = {
         p match {
           case d: AbstractSyntax.Document if d.source != document.source => Some("...")
