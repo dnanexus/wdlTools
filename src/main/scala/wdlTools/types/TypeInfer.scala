@@ -26,6 +26,12 @@ import dx.util.{
 
 import scala.collection.immutable.{SeqMap, TreeSeqMap}
 
+trait TypeErrorHandler {
+  def handleTypeErrors(errors: Vector[TypeError]): Boolean
+
+  def hasTypeErrors: Boolean
+}
+
 /**
   * Type inference
   * @param regime Type checking rules. Are we lenient or strict in checking coercions?
@@ -42,7 +48,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
                      substituteFunctionsForTasks: Boolean = false,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
-                     errorHandler: Option[Vector[TypeError] => Boolean] = None,
+                     errorHandler: Option[TypeErrorHandler] = None,
                      logger: Logger = Logger.get) {
   private val unify = Unification(regime, logger)
   // TODO: handle warnings similarly to errors - either have TypeError take an ErrorKind parameter
@@ -1317,7 +1323,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     //val (tDoc, _) = applyDoc(doc)
     //tDoc
     val (tDoc, ctx) = applyDoc(doc)
-    if (errors.nonEmpty && errorHandler.forall(eh => eh(errors))) {
+    if (errors.nonEmpty && errorHandler.forall(eh => eh.handleTypeErrors(errors))) {
       throw new TypeException(errors)
     }
     (tDoc, ctx)

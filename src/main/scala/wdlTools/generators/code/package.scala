@@ -8,8 +8,14 @@
   */
 package wdlTools.generators.code
 
+import dx.util.{AddressableFileSource, FileSource, FileUtils, LocalFileSource}
+
 import scala.reflect.runtime.universe._
 import wdlTools.syntax.{BuiltinSymbols, Quoting}
+
+import java.nio.file.{Path, Paths}
+import scala.collection.immutable.SeqMap
+import scala.jdk.CollectionConverters._
 
 object Indenting extends Enumeration {
   type Indenting = Value
@@ -156,6 +162,54 @@ object Utils {
       (raw, Quoting.Single)
     } else {
       (raw, Quoting.Double)
+    }
+  }
+
+  def writeDocuments[T <: FileSource](
+      docs: SeqMap[T, Iterable[String]],
+      outputDir: Option[Path] = None,
+      overwrite: Boolean = false
+  ): Map[AddressableFileSource, Path] = {
+    val writableDocs = docs.flatMap {
+      case (fs: AddressableFileSource, lines) if outputDir.isDefined => Some(fs -> lines)
+      case (local: LocalFileSource, lines) if overwrite =>
+        FileUtils.writeFileContent(local.canonicalPath,
+                                   lines.mkString(System.lineSeparator()),
+                                   overwrite = true)
+        None
+      case (fs, lines) =>
+        println(s"${fs.toString}\n${lines.mkString(System.lineSeparator())}")
+        None
+    }
+
+    if (writableDocs.nonEmpty) {
+      // determine the common ancestor path between all generated files
+      val rootPath = Paths.get("/")
+      val sourceToRelPath = writableDocs.keys.map { fs =>
+        fs -> rootPath.relativize(Paths.get(fs.folder).resolve(fs.name))
+      }.toMap
+      val pathComponents = sourceToRelPath.values.map(_.iterator().asScala.toVector)
+      // don't include the file name in the path components
+      val shortestPathSize = pathComponents.map(_.size - 1).min
+      val commonPathComponents = pathComponents
+        .map(_.slice(0, shortestPathSize))
+        .transpose
+        .iterator
+        .map(_.toSet)
+        .takeWhile(_.size == 1)
+        .map(_.head.toString)
+        .toVector
+      val commonAncestor = Paths.get(commonPathComponents.head, commonPathComponents.tail: _*)
+      writableDocs.map {
+        case (fs, lines) =>
+          val outputPath = outputDir.get.resolve(commonAncestor.relativize(sourceToRelPath(fs)))
+          FileUtils.writeFileContent(outputPath,
+                                     lines.mkString(System.lineSeparator()),
+                                     overwrite = overwrite)
+          fs -> outputPath
+      }
+    } else {
+      Map.empty
     }
   }
 }

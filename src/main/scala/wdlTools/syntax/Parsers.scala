@@ -10,7 +10,7 @@ case class Parsers(
     followImports: Boolean = false,
     fileResolver: FileSourceResolver = FileSourceResolver.get,
     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-    errorHandler: Option[Vector[SyntaxError] => Boolean] = None,
+    errorHandler: Option[SyntaxErrorHandler] = None,
     logger: Logger = Logger.get
 ) {
   private val parsers: Map[WdlVersion, WdlParser] = Map(
