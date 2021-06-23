@@ -195,4 +195,12 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   it should "ensure we don't have nested optionals" in {
     check(v1Dir, "nested_optional.wdl")
   }
+
+  it should "handle optional array in placeholder with sep" in {
+    check(v1Dir, "optional_placeholder_value.wdl")
+  }
+
+  it should "handle coercion from primitive array to string array" in {
+    check(v1Dir, "array_coersion.wdl")
+  }
 }

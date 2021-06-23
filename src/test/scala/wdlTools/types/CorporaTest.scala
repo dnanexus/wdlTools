@@ -33,15 +33,19 @@ class CorporaTest extends AnyWordSpec with Matchers {
         val fixer = Fixer(fileResolver = fileResolver)
         fixer.fix(source, fixDir.resolve(uniqueDir.next().toString))
       } else {
-        val doc = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
-          .parseDocument(source)
+        val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
+        val doc = parsers.parseDocument(source)
         val checker = TypeInfer(fileResolver = fileResolver, logger = logger)
         checker.apply(doc)
       }
     }
 
-    def parseAndTypeCheck(dir: Path, file: String, fix: Boolean, expectFailure: Boolean): Unit = {
-      val fileResolver = FileSourceResolver.create(Vector(dir))
+    def parseAndTypeCheck(dir: Path,
+                          file: Path,
+                          fix: Boolean,
+                          expectFailure: Boolean,
+                          importDirs: Vector[Path]): Unit = {
+      val fileResolver = FileSourceResolver.create(dir +: importDirs)
       val sourceFile = fileResolver.fromPath(dir.resolve(file))
       if (expectFailure) {
         assertThrows[Exception] {
@@ -62,30 +66,40 @@ class CorporaTest extends AnyWordSpec with Matchers {
           case s                       => s
         }
         val root = corporaDir.resolve(repo)
-        val fix = JsUtils.getOptionalBoolean(corpus, "fix").getOrElse(false)
-        val expectFailure = JsUtils.getOptionalBoolean(corpus, "fail").getOrElse(false)
-        JsUtils.getValues(corpus("entrypoints")).map(JsUtils.getFields(_)).foreach {
-          case example if example.contains("path") =>
-            val path = JsUtils.getString(example("path"))
-            s"parse and type-check ${root}/${path}" in {
-              parseAndTypeCheck(root, path, fix, expectFailure)
+        JsUtils.getValues(corpus("entrypoints")).map(JsUtils.getFields(_)).foreach { example =>
+          val fix = JsUtils.getOptionalBoolean(example, "fix").getOrElse(false)
+          val expectFailure = JsUtils.getOptionalBoolean(example, "fail").getOrElse(false)
+          val importDirs = JsUtils
+            .getOptionalValues(example, "import_dirs")
+            .map(_.map(d => root.resolve(JsUtils.getString(d))))
+            .getOrElse(Vector.empty)
+          if (example.contains("path")) {
+            val path = Paths.get(JsUtils.getString(example("path")))
+            s"parse and type-check ${root.resolve(path)}" in {
+              parseAndTypeCheck(root, path, fix, expectFailure, importDirs)
             }
-          case example =>
+          } else {
             val dir = JsUtils.getOptionalString(example, "dir").map(root.resolve).getOrElse(root)
+            val include = JsUtils
+              .getOptionalValues(example, "include")
+              .map(_.map(i => Paths.get(JsUtils.getString(i))).toSet)
             val exclude = JsUtils
               .getOptionalValues(example, "exclude")
-              .map(_.map(JsUtils.getString(_)).toSet)
-              .getOrElse(Set.empty)
+              .map(_.map(e => Paths.get(JsUtils.getString(e))).toSet)
             Files
               .list(dir)
               .filter(!Files.isDirectory(_))
-              .map(_.getFileName.toString)
-              .forEach {
-                case name if name.endsWith(".wdl") && !exclude.contains(name) =>
-                  s"parse and type-check ${dir}/${name}" in {
-                    parseAndTypeCheck(dir, name, fix, expectFailure)
-                  }
+              .filter { path =>
+                path.getFileName.toString.endsWith(".wdl") &&
+                include.forall(_.exists(i => path.endsWith(i))) &&
+                !exclude.exists(_.exists(e => path.endsWith(e)))
               }
+              .forEach { path =>
+                s"parse and type-check ${dir.resolve(path)}" in {
+                  parseAndTypeCheck(dir, path, fix, expectFailure, importDirs)
+                }
+              }
+          }
         }
       }
     }

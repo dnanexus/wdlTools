@@ -632,7 +632,9 @@ case class Stdlib(regime: TypeCheckingRegime,
             )
         }
     )
-    val ctx = UnificationContext(section, inPlaceholder = exprState >= ExprState.InPlaceholder)
+    val ctx = UnificationContext(Some(version),
+                                 section,
+                                 inPlaceholder = exprState >= ExprState.InPlaceholder)
     // The function may be overloaded, taking several types of inputs. Try to match all
     // prototypes against the input, preferring the one with exactly matching inputs (if any)
     val (priority, viableCandidates): (Priority.Priority,

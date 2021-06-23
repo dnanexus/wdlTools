@@ -4,6 +4,7 @@ import wdlTools.types.TypeUtils.{isPrimitive, prettyFormatType}
 import wdlTools.types.WdlTypes._
 import TypeCheckingRegime._
 import dx.util.{AbstractBindings, Bindings, Enum, Logger, TraceLevel}
+import wdlTools.syntax.WdlVersion
 
 case class VarTypeBindings(bindings: Map[Int, T]) extends AbstractBindings[Int, T](bindings) {
   override protected val elementType: String = "varType"
@@ -22,28 +23,28 @@ object Section extends Enum {
   val Input, Output, Call, Other = Value
 }
 
-case class UnificationContext(section: Section.Section = Section.Other,
+case class UnificationContext(version: Option[WdlVersion],
+                              section: Section.Section = Section.Other,
                               inPlaceholder: Boolean = false,
                               inReadFunction: Boolean = false)
-
-object UnificationContext {
-  def empty: UnificationContext = UnificationContext()
-}
 
 /**
   * Coercion priorities:
   * 0: an exact match of concrete types
-  * 1: an exact match of type variables, e.g. T_Var(0) == T_Var(0)
-  * 2: a non-exact match that is always allowed
+  * 1: a non-exact match that is always allowed
+  * 2: an exact match of type variables, e.g. T_Var(0) == T_Var(0)
   * 3: a non-exact match that is generally disallowed but is specifically
   *    allowed in the current context
   * 4: a non-exact match that is generally disallowed but is specifically
   *    allowed under the current type-checking regime
-  * 5: a coercion involving T_Any
+  * 5: a non-exact match that is generally disallowed but is specifically
+  *    allowed for certain WDL version(s)
+  * 6: a coercion involving T_Any
   */
 object Priority extends Enum {
   type Priority = Value
-  val Exact, AlwaysAllowed, VarMatch, ContextAllowed, RegimeAllowed, AnyMatch = Value
+  val Exact, AlwaysAllowed, VarMatch, ContextAllowed, RegimeAllowed, VersionAllowed, AnyMatch =
+    Value
 }
 
 /**
@@ -132,6 +133,10 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           logger.trace(s"lenient coercion from ${innerFrom} to T_String",
                        minLevel = TraceLevel.VVerbose)
           Some(Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_String, T_Boolean | T_Int | T_Float) if ctx.version.exists(_ <= WdlVersion.V1) =>
+          logger.trace(s"WDL v1 or earlier coercion from ${innerFrom} to T_String",
+                       minLevel = TraceLevel.VVerbose)
+          Some(Enum.max(minPriority, Priority.VersionAllowed))
         case (T_Boolean | T_Int | T_Float, T_String) if ctx.inReadFunction =>
           // coercion from String to Int|Float|Boolean is specifically allowed
           // in the context of read_* functions, for example:
@@ -204,9 +209,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     inner(toType, fromType)
   }
 
-  def isCoercibleTo(toType: T,
-                    fromType: T,
-                    ctx: UnificationContext = UnificationContext.empty): Boolean = {
+  def isCoercibleTo(toType: T, fromType: T, ctx: UnificationContext): Boolean = {
     coerces(toType, fromType, ctx).isDefined
   }
 
@@ -291,6 +294,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
             inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
           (T_Optional(t), newVarTypes, newPriority)
         case (T_Array(l, lNonEmpty), T_Array(r, rNonEmpty)) =>
+          println(l, r)
           val (t, newVarTypes, newPriority) = inner(l, r, vt, minPriority)
           (T_Array(t, nonEmpty = lNonEmpty && rNonEmpty), newVarTypes, newPriority)
         case (T_Map(k1, v1), T_Map(k2, v2)) =>

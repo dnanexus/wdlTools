@@ -220,9 +220,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       val e2 = nested(expr, nestedState)
       // check that the expression is coercible to a string - we also allow optional because
       // null/None/undefined value auto-coerces to the empty string within a placeholder
-      val unifyCtx = UnificationContext(section, inPlaceholder = true)
+      val unifyCtx = UnificationContext(Some(ctx.version), section, inPlaceholder = true)
       val coerces = unify.isCoercibleTo(T_String, e2.wdlType, unifyCtx) ||
-        unify.isCoercibleTo(T_Optional(T_String), e2.wdlType)
+        unify.isCoercibleTo(T_Optional(T_String), e2.wdlType, unifyCtx)
       val t2: T = if (coerces) {
         exprType
       } else {
@@ -286,7 +286,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ExprArray =>
               val tItems = e.value.map(e => nested(e, nextState))
               val unifyCtx =
-                UnificationContext(section, inPlaceholder = nextState >= ExprState.InPlaceholder)
+                UnificationContext(Some(ctx.version),
+                                   section,
+                                   inPlaceholder = nextState >= ExprState.InPlaceholder)
               val wdlTypes = tItems.map(_.wdlType)
               val itemType =
                 try {
@@ -341,7 +343,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
                 .to(TreeSeqMap)
               // unify the key/value types
-              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              val unifyCtx =
+                UnificationContext(Some(ctx.version), section, nextState >= ExprState.InPlaceholder)
               val (keys, values) = tMembers.unzip
               val keyType = unifyTypes(keys.map(_.wdlType), "map keys", e.loc, unifyCtx) match {
                 case t: T_Primitive => t
@@ -364,7 +367,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               TAT.ExprIdentifier(e.id, t)(e.loc)
 
             case e: AST.ExprPlaceholder =>
-              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              val unifyCtx =
+                UnificationContext(Some(ctx.version), section, nextState >= ExprState.InPlaceholder)
               val valueExpr = nested(e.value, ExprState.InPlaceholder)
 
               val (defaultExpr, defaultValueType) = e.defaultOpt
@@ -477,7 +481,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   eCond.wdlType
                 } else {
                   try {
-                    val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                    val unifyCtx = UnificationContext(Some(ctx.version),
+                                                      section,
+                                                      nextState >= ExprState.InPlaceholder)
                     unify.apply(eTrueBranch.wdlType, eFalseBranch.wdlType, unifyCtx)
                   } catch {
                     case _: TypeUnificationException =>
@@ -503,7 +509,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                     if unify.isCoercibleTo(
                         kType,
                         iType,
-                        UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                        UnificationContext(Some(ctx.version),
+                                           section,
+                                           nextState >= ExprState.InPlaceholder)
                     ) =>
                   vType
                 case (T_Int, _) =>
@@ -601,7 +609,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(expr) =>
         val e = applyExpr(expr, ctx, bindings, section = section)
         val rhsType = e.wdlType
-        val unifyCtx = UnificationContext(section, inReadFunction = isReadFunction(expr))
+        val unifyCtx =
+          UnificationContext(Some(ctx.version), section, inReadFunction = isReadFunction(expr))
         val wdlType = if (unify.isCoercibleTo(lhsType, rhsType, unifyCtx)) {
           lhsType
         } else {
@@ -716,6 +725,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: TypeContext): TAT.RuntimeSection = {
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
+    val unifyCtx = UnificationContext(Some(ctx.version))
     val m = rtSection.kvs
       .map { kv: AST.RuntimeKV =>
         val tExpr = applyExpr(kv.expr, ctx)
@@ -723,7 +733,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // one of the allowed types
         if (!restrictions
               .get(kv.id)
-              .forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+              .forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType, unifyCtx)))) {
           throw new TypeException(
               s"runtime id ${kv.id} is not coercible to one of the allowed types ${restrictions(kv.id)}",
               kv.loc
@@ -991,8 +1001,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               } else {
                 TypeUtils.unwrapOptional(calleeInputType)
               }
-              if (!unify
-                    .isCoercibleTo(checkType, tExpr.wdlType, UnificationContext(Section.Call))) {
+              if (!unify.isCoercibleTo(checkType,
+                                       tExpr.wdlType,
+                                       UnificationContext(Some(ctx.version), Section.Call))) {
                 handleError(
                     s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
                     call.loc

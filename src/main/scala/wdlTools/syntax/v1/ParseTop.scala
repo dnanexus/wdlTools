@@ -229,6 +229,9 @@ wdl_type
         ctx.string() match {
           case sq: WdlV1Parser.Squote_stringContext => visitSquote_string(sq)
           case dq: WdlV1Parser.Dquote_stringContext => visitDquote_string(dq)
+          case other =>
+            throw new SyntaxException(s"unrecognized placeholder option value ${other.getClass}",
+                                      getSourceLocation(grammar.docSource, ctx))
         }
       } else {
         throw new SyntaxException(s"${optionType} placeholder option value must be a string",

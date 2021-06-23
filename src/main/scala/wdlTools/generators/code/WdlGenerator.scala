@@ -558,7 +558,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
     def isMixedStringAndNonString(exprs: Vector[Expr]): Boolean = {
       val unify = Unification(TypeCheckingRegime.Moderate)
-      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
+      val unifyCtx = UnificationContext(targetVersion, inPlaceholder = ctx.inPlaceholder)
       exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
     }
 
@@ -824,7 +824,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
   private def notCoercibleTo(expr: Expr, wdlType: T): Boolean = {
     val unify = Unification(TypeCheckingRegime.Moderate)
-    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext.empty)
+    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext(targetVersion))
   }
 
   private case class DeclarationStatement(name: String, wdlType: T, expr: Option[Expr] = None)
