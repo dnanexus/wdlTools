@@ -377,7 +377,7 @@ object Runtime {
     evaluator.wdlVersion match {
       case None => throw new RuntimeException("no WdlVersion")
       case Some(wdlVersion: WdlVersion) if wdlVersion >= WdlVersion.V2 =>
-        V2Runtime(runtime, evaluator, WdlVersion.V2, ctx, defaultValues, loc)
+        V2Runtime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
       case Some(wdlVersion) =>
         DefaultRuntime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
     }
