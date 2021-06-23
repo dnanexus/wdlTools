@@ -294,7 +294,6 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
             inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
           (T_Optional(t), newVarTypes, newPriority)
         case (T_Array(l, lNonEmpty), T_Array(r, rNonEmpty)) =>
-          println(l, r)
           val (t, newVarTypes, newPriority) = inner(l, r, vt, minPriority)
           (T_Array(t, nonEmpty = lNonEmpty && rNonEmpty), newVarTypes, newPriority)
         case (T_Map(k1, v1), T_Map(k2, v2)) =>

@@ -3,6 +3,7 @@
 ## in develop
 
 * Updates to dxCommon 0.4.2, which fixes the output of the `printTree` command
+* Allow primitive -> `String` coercion for WDL versions <= 1.0
 
 ## 0.14.1 (2021-06-08)
 
