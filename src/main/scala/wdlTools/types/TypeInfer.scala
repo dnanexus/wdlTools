@@ -414,8 +414,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   if (!unify.isCoercibleTo(T_Boolean, valueType, unifyCtx)) {
                     val msg =
                       s"""Condition ${prettyFormatExpr(valueExpr)} has type
-                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean""".stripMargin
-                        .replaceAll("\n", " ")
+                         |${prettyFormatType(valueExpr.wdlType)}, which is not 
+                         |coercible to Boolean""".stripMargin.replaceAll("\n", " ")
                     handleError(msg, nestedExpr.loc)
                   }
                   val wdlType = (trueType, falseType, defaultValueType) match {
@@ -435,18 +435,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   } else {
                     valueExpr.wdlType
                   }
-                  val t = valueType match {
-                    case T_Array(x, _) if unify.isCoercibleTo(T_String, x, unifyCtx) =>
-                      T_String
-                    case other =>
-                      val msg =
-                        s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(
-                               other
-                           )},
-                           |which is not coercible to Array[String]""".stripMargin
-                          .replaceAll("\n", " ")
-                      handleError(msg, valueExpr.loc)
-                      other
+                  val t = if (unify.isCoercibleTo(T_Array(T_String), valueType, unifyCtx)) {
+                    T_String
+                  } else {
+                    val msg =
+                      s"""Expression ${prettyFormatExpr(valueExpr)} has type 
+                         |${prettyFormatType(valueType)}, which is not coercible 
+                         |to Array[String]""".stripMargin
+                        .replaceAll("\n", " ")
+                    handleError(msg, valueExpr.loc)
+                    valueType
                   }
                   val wdlType = (t, defaultValueType) match {
                     case (t, Some(d)) if t == d => t

@@ -121,12 +121,27 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           Some(Enum.max(minPriority, Priority.VarMatch))
 
         // Other coercions are not generally allowed, but are either allowed
-        // in specific contexts or are used often and so allowed under less
-        // strict regimes
+        // in specific contexts or are used often "in the wild" and so allowed
+        // under less strict regimes
         case (T_String, T_Optional(r)) if ctx.inPlaceholder =>
           // Within a placeholder, an optional value can be coerced to a String -
           // None values result in the empty string
-          inner(innerTo, r, Enum.max(minPriority, Priority.ContextAllowed))
+          inner(toType, r, Enum.max(minPriority, Priority.ContextAllowed))
+        case (T_Boolean, T_Optional(r)) if ctx.inPlaceholder && regime <= Lenient =>
+          // Within a placeholder and under the Lenient regime, an optional
+          // Boolean can be coerced to a Boolean for use with the true/false
+          // options - None values result in the empty string
+          logger.trace(s"lenient coercion from ${innerFrom} to Boolean",
+                       minLevel = TraceLevel.VVerbose)
+          inner(toType, r, Enum.max(minPriority, Priority.RegimeAllowed))
+        case (T_Array(T_String, _), T_Optional(arr: T_Array))
+            if ctx.inPlaceholder && regime <= Lenient =>
+          // Within a placeholder and under the Lenient regime, an optional
+          // Array can be coerced to an Array[String] for use with the sep
+          // option - None values result in the empty string
+          logger.trace(s"lenient coercion from ${innerFrom} to Array[T_String]",
+                       minLevel = TraceLevel.VVerbose)
+          inner(toType, arr, Enum.max(minPriority, Priority.RegimeAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if ctx.inPlaceholder =>
           Some(Enum.max(minPriority, Priority.ContextAllowed))
         case (T_String, T_Boolean | T_Int | T_Float) if regime <= Lenient =>
