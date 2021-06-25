@@ -28,6 +28,10 @@ jobs:
           # compile antlr4 sources
           cd ${GITHUB_WORKSPACE}
           make
+      - name: Clone corpora
+        run: |
+          cd src/test/resources
+          ./clone-corpora.sh
       - name: Unit Tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
