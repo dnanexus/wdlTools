@@ -5,7 +5,7 @@
       "tag": "4d2941f5e511ef853858819c136359d320f6b20f",
       "entrypoints": [
         {
-          "path": "pipelines/skylab/optimus/optimus.wdl",
+          "path": "pipelines/skylab/optimus/Optimus.wdl",
           "fix": true,
           "lint": {
           }
