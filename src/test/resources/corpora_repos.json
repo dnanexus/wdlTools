@@ -99,6 +99,7 @@
           "import_dirs": [
             "pipes/WDL/workflows/tasks"
           ],
+          "fix": true,
           "lint": {
             "T006": 23,
             "T000": 53,
@@ -115,6 +116,7 @@
       "entrypoints": [
         {
           "path": "atac.wdl",
+          "fix": true,
           "lint": {
             "T006": 108,
             "P001": 15,
@@ -132,6 +134,7 @@
       "entrypoints": [
         {
           "path": "chip.wdl",
+          "fix": true,
           "lint": {
             "T000": 16,
             "P001": 32,

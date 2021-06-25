@@ -263,10 +263,6 @@ fragment FloatFragment
 	| Decimals EXP?
 	;
 
-fragment SignedFloatFragment
-	: ('+' |'e') FloatFragment
-	;
-
 fragment EXP
-	: ('e'|'E') SignedDigits
+	: ('e' | 'E') SignedDigits
 	;

@@ -1,6 +1,5 @@
 package wdlTools.generators.project
 
-import java.nio.file.Paths
 import wdlTools.generators.{Renderer, code}
 import wdlTools.generators.code.WdlFormatter
 import wdlTools.generators.project.ProjectGenerator.{FieldModel, TaskModel, WorkflowModel}
@@ -303,7 +302,7 @@ case class ProjectGenerator(name: String,
       Map.empty
     }
     val testFile = if (tests) {
-      val testPath = Paths.get("tests").resolve(s"test_${name}.json").toString
+      val testPath = FileUtils.getPath("tests").resolve(s"test_${name}.json").toString
       Map(testPath -> TestsGenerator.apply(wdlName, doc))
     } else {
       Map.empty

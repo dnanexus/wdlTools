@@ -184,9 +184,13 @@ object Utils {
 
     if (writableDocs.nonEmpty) {
       // determine the common ancestor path between all generated files
-      val rootPath = Paths.get("/")
       val sourceToRelPath = writableDocs.keys.map { fs =>
-        fs -> rootPath.relativize(Paths.get(fs.folder).resolve(fs.name))
+        val file = FileUtils.getPath(fs.folder).resolve(fs.name)
+        fs -> Option
+          .when(file.isAbsolute) {
+            file.getRoot.relativize(file)
+          }
+          .getOrElse(file)
       }.toMap
       val pathComponents = sourceToRelPath.values.map(_.iterator().asScala.toVector)
       // don't include the file name in the path components

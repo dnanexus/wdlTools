@@ -57,6 +57,14 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     (evaluator, decls)
   }
 
+  it should "respect operator precedence" in {
+    val file = v1Dir.resolve("operator_precedence.wdl")
+    val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)
+    val inputs = WdlValueBindings(Map("x" -> V_Int(-1), "y" -> V_Float(1)))
+    val bindings = evaluator.applyPrivateVariables(decls, inputs)
+    bindings("b") shouldBe V_Boolean(true)
+  }
+
   it should "handle simple expressions" in {
     val file = v1Dir.resolve("simple_expr.wdl")
     val (evaluator, decls) = parseAndTypeCheckAndGetDeclarations(file)

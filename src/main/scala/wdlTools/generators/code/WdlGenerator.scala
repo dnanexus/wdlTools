@@ -4,10 +4,17 @@ import wdlTools.generators.code.WdlGenerator._
 import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
+import wdlTools.types.{
+  ExprState,
+  Stdlib,
+  TypeCheckingRegime,
+  TypeUtils,
+  Unification,
+  UnificationContext
+}
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Operator, Quoting, SourceLocation, WdlVersion}
-import wdlTools.types.{TypeCheckingRegime, Unification, UnificationContext}
+import wdlTools.syntax.{Builtins, Operator, Quoting, SourceLocation, WdlVersion}
 
 import java.net.URI
 import scala.collection.mutable
@@ -619,8 +626,31 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
         )
       // placeholders
       case ExprPlaceholder(t, f, sep, default, value, _) =>
+        val newValue: Expr =
+          if (rewriteNonstandardUsages &&
+              default.isEmpty &&
+              (t.isDefined || f.isDefined || sep.isDefined) &&
+              TypeUtils.isOptional(value.wdlType)) {
+            // wrap optional placeholder value in select_first if there is
+            // a sep or true/false option without a default option
+            val stdlib = Stdlib(TypeCheckingRegime.Moderate, targetVersion.get)
+            val arrayWdlType = T_Array(value.wdlType)
+            val (selectFirstType, selectFirstProto) = stdlib.apply(
+                Builtins.SelectFirst,
+                Vector(arrayWdlType),
+                ExprState.InPlaceholder
+            )
+            ExprApply(Builtins.SelectFirst,
+                      selectFirstProto,
+                      Vector(ExprArray(Vector(value), arrayWdlType)(value.loc)),
+                      selectFirstType)(
+                value.loc
+            )
+          } else {
+            value
+          }
         Placeholder(
-            buildExpression(value, ctx.advanceTo(InPlaceholderState)),
+            buildExpression(newValue, ctx.advanceTo(InPlaceholderState)),
             ctx.placeholderOpen,
             ctx.inString(),
             Some(
@@ -899,7 +929,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       // literal values
       case MetaValueNull() => Literal(Symbols.Null)
       case MetaValueString(value, quoting) =>
-        Literal(value, quoting = quoting)
+        val escaped = if (quoting != Quoting.None) {
+          Utils.escape(value)
+        } else {
+          value
+        }
+        Literal(escaped, quoting = quoting)
       case MetaValueBoolean(value) => Literal(value)
       case MetaValueInt(value)     => Literal(value)
       case MetaValueFloat(value)   => Literal(value)

@@ -54,7 +54,7 @@ object DefaultExecPaths {
     new DefaultExecPaths(executionDir, tempDir)
   }
 
-  def createLocalPathsFromDir(executionDir: Path = FileUtils.cwd,
+  def createLocalPathsFromDir(executionDir: Path = FileUtils.cwd(absolute = true),
                               tempDir: Path = FileUtils.systemTempDir): ExecPaths = {
     if (!Files.isDirectory(executionDir)) {
       throw new ExecException(s"${executionDir} does not exist or is not a directory")

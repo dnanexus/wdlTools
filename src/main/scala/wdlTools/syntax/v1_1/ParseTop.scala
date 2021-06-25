@@ -523,18 +523,30 @@ string
 
   // | NOT expr #negate
   override def visitNegate(ctx: WdlV1_1Parser.NegateContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-    ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify boolean literals
+    expr match {
+      case b: ExprBoolean => ExprBoolean(!b.value)(b.loc)
+      case _              => ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | (PLUS | MINUS) expr #unarysigned
   override def visitUnarysigned(ctx: WdlV1_1Parser.UnarysignedContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify positive/negative numeric literals
     if (ctx.PLUS() != null) {
-      ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
+      expr match {
+        case i: ExprInt   => i
+        case f: ExprFloat => f
+        case _            => ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
     } else if (ctx.MINUS() != null) {
-      ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
+      expr match {
+        case i: ExprInt   => ExprInt(-i.value)(i.loc)
+        case f: ExprFloat => ExprFloat(-f.value)(f.loc)
+        case _            => ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
     } else {
       throw new SyntaxException("unrecognized expression",
                                 getSourceLocation(grammar.docSource, ctx))
@@ -661,13 +673,21 @@ string
 	: expr_core
 	; */
 
-  override def visitExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Expr = {
+  private def visitExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Expr = {
+    ctx match {
+      case negate: WdlV1_1Parser.NegateContext           => visitNegate(negate)
+      case unarysigned: WdlV1_1Parser.UnarysignedContext => visitUnarysigned(unarysigned)
+      case infix6: WdlV1_1Parser.Infix6Context           => visitInfix6(infix6).asInstanceOf[Expr]
+    }
+  }
+
+  override def visitExpr_infix6(ctx: WdlV1_1Parser.Expr_infix6Context): Expr = {
     visitExpr_core(ctx.expr_core())
   }
 
   /* expr
-	: expr_infix
-	; */
+    : expr_infix
+    ; */
   override def visitExpr(ctx: WdlV1_1Parser.ExprContext): Expr = {
     try {
       visitChildren(ctx).asInstanceOf[Expr]
@@ -705,13 +725,11 @@ string
         visitObject_literal(object_literal)
       case struct_literal: WdlV1_1Parser.Struct_literalContext =>
         visitStruct_literal(struct_literal)
-      case negate: WdlV1_1Parser.NegateContext           => visitNegate(negate)
-      case unarysigned: WdlV1_1Parser.UnarysignedContext => visitUnarysigned(unarysigned)
-      case at: WdlV1_1Parser.AtContext                   => visitAt(at)
-      case ifthenelse: WdlV1_1Parser.IfthenelseContext   => visitIfthenelse(ifthenelse)
-      case apply: WdlV1_1Parser.ApplyContext             => visitApply(apply)
-      case left_name: WdlV1_1Parser.Left_nameContext     => visitLeft_name(left_name)
-      case get_name: WdlV1_1Parser.Get_nameContext       => visitGet_name(get_name)
+      case at: WdlV1_1Parser.AtContext                 => visitAt(at)
+      case ifthenelse: WdlV1_1Parser.IfthenelseContext => visitIfthenelse(ifthenelse)
+      case apply: WdlV1_1Parser.ApplyContext           => visitApply(apply)
+      case left_name: WdlV1_1Parser.Left_nameContext   => visitLeft_name(left_name)
+      case get_name: WdlV1_1Parser.Get_nameContext     => visitGet_name(get_name)
       case _ =>
         throw new SyntaxException("bad expression", getSourceLocation(grammar.docSource, ctx))
     }

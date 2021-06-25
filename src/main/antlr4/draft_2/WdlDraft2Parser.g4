@@ -120,28 +120,32 @@ expr_infix4
 	;
 
 expr_infix5
-	: expr_core
-	;
+  : NOT expr_infix5 #negate
+  | (PLUS | MINUS) expr_infix5 #unarysigned
+  | expr_infix6 #infix6
+  ;
+
+expr_infix6
+  : expr_core
+  ;
 
 member
   : Identifier
   ;
 
 expr_core
-        : Identifier LPAREN (expr (COMMA expr)* COMMA?)? RPAREN #apply
-        | LBRACK (expr (COMMA expr)* COMMA?)* RBRACK #array_literal
-        | LPAREN expr COMMA expr RPAREN #pair_literal
-        | LBRACE (expr COLON expr (COMMA expr COLON expr)* COMMA?)* RBRACE #map_literal
-        | OBJECTLITERAL LBRACE (member COLON expr (COMMA member COLON expr)* COMMA?)* RBRACE #object_literal
-        | IF expr THEN expr ELSE expr #ifthenelse
-        | LPAREN expr RPAREN #expression_group
-        | expr_core LBRACK expr RBRACK #at
-        | expr_core DOT Identifier #get_name
-        | NOT expr #negate
-        | (PLUS | MINUS) expr #unarysigned
-        | primitive_literal #primitives
-        | Identifier #left_name
-        ;
+  : Identifier LPAREN (expr (COMMA expr)* COMMA?)? RPAREN #apply
+  | expr_core LBRACK expr RBRACK #at
+  | expr_core DOT Identifier #get_name
+  | LPAREN expr RPAREN #expression_group
+  | IF expr THEN expr ELSE expr #ifthenelse
+  | LBRACK (expr (COMMA expr)* COMMA?)* RBRACK #array_literal
+  | LPAREN expr COMMA expr RPAREN #pair_literal
+  | LBRACE (expr COLON expr (COMMA expr COLON expr)* COMMA?)* RBRACE #map_literal
+  | OBJECTLITERAL LBRACE (member COLON expr (COMMA member COLON expr)* COMMA?)* RBRACE #object_literal
+  | primitive_literal #primitives
+  | Identifier #left_name
+  ;
 
 import_as
 	: AS Identifier
