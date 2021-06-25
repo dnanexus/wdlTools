@@ -49,7 +49,7 @@ case class Fixer(followImports: Boolean = true,
           outputDir: Path,
           overwrite: Boolean = true,
           sourceVersion: Option[WdlVersion] = None,
-          errorHandler: Option[TypeErrorHandler] = None): Unit = {
+          errorHandler: Option[TypeErrorHandler] = None): FileNode = {
     val wdlVersion = sourceVersion.getOrElse(Parsers.default.getWdlVersion(docSource))
     val document = check(docSource,
                          wdlVersion,
@@ -112,5 +112,7 @@ case class Fixer(followImports: Boolean = true,
         fixedFileResolver,
         errorHandler
     )
+
+    fixedSource
   }
 }
