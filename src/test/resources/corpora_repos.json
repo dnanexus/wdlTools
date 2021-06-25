@@ -6,11 +6,12 @@
       "entrypoints": [
         {
           "path": "pipelines/skylab/optimus/optimus.wdl",
+          "fix": true,
           "lint": {
           }
         },
         {
-          "path": "pipelines/skylab/scATAC/ATAC.wdl",
+          "path": "pipelines/skylab/scATAC/scATAC.wdl",
           "lint": {
           }
         },
@@ -52,6 +53,8 @@
         {
           "path": "pipelines/broad/dna_seq/somatic/single_sample/wgs/gdc_genome/GDCWholeGenomeSomaticSingleSample.wdl",
           "fix": true,
+          "fail": true,
+          "reason": "reuse of variable name 'ubam' in GDCWholeGenomeSomaticSingleSample.wdl; forward reference",
           "lint": {}
         }
       ]
@@ -62,50 +65,17 @@
       "entrypoints": [
         {
           "dir": "rnaseq",
+          "reason": "these WDLs are draft2 and require fixing, and the code generator does not support draft2",
+          "exclude": [
+            "rnaseqc2_aggregate.wdl",
+            "star_fastq_list.wdl"
+          ],
           "lint": {
           }
         },
         {
           "dir": "qtl",
           "lint": {
-          }
-        }
-      ]
-    },
-    {
-      "url": "https://github.com/DataBiosphere/topmed-workflows.git",
-      "tag": "de683e0be7c2798b3eb503812a095659039247b3",
-      "entrypoints": [
-        {
-          "dir": "aligner/functional-equivalence-wdl",
-          "fix": true,
-          "lint": {
-          }
-        },
-        {
-          "dir": "variant-caller/variant-caller-wdl",
-          "fix": true,
-          "lint": {
-          }
-        }
-      ]
-    },
-    {
-      "url": "https://github.com/broadinstitute/viral-ngs.git",
-      "tag": "e144969e4c57060d53f38a4c3a270e8227feace1",
-      "entrypoints": [
-        {
-          "dir": "pipes/WDL/workflows",
-          "import_dirs": [
-            "pipes/WDL/workflows/tasks"
-          ],
-          "fix": true,
-          "lint": {
-            "T006": 23,
-            "T000": 53,
-            "A005": 1,
-            "T009": 4,
-            "A009": 62
           }
         }
       ]
@@ -379,6 +349,48 @@
             "T009": 2,
             "T004": 2,
             "T005": 3
+          }
+        }
+      ]
+    }
+  ],
+  "ignored": [
+    {
+      "url": "https://github.com/broadinstitute/viral-ngs.git",
+      "tag": "e144969e4c57060d53f38a4c3a270e8227feace1",
+      "reason": "These WDLs are all draft2, and they require fixing, but the code generator doesn't support draft2",
+      "entrypoints": [
+        {
+          "dir": "pipes/WDL/workflows",
+          "import_dirs": [
+            "pipes/WDL/workflows/tasks"
+          ],
+          "fix": true,
+          "lint": {
+            "T006": 23,
+            "T000": 53,
+            "A005": 1,
+            "T009": 4,
+            "A009": 62
+          }
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/DataBiosphere/topmed-workflows.git",
+      "tag": "de683e0be7c2798b3eb503812a095659039247b3",
+      "reason": "These WDLs are all draft2, and they require fixing, but the code generator doesn't support draft2",
+      "entrypoints": [
+        {
+          "dir": "aligner/functional-equivalence-wdl",
+          "fix": true,
+          "lint": {
+          }
+        },
+        {
+          "dir": "variant-caller/variant-caller-wdl",
+          "fix": true,
+          "lint": {
           }
         }
       ]

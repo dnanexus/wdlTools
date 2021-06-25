@@ -786,17 +786,23 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                              ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
         paramMetaSection.kvs
-          .map { kv: AST.MetaKV =>
+          .flatMap { kv: AST.MetaKV =>
             val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
-              applyMetaValue(kv.value, ctx)
+              Some(applyMetaValue(kv.value, ctx))
+            } else if (regime < TypeCheckingRegime.Strict) {
+              logger.warning(
+                  s"""parameter_meta key ${kv.id} is being ignored because it does not refer to 
+                     |an input or output declaration""".stripMargin.replaceAll("\n", " ")
+              )
+              None
             } else {
               handleError(
                   s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
                   kv.loc
               )
-              TAT.MetaValueNull()(kv.value.loc)
+              None
             }
-            kv.id -> metaValue
+            metaValue.map(kv.id -> _)
           }
           .to(TreeSeqMap)
     )(
@@ -989,11 +995,11 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(AST.CallInputs(value)) =>
         value
           .map { inp =>
-            val argName = inp.name
+            val paramName = inp.name
             val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
-            if (callee.input.contains(argName)) {
+            if (callee.input.contains(paramName)) {
               // type-check input argument
-              val (calleeInputType, optional) = callee.input(argName)
+              val (calleeInputType, optional) = callee.input(paramName)
               val checkType = if (optional) {
                 TypeUtils.ensureOptional(calleeInputType)
               } else {
@@ -1003,17 +1009,18 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                                        tExpr.wdlType,
                                        UnificationContext(Some(ctx.version), Section.Call))) {
                 handleError(
-                    s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
+                    s"""argument to parameter '${paramName}' has type ${tExpr.wdlType}, 
+                       |it is not coercible to ${checkType}""".stripMargin.replaceAll("\n", " "),
                     call.loc
                 )
               }
             } else {
               handleError(
-                  s"call '${call.name}' has argument ${argName} that does not exist in the callee",
+                  s"call '${call.name}' has argument ${paramName} that does not exist in the callee",
                   call.loc
               )
             }
-            argName -> tExpr
+            paramName -> tExpr
           }
           .to(TreeSeqMap)
       case None => SeqMap.empty

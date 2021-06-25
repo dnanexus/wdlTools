@@ -1,7 +1,7 @@
 package wdlTools.generators.code
 
 import dx.util.{AddressableFileSource, FileNode, FileSourceResolver, LinesFileNode}
-import wdlTools.syntax.{Parsers, SyntaxException, WdlParser, WdlVersion}
+import wdlTools.syntax.{Parsers, SyntaxException, WdlVersion}
 import wdlTools.types.{
   TypeCheckingRegime,
   TypeErrorHandler,
@@ -15,14 +15,13 @@ import scala.collection.immutable.SeqMap
 
 case class Fixer(followImports: Boolean = true,
                  fileResolver: FileSourceResolver = FileSourceResolver.get) {
-  private lazy val parsers = Parsers(followImports, fileResolver = fileResolver)
-
   private def check(source: FileNode,
-                    parser: WdlParser,
+                    wdlVersion: WdlVersion,
                     regime: TypeCheckingRegime.TypeCheckingRegime,
                     message: String,
                     fileResolver: FileSourceResolver,
                     errorHandler: Option[TypeErrorHandler]): TAT.Document = {
+    val parser = Parsers(followImports, fileResolver = fileResolver).getParser(wdlVersion)
     val checker = TypeInfer(regime, fileResolver = fileResolver, errorHandler = errorHandler)
     val document =
       try {
@@ -51,10 +50,9 @@ case class Fixer(followImports: Boolean = true,
           overwrite: Boolean = true,
           sourceVersion: Option[WdlVersion] = None,
           errorHandler: Option[TypeErrorHandler] = None): Unit = {
-    val wdlVersion = sourceVersion.getOrElse(parsers.getWdlVersion(docSource))
-    val parser = parsers.getParser(wdlVersion)
+    val wdlVersion = sourceVersion.getOrElse(Parsers.default.getWdlVersion(docSource))
     val document = check(docSource,
-                         parser,
+                         wdlVersion,
                          TypeCheckingRegime.Lenient,
                          "this error cannot be fixed automatically",
                          fileResolver,
@@ -83,10 +81,11 @@ case class Fixer(followImports: Boolean = true,
     generateDocument(docSource, document)
 
     // validate that the generated files parse
+    val validationParser = Parsers(fileResolver = fileResolver).getParser(wdlVersion)
     results.foreach {
       case (fs, lines) =>
         try {
-          parser.parseDocument(LinesFileNode(lines.toVector, fs.toString))
+          validationParser.parseDocument(LinesFileNode(lines.toVector, fs.toString))
         } catch {
           case e: SyntaxException =>
             throw new Exception(
@@ -106,7 +105,7 @@ case class Fixer(followImports: Boolean = true,
     val fixedSource = fixedFileResolver.fromPath(outputPaths(results.head._1))
     check(
         fixedSource,
-        parser,
+        wdlVersion,
         TypeCheckingRegime.Moderate,
         """this may be an unsupported fix, or it may be due to a bug in the WDL code generator - 
           |please report this issue""".stripMargin.replaceAll("\n", " "),

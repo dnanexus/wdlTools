@@ -85,7 +85,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       // metadata
       ("meta_null_value.wdl", TResult(correct = true)),
       ("meta_section_compound.wdl", TResult(correct = true)),
-      ("invalid_param_meta.wdl", TResult(correct = false)),
+      ("invalid_param_meta.wdl", TResult(correct = false, Some(TypeCheckingRegime.Strict))),
       // runtime section
       ("runtime_section_I.wdl", TResult(correct = true)),
       ("runtime_section_bad.wdl", TResult(correct = false))
