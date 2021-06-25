@@ -48,6 +48,8 @@
         {
           "path": "pipelines/broad/dna_seq/germline/joint_genotyping/JointGenotyping.wdl",
           "fix": true,
+          "fail": true,
+          "reason": "https://github.com/broadinstitute/warp/issues/341",
           "lint": {}
         },
         {
