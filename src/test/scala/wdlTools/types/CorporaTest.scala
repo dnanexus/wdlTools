@@ -13,9 +13,11 @@ import java.nio.file.{Files, Path, Paths}
 // these tests will parse and type-check the WDL files and will fail if there
 // are any errors.
 class CorporaTest extends AnyWordSpec with Matchers {
-  private val corporaDir = Paths.get(getClass.getResource(s"/corpora").getPath)
-  private val configFile = Paths.get(getClass.getResource(s"/corpora_repos.json").getPath)
-  private val corporaAvailable = Files.exists(configFile) && Files.isDirectory(corporaDir)
+  private val corporaDir = Option(getClass.getResource(s"/corpora")).map(f => Paths.get(f.getPath))
+  private val configFile =
+    Option(getClass.getResource(s"/corpora_repos.json")).map(f => Paths.get(f.getPath))
+  private val corporaAvailable =
+    configFile.exists(Files.exists(_)) && corporaDir.exists(Files.isDirectory(_))
 
   if (corporaAvailable) {
     val logger = Logger.Quiet
@@ -56,7 +58,7 @@ class CorporaTest extends AnyWordSpec with Matchers {
       }
     }
 
-    val corpora = JsUtils.getValues(JsUtils.jsFromFile(configFile), Some("corpora"))
+    val corpora = JsUtils.getValues(JsUtils.jsFromFile(configFile.get), Some("corpora"))
 
     "corpora test" should {
       corpora.map(JsUtils.getFields(_)).foreach { corpus =>
@@ -65,7 +67,7 @@ class CorporaTest extends AnyWordSpec with Matchers {
           case s if s.endsWith(".git") => s.dropRight(4)
           case s                       => s
         }
-        val root = corporaDir.resolve(repo)
+        val root = corporaDir.get.resolve(repo)
         JsUtils.getValues(corpus("entrypoints")).map(JsUtils.getFields(_)).foreach { example =>
           val fix = JsUtils.getOptionalBoolean(example, "fix").getOrElse(false)
           val expectFailure = JsUtils.getOptionalBoolean(example, "fail").getOrElse(false)
