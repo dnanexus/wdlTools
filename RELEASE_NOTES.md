@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.14.2 (2021-06-28)
 
 * Updates dxCommon version, which fixes the output of the `printTree` command
 * Allow primitive -> `String` coercion for WDL versions <= 1.0
