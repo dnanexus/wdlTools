@@ -69,6 +69,9 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       ("input_section.wdl", TResult(correct = true)),
       ("output_section.wdl", TResult(correct = true)),
       ("echo-pairs.wdl", TResult(correct = true)),
+      ("nested_optional.wdl", TResult(correct = true)),
+      ("optional_placeholder_value.wdl", TResult(correct = true, Some(TypeCheckingRegime.Lenient))),
+      ("array_coersion.wdl", TResult(correct = true)),
       // incorrect tasks
       ("comparison1.wdl", TResult(correct = false)),
       ("comparison2.wdl", TResult(correct = false)),
@@ -82,7 +85,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
       // metadata
       ("meta_null_value.wdl", TResult(correct = true)),
       ("meta_section_compound.wdl", TResult(correct = true)),
-      ("invalid_param_meta.wdl", TResult(correct = false)),
+      ("invalid_param_meta.wdl", TResult(correct = false, Some(TypeCheckingRegime.Strict))),
       // runtime section
       ("runtime_section_I.wdl", TResult(correct = true)),
       ("runtime_section_bad.wdl", TResult(correct = false))

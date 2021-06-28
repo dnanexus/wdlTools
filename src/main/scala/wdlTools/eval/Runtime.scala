@@ -93,11 +93,21 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
+                          wdlVersion: WdlVersion,
                           ctx: Option[Bindings[String, V]],
                           userDefaultValues: Option[VBindings],
                           runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
+  assert(wdlVersion < WdlVersion.V2, "DefaultRuntime is only for WDL versions < 2")
   val defaults: Map[String, V] = Map.empty
+
+  override val aliases: SymmetricBiMap[String] = {
+    if (wdlVersion >= WdlVersion.V1_1) {
+      SymmetricBiMap(Map(Runtime.DockerKey -> Runtime.ContainerKey))
+    } else {
+      SymmetricBiMap.empty
+    }
+  }
 
   // prior to WDL 2, any key was allowed
   override def allows(key: String): Boolean = true
@@ -173,10 +183,13 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
 
 case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
+                     wdlVersion: WdlVersion,
                      ctx: Option[Bindings[String, V]],
                      userDefaultValues: Option[VBindings],
                      runtimeLocation: SourceLocation)
     extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
+  assert(wdlVersion >= WdlVersion.V2, "V2Runtime only supports WDL versions >= 2")
+
   val defaults: Map[String, V] = Map(
       Runtime.CpuKey -> V_Int(1),
       Runtime.MemoryKey -> V_String(Runtime.MemoryDefault),
@@ -362,9 +375,11 @@ object Runtime {
           throw new RuntimeException("either 'runtime' or 'runtimeLocation' must be nonEmpty")
       )
     evaluator.wdlVersion match {
-      case None                => throw new RuntimeException("no WdlVersion")
-      case Some(WdlVersion.V2) => V2Runtime(runtime, evaluator, ctx, defaultValues, loc)
-      case _                   => DefaultRuntime(runtime, evaluator, ctx, defaultValues, loc)
+      case None => throw new RuntimeException("no WdlVersion")
+      case Some(wdlVersion: WdlVersion) if wdlVersion >= WdlVersion.V2 =>
+        V2Runtime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
+      case Some(wdlVersion) =>
+        DefaultRuntime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
     }
   }
 

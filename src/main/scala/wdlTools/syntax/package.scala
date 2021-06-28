@@ -116,6 +116,12 @@ object SourceLocation {
 // by the ANTLR machinery and we transform it into this format.
 final case class SyntaxError(symbol: String, loc: SourceLocation, reason: String)
 
+trait SyntaxErrorHandler {
+  def handleSyntaxErrors(errors: Vector[SyntaxError]): Boolean
+
+  def hasSyntaxErrors: Boolean
+}
+
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {
   def this(msg: String, loc: SourceLocation) = {

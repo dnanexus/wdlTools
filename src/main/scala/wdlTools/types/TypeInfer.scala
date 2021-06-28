@@ -26,6 +26,12 @@ import dx.util.{
 
 import scala.collection.immutable.{SeqMap, TreeSeqMap}
 
+trait TypeErrorHandler {
+  def handleTypeErrors(errors: Vector[TypeError]): Boolean
+
+  def hasTypeErrors: Boolean
+}
+
 /**
   * Type inference
   * @param regime Type checking rules. Are we lenient or strict in checking coercions?
@@ -42,7 +48,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                      userDefinedFunctions: Vector[UserDefinedFunctionPrototype] = Vector.empty,
                      substituteFunctionsForTasks: Boolean = false,
                      fileResolver: FileSourceResolver = FileSourceResolver.get,
-                     errorHandler: Option[Vector[TypeError] => Boolean] = None,
+                     errorHandler: Option[TypeErrorHandler] = None,
                      logger: Logger = Logger.get) {
   private val unify = Unification(regime, logger)
   // TODO: handle warnings similarly to errors - either have TypeError take an ErrorKind parameter
@@ -214,9 +220,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       val e2 = nested(expr, nestedState)
       // check that the expression is coercible to a string - we also allow optional because
       // null/None/undefined value auto-coerces to the empty string within a placeholder
-      val unifyCtx = UnificationContext(section, inPlaceholder = true)
+      val unifyCtx = UnificationContext(Some(ctx.version), section, inPlaceholder = true)
       val coerces = unify.isCoercibleTo(T_String, e2.wdlType, unifyCtx) ||
-        unify.isCoercibleTo(T_Optional(T_String), e2.wdlType)
+        unify.isCoercibleTo(T_Optional(T_String), e2.wdlType, unifyCtx)
       val t2: T = if (coerces) {
         exprType
       } else {
@@ -280,7 +286,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ExprArray =>
               val tItems = e.value.map(e => nested(e, nextState))
               val unifyCtx =
-                UnificationContext(section, inPlaceholder = nextState >= ExprState.InPlaceholder)
+                UnificationContext(Some(ctx.version),
+                                   section,
+                                   inPlaceholder = nextState >= ExprState.InPlaceholder)
               val wdlTypes = tItems.map(_.wdlType)
               val itemType =
                 try {
@@ -335,7 +343,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
                 .to(TreeSeqMap)
               // unify the key/value types
-              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              val unifyCtx =
+                UnificationContext(Some(ctx.version), section, nextState >= ExprState.InPlaceholder)
               val (keys, values) = tMembers.unzip
               val keyType = unifyTypes(keys.map(_.wdlType), "map keys", e.loc, unifyCtx) match {
                 case t: T_Primitive => t
@@ -358,7 +367,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               TAT.ExprIdentifier(e.id, t)(e.loc)
 
             case e: AST.ExprPlaceholder =>
-              val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+              val unifyCtx =
+                UnificationContext(Some(ctx.version), section, nextState >= ExprState.InPlaceholder)
               val valueExpr = nested(e.value, ExprState.InPlaceholder)
 
               val (defaultExpr, defaultValueType) = e.defaultOpt
@@ -404,8 +414,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   if (!unify.isCoercibleTo(T_Boolean, valueType, unifyCtx)) {
                     val msg =
                       s"""Condition ${prettyFormatExpr(valueExpr)} has type
-                         |${prettyFormatType(valueExpr.wdlType)}, which is not coercible to Boolean""".stripMargin
-                        .replaceAll("\n", " ")
+                         |${prettyFormatType(valueExpr.wdlType)}, which is not 
+                         |coercible to Boolean""".stripMargin.replaceAll("\n", " ")
                     handleError(msg, nestedExpr.loc)
                   }
                   val wdlType = (trueType, falseType, defaultValueType) match {
@@ -425,18 +435,16 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   } else {
                     valueExpr.wdlType
                   }
-                  val t = valueType match {
-                    case T_Array(x, _) if unify.isCoercibleTo(T_String, x, unifyCtx) =>
-                      T_String
-                    case other =>
-                      val msg =
-                        s"""Expression ${prettyFormatExpr(valueExpr)} has type ${prettyFormatType(
-                               other
-                           )},
-                           |which is not coercible to Array[String]""".stripMargin
-                          .replaceAll("\n", " ")
-                      handleError(msg, valueExpr.loc)
-                      other
+                  val t = if (unify.isCoercibleTo(T_Array(T_String), valueType, unifyCtx)) {
+                    T_String
+                  } else {
+                    val msg =
+                      s"""Expression ${prettyFormatExpr(valueExpr)} has type 
+                         |${prettyFormatType(valueType)}, which is not coercible 
+                         |to Array[String]""".stripMargin
+                        .replaceAll("\n", " ")
+                    handleError(msg, valueExpr.loc)
+                    valueType
                   }
                   val wdlType = (t, defaultValueType) match {
                     case (t, Some(d)) if t == d => t
@@ -471,7 +479,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   eCond.wdlType
                 } else {
                   try {
-                    val unifyCtx = UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                    val unifyCtx = UnificationContext(Some(ctx.version),
+                                                      section,
+                                                      nextState >= ExprState.InPlaceholder)
                     unify.apply(eTrueBranch.wdlType, eFalseBranch.wdlType, unifyCtx)
                   } catch {
                     case _: TypeUnificationException =>
@@ -497,7 +507,9 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                     if unify.isCoercibleTo(
                         kType,
                         iType,
-                        UnificationContext(section, nextState >= ExprState.InPlaceholder)
+                        UnificationContext(Some(ctx.version),
+                                           section,
+                                           nextState >= ExprState.InPlaceholder)
                     ) =>
                   vType
                 case (T_Int, _) =>
@@ -595,7 +607,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(expr) =>
         val e = applyExpr(expr, ctx, bindings, section = section)
         val rhsType = e.wdlType
-        val unifyCtx = UnificationContext(section, inReadFunction = isReadFunction(expr))
+        val unifyCtx =
+          UnificationContext(Some(ctx.version), section, inReadFunction = isReadFunction(expr))
         val wdlType = if (unify.isCoercibleTo(lhsType, rhsType, unifyCtx)) {
           lhsType
         } else {
@@ -710,6 +723,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // The runtime section can make use of values defined in declarations
   private def applyRuntime(rtSection: AST.RuntimeSection, ctx: TypeContext): TAT.RuntimeSection = {
     val restrictions = getRuntimeTypeRestrictions(ctx.version)
+    val unifyCtx = UnificationContext(Some(ctx.version))
     val m = rtSection.kvs
       .map { kv: AST.RuntimeKV =>
         val tExpr = applyExpr(kv.expr, ctx)
@@ -717,7 +731,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
         // one of the allowed types
         if (!restrictions
               .get(kv.id)
-              .forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType)))) {
+              .forall(_.exists(t => unify.isCoercibleTo(t, tExpr.wdlType, unifyCtx)))) {
           throw new TypeException(
               s"runtime id ${kv.id} is not coercible to one of the allowed types ${restrictions(kv.id)}",
               kv.loc
@@ -772,17 +786,23 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                              ctx: TypeContext): TAT.MetaSection = {
     TAT.MetaSection(
         paramMetaSection.kvs
-          .map { kv: AST.MetaKV =>
+          .flatMap { kv: AST.MetaKV =>
             val metaValue = if (ctx.inputs.contains(kv.id) || ctx.outputs.contains(kv.id)) {
-              applyMetaValue(kv.value, ctx)
+              Some(applyMetaValue(kv.value, ctx))
+            } else if (regime < TypeCheckingRegime.Strict) {
+              logger.warning(
+                  s"""parameter_meta key ${kv.id} is being ignored because it does not refer to 
+                     |an input or output declaration""".stripMargin.replaceAll("\n", " ")
+              )
+              None
             } else {
               handleError(
                   s"parameter_meta key ${kv.id} does not refer to an input or output declaration",
                   kv.loc
               )
-              TAT.MetaValueNull()(kv.value.loc)
+              None
             }
-            kv.id -> metaValue
+            metaValue.map(kv.id -> _)
           }
           .to(TreeSeqMap)
     )(
@@ -975,30 +995,32 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
       case Some(AST.CallInputs(value)) =>
         value
           .map { inp =>
-            val argName = inp.name
+            val paramName = inp.name
             val tExpr = applyExpr(inp.expr, ctx, section = Section.Call)
-            if (callee.input.contains(argName)) {
+            if (callee.input.contains(paramName)) {
               // type-check input argument
-              val (calleeInputType, optional) = callee.input(argName)
+              val (calleeInputType, optional) = callee.input(paramName)
               val checkType = if (optional) {
                 TypeUtils.ensureOptional(calleeInputType)
               } else {
                 TypeUtils.unwrapOptional(calleeInputType)
               }
-              if (!unify
-                    .isCoercibleTo(checkType, tExpr.wdlType, UnificationContext(Section.Call))) {
+              if (!unify.isCoercibleTo(checkType,
+                                       tExpr.wdlType,
+                                       UnificationContext(Some(ctx.version), Section.Call))) {
                 handleError(
-                    s"argument '${argName}' has type ${tExpr.wdlType}, it is not coercible to ${checkType}",
+                    s"""argument to parameter '${paramName}' has type ${tExpr.wdlType}, 
+                       |it is not coercible to ${checkType}""".stripMargin.replaceAll("\n", " "),
                     call.loc
                 )
               }
             } else {
               handleError(
-                  s"call '${call.name}' has argument ${argName} that does not exist in the callee",
+                  s"call '${call.name}' has argument ${paramName} that does not exist in the callee",
                   call.loc
               )
             }
-            argName -> tExpr
+            paramName -> tExpr
           }
           .to(TreeSeqMap)
       case None => SeqMap.empty
@@ -1317,7 +1339,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     //val (tDoc, _) = applyDoc(doc)
     //tDoc
     val (tDoc, ctx) = applyDoc(doc)
-    if (errors.nonEmpty && errorHandler.forall(eh => eh(errors))) {
+    if (errors.nonEmpty && errorHandler.forall(eh => eh.handleTypeErrors(errors))) {
       throw new TypeException(errors)
     }
     (tDoc, ctx)

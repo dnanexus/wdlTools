@@ -2,7 +2,12 @@
 
 ## in develop
 
-* Updates to dxCommon 0.4.2, which fixes the output of the `printTree` command
+* Updates dxCommon version, which fixes the output of the `printTree` command
+* Allow primitive -> `String` coercion for WDL versions <= 1.0
+* Fixes parsing of unary operations
+* A `parameter_meta` key that does not correspond to an input or output parameter is now ignored with a warning
+* Fixes caching of imports during parsing - now absolute rather than relative file paths are used 
+* Fixes case where the `fix` tool would generate an invalid declaration
 
 ## 0.14.1 (2021-06-08)
 

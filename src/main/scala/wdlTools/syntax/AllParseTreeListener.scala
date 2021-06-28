@@ -102,8 +102,10 @@ class AllParseTreeListener
   def exitDivide(ctx: ParserRuleContext): Unit = {}
   def enterInfix5(ctx: ParserRuleContext): Unit = {}
   def exitInfix5(ctx: ParserRuleContext): Unit = {}
-  def enterExpr_infix5(ctx: ParserRuleContext): Unit = {}
-  def exitExpr_infix5(ctx: ParserRuleContext): Unit = {}
+  def enterInfix6(ctx: ParserRuleContext): Unit = {}
+  def exitInfix6(ctx: ParserRuleContext): Unit = {}
+  def enterExpr_infix6(ctx: ParserRuleContext): Unit = {}
+  def exitExpr_infix6(ctx: ParserRuleContext): Unit = {}
   def enterPair_literal(ctx: ParserRuleContext): Unit = {}
   def exitPair_literal(ctx: ParserRuleContext): Unit = {}
   def enterApply(ctx: ParserRuleContext): Unit = {}
@@ -480,11 +482,17 @@ class AllParseTreeListener
   override def exitInfix5(ctx: WdlDraft2Parser.Infix5Context): Unit = {
     exitInfix5(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterExpr_infix5(ctx: WdlDraft2Parser.Expr_infix5Context): Unit = {
-    enterExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def enterInfix6(ctx: WdlDraft2Parser.Infix6Context): Unit = {
+    enterInfix6(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitExpr_infix5(ctx: WdlDraft2Parser.Expr_infix5Context): Unit = {
-    exitExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def exitInfix6(ctx: WdlDraft2Parser.Infix6Context): Unit = {
+    exitInfix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_infix6(ctx: WdlDraft2Parser.Expr_infix6Context): Unit = {
+    enterExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_infix6(ctx: WdlDraft2Parser.Expr_infix6Context): Unit = {
+    exitExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPair_literal(ctx: WdlDraft2Parser.Pair_literalContext): Unit = {
     enterPair_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1060,11 +1068,17 @@ class AllParseTreeListener
   override def exitInfix5(ctx: WdlV1Parser.Infix5Context): Unit = {
     exitInfix5(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Unit = {
-    enterExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def enterInfix6(ctx: WdlV1Parser.Infix6Context): Unit = {
+    enterInfix6(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Unit = {
-    exitExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def exitInfix6(ctx: WdlV1Parser.Infix6Context): Unit = {
+    exitInfix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_infix6(ctx: WdlV1Parser.Expr_infix6Context): Unit = {
+    enterExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_infix6(ctx: WdlV1Parser.Expr_infix6Context): Unit = {
+    exitExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPair_literal(ctx: WdlV1Parser.Pair_literalContext): Unit = {
     enterPair_literal(ctx.asInstanceOf[ParserRuleContext])
@@ -1673,11 +1687,17 @@ class AllParseTreeListener
   override def exitInfix5(ctx: WdlV1_1Parser.Infix5Context): Unit = {
     exitInfix5(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Unit = {
-    enterExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def enterInfix6(ctx: WdlV1_1Parser.Infix6Context): Unit = {
+    enterInfix6(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitExpr_infix5(ctx: WdlV1_1Parser.Expr_infix5Context): Unit = {
-    exitExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def exitInfix6(ctx: WdlV1_1Parser.Infix6Context): Unit = {
+    exitInfix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_infix6(ctx: WdlV1_1Parser.Expr_infix6Context): Unit = {
+    enterExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_infix6(ctx: WdlV1_1Parser.Expr_infix6Context): Unit = {
+    exitExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterMember(ctx: WdlV1_1Parser.MemberContext): Unit = {
     enterMember(ctx.asInstanceOf[ParserRuleContext])
@@ -2299,11 +2319,17 @@ class AllParseTreeListener
   override def exitInfix5(ctx: WdlV2Parser.Infix5Context): Unit = {
     exitInfix5(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def enterExpr_infix5(ctx: WdlV2Parser.Expr_infix5Context): Unit = {
-    enterExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def enterInfix6(ctx: WdlV2Parser.Infix6Context): Unit = {
+    enterInfix6(ctx.asInstanceOf[ParserRuleContext])
   }
-  override def exitExpr_infix5(ctx: WdlV2Parser.Expr_infix5Context): Unit = {
-    exitExpr_infix5(ctx.asInstanceOf[ParserRuleContext])
+  override def exitInfix6(ctx: WdlV2Parser.Infix6Context): Unit = {
+    exitInfix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def enterExpr_infix6(ctx: WdlV2Parser.Expr_infix6Context): Unit = {
+    enterExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
+  }
+  override def exitExpr_infix6(ctx: WdlV2Parser.Expr_infix6Context): Unit = {
+    exitExpr_infix6(ctx.asInstanceOf[ParserRuleContext])
   }
   override def enterPair_literal(ctx: WdlV2Parser.Pair_literalContext): Unit = {
     enterPair_literal(ctx.asInstanceOf[ParserRuleContext])
