@@ -4,10 +4,17 @@ import wdlTools.generators.code.WdlGenerator._
 import wdlTools.generators.code.Indenting.Indenting
 import wdlTools.generators.code.Spacing.Spacing
 import wdlTools.generators.code.Wrapping.Wrapping
+import wdlTools.types.{
+  ExprState,
+  Stdlib,
+  TypeCheckingRegime,
+  TypeUtils,
+  Unification,
+  UnificationContext
+}
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes.{T_Int, T_Object, T_String, _}
-import wdlTools.syntax.{Operator, Quoting, SourceLocation, WdlVersion}
-import wdlTools.types.{TypeCheckingRegime, Unification, UnificationContext}
+import wdlTools.syntax.{Builtins, Operator, Quoting, SourceLocation, WdlVersion}
 
 import java.net.URI
 import scala.collection.mutable
@@ -534,6 +541,119 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     }
   }
 
+  // fix expressions with non-standard WDL usages
+  private def fixExpression(expr: Expr,
+                            ctx: ExpressionContext = ExpressionContext.default): Expr = {
+    def isMixedStringAndNonString(exprs: Vector[Expr], inPlaceholder: Boolean): Boolean = {
+      val unify = Unification(TypeCheckingRegime.Moderate)
+      val unifyCtx = UnificationContext(targetVersion, inPlaceholder = inPlaceholder)
+      exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
+    }
+    def inner(innerExpr: Expr, innerCtx: ExpressionContext): Expr = {
+      innerExpr match {
+        case p @ ExprPlaceholder(t, f, sep, default, value, wdlType) =>
+          val newCtx = innerCtx.advanceTo(InPlaceholderState)
+          val fixedValue = inner(value, newCtx)
+          val newValue: Expr =
+            if (default.isEmpty &&
+                (t.isDefined || f.isDefined || sep.isDefined) &&
+                TypeUtils.isOptional(fixedValue.wdlType)) {
+              // wrap optional placeholder value in select_first if there is
+              // a sep or true/false option without a default option
+              val stdlib = Stdlib(TypeCheckingRegime.Moderate, targetVersion.get)
+              val arrayWdlType = T_Array(fixedValue.wdlType)
+              val (selectFirstType, selectFirstProto) = stdlib.apply(
+                  Builtins.SelectFirst,
+                  Vector(arrayWdlType),
+                  ExprState.InPlaceholder
+              )
+              val newValue =
+                ExprApply(Builtins.SelectFirst,
+                          selectFirstProto,
+                          Vector(ExprArray(Vector(fixedValue), arrayWdlType)(fixedValue.loc)),
+                          selectFirstType)(
+                    fixedValue.loc
+                )
+              newValue
+            } else {
+              fixedValue
+            }
+          ExprPlaceholder(t.map(inner(_, newCtx)),
+                          f.map(inner(_, newCtx)),
+                          sep.map(inner(_, newCtx)),
+                          default.map(inner(_, newCtx)),
+                          newValue,
+                          wdlType)(p.loc)
+        case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), _)
+            if isMixedStringAndNonString(args, innerCtx.inPlaceholder) =>
+          // nonstandard usage: "foo " + bar + " baz", where bar is a non-String type
+          // re-write as "foo ${bar} baz"
+          val (newArgs, quotings) = args.map {
+            case s @ ValueString(_, _, quoting) if quoting != Quoting.None =>
+              (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+            case s @ ExprCompoundString(_, _, quoting) if quoting != Quoting.None =>
+              (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
+            case arg => (arg, None)
+          }.unzip
+          val quoting = quotings.flatten.distinct match {
+            case Vector()        => Quoting.Double
+            case Vector(quoting) => quoting
+            case _ =>
+              throw new Exception(
+                  s"Cannot re-write non-standard expression ${expr}: sub-expressions use different quoting"
+              )
+          }
+          val loc = SourceLocation.merge(newArgs.map(_.loc))
+          val strCtx = innerCtx.advanceTo(InStringState(quoting))
+          inner(ExprCompoundString(newArgs, T_String, quoting)(loc), strCtx)
+
+        // remaining expression types don't need fixing but we need to recurse to fix nested expressions
+        case a @ ExprArray(value, wdlType) =>
+          ExprArray(value.map(inner(_, innerCtx)), wdlType)(a.loc)
+        case p @ ExprPair(left, right, wdlType) =>
+          ExprPair(inner(left, innerCtx), inner(right, innerCtx), wdlType)(p.loc)
+        case m @ ExprMap(value, wdlType) =>
+          ExprMap(value.map {
+            case (k, v) => (inner(k, innerCtx), inner(v, innerCtx))
+          }, wdlType)(m.loc)
+        case o @ ExprObject(value, wdlType) =>
+          ExprObject(value.map {
+            case (k, v) => k -> inner(v, innerCtx)
+          }, wdlType)(o.loc)
+        case s @ ExprCompoundString(value, wdlType, quoting) =>
+          ExprCompoundString(value.map(inner(_, innerCtx)), wdlType, quoting)(s.loc)
+        case _ =>
+          val nextCtx = if (innerCtx.inString(resetInPlaceholder = true)) {
+            innerCtx.advanceTo(InPlaceholderState)
+          } else {
+            innerCtx
+          }
+          innerExpr match {
+            case a @ ExprAt(array, index, wdlType) =>
+              ExprAt(inner(array, nextCtx), inner(index, nextCtx), wdlType)(a.loc)
+            case i @ ExprIfThenElse(cond, tBranch, fBranch, wdlType) =>
+              ExprIfThenElse(inner(cond, nextCtx),
+                             inner(tBranch, nextCtx),
+                             inner(fBranch, nextCtx),
+                             wdlType)(i.loc)
+            case a @ ExprApply(oper, sig, elements, wdlType) if Operator.All.contains(oper) =>
+              val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
+              ExprApply(oper, sig, elements.map(inner(_, operCtx)), wdlType)(a.loc)
+            case a @ ExprApply(oper, sig, elements, wdlType) =>
+              ExprApply(oper, sig, elements.map(inner(_, nextCtx)), wdlType)(a.loc)
+            case g @ ExprGetName(e, id, wdlType) =>
+              ExprGetName(inner(e, nextCtx), id, wdlType)(g.loc)
+            case _ => innerExpr
+          }
+      }
+    }
+    if (rewriteNonstandardUsages) {
+      inner(expr, ctx)
+    } else {
+      expr
+    }
+  }
+
   private def buildExpression(
       expr: Expr,
       ctx: ExpressionContext = ExpressionContext.default
@@ -554,12 +674,6 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       val eqLiteral = Literal(Symbols.Assignment)
       val exprSized = buildExpression(value, ctx.advanceTo(InPlaceholderState))
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
-    }
-
-    def isMixedStringAndNonString(exprs: Vector[Expr]): Boolean = {
-      val unify = Unification(TypeCheckingRegime.Moderate)
-      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
-      exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
     }
 
     expr match {
@@ -676,27 +790,6 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                 ),
                 wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded
             )
-          case ExprApply(Operator.Addition.name, _, Vector(ExprArray(args, _)), _)
-              if rewriteNonstandardUsages && isMixedStringAndNonString(args) =>
-            // nonstandard usage: "foo " + bar + " baz", where bar is a non-String type
-            // re-write as "foo ${bar} baz"
-            val (newArgs, quotings) = args.map {
-              case s @ ValueString(_, _, quoting) if quoting != Quoting.None =>
-                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
-              case s @ ExprCompoundString(_, _, quoting) if quoting != Quoting.None =>
-                (s.copy(quoting = Quoting.None)(s.loc), Some(quoting))
-              case arg => (arg, None)
-            }.unzip
-            val quoting = quotings.flatten.distinct match {
-              case Vector()        => Quoting.Double
-              case Vector(quoting) => quoting
-              case _ =>
-                throw new Exception(
-                    s"Cannot re-write non-standard expression ${expr}: sub-expressions use different quoting"
-                )
-            }
-            val loc = SourceLocation.merge(newArgs.map(_.loc))
-            buildExpression(ExprCompoundString(newArgs, T_String, quoting)(loc))
           case ExprApply(oper, _, Vector(ExprArray(args, _)), _)
               if Operator.Vectorizable.contains(oper) =>
             val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
@@ -709,8 +802,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                        buildExpression(value, nextCtx.advanceTo(InOperationState())))
             )
           case ExprApply(oper, _, Vector(lhs, rhs), _) if Operator.All.contains(oper) =>
-            val nextCtx2 = nextCtx.advanceTo(InOperationState(Some(oper)))
-            val operands = Vector(buildExpression(lhs, nextCtx2), buildExpression(rhs, nextCtx2))
+            val operCtx = nextCtx.advanceTo(InOperationState(Some(oper)))
+            val operands = Vector(buildExpression(lhs, operCtx), buildExpression(rhs, operCtx))
             Operation(oper, operands, vectorizable = false, ctx)
           case ExprApply(funcName, _, elements, _) =>
             val prefix = Sequence(
@@ -824,26 +917,27 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
   private def notCoercibleTo(expr: Expr, wdlType: T): Boolean = {
     val unify = Unification(TypeCheckingRegime.Moderate)
-    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext.empty)
+    !unify.isCoercibleTo(wdlType, expr.wdlType, UnificationContext(targetVersion))
   }
 
   private case class DeclarationStatement(name: String, wdlType: T, expr: Option[Expr] = None)
       extends BaseStatement {
 
+    private val fixedExpr = expr.map(fixExpression(_))
     private val typeSized = {
       val newType = wdlType match {
         case T_String | T_Optional(T_String)
-            if rewriteNonstandardUsages && expr.exists(notCoercibleTo(_, T_String)) =>
+            if rewriteNonstandardUsages && fixedExpr.exists(notCoercibleTo(_, T_String)) =>
           // non-standard usage: String foo = 1 + 1
           // re-write to: Int foo = 1 + 1
-          expr.get.wdlType
+          fixedExpr.get.wdlType
         case _ => wdlType
       }
       DataType.fromWdlType(newType)
     }
     private val nameLiteral = Literal(name)
     private val lhs = Vector(typeSized, nameLiteral)
-    private val rhs = expr.map { e =>
+    private val rhs = fixedExpr.map { e =>
       val eqToken = Literal(Symbols.Assignment)
       val exprAtom = buildExpression(e)
       Vector(eqToken, exprAtom)
@@ -899,7 +993,12 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       // literal values
       case MetaValueNull() => Literal(Symbols.Null)
       case MetaValueString(value, quoting) =>
-        Literal(value, quoting = quoting)
+        val escaped = if (quoting != Quoting.None) {
+          Utils.escape(value)
+        } else {
+          value
+        }
+        Literal(escaped, quoting = quoting)
       case MetaValueBoolean(value) => Literal(value)
       case MetaValueInt(value)     => Literal(value)
       case MetaValueFloat(value)   => Literal(value)
@@ -996,7 +1095,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       case (_, ValueNone(_)) if omitNullCallInputs => None
       case (name, expr) =>
         val nameToken = Literal(name)
-        val exprSized = buildExpression(expr)
+        val exprSized = buildExpression(fixExpression(expr))
         Some(
             Container(
                 Vector(nameToken, Literal(Symbols.Assignment), exprSized)
@@ -1040,7 +1139,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       val openToken = Literal(Symbols.GroupOpen)
       val idToken = Literal(scatter.identifier)
       val inToken = Literal(Symbols.In)
-      val exprAtom = buildExpression(scatter.expr)
+      val exprAtom = buildExpression(fixExpression(scatter.expr))
       val closeToken = Literal(Symbols.GroupClose)
       Some(
           Container(
@@ -1056,7 +1155,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
 
   private case class ConditionalBlock(conditional: Conditional) extends BlockStatement(Symbols.If) {
     override def clause: Option[Sized] = {
-      val exprAtom = buildExpression(conditional.expr)
+      val exprAtom = buildExpression(fixExpression(conditional.expr))
       val openToken = Literal(Symbols.GroupOpen)
       val closeToken = Literal(Symbols.GroupClose)
       Some(
@@ -1190,7 +1289,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
         bodyGenerator.endLine(continue = true)
         bodyGenerator.beginLine()
         newParts.foreach { expr =>
-          bodyGenerator.append(buildExpression(expr, ExpressionContext.command))
+          val fixedExpr = fixExpression(expr, ExpressionContext.command)
+          bodyGenerator.append(buildExpression(fixedExpr, ExpressionContext.command))
         }
         bodyGenerator.endLine()
 
@@ -1205,7 +1305,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     private val idToken = Literal(id)
     private val delimToken = Literal(Symbols.KeyValueDelimiter)
     private val lhs = Vector(idToken, delimToken)
-    private val rhs = buildExpression(expr)
+    private val rhs = buildExpression(fixExpression(expr))
 
     override def formatContents(lineGenerator: LineGenerator): Unit = {
       lineGenerator.appendAll(Vector(Sequence(lhs), rhs))

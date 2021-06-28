@@ -1,6 +1,13 @@
 package wdlTools.syntax
 
-import dx.util.{AddressableFileSource, FileNode, FileSourceResolver, Logger, TraceLevel}
+import dx.util.{
+  AddressableFileNode,
+  AddressableFileSource,
+  FileNode,
+  FileSourceResolver,
+  Logger,
+  TraceLevel
+}
 import wdlTools.syntax.AbstractSyntax.{Document, Expr, ImportDoc, Type}
 
 trait DocumentWalker[T] {
@@ -17,14 +24,17 @@ abstract class WdlParser(followImports: Boolean = false,
       uri: String,
       parent: Option[AddressableFileSource] = None
   ): Option[AbstractSyntax.Document] = {
-    docCache.get(uri) match {
-      case None =>
-        logger.trace(s"parsing import ${uri}", minLevel = TraceLevel.VVerbose)
-        val fn: FileNode = fileResolver.resolve(uri, parent)
-        val doc = Some(parseDocument(fn))
-        docCache += (uri -> doc)
-        doc
-      case Some(doc) => doc
+    fileResolver.resolve(uri, parent) match {
+      case fn: AddressableFileNode =>
+        docCache.getOrElse(
+            fn.address, {
+              logger.trace(s"parsing import ${fn.address}", minLevel = TraceLevel.VVerbose)
+              val doc = Some(parseDocument(fn))
+              docCache += (fn.address -> doc)
+              doc
+            }
+        )
+      case fn => Some(parseDocument(fn))
     }
   }
 

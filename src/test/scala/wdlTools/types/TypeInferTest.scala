@@ -31,11 +31,10 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
                     substituteFunctionsForTasks: Boolean = false,
                     importDirs: Set[Path] = Set.empty): TAT.Document = {
     val fileResolver = FileSourceResolver.create((importDirs + dir).toVector)
-    val checker =
-      TypeInfer(userDefinedFunctions = udfs,
-                substituteFunctionsForTasks = substituteFunctionsForTasks,
-                fileResolver = fileResolver,
-                logger = logger)
+    val checker = TypeInfer(userDefinedFunctions = udfs,
+                            substituteFunctionsForTasks = substituteFunctionsForTasks,
+                            fileResolver = fileResolver,
+                            logger = logger)
     val sourceFile = fileResolver.fromPath(dir.resolve(file))
     val doc = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
       .parseDocument(sourceFile)
@@ -190,9 +189,5 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
     say_hello_task.wdlType.function shouldBe Some(
         (WdlTypes.T_Function1("say_hello", WdlTypes.T_String, WdlTypes.T_String), Vector("name"))
     )
-  }
-
-  it should "ensure we don't have nested optionals" in {
-    check(v1Dir, "nested_optional.wdl")
   }
 }

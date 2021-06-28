@@ -2,19 +2,19 @@ package wdlTools.cli
 
 import dx.util.FileNode
 import spray.json.{JsArray, JsNumber, JsObject, JsString}
-import wdlTools.types.TypeError
+import wdlTools.types.{TypeErrorHandler, TypeError}
 
-import java.io.PrintStream
+import java.io.{ByteArrayOutputStream, PrintStream}
 import scala.io.AnsiColor
 
-class ErrorHandler {
+class CliTypeErrorHandler extends TypeErrorHandler {
   private var errors: Map[FileNode, Vector[TypeError]] = Map.empty
 
-  def hasErrors: Boolean = errors.nonEmpty
+  def hasTypeErrors: Boolean = errors.nonEmpty
 
   def getErrors: Map[FileNode, Vector[TypeError]] = errors
 
-  def apply(typeErrors: Vector[TypeError]): Boolean = {
+  override def handleTypeErrors(typeErrors: Vector[TypeError]): Boolean = {
     typeErrors.groupBy(_.loc.source).foreach {
       case (docSource, docErrors) =>
         errors += (docSource -> (errors.getOrElse(docSource, Vector.empty) ++ docErrors))
@@ -82,5 +82,11 @@ class ErrorHandler {
           )
         }
     }
+  }
+
+  override def toString: String = {
+    val msgStream = new ByteArrayOutputStream()
+    printErrors(new PrintStream(msgStream), effects = true)
+    msgStream.toString
   }
 }

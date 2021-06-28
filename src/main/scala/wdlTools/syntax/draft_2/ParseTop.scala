@@ -483,18 +483,30 @@ wdl_type
 
   // | NOT expr #negate
   override def visitNegate(ctx: WdlDraft2Parser.NegateContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-    ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify boolean literals
+    expr match {
+      case b: ExprBoolean => ExprBoolean(!b.value)(b.loc)
+      case _              => ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | (PLUS | MINUS) expr #unarysigned
   override def visitUnarysigned(ctx: WdlDraft2Parser.UnarysignedContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify positive/negative numeric literals
     if (ctx.PLUS() != null) {
-      ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
+      expr match {
+        case i: ExprInt   => i
+        case f: ExprFloat => f
+        case _            => ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
     } else if (ctx.MINUS() != null) {
-      ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
+      expr match {
+        case i: ExprInt   => ExprInt(-i.value)(i.loc)
+        case f: ExprFloat => ExprFloat(-f.value)(f.loc)
+        case _            => ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
     } else {
       throw new SyntaxException("invalid unary operation",
                                 getSourceLocation(grammar.docSource, ctx))
@@ -618,13 +630,21 @@ wdl_type
 	: expr_core
 	; */
 
-  override def visitExpr_infix5(ctx: WdlDraft2Parser.Expr_infix5Context): Expr = {
+  private def visitExpr_infix5(ctx: WdlDraft2Parser.Expr_infix5Context): Expr = {
+    ctx match {
+      case negate: WdlDraft2Parser.NegateContext           => visitNegate(negate)
+      case unarysigned: WdlDraft2Parser.UnarysignedContext => visitUnarysigned(unarysigned)
+      case infix6: WdlDraft2Parser.Infix6Context           => visitInfix6(infix6).asInstanceOf[Expr]
+    }
+  }
+
+  override def visitExpr_infix6(ctx: WdlDraft2Parser.Expr_infix6Context): Expr = {
     visitExpr_core(ctx.expr_core())
   }
 
   /* expr
-	: expr_infix
-	; */
+    : expr_infix
+    ; */
   override def visitExpr(ctx: WdlDraft2Parser.ExprContext): Expr = {
     try {
       visitChildren(ctx).asInstanceOf[Expr]
@@ -659,8 +679,6 @@ wdl_type
       case pair_literal: WdlDraft2Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlDraft2Parser.Map_literalContext     => visitMap_literal(map_literal)
       case obj_literal: WdlDraft2Parser.Object_literalContext  => visitObject_literal(obj_literal)
-      case negate: WdlDraft2Parser.NegateContext               => visitNegate(negate)
-      case unarysigned: WdlDraft2Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlDraft2Parser.AtContext                       => visitAt(at)
       case ifthenelse: WdlDraft2Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
       case apply: WdlDraft2Parser.ApplyContext                 => visitApply(apply)

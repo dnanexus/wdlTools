@@ -73,7 +73,7 @@ object DefaultEvalPaths {
   }
 
   def create(): DefaultEvalPaths = {
-    DefaultEvalPaths(FileUtils.cwd, FileUtils.systemTempDir)
+    DefaultEvalPaths(FileUtils.cwd(absolute = true), FileUtils.systemTempDir)
   }
 
   def createFromTemp(): DefaultEvalPaths = {

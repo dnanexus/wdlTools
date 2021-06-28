@@ -2,7 +2,6 @@ package wdlTools.cli
 
 import java.net.URI
 import java.nio.file.{Path, Paths}
-
 import org.rogach.scallop.{
   ArgType,
   ScallopConf,
@@ -15,7 +14,7 @@ import wdlTools.syntax.{Antlr4Util, WdlVersion}
 import wdlTools.types.TypeCheckingRegime
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import dx.util.FileUtils.{FileScheme, getUriScheme}
-import dx.util.{FileSourceResolver, Logger}
+import dx.util.{FileSourceResolver, FileUtils, Logger}
 
 import scala.util.Try
 
@@ -48,7 +47,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     val argType = ArgType.LIST
   }
   implicit val fileListConverter: ValueConverter[List[Path]] =
-    listArgConverter[Path](Paths.get(_), exceptionHandler[List[Path]])
+    listArgConverter[Path](FileUtils.getPath, exceptionHandler[List[Path]])
   implicit val versionConverter: ValueConverter[WdlVersion] =
     singleArgConverter[WdlVersion](WdlVersion.withNameIgnoreCase, exceptionHandler[WdlVersion])
   implicit val tcRegimeConverter: ValueConverter[TypeCheckingRegime] =
@@ -81,7 +80,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
   private def getParent(pathOrUri: String): Option[Path] = {
     getUriScheme(pathOrUri) match {
       case Some(FileScheme) => Some(Paths.get(URI.create(pathOrUri)).getParent)
-      case None             => Some(Paths.get(pathOrUri).getParent)
+      case None             => Some(FileUtils.getPath(pathOrUri).getParent)
       case _                => None
     }
   }
@@ -172,7 +171,7 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
     val outputDir: ScallopOption[Path] = opt[Path](
         descr = "Directory in which to output documentation",
         short = 'O',
-        default = Some(Paths.get("docs"))
+        default = Some(FileUtils.cwd(absolute = true).resolve("docs"))
     )
     val overwrite: ScallopOption[Boolean] = toggle(
         descrYes = "Overwrite existing files",
