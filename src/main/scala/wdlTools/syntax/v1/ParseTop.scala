@@ -229,6 +229,9 @@ wdl_type
         ctx.string() match {
           case sq: WdlV1Parser.Squote_stringContext => visitSquote_string(sq)
           case dq: WdlV1Parser.Dquote_stringContext => visitDquote_string(dq)
+          case other =>
+            throw new SyntaxException(s"unrecognized placeholder option value ${other.getClass}",
+                                      getSourceLocation(grammar.docSource, ctx))
         }
       } else {
         throw new SyntaxException(s"${optionType} placeholder option value must be a string",
@@ -514,20 +517,33 @@ string
 
   // | NOT expr #negate
   override def visitNegate(ctx: WdlV1Parser.NegateContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-    ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify boolean literals
+    expr match {
+      case b: ExprBoolean => ExprBoolean(!b.value)(b.loc)
+      case _              => ExprNegate(expr)(getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | (PLUS | MINUS) expr #unarysigned
   override def visitUnarysigned(ctx: WdlV1Parser.UnarysignedContext): Expr = {
-    val expr = visitExpr(ctx.expr())
-
-    if (ctx.PLUS() != null)
-      ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else if (ctx.MINUS() != null)
-      ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
-    else
+    val expr = visitExpr_infix5(ctx.expr_infix5())
+    // simplify positive/negative numeric literals
+    if (ctx.PLUS() != null) {
+      expr match {
+        case i: ExprInt   => i
+        case f: ExprFloat => f
+        case _            => ExprUnaryPlus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
+    } else if (ctx.MINUS() != null) {
+      expr match {
+        case i: ExprInt   => ExprInt(-i.value)(i.loc)
+        case f: ExprFloat => ExprFloat(-f.value)(f.loc)
+        case _            => ExprUnaryMinus(expr)(getSourceLocation(grammar.docSource, ctx))
+      }
+    } else {
       throw new SyntaxException("bad unary expression", getSourceLocation(grammar.docSource, ctx))
+    }
   }
 
   // | expr_core LBRACK expr RBRACK #at
@@ -649,9 +665,15 @@ string
   /* expr_infix5
 	: expr_core
 	; */
+  private def visitExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Expr = {
+    ctx match {
+      case negate: WdlV1Parser.NegateContext           => visitNegate(negate)
+      case unarysigned: WdlV1Parser.UnarysignedContext => visitUnarysigned(unarysigned)
+      case infix6: WdlV1Parser.Infix6Context           => visitInfix6(infix6).asInstanceOf[Expr]
+    }
+  }
 
-  override def visitExpr_infix5(ctx: WdlV1Parser.Expr_infix5Context): Expr = {
-    //(s"infix5 ${ctx.getText}")
+  override def visitExpr_infix6(ctx: WdlV1Parser.Expr_infix6Context): Expr = {
     visitExpr_core(ctx.expr_core())
   }
 
@@ -691,8 +713,6 @@ string
       case pair_literal: WdlV1Parser.Pair_literalContext   => visitPair_literal(pair_literal)
       case map_literal: WdlV1Parser.Map_literalContext     => visitMap_literal(map_literal)
       case obj_literal: WdlV1Parser.Object_literalContext  => visitObject_literal(obj_literal)
-      case negate: WdlV1Parser.NegateContext               => visitNegate(negate)
-      case unarysigned: WdlV1Parser.UnarysignedContext     => visitUnarysigned(unarysigned)
       case at: WdlV1Parser.AtContext                       => visitAt(at)
       case ifthenelse: WdlV1Parser.IfthenelseContext       => visitIfthenelse(ifthenelse)
       case apply: WdlV1Parser.ApplyContext                 => visitApply(apply)

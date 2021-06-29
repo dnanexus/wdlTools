@@ -15,6 +15,7 @@ import scala.collection.immutable.SeqMap
 
 class TypeInferTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
+  private val draft2Dir = Paths.get(getClass.getResource("/types/draft2").getPath)
   private val v1Dir = Paths.get(getClass.getResource("/types/v1").getPath)
   private val v2Dir = Paths.get(getClass.getResource("/types/v2").getPath)
   private val v1StructsDir =
@@ -30,15 +31,18 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
                     substituteFunctionsForTasks: Boolean = false,
                     importDirs: Set[Path] = Set.empty): TAT.Document = {
     val fileResolver = FileSourceResolver.create((importDirs + dir).toVector)
-    val checker =
-      TypeInfer(userDefinedFunctions = udfs,
-                substituteFunctionsForTasks = substituteFunctionsForTasks,
-                fileResolver = fileResolver,
-                logger = logger)
+    val checker = TypeInfer(userDefinedFunctions = udfs,
+                            substituteFunctionsForTasks = substituteFunctionsForTasks,
+                            fileResolver = fileResolver,
+                            logger = logger)
     val sourceFile = fileResolver.fromPath(dir.resolve(file))
     val doc = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
       .parseDocument(sourceFile)
     checker.apply(doc)._1
+  }
+
+  it should "handle a conditional in draft2 workflow" in {
+    check(draft2Dir, "conditional.wdl")
   }
 
   it should "handle several struct definitions" taggedAs Edge in {

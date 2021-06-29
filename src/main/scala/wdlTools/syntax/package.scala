@@ -10,9 +10,9 @@ sealed abstract class WdlVersion(val name: String, val order: Int, val aliases: 
 }
 
 object WdlVersion {
-  case object Draft_2 extends WdlVersion("draft-2", 0, Set.empty)
+  case object Draft_2 extends WdlVersion("draft-2", 0, aliases = Set.empty)
   case object V1 extends WdlVersion("1.0", 1, aliases = Set("draft-3"))
-  case object V1_1 extends WdlVersion("1.1", 2, Set.empty)
+  case object V1_1 extends WdlVersion("1.1", 2, aliases = Set("1.1.0", "1.1.1"))
   case object V2 extends WdlVersion("2.0", 3, aliases = Set("development"))
 
   val All: Vector[WdlVersion] = Vector(V2, V1_1, V1, Draft_2).sortWith(_ < _)
@@ -115,6 +115,12 @@ object SourceLocation {
 // A syntax error that occured when parsing a document. It is generated
 // by the ANTLR machinery and we transform it into this format.
 final case class SyntaxError(symbol: String, loc: SourceLocation, reason: String)
+
+trait SyntaxErrorHandler {
+  def handleSyntaxErrors(errors: Vector[SyntaxError]): Boolean
+
+  def hasSyntaxErrors: Boolean
+}
 
 // Syntax error exception
 final class SyntaxException(message: String) extends Exception(message) {

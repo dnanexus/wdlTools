@@ -1,6 +1,6 @@
 package wdlTools.cli
 
-import java.nio.file.{FileAlreadyExistsException, Files, Path, Paths}
+import java.nio.file.{FileAlreadyExistsException, Files, Path}
 
 import wdlTools.generators.project.ProjectGenerator.{TaskModel, WorkflowModel}
 import wdlTools.generators.project.ProjectGenerator
@@ -13,7 +13,7 @@ case class Generate(conf: WdlToolsConf) extends Command {
     val args = conf.generate
     val name = args.name()
     val overwrite = args.overwrite()
-    val outputDir: Path = args.outputDir.getOrElse(Paths.get(name))
+    val outputDir: Path = args.outputDir.getOrElse(FileUtils.cwd(absolute = true).resolve(name))
     if (!overwrite && Files.exists(outputDir)) {
       throw new Exception(s"Directory ${outputDir} already exists and overwrite = false")
     }

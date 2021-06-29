@@ -4,7 +4,7 @@ import wdlTools.syntax.Antlr4Util.ParseTreeListenerFactory
 import wdlTools.syntax.{
   Operator,
   SourceLocation,
-  SyntaxError,
+  SyntaxErrorHandler,
   SyntaxException,
   WdlParser,
   WdlVersion,
@@ -19,7 +19,7 @@ import scala.collection.immutable.TreeSeqMap
 case class ParseAll(followImports: Boolean = false,
                     fileResolver: FileSourceResolver = FileSourceResolver.get,
                     listenerFactories: Vector[ParseTreeListenerFactory] = Vector.empty,
-                    errorHandler: Option[Vector[SyntaxError] => Boolean] = None,
+                    errorHandler: Option[SyntaxErrorHandler] = None,
                     logger: Logger = Logger.get)
     extends WdlParser(followImports, fileResolver, logger) {
 
@@ -356,7 +356,7 @@ case class ParseAll(followImports: Boolean = false,
       }
     val errorListener = grammar.errListener
     if (errorListener.hasErrors && errorHandler
-          .forall(eh => eh(errorListener.getErrors))) {
+          .forall(eh => eh.handleSyntaxErrors(errorListener.getErrors))) {
       throw new SyntaxException(errorListener.getErrors)
     }
     val translator = Translator(fileSource)

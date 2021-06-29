@@ -13,8 +13,8 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
   override def apply(): Unit = {
     val docSource = FileSourceResolver.get.resolve(conf.check.uri())
     val parsers = Parsers(followImports = true)
-    val errorHandler = new ErrorHandler()
-    val checker = TypeInfer(conf.check.regime(), errorHandler = Some(errorHandler.apply))
+    val errorHandler = new CliTypeErrorHandler()
+    val checker = TypeInfer(conf.check.regime(), errorHandler = Some(errorHandler))
 
     try {
       checker.apply(parsers.parseDocument(docSource))
@@ -23,7 +23,7 @@ case class TypeCheck(conf: WdlToolsConf) extends Command {
       case e: TypeException   => println(s"Failed to type-check WDL document: ${e.getMessage}")
     }
 
-    if (errorHandler.hasErrors) {
+    if (errorHandler.hasTypeErrors) {
       // format as json or text and write to file or stdout
       val outputFile = conf.check.outputFile.toOption
       val toFile = outputFile.isDefined
