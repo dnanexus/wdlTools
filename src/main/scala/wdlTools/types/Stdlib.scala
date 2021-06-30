@@ -75,7 +75,9 @@ case class Stdlib(regime: TypeCheckingRegime,
         T_Function2(funcName, T_Int, T_Float, T_Boolean),
         T_Function2(funcName, T_Float, T_Int, T_Boolean),
         T_Function2(funcName, T_File, T_String, T_Boolean),
-        T_Function2(funcName, T_Var(0), T_Var(0), T_Boolean)
+        T_Function2(funcName, T_Var(0), T_Var(0), T_Boolean),
+        T_Function2(funcName, T_Any, T_String, T_Boolean),
+        T_Function2(funcName, T_String, T_Any, T_Boolean)
     )
   }
 

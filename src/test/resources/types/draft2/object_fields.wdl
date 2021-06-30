@@ -29,7 +29,11 @@ task use_object {
 workflow object_access {
   call mk_object
   call use_object { input: obj_in = mk_object.out }
+  if (mk_object.out.a == "1") {
+    String greet = "hello"
+  }
   output {
     Array[String] lines = use_object.lines
+    String? greeting = greet
   }
 }

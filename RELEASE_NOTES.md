@@ -3,6 +3,7 @@
 ## in develop
 
 * Handles accessing object fields within placeholders
+* Allows comparison of object fields to `String`
 
 ## 0.14.2 (2021-06-28)
 
