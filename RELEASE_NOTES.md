@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Code generator/formatter handles empty blocks
+
 ## 0.14.2 (2021-06-28)
 
 * Updates dxCommon version, which fixes the output of the `printTree` command

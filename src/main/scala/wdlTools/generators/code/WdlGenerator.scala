@@ -905,12 +905,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                              emtpyLineBetweenStatements: Boolean = false)
       extends Statement {
     override def format(lineGenerator: LineGenerator): Unit = {
-      statements.head.format(lineGenerator)
-      statements.tail.foreach { section =>
-        if (emtpyLineBetweenStatements) {
-          lineGenerator.emptyLine()
+      if (statements.nonEmpty) {
+        statements.head.format(lineGenerator)
+        statements.tail.foreach { section =>
+          if (emtpyLineBetweenStatements) {
+            lineGenerator.emptyLine()
+          }
+          section.format(lineGenerator)
         }
-        section.format(lineGenerator)
       }
     }
   }
