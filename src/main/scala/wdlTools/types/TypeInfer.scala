@@ -886,13 +886,15 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tRuntime = task.runtime.map(applyRuntime(_, declCtx))
     val tHints = task.hints.map(applyHints(_, declCtx))
 
-    // check that all expressions can be coereced to a string inside
-    // the command section
+    // Check that all expressions can be coereced to a string inside
+    // the command section. If type is T_Any we allow it here - the
+    // actual type will be checked at runtime.
     val tCommandParts = task.command.parts.map { expr =>
       val e = applyExpr(expr, declCtx, exprState = ExprState.InString)
       e.wdlType match {
         case x if isPrimitive(x)             => e
         case T_Optional(x) if isPrimitive(x) => e
+        case T_Any                           => e
         case other =>
           handleError(
               s"""Expression ${prettyFormatExpr(e)} in the command section has type ${other},

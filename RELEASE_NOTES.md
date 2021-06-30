@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Handles accessing object fields within placeholders
+
 ## 0.14.2 (2021-06-28)
 
 * Updates dxCommon version, which fixes the output of the `printTree` command
