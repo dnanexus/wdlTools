@@ -2,6 +2,7 @@
 
 ## in develop
 
+* Code generator/formatter handles empty blocks
 * Handles accessing object fields within placeholders
 * Allows comparison of object fields to `String`
 
