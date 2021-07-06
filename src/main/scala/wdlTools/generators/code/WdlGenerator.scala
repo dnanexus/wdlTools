@@ -676,12 +676,6 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
-    def isMixedStringAndNonString(exprs: Vector[Expr]): Boolean = {
-      val unify = Unification(TypeCheckingRegime.Moderate)
-      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
-      exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
-    }
-
     expr match {
       // literal values
       case ValueNone(_)                   => Literal(Symbols.None)
@@ -911,12 +905,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                              emtpyLineBetweenStatements: Boolean = false)
       extends Statement {
     override def format(lineGenerator: LineGenerator): Unit = {
-      statements.head.format(lineGenerator)
-      statements.tail.foreach { section =>
-        if (emtpyLineBetweenStatements) {
-          lineGenerator.emptyLine()
+      if (statements.nonEmpty) {
+        statements.head.format(lineGenerator)
+        statements.tail.foreach { section =>
+          if (emtpyLineBetweenStatements) {
+            lineGenerator.emptyLine()
+          }
+          section.format(lineGenerator)
         }
-        section.format(lineGenerator)
       }
     }
   }

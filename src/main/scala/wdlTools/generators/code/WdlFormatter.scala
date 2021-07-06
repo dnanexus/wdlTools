@@ -1188,12 +1188,14 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
 
     override def format(lineFormatter: LineFormatter): Unit = {
       lineFormatter.beginSection(this)
-      statements.head.format(lineFormatter)
-      statements.tail.foreach { section =>
-        if (emtpyLineBetweenStatements) {
-          lineFormatter.emptyLine()
+      if (statements.nonEmpty) {
+        statements.head.format(lineFormatter)
+        statements.tail.foreach { section =>
+          if (emtpyLineBetweenStatements) {
+            lineFormatter.emptyLine()
+          }
+          section.format(lineFormatter)
         }
-        section.format(lineFormatter)
       }
       lineFormatter.endSection(this)
     }

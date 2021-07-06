@@ -1,5 +1,11 @@
 # Change log
 
+## 0.14.3 (2021-07-06)
+
+* Code generator/formatter handles empty blocks
+* Handles accessing object fields within placeholders
+* Allows comparison of object fields to `String`
+
 ## 0.14.2 (2021-06-28)
 
 * Updates dxCommon version, which fixes the output of the `printTree` command
