@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.14.3 (2021-07-06)
 
 * Code generator/formatter handles empty blocks
 * Handles accessing object fields within placeholders
