@@ -676,12 +676,6 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
       Sequence(Vector(nameLiteral, eqLiteral, exprSized))
     }
 
-    def isMixedStringAndNonString(exprs: Vector[Expr]): Boolean = {
-      val unify = Unification(TypeCheckingRegime.Moderate)
-      val unifyCtx = UnificationContext(inPlaceholder = ctx.inPlaceholder)
-      exprs.map(e => unify.isCoercibleTo(T_String, e.wdlType, unifyCtx)).toSet.size == 2
-    }
-
     expr match {
       // literal values
       case ValueNone(_)                   => Literal(Symbols.None)
