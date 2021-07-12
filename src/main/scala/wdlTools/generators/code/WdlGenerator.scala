@@ -953,28 +953,32 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     }
   }
 
-  private abstract class BlockStatement(keyword: String) extends Statement {
+  private abstract class BlockStatement(keyword: String, emitBracesIfEmpty: Boolean = true)
+      extends Statement {
     def clause: Option[Sized] = None
 
     def body: Option[Statement] = None
 
     protected val keywordLiteral: Literal = Literal(keyword)
-
     private val clauseSized: Option[Sized] = clause
-    // assume the open brace is on the same line as the keyword/clause
-    private val openLiteral = Literal(Symbols.BlockOpen)
     private val bodyStatement: Option[Statement] = body
-    private val closeLiteral = Literal(Symbols.BlockClose)
+    private val (openLiteral, closeLiteral) = if (bodyStatement.isDefined || emitBracesIfEmpty) {
+      (Some(Literal(Symbols.BlockOpen)), Some(Literal(Symbols.BlockClose)))
+    } else {
+      (None, None)
+    }
 
     override def format(lineGenerator: LineGenerator): Unit = {
       lineGenerator.beginLine()
-      lineGenerator.appendAll(Vector(Some(keywordLiteral), clauseSized, Some(openLiteral)).flatten)
+      lineGenerator.appendAll(Vector(Some(keywordLiteral), clauseSized, openLiteral).flatten)
       if (bodyStatement.isDefined) {
         lineGenerator.endLine()
         bodyStatement.get.format(lineGenerator.derive(increaseIndent = true))
         lineGenerator.beginLine()
       }
-      lineGenerator.append(closeLiteral)
+      if (closeLiteral.isDefined) {
+        lineGenerator.append(closeLiteral.get)
+      }
       lineGenerator.endLine()
     }
   }
@@ -1114,7 +1118,8 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
     }
   }
 
-  private case class CallBlock(call: Call) extends BlockStatement(Symbols.Call) {
+  private case class CallBlock(call: Call)
+      extends BlockStatement(Symbols.Call, emitBracesIfEmpty = false) {
     override def clause: Option[Sized] = Some(
         if (call.alias.isDefined) {
           val alias = call.alias.get
