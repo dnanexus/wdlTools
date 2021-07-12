@@ -709,7 +709,7 @@ case class Stdlib(paths: EvalPaths,
     def divide2(a: V, b: V, loc: SourceLocation): V = {
       (a, b) match {
         case (_, denominator: V_Numeric) if denominator.floatValue == 0 =>
-          throw new EvalException("DivisionByZero", loc)
+          throw new EvalError("DivisionByZero", loc)
         case (V_Int(n1), V_Int(n2))     => V_Int(n1 / n2)
         case (V_Float(x1), V_Int(n2))   => V_Float(x1 / n2)
         case (V_Int(n1), V_Float(x2))   => V_Float(n1 / x2)
