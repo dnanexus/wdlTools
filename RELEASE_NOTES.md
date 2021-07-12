@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* No longer unwraps optional type for an input with a default value
+
 ## 0.14.3 (2021-07-06)
 
 * Code generator/formatter handles empty blocks

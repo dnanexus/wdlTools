@@ -13,7 +13,7 @@ object WdlVersion {
   case object Draft_2 extends WdlVersion("draft-2", 0, aliases = Set.empty)
   case object V1 extends WdlVersion("1.0", 1, aliases = Set("draft-3"))
   case object V1_1 extends WdlVersion("1.1", 2, aliases = Set("1.1.0", "1.1.1"))
-  case object V2 extends WdlVersion("2.0", 3, aliases = Set("development"))
+  case object V2 extends WdlVersion("development", 3, aliases = Set("2.0"))
 
   val All: Vector[WdlVersion] = Vector(V2, V1_1, V1, Draft_2).sortWith(_ < _)
 
