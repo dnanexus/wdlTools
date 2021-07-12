@@ -3,6 +3,7 @@
 ## in develop
 
 * No longer unwraps optional type for an input with a default value
+* Adds `EvalError` to differentiate between evaluation exceptions (which can be deferred when the occur during static analysis) and errors (which cannot)
 
 ## 0.14.3 (2021-07-06)
 
