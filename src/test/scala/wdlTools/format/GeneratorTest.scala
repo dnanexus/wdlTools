@@ -155,4 +155,8 @@ class GeneratorTest extends AnyFlatSpec with Matchers {
   it should "handle struct field access" in {
     generate("struct_field.wdl", validateContentSelf = true)
   }
+
+  it should "handle None literal" in {
+    generate("none_literal.wdl", validateContentSelf = true, wdlVersion = WdlVersion.V2)
+  }
 }
