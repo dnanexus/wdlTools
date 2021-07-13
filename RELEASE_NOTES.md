@@ -3,6 +3,7 @@
 ## in develop
 
 * No longer unwraps optional type for an input with a default value
+* Automatically changes struct declaration with map literal assignment to an object literal 
 
 ## 0.14.3 (2021-07-06)
 

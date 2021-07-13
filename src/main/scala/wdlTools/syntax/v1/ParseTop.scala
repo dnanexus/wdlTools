@@ -752,7 +752,13 @@ bound_decls
       Declaration(name, wdlType, None)(getSourceLocation(grammar.docSource, ctx))
     } else {
       val expr: Expr = visitExpr(ctx.expr())
-      Declaration(name, wdlType, Some(expr))(getSourceLocation(grammar.docSource, ctx))
+      val fixedExpr = (wdlType, expr) match {
+        case (_: TypeStruct | _: TypeIdentifier, e @ ExprMapLiteral(members)) =>
+          // automatically fix assigning Map value to struct type
+          ExprObjectLiteral(members)(e.loc)
+        case _ => expr
+      }
+      Declaration(name, wdlType, Some(fixedExpr))(getSourceLocation(grammar.docSource, ctx))
     }
   }
 
