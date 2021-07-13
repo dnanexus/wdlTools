@@ -87,20 +87,41 @@ object DefaultEvalPaths {
   lazy val empty: DefaultEvalPaths = DefaultEvalPaths(FileUtils.NullPath, FileUtils.NullPath)
 }
 
-// A runtime error
-final class EvalException(message: String) extends Exception(message) {
+sealed class EvalThrowable(message: String) extends Exception(message)
+
+object EvalThrowable {
+  def formatMessage(msg: String, loc: SourceLocation): String = {
+    s"${msg} at ${loc}"
+  }
+}
+
+/**
+  * An Exception that occurs during evaluation. An EvalException that
+  * occurs during static evaluation can be deferred until runtime.
+  */
+final class EvalException(message: String) extends EvalThrowable(message) {
   def this(msg: String, loc: SourceLocation) = {
-    this(EvalException.formatMessage(msg, loc))
+    this(EvalThrowable.formatMessage(msg, loc))
   }
 
   def this(msg: String, loc: SourceLocation, cause: Throwable) = {
-    this(EvalException.formatMessage(msg, loc))
+    this(EvalThrowable.formatMessage(msg, loc))
     initCause(cause)
   }
 }
 
-object EvalException {
-  def formatMessage(msg: String, loc: SourceLocation): String = {
-    s"${msg} at ${loc}"
+/**
+  * An Error that occurs during evaluation. All EvalErrors should
+  * result in immediate program exit - i.e. they cannot be deferred
+  * until runtime.
+  */
+final class EvalError(message: String) extends EvalThrowable(message) {
+  def this(msg: String, loc: SourceLocation) = {
+    this(EvalThrowable.formatMessage(msg, loc))
+  }
+
+  def this(msg: String, loc: SourceLocation, cause: Throwable) = {
+    this(EvalThrowable.formatMessage(msg, loc))
+    initCause(cause)
   }
 }
