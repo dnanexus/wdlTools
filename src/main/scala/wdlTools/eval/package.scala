@@ -112,7 +112,7 @@ final class EvalException(message: String) extends EvalThrowable(message) {
 
 /**
   * An Error that occurs during evaluation. All EvalErrors should
-  * result in immediate program exist - i.e. they cannot be deferred
+  * result in immediate program exit - i.e. they cannot be deferred
   * until runtime.
   */
 final class EvalError(message: String) extends EvalThrowable(message) {
