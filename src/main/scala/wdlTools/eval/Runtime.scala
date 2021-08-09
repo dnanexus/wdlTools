@@ -70,24 +70,32 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def disks: Vector[DiskRequest]
 
-  def isValidReturnCode(returnCode: Int): Boolean = {
+  /**
+    * Return codes that indicate success. If None, then all return codes
+    * indicate success.
+    */
+  def returnCodes: Option[Set[Int]] = {
     val loc = getSourceLocation(Runtime.ReturnCodesKey)
     get(Runtime.ReturnCodesKey, Vector(T_String, T_Int, T_Array(T_Int))) match {
-      case None                => returnCode == Runtime.ReturnCodesDefault
-      case Some(V_String("*")) => true
-      case Some(V_Int(i))      => returnCode == i.toInt
+      case None                => Some(Runtime.ReturnCodesDefault)
+      case Some(V_String("*")) => None
+      case Some(V_Int(i))      => Some(Set(i.toInt))
       case Some(V_Array(v)) =>
-        v.exists {
-          case V_Int(i) => returnCode == i.toInt
+        Some(v.map {
+          case V_Int(i) => i.toInt
           case other =>
             throw new EvalException(
                 s"Invalid ${Runtime.ReturnCodesKey} array item value ${other}",
                 loc
             )
-        }
+        }.toSet)
       case other =>
         throw new EvalException(s"Invalid ${Runtime.ReturnCodesKey} value ${other}", loc)
     }
+  }
+
+  def isValidReturnCode(returnCode: Int): Boolean = {
+    returnCodes.forall(_.contains(returnCode))
   }
 }
 
@@ -196,7 +204,11 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       Runtime.GpuKey -> V_Boolean(Runtime.GpuDefault),
       Runtime.DisksKey -> V_String(Runtime.DisksDefault),
       Runtime.MaxRetriesKey -> V_Int(Runtime.MaxRetriesDefault),
-      Runtime.ReturnCodesKey -> V_Int(Runtime.ReturnCodesDefault)
+      Runtime.ReturnCodesKey -> (if (Runtime.ReturnCodesDefault.size == 1) {
+                                   V_Int(Runtime.ReturnCodesDefault.head)
+                                 } else {
+                                   V_Array(Runtime.ReturnCodesDefault.map(V_Int(_)).toVector)
+                                 })
   )
 
   private val allowedKeys: Set[String] = Set(
@@ -346,7 +358,7 @@ object Runtime {
   val MaxRetriesKey = "maxRetries"
   val MaxRetriesDefault = 0
   val ReturnCodesKey = "returnCodes"
-  val ReturnCodesDefault = 0
+  val ReturnCodesDefault = Set(0)
 
   def fromTask(
       task: TAT.Task,
