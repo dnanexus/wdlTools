@@ -1702,8 +1702,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                     // the first is empty or a WDL comment, so we ignore it
                     (expr.copy(value = rest)(expr.loc), Some(s), false)
                   case _ if rest.trim.isEmpty =>
-                    // single-line expression
-                    (expr.copy(value = first)(expr.loc), None, true)
+                    // single-line expression - trim leading but not trailing whitespace
+                    (expr.copy(value = first.replaceFirst("^\\s+", ""))(expr.loc), None, true)
                   case _ =>
                     // opening line has some real content, so leave as-is
                     (expr, None, false)

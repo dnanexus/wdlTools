@@ -1250,7 +1250,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                     (v.copy(value = rest)(v.loc), false)
                   case _ if rest.trim.isEmpty =>
                     // single-line expression
-                    (v.copy(value = first)(v.loc), true)
+                    (v.copy(value = first.replaceFirst("^\\s+", ""))(v.loc), true)
                   case _ =>
                     // opening line has some real content, so leave as-is
                     (v, false)
