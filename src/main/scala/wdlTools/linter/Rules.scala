@@ -4,7 +4,13 @@ import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import wdlTools.linter.Severity.Severity
 import wdlTools.syntax
 import wdlTools.syntax.AbstractSyntax._
-import wdlTools.syntax.{ASTVisitor, AllParseTreeListener, Antlr4Util, SourceLocation, WdlVersion}
+import wdlTools.syntax.{
+  AbstractSyntaxTreeVisitor,
+  AllParseTreeListener,
+  Antlr4Util,
+  SourceLocation,
+  WdlVersion
+}
 import wdlTools.syntax.Antlr4Util.Grammar
 import wdlTools.types
 import dx.util.FileNode
@@ -178,12 +184,13 @@ object Rules {
   // Note that most of these are caught by the type-checker, but it's
   // still good to be able to warn the user
 
-  class LinterAstRule(id: String, severity: Severity) extends ASTVisitor {
+  class LinterAbstractSyntaxTreeRule(id: String, severity: Severity)
+      extends AbstractSyntaxTreeVisitor {
     private var events: Vector[LintEvent] = Vector.empty
 
     def getEvents: Vector[LintEvent] = events
 
-    protected def addEvent(ctx: ASTVisitor.Context[_ <: Element],
+    protected def addEvent(ctx: AbstractSyntaxTreeVisitor.VisitorContext[_ <: Element],
                            message: Option[String] = None): Unit = {
       addEventFromElement(ctx.element, message)
     }
@@ -198,7 +205,7 @@ object Rules {
       Severity,
       WdlVersion,
       types.TypeContext
-  ) => LinterAstRule
+  ) => LinterAbstractSyntaxTreeRule
 
   // rules ported from miniwdl
 
@@ -306,10 +313,10 @@ object Rules {
                                  severity: Severity,
                                  version: WdlVersion,
                                  typesContext: types.TypeContext)
-      extends LinterAstRule(id, severity) {
+      extends LinterAbstractSyntaxTreeRule(id, severity) {
     private val containerKeys = Set("docker", "container")
 
-    override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
+    override def visitTask(ctx: AbstractSyntaxTreeVisitor.VisitorContext[Task]): Unit = {
       if (ctx.element.runtime.isEmpty) {
         addEvent(ctx, Some("add a runtime section specifying a container"))
       } else if (!ctx.element.runtime.get.kvs.exists(kv => containerKeys.contains(kv.id))) {
@@ -322,8 +329,8 @@ object Rules {
                               severity: Severity,
                               version: WdlVersion,
                               typesContext: types.TypeContext)
-      extends LinterAstRule(id, severity) {
-    override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
+      extends LinterAbstractSyntaxTreeRule(id, severity) {
+    override def visitTask(ctx: AbstractSyntaxTreeVisitor.VisitorContext[Task]): Unit = {
       if (ctx.element.input.isEmpty || ctx.element.input.get.parameters.isEmpty) {
         addEvent(ctx)
       }
@@ -334,9 +341,9 @@ object Rules {
                                severity: Severity,
                                version: WdlVersion,
                                typesContext: types.TypeContext)
-      extends LinterAstRule(id, severity) {
+      extends LinterAbstractSyntaxTreeRule(id, severity) {
 
-    override def visitTask(ctx: ASTVisitor.Context[Task]): Unit = {
+    override def visitTask(ctx: AbstractSyntaxTreeVisitor.VisitorContext[Task]): Unit = {
       if (ctx.element.output.isEmpty || ctx.element.output.get.parameters.isEmpty) {
         addEvent(ctx)
       }
