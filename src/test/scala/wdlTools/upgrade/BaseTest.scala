@@ -31,4 +31,12 @@ class BaseTest extends AnyFlatSpec with Matchers {
     val documents = upgrader.upgrade(beforeUri, Some(WdlVersion.Draft_2), WdlVersion.V1)
     documents(beforeUri).mkString("\n") shouldBe afterPath.readString
   }
+
+  it should "Upgrade draft-2 command" in {
+    val (beforeUri, afterPath) = getBeforeAfterPair("command4.wdl")
+    val upgrader = code.Upgrader()
+    val documents = upgrader.upgrade(beforeUri, Some(WdlVersion.Draft_2), WdlVersion.V1)
+    val upgraded = documents(beforeUri).mkString("\n")
+    upgraded shouldBe afterPath.readString
+  }
 }

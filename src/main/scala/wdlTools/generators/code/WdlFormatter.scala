@@ -1680,7 +1680,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
           Literal.chainFromStart(Vector(Symbols.Command, Symbols.CommandOpen), command.loc)
       )
       if (hasCommand) {
-        // The parser swallows anyting after the opening token ('{' or '<<<')
+        // The parser swallows anything after the opening token ('{' or '<<<')
         // as part of the comment block, so we need to parse out any in-line
         // comment and append it separately.
         val (headExpr: Expr, comment, indent) = command.parts.head match {
@@ -1701,9 +1701,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                   case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
                     // the first is empty or a WDL comment, so we ignore it
                     (expr.copy(value = rest)(expr.loc), Some(s), false)
-                  case s if rest.trim.isEmpty =>
+                  case _ if rest.trim.isEmpty =>
                     // single-line expression
-                    (expr.copy(value = s)(expr.loc), None, true)
+                    (expr.copy(value = first)(expr.loc), None, true)
                   case _ =>
                     // opening line has some real content, so leave as-is
                     (expr, None, false)

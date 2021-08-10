@@ -1248,9 +1248,9 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                   case s if s.startsWith(Symbols.Comment) || s.isEmpty =>
                     // the first is empty or a WDL comment so we ignore it
                     (v.copy(value = rest)(v.loc), false)
-                  case s if rest.trim.isEmpty =>
+                  case _ if rest.trim.isEmpty =>
                     // single-line expression
-                    (v.copy(value = s)(v.loc), true)
+                    (v.copy(value = first)(v.loc), true)
                   case _ =>
                     // opening line has some real content, so leave as-is
                     (v, false)

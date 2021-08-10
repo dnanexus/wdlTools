@@ -5,6 +5,7 @@
 * No longer unwraps optional type for an input with a default value
 * Automatically changes struct declaration with map literal assignment to an object literal 
 * Adds `Runtime.returnCodes` accessor
+* Fixes formatting of single-line expressions in code generator/formatter
 
 ## 0.14.3 (2021-07-06)
 
