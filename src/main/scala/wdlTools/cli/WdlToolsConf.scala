@@ -14,7 +14,7 @@ import wdlTools.syntax.{Antlr4Util, WdlVersion}
 import wdlTools.types.TypeCheckingRegime
 import wdlTools.types.TypeCheckingRegime.TypeCheckingRegime
 import dx.util.FileUtils.{FileScheme, getUriScheme}
-import dx.util.{FileSourceResolver, FileUtils, Logger}
+import dx.util.{FileSourceResolver, FileUtils, LogLevel, Logger}
 
 import scala.util.Try
 
@@ -71,9 +71,9 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
       * @return
       */
     def init(): Unit = {
-      val quiet = this.quiet.getOrElse(default = false)
+      val level = if (this.quiet.getOrElse(default = false)) LogLevel.Error else LogLevel.Info
       val traceLevel = this.verbose.getOrElse(default = 0)
-      Logger.set(quiet, traceLevel)
+      Logger.set(level, traceLevel)
     }
   }
 
