@@ -169,9 +169,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
       case Some(V_String(s)) =>
         val d = EvalUtils.sizeStringToFloat(s, getSourceLocation(Runtime.MemoryKey))
         EvalUtils.floatToInt(d)
-      case None =>
-        val d = EvalUtils.sizeStringToFloat(Runtime.MemoryDefault, SourceLocation.empty)
-        EvalUtils.floatToInt(d)
+      case None => Runtime.MemoryDefault
       case other =>
         throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
                                 getSourceLocation(Runtime.MemoryKey))
@@ -199,8 +197,8 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   assert(wdlVersion >= WdlVersion.V2, "V2Runtime only supports WDL versions >= 2")
 
   val defaults: Map[String, V] = Map(
-      Runtime.CpuKey -> V_Int(1),
-      Runtime.MemoryKey -> V_String(Runtime.MemoryDefault),
+      Runtime.CpuKey -> V_Float(Runtime.CpuDefault),
+      Runtime.MemoryKey -> V_Int(Runtime.MemoryDefault),
       Runtime.GpuKey -> V_Boolean(Runtime.GpuDefault),
       Runtime.DisksKey -> V_String(Runtime.DisksDefault),
       Runtime.MaxRetriesKey -> V_Int(Runtime.MaxRetriesDefault),
@@ -350,7 +348,10 @@ object Runtime {
   val CpuKey = "cpu"
   val CpuDefault = 1.0
   val MemoryKey = "memory"
-  val MemoryDefault = "2 GiB"
+  lazy val MemoryDefault: Long = {
+    val d = EvalUtils.sizeStringToFloat("2 GiB", SourceLocation.empty)
+    EvalUtils.floatToInt(d)
+  }
   val DisksKey = "disks"
   val DisksDefault = "1 GiB"
   val GpuKey = "gpu"

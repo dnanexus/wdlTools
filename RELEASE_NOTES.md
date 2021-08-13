@@ -6,6 +6,7 @@
 * Automatically changes struct declaration with map literal assignment to an object literal 
 * Adds `Runtime.returnCodes` accessor
 * Fixes formatting of single-line expressions in code generator/formatter
+* Fixes default memory value for WDL `development`
 
 ## 0.14.3 (2021-07-06)
 
