@@ -177,10 +177,7 @@ object Coercion {
           }.toVector)
         // TODO: Support Array[String] to Struct coercion as described in
         //  https://github.com/openwdl/wdl/issues/389
-        case (WdlTypes.T_Any, any) if allowNonstandardCoercions =>
-          // we shouldn't be seeing Any here, but allow it if optional coercions is enabled
-          any
-
+        case (WdlTypes.T_Any, any) => any
         case (t, other) =>
           throw new EvalException(s"value ${other} cannot be coerced to type ${t}", loc)
       }
