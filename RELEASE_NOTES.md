@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.15.0 (2021-08-16)
 
 * No longer unwraps optional type for an input with a default value
 * Automatically changes struct declaration with map literal assignment to an object literal 
