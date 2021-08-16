@@ -5,7 +5,7 @@ on:
     inputs:
       release-version:
         description: 'Release version'
-        required: true
+        required: false
 
 jobs:
   run-release:
@@ -40,8 +40,20 @@ jobs:
       - name: Extract release notes and set version in application.conf files
         id: update-release
         run: |
+          # Default to the version in the branch name
+          if [[ -z "${{ github.event.inputs.release-version }}" ]]; then
+            version=`echo '${{ github.ref }}' | sed -E 's/refs\/heads\/release-([\d.]*)/\1/g'`
+          else
+            version="${{ github.event.inputs.release-version }}"
+          fi
+          version_check=`echo ${version} | grep -o -P "^\d+\.\d+\.\d+$"`
+          if [ -z "$version_check" ]; then
+            echo "wdlTools version '${version}' is not a valid release version"
+            exit 1
+          fi
+
           # Update the config file with the newest version
-          sed -i 's/version.*$/version = "${{ github.event.inputs.release-version }}"/' ./src/main/resources/application.conf
+          sed -i "s/version.*$/version = \"${version}\"/" ./src/main/resources/application.conf
 
           # Extract release notes for the release into a temporary (unpushed) file
           # It is expected the RELEASE_NOTES.md has already an entry for the version being
