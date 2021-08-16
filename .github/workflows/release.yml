@@ -31,14 +31,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sbt test
-      - name: Assembly
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          sbt assembly
-          mv ./target/wdlTools.jar ./wdlTools-${{ github.event.inputs.release-version }}.jar
-      - name: Extract release notes and set version in application.conf files
-        id: update-release
+      - name: Get version
+        id: version
         run: |
           # Default to the version in the branch name
           if [[ -z "${{ github.event.inputs.release-version }}" ]]; then
@@ -51,34 +45,43 @@ jobs:
             echo "wdlTools version '${version}' is not a valid release version"
             exit 1
           fi
-
+          echo ::set-output name=version::"${version}"
+      - name: Assembly
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sbt assembly
+          mv ./target/wdlTools.jar ./wdlTools-${{ steps.version.outputs.version }}.jar
+      - name: Extract release notes and set version in application.conf files
+        id: update-release
+        run: |
           # Update the config file with the newest version
-          sed -i "s/version.*$/version = \"${version}\"/" ./src/main/resources/application.conf
+          sed -i 's/version.*$/version = "${{ steps.version.outputs.version }}"/' ./src/main/resources/application.conf
 
           # Extract release notes for the release into a temporary (unpushed) file
           # It is expected the RELEASE_NOTES.md has already an entry for the version being
           # released. The section should start with '## <version>', e.g. ## 1.0.0 2021-01-01
           # The file will be read by the create-release step
-          RELEASE_NOTES_PATH="./release_notes_${{ github.event.inputs.release-version }}.md"
-          sed -n '/## ${{ github.event.inputs.release-version }}/,/##/p' RELEASE_NOTES.md | sed '1d; $d' > $RELEASE_NOTES_PATH
+          RELEASE_NOTES_PATH="./release_notes_${{ steps.version.outputs.version }}.md"
+          sed -n '/## ${{ steps.version.outputs.version }}/,/##/p' RELEASE_NOTES.md | sed '1d; $d' > $RELEASE_NOTES_PATH
           echo ::set-output name=release-notes-path::$(echo "${RELEASE_NOTES_PATH}")
       - name: Commit changes to application.conf files
         uses: EndBug/add-and-commit@v7
         with:
-          message: 'Release ${{ github.event.inputs.release-version }}'
+          message: 'Release ${{ steps.version.outputs.version }}'
           add: '[
               "./src/main/resources/application.conf"
           ]'
           push: false
-          tag: ${{ github.event.inputs.release-version }}
+          tag: ${{ steps.version.outputs.version }}
       - name: Create release entry
         id: create-release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event.inputs.release-version }}
-          release_name: wdlTools ${{ github.event.inputs.release-version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: wdlTools ${{ steps.version.outputs.version }}
           body_path: ${{ steps.update-release.outputs.release-notes-path }}
           draft: true
           prerelease: false
@@ -92,15 +95,15 @@ jobs:
           # which include a `upload_url`. See this blog post for more info:
           # https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: ./wdlTools-${{ github.event.inputs.release-version }}.jar
-          asset_name: wdlTools-${{ github.event.inputs.release-version }}.jar
+          asset_path: ./wdlTools-${{ steps.version.outputs.version }}.jar
+          asset_name: wdlTools-${{ steps.version.outputs.version }}.jar
           asset_content_type: application/jar
       - name: Push local release branch and tag to origin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git push origin HEAD:${{ github.ref }}
-          git push origin HEAD:${{ github.event.inputs.release-version }}
+          git push origin HEAD:${{ steps.version.outputs.version }}
       - name: Publish package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,7 +114,7 @@ jobs:
         uses: author/action-rollback@stable
         with:
           release_id: ${{ steps.create-release.outputs.id }}
-          tag: ${{ github.event.inputs.release-version }}
+          tag: ${{ steps.version.outputs.version }}
           delete_orphan_tag: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
