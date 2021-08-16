@@ -209,8 +209,6 @@ object TypedAbstractSyntax {
       extends DocumentElement
       with Callable
 
-  case class CallAfter(name: String)(val loc: SourceLocation) extends Element
-
   // A call has three names - a fully-qualified name (FQN), an unqualified name
   // (UQN), and an "actual" name. The UQN is the callee name without any namespace.
   // The FQN is the callee name including dot-separated namespace(s). The actual

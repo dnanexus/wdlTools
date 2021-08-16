@@ -676,10 +676,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               case (_, None) =>
                 TAT.RequiredInputParameter(decl.name, wdlType)(decl.loc)
               case (t, Some(expr)) =>
-                // drop any optional type wrapper if this is an input with a default value
-                TAT.OverridableInputParameterWithDefault(decl.name,
-                                                         TypeUtils.unwrapOptional(t),
-                                                         expr)(decl.loc)
+                TAT.OverridableInputParameterWithDefault(decl.name, t, expr)(decl.loc)
             }
             (tInputParams :+ tParam, names + decl.name, afterBindings)
         }

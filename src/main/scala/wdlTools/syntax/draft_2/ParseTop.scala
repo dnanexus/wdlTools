@@ -707,9 +707,10 @@ bound_decls
 	;
    */
   override def visitBound_decls(ctx: WdlDraft2Parser.Bound_declsContext): Declaration = {
-    if (ctx.wdl_type() == null)
+    if (ctx.wdl_type() == null) {
       throw new SyntaxException("type missing in declaration",
                                 getSourceLocation(grammar.docSource, ctx))
+    }
     val wdlType: Type = visitWdl_type(ctx.wdl_type())
     val name: String = getIdentifierText(ctx.Identifier(), ctx)
     if (ctx.expr() == null) {

@@ -70,24 +70,32 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def disks: Vector[DiskRequest]
 
-  def isValidReturnCode(returnCode: Int): Boolean = {
+  /**
+    * Return codes that indicate success. If None, then all return codes
+    * indicate success.
+    */
+  def returnCodes: Option[Set[Int]] = {
     val loc = getSourceLocation(Runtime.ReturnCodesKey)
     get(Runtime.ReturnCodesKey, Vector(T_String, T_Int, T_Array(T_Int))) match {
-      case None                => returnCode == Runtime.ReturnCodesDefault
-      case Some(V_String("*")) => true
-      case Some(V_Int(i))      => returnCode == i.toInt
+      case None                => Some(Runtime.ReturnCodesDefault)
+      case Some(V_String("*")) => None
+      case Some(V_Int(i))      => Some(Set(i.toInt))
       case Some(V_Array(v)) =>
-        v.exists {
-          case V_Int(i) => returnCode == i.toInt
+        Some(v.map {
+          case V_Int(i) => i.toInt
           case other =>
             throw new EvalException(
                 s"Invalid ${Runtime.ReturnCodesKey} array item value ${other}",
                 loc
             )
-        }
+        }.toSet)
       case other =>
         throw new EvalException(s"Invalid ${Runtime.ReturnCodesKey} value ${other}", loc)
     }
+  }
+
+  def isValidReturnCode(returnCode: Int): Boolean = {
+    returnCodes.forall(_.contains(returnCode))
   }
 }
 
@@ -161,9 +169,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
       case Some(V_String(s)) =>
         val d = EvalUtils.sizeStringToFloat(s, getSourceLocation(Runtime.MemoryKey))
         EvalUtils.floatToInt(d)
-      case None =>
-        val d = EvalUtils.sizeStringToFloat(Runtime.MemoryDefault, SourceLocation.empty)
-        EvalUtils.floatToInt(d)
+      case None => Runtime.MemoryDefault
       case other =>
         throw new EvalException(s"Invalid ${Runtime.MemoryKey} value ${other}",
                                 getSourceLocation(Runtime.MemoryKey))
@@ -191,12 +197,16 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   assert(wdlVersion >= WdlVersion.V2, "V2Runtime only supports WDL versions >= 2")
 
   val defaults: Map[String, V] = Map(
-      Runtime.CpuKey -> V_Int(1),
-      Runtime.MemoryKey -> V_String(Runtime.MemoryDefault),
+      Runtime.CpuKey -> V_Float(Runtime.CpuDefault),
+      Runtime.MemoryKey -> V_Int(Runtime.MemoryDefault),
       Runtime.GpuKey -> V_Boolean(Runtime.GpuDefault),
       Runtime.DisksKey -> V_String(Runtime.DisksDefault),
       Runtime.MaxRetriesKey -> V_Int(Runtime.MaxRetriesDefault),
-      Runtime.ReturnCodesKey -> V_Int(Runtime.ReturnCodesDefault)
+      Runtime.ReturnCodesKey -> (if (Runtime.ReturnCodesDefault.size == 1) {
+                                   V_Int(Runtime.ReturnCodesDefault.head)
+                                 } else {
+                                   V_Array(Runtime.ReturnCodesDefault.map(V_Int(_)).toVector)
+                                 })
   )
 
   private val allowedKeys: Set[String] = Set(
@@ -338,7 +348,10 @@ object Runtime {
   val CpuKey = "cpu"
   val CpuDefault = 1.0
   val MemoryKey = "memory"
-  val MemoryDefault = "2 GiB"
+  lazy val MemoryDefault: Long = {
+    val d = EvalUtils.sizeStringToFloat("2 GiB", SourceLocation.empty)
+    EvalUtils.floatToInt(d)
+  }
   val DisksKey = "disks"
   val DisksDefault = "1 GiB"
   val GpuKey = "gpu"
@@ -346,7 +359,7 @@ object Runtime {
   val MaxRetriesKey = "maxRetries"
   val MaxRetriesDefault = 0
   val ReturnCodesKey = "returnCodes"
-  val ReturnCodesDefault = 0
+  val ReturnCodesDefault = Set(0)
 
   def fromTask(
       task: TAT.Task,
