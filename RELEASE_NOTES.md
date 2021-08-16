@@ -7,6 +7,7 @@
 * Adds `Runtime.returnCodes` accessor
 * Fixes formatting of single-line expressions in code generator/formatter
 * Fixes default memory value for WDL `development`
+* Always allow coercion to `T_Any`
 
 ## 0.14.3 (2021-07-06)
 
