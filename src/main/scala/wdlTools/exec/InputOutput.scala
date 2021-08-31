@@ -13,7 +13,7 @@ import wdlTools.eval.{
 }
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.{ExprGraph, TypeUtils, WdlTypes}
+import wdlTools.types.{ExprGraph, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 object InputOutput {
@@ -80,25 +80,10 @@ object InputOutput {
   def evaluateOutputs(outputParameters: Vector[OutputParameter],
                       evaluator: Eval,
                       ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
-    val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
-    // create value bindings for the output parameters
-    // some values may already exist in the input bindings (ctx),
-    // so we copy them to the output bindings, otherwise evaluate
-    // the output parameter expression using the union of the input
-    // and output bindings
-    outputParameters.foldLeft(init) {
-      case (outCtx, OutputParameter(name, _, _)) if ctx.contains(name) =>
-        outCtx.add(name, ctx.bindings(name))
-      case (outCtx, OutputParameter(name, wdlType, expr)) =>
-        // if the output parameter is optional, then it is okay if the
-        // expression fails to evaluate - we set the value to None
-        try {
-          outCtx.add(name, evaluator.applyExprAndCoerce(expr, wdlType, ctx.update(outCtx.toMap)))
-        } catch {
-          case _: EvalException if TypeUtils.isOptional(wdlType) =>
-            outCtx.add(name, WdlValues.V_Null)
-        }
-    }
+    evaluator.applyMap(outputParameters.map {
+      case OutputParameter(name, wdlType, expr) =>
+        name -> (wdlType, expr)
+    }.toMap, ctx)
   }
 }
 
