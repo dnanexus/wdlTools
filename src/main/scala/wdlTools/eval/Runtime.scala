@@ -10,7 +10,13 @@ case class DiskRequest(size: Long,
                        mountPoint: Option[String] = None,
                        diskType: Option[String] = None)
 
+/**
+  * Evaluation of runtime section. For any given runtime attribute, the value is
+  * resolved in the following order:
+  * overrides > runtime section > user defaults > spec defaults
+  */
 abstract class Runtime(runtime: Map[String, TAT.Expr],
+                       overrideValues: Option[VBindings],
                        userDefaultValues: Option[VBindings],
                        runtimeLocation: SourceLocation) {
   private var cache: Map[String, Option[V]] = Map.empty
@@ -24,6 +30,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   def contains(id: String): Boolean = {
     allows(id) && (
         cache.contains(id) ||
+        overrideValues.exists(_.contains(id)) ||
         runtime.contains(id) ||
         (aliases.contains(id) && contains(aliases.get(id))) ||
         userDefaultValues.exists(_.contains(id)) ||
@@ -34,19 +41,23 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V
 
   def get(id: String, wdlTypes: Vector[T] = Vector.empty): Option[V] = {
-    if (!cache.contains(id)) {
-      val value = runtime.get(id) match {
-        case Some(expr) =>
-          Some(applyKv(id, expr, wdlTypes))
-        case None if aliases.contains(id) =>
-          get(aliases.get(id), wdlTypes)
-        case None =>
-          // TODO: check type
-          userDefaultValues.flatMap(_.get(id, wdlTypes)).orElse(defaults.get(id))
-      }
-      cache += (id -> value)
-    }
-    cache(id)
+    cache.getOrElse(
+        id, {
+          // TODO: check type for overrides and user defaults
+          val value = overrideValues.flatMap(_.get(id)).orElse {
+            runtime.get(id) match {
+              case Some(expr) =>
+                Some(applyKv(id, expr, wdlTypes))
+              case None if aliases.contains(id) =>
+                get(aliases.get(id), wdlTypes)
+              case None =>
+                userDefaultValues.flatMap(_.get(id, wdlTypes)).orElse(defaults.get(id))
+            }
+          }
+          cache += (id -> value)
+          value
+        }
+    )
   }
 
   def getAll: Map[String, WdlValues.V] = {
@@ -103,9 +114,13 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
                           evaluator: Eval,
                           wdlVersion: WdlVersion,
                           ctx: Option[Bindings[String, V]],
+                          overrideValues: Option[VBindings] = None,
                           userDefaultValues: Option[VBindings],
                           runtimeLocation: SourceLocation)
-    extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
+    extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty),
+                    overrideValues,
+                    userDefaultValues,
+                    runtimeLocation) {
   assert(wdlVersion < WdlVersion.V2, "DefaultRuntime is only for WDL versions < 2")
   val defaults: Map[String, V] = Map.empty
 
@@ -191,9 +206,13 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
                      evaluator: Eval,
                      wdlVersion: WdlVersion,
                      ctx: Option[Bindings[String, V]],
+                     overrideValues: Option[VBindings] = None,
                      userDefaultValues: Option[VBindings],
                      runtimeLocation: SourceLocation)
-    extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty), userDefaultValues, runtimeLocation) {
+    extends Runtime(runtime.map(_.kvs).getOrElse(Map.empty),
+                    overrideValues,
+                    userDefaultValues,
+                    runtimeLocation) {
   assert(wdlVersion >= WdlVersion.V2, "V2Runtime only supports WDL versions >= 2")
 
   val defaults: Map[String, V] = Map(
@@ -365,11 +384,13 @@ object Runtime {
       task: TAT.Task,
       evaluator: Eval,
       ctx: Option[Bindings[String, V]] = None,
+      overrideValues: Option[VBindings] = None,
       defaultValues: Option[VBindings] = None
   ): Runtime = {
     create(task.runtime,
            evaluator,
            ctx,
+           overrideValues,
            defaultValues,
            Some(task.runtime.map(_.loc).getOrElse(task.loc)))
   }
@@ -378,6 +399,7 @@ object Runtime {
       runtime: Option[TAT.RuntimeSection],
       evaluator: Eval,
       ctx: Option[Bindings[String, V]] = None,
+      overrideValues: Option[VBindings] = None,
       defaultValues: Option[VBindings] = None,
       runtimeLocation: Option[SourceLocation] = None
   ): Runtime = {
@@ -390,9 +412,9 @@ object Runtime {
     evaluator.wdlVersion match {
       case None => throw new RuntimeException("no WdlVersion")
       case Some(wdlVersion: WdlVersion) if wdlVersion >= WdlVersion.V2 =>
-        V2Runtime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
+        V2Runtime(runtime, evaluator, wdlVersion, ctx, overrideValues, defaultValues, loc)
       case Some(wdlVersion) =>
-        DefaultRuntime(runtime, evaluator, wdlVersion, ctx, defaultValues, loc)
+        DefaultRuntime(runtime, evaluator, wdlVersion, ctx, overrideValues, defaultValues, loc)
     }
   }
 
