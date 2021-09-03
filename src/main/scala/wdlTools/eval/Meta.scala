@@ -47,13 +47,21 @@ object MetaMap {
   * @param kvs mapping of meta key to value
   * @param userDefaultValues default values supplied by the users - these override any built-in defaults
   */
-class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Option[VBindings] = None)
+class Meta(kvs: Map[String, TAT.MetaValue],
+           overrideValues: Option[VBindings] = None,
+           userDefaultValues: Option[VBindings] = None)
     extends MetaMap(kvs) {
   val defaults: Map[String, WdlValues.V] = Map.empty
 
-  def contains(id: String): Boolean = kvs.contains(id)
+  def contains(id: String): Boolean = {
+    overrideValues.exists(_.contains(id)) ||
+    kvs.contains(id) ||
+    userDefaultValues.exists(_.contains(id)) ||
+    defaults.contains(id)
+  }
 
   override def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
+    overrideValues.flatMap(_.get(id, wdlTypes))
     super
       .get(id, wdlTypes)
       .orElse(userDefaultValues.flatMap(_.get(id, wdlTypes)))
@@ -61,8 +69,10 @@ class Meta(kvs: Map[String, TAT.MetaValue], userDefaultValues: Option[VBindings]
   }
 }
 
-case class Draft2Meta(meta: Map[String, TAT.MetaValue], userDefaultValues: Option[VBindings] = None)
-    extends Meta(meta, userDefaultValues) {
+case class Draft2Meta(meta: Map[String, TAT.MetaValue],
+                      overrideValues: Option[VBindings] = None,
+                      userDefaultValues: Option[VBindings] = None)
+    extends Meta(meta, overrideValues, userDefaultValues) {
   override protected def applyKv(id: String,
                                  value: TAT.MetaValue,
                                  wdlTypes: Vector[WdlTypes.T] = Vector.empty): WdlValues.V = {
@@ -75,25 +85,30 @@ case class Draft2Meta(meta: Map[String, TAT.MetaValue], userDefaultValues: Optio
   }
 }
 
-case class V1Meta(meta: Map[String, TAT.MetaValue], userDefaultValues: Option[VBindings] = None)
-    extends Meta(meta, userDefaultValues)
+case class V1Meta(meta: Map[String, TAT.MetaValue],
+                  overrideValues: Option[VBindings] = None,
+                  userDefaultValues: Option[VBindings] = None)
+    extends Meta(meta, overrideValues, userDefaultValues)
 
 object Meta {
   def create(
       version: WdlVersion,
       meta: Option[TAT.MetaSection],
+      overrideValues: Option[VBindings] = None,
       userDefaultValues: Option[VBindings] = None
   ): Meta = {
     val kvs = meta.map(_.kvs.toMap).getOrElse(Map.empty)
     version match {
-      case WdlVersion.Draft_2 => Draft2Meta(kvs, userDefaultValues)
-      case _                  => V1Meta(kvs, userDefaultValues)
+      case WdlVersion.Draft_2 => Draft2Meta(kvs, overrideValues, userDefaultValues)
+      case _                  => V1Meta(kvs, overrideValues, userDefaultValues)
     }
   }
 }
 
-case class Hints(hints: Option[TAT.MetaSection], userDefaultValues: Option[VBindings] = None)
-    extends Meta(hints.map(_.kvs).getOrElse(Map.empty), userDefaultValues) {
+case class Hints(hints: Option[TAT.MetaSection],
+                 overrideValues: Option[VBindings] = None,
+                 userDefaultValues: Option[VBindings] = None)
+    extends Meta(hints.map(_.kvs).getOrElse(Map.empty), overrideValues, userDefaultValues) {
   override val defaults: Map[String, WdlValues.V] = Map(
       Hints.ShortTaskKey -> V_Boolean(false),
       Hints.LocalizationOptionalKey -> V_Boolean(false),
@@ -144,7 +159,8 @@ object Hints {
 
   def create(
       hints: Option[TAT.MetaSection],
+      overrideValues: Option[VBindings] = None,
       userDefaultValues: Option[VBindings] = None
   ): Hints =
-    Hints(hints, userDefaultValues)
+    Hints(hints, overrideValues, userDefaultValues)
 }

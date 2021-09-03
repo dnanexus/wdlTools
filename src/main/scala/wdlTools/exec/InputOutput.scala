@@ -5,6 +5,7 @@ import spray.json._
 import wdlTools.eval.{
   Eval,
   EvalException,
+  VBindings,
   WdlValueBindings,
   WdlValueSerde,
   WdlValueSerializationException,
@@ -115,22 +116,57 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
                                  logger)
   }
 
-  def inputsFromJson(jsInputs: Map[String, JsValue],
-                     evaluator: Eval,
-                     strict: Boolean = false): Bindings[String, WdlValues.V] = {
-    val values = inputParameters.flatMap { decl =>
-      // lookup by fully-qualified name first, then plain name
-      val fqn = s"${task.name}.${decl.name}"
-      val value = if (jsInputs.contains(fqn)) {
-        TaskInputOutput.deserialize(jsInputs(fqn), decl, fqn)
-      } else if (jsInputs.contains(decl.name)) {
-        TaskInputOutput.deserialize(jsInputs(decl.name), decl, decl.name)
-      } else {
-        None
+  def inputsFromJson(
+      jsInputs: Map[String, JsValue],
+      evaluator: Eval,
+      strict: Boolean = false
+  ): (Bindings[String, WdlValues.V], Option[VBindings], Option[VBindings]) = {
+    val runtimeOverridesPrefixes = Seq(s"${task.name}.runtime.", "runtime.")
+    val hintOverridesPrefixes = Seq(s"${task.name}.hints.", "hints.")
+    val (inputs, runtimeOverrides, hintOverrides) =
+      jsInputs.foldLeft(Map.empty[String, JsValue],
+                        Map.empty[String, JsValue],
+                        Map.empty[String, JsValue]) {
+        case ((inputAccu, runtimeOverrideAccu, hintsOverrideAccu), (key, value)) =>
+          runtimeOverridesPrefixes
+            .collectFirst { case prefix if key.startsWith(prefix) => prefix.length }
+            .map { prefixLength =>
+              (inputAccu,
+               runtimeOverrideAccu + (key.drop(prefixLength) -> value),
+               hintsOverrideAccu)
+            }
+            .orElse(
+                hintOverridesPrefixes
+                  .collectFirst { case prefix if key.startsWith(prefix) => prefix.length }
+                  .map { prefixLength =>
+                    (inputAccu,
+                     runtimeOverrideAccu,
+                     hintsOverrideAccu + (key.drop(prefixLength) -> value))
+                  }
+            )
+            .getOrElse((inputAccu + (key -> value), runtimeOverrideAccu, hintsOverrideAccu))
       }
-      value.map(decl.name -> _)
+    val inputValues = inputParameters.flatMap { decl =>
+      // lookup by fully-qualified name first, then plain name
+      Vector(s"${task.name}.${decl.name}", decl.name)
+        .collectFirst {
+          case key if inputs.contains(key) =>
+            TaskInputOutput.deserialize(inputs(key), decl, key)
+        }
+        .flatten
+        .map(decl.name -> _)
     }.toMap
-    inputsFromValues(values, evaluator, strict)
+    val runtimeOverrideBindings =
+      Option.when(runtimeOverrides.nonEmpty)(WdlValueBindings(runtimeOverrides.map {
+        case (key, value) => key -> WdlValueSerde.deserialize(value)
+      }))
+    val hintOverrideBindings =
+      Option.when(hintOverrides.nonEmpty)(WdlValueBindings(hintOverrides.map {
+        case (key, value) => key -> WdlValueSerde.deserialize(value)
+      }))
+    (inputsFromValues(inputValues, evaluator, strict),
+     runtimeOverrideBindings,
+     hintOverrideBindings)
   }
 
   def evaluateOutputs(evaluator: Eval, ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {

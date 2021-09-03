@@ -12,44 +12,58 @@ import wdlTools.types.{WdlTypes, TypedAbstractSyntax => TAT}
   */
 case class RuntimeAttributes(runtime: Option[Runtime] = None,
                              hints: Option[Hints] = None,
+                             overrideRuntimeValues: Option[VBindings] = None,
+                             overrideHintValues: Option[VBindings] = None,
                              defaultValues: Option[VBindings] = None) {
   def contains(id: String): Boolean = {
-    runtime.exists(_.contains(id)) || hints.exists(_.contains(id)) || defaultValues.exists(
-        _.contains(id)
-    )
+    overrideRuntimeValues.exists(_.contains(id)) ||
+    overrideHintValues.exists(_.contains(id)) ||
+    runtime.exists(_.contains(id)) ||
+    hints.exists(_.contains(id)) ||
+    defaultValues.exists(_.contains(id))
   }
 
   def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
-    val value = if (runtime.exists(_.allows(id))) {
-      runtime.get.get(id, wdlTypes)
-    } else {
-      None
-    }
-    value
-      .orElse(hints.flatMap(_.get(id, wdlTypes)))
-      .orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
+    overrideRuntimeValues
+      .flatMap(_.get(id, wdlTypes))
+      .orElse(overrideHintValues.flatMap(_.get(id, wdlTypes)))
+      .orElse(
+          Option
+            .when(runtime.exists(_.allows(id)))(runtime.get.get(id, wdlTypes))
+            .flatten
+            .orElse(hints.flatMap(_.get(id, wdlTypes)))
+            .orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
+      )
   }
 
   def containsRuntime(id: String): Boolean = {
-    runtime.exists(_.contains(id)) || defaultValues.exists(_.contains(id))
+    overrideRuntimeValues.exists(_.contains(id)) ||
+    runtime.exists(_.contains(id)) ||
+    defaultValues.exists(_.contains(id))
   }
 
   def getRuntime(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
-    val value = if (runtime.exists(_.allows(id))) {
-      runtime.get.get(id, wdlTypes)
-    } else {
-      None
-    }
-    value
-      .orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
+    overrideRuntimeValues
+      .flatMap(_.get(id, wdlTypes))
+      .orElse(
+          Option
+            .when(runtime.exists(_.allows(id)))(runtime.get.get(id, wdlTypes))
+            .flatten
+            .orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
+      )
   }
 
   def containsHint(id: String): Boolean = {
-    hints.exists(_.contains(id)) || defaultValues.exists(_.contains(id))
+    overrideHintValues.exists(_.contains(id)) ||
+    hints.exists(_.contains(id)) ||
+    defaultValues.exists(_.contains(id))
   }
 
   def getHint(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
-    hints.flatMap(_.get(id, wdlTypes)).orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
+    overrideHintValues
+      .flatMap(_.get(id, wdlTypes))
+      .orElse(hints.flatMap(_.get(id, wdlTypes)))
+      .orElse(defaultValues.flatMap(_.get(id, wdlTypes)))
   }
 }
 
@@ -58,9 +72,18 @@ object RuntimeAttributes {
       task: TAT.Task,
       evaluator: Eval,
       ctx: Option[WdlValueBindings] = None,
+      overrideRuntimeValues: Option[VBindings] = None,
+      overrideHintValues: Option[VBindings] = None,
       defaultValues: Option[VBindings] = None
   ): RuntimeAttributes = {
-    create(task.runtime, task.hints, evaluator, ctx, defaultValues, Some(task.loc))
+    create(task.runtime,
+           task.hints,
+           evaluator,
+           ctx,
+           overrideRuntimeValues,
+           overrideHintValues,
+           defaultValues,
+           Some(task.loc))
   }
 
   def create(
@@ -68,6 +91,8 @@ object RuntimeAttributes {
       hintsSection: Option[MetaSection],
       evaluator: Eval,
       ctx: Option[WdlValueBindings] = None,
+      overrideRuntimeValues: Option[VBindings] = None,
+      overrideHintValues: Option[VBindings] = None,
       defaultValues: Option[VBindings] = None,
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
@@ -75,6 +100,6 @@ object RuntimeAttributes {
       Runtime.create(Some(r), evaluator, ctx, runtimeLocation = sourceLocation)
     )
     val hints = hintsSection.map(h => Hints.create(Some(h)))
-    RuntimeAttributes(runtime, hints, defaultValues)
+    RuntimeAttributes(runtime, hints, overrideRuntimeValues, overrideHintValues, defaultValues)
   }
 }
