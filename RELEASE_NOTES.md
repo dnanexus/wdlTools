@@ -3,6 +3,7 @@
 ## in develop
 
 * Adds parameters for runtime and hint overrides to `Eval.Runtime` and `Eval.Meta` classes
+* Fixes parsing of `runtime.returnCodes`
 
 ## 0.15.0 (2021-08-16)
 
