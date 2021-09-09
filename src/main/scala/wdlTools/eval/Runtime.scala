@@ -87,7 +87,7 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
     */
   def returnCodes: Option[Set[Int]] = {
     val loc = getSourceLocation(Runtime.ReturnCodesKey)
-    get(Runtime.ReturnCodesKey, Vector(T_String, T_Int, T_Array(T_Int))) match {
+    get(Runtime.ReturnCodesKey, Vector(T_Int, T_Array(T_Int), T_String)) match {
       case None                => Some(Runtime.ReturnCodesDefault)
       case Some(V_String("*")) => None
       case Some(V_Int(i))      => Some(Set(i.toInt))
