@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.16.0 (2021-09-09)
 
 * Adds parameters for runtime and hint overrides to `Eval.Runtime` and `Eval.Meta` classes
 * Fixes parsing of `runtime.returnCodes`
