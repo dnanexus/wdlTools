@@ -154,7 +154,7 @@ uid           [ultimate] <your email>
 ```
 
 - Distribute the key `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
-- Export secret key where sbt plugin expects it `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
+- Export secret key for sbt plugin `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
 - Add the following to `~/.sbt/1.0/plugins/gpg.sbt`.
 
 ```
@@ -164,6 +164,21 @@ credentials += Credentials(
   "<key identifer>", // key identifier
   "ignored" // this field is ignored; passwords are supplied by pinentry
 )
+```
+
+- Add the following to `~/.sbt/1.0/sonatype.sbt`.
+
+```
+credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
+```
+
+- Add the following to `~/.sbt/sonatype_credentials`.
+
+```
+realm=Sonatype Nexus Repository Manager
+host=oss.sonatype.org
+user=dnanexus
+password=<dnanexus's password>
 ```
 
 ### Beginning the release
