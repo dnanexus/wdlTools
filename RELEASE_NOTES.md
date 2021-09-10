@@ -2,6 +2,7 @@
 
 ## in develop
 
+* **Breaking Change** `Eval.applyMap` is changed to `Eval.applyAll` and takes a `Vector` rather than `Map` argument. This is done to ensure the expressions are evaluated in order in case there are dependencies between them.
 * Additional fixes to parsing `runtime.returnCodes`
 
 ## 0.16.0 (2021-09-09)
