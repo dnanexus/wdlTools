@@ -81,10 +81,10 @@ object InputOutput {
   def evaluateOutputs(outputParameters: Vector[OutputParameter],
                       evaluator: Eval,
                       ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
-    evaluator.applyMap(outputParameters.map {
+    evaluator.applyAll(outputParameters.map {
       case OutputParameter(name, wdlType, expr) =>
-        name -> (wdlType, expr)
-    }.toMap, ctx)
+        (name, (wdlType, expr))
+    }, ctx)
   }
 }
 

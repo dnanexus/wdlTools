@@ -20,7 +20,8 @@ ThisBuild / organization := "com.dnanexus"
 ThisBuild / scalaVersion := "2.13.2"
 ThisBuild / developers := List(
     Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus-rnd")),
-    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd"))
+    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd")),
+    Developer("r-i-v-a", "Riva Nathans", "rnathans-cf@dnanexus.com", url("https://github.com/dnanexus-rnd"))
 )
 ThisBuild / homepage := Some(url("https://github.com/dnanexus-rnd/wdlTools"))
 ThisBuild / scmInfo := Some(

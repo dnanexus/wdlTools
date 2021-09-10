@@ -549,7 +549,7 @@ case class Eval(paths: EvalPaths,
     }
   }
 
-  def applyMap(exprs: Map[String, (WdlTypes.T, TAT.Expr)],
+  def applyAll(exprs: Vector[(String, (WdlTypes.T, TAT.Expr))],
                ctx: Bindings[String, V]): Bindings[String, V] = {
     val init: Bindings[String, V] = WdlValueBindings.empty
     exprs.foldLeft(init) {
