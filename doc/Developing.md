@@ -138,6 +138,34 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 ## Releasing
 
+### Sonatype Nexus publishing setup
+
+- Have `dnanexus`'s password for [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories).
+- Install gnupg `brew install gnupg`.
+- Generate a key `gpg --quick-gen-key <your email> rsa2048`. Remember the passphrase.
+- Get the key's identifier.
+
+```
+% gpg --list-keys
+
+pub   rsa2048 2021-09-09 [SC] [expires: 2023-09-09]
+      <key identifier is this string>
+uid           [ultimate] <your email>
+```
+
+- Send key to keyserver `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
+- Export secret key where sbt plugin expects it `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
+- Add the following to `~/.sbt/1.0/plugins/gpg.sbt`.
+
+```
+credentials += Credentials(
+  "GnuPG Key ID",
+  "gpg",
+  "<key identifer>", // key identifier
+  "ignored" // this field is ignored; passwords are supplied by pinentry
+)
+```
+
 ### Beginning the release
 
 1. Checkout the develop branch (either HEAD or the specific commit you want to release)
@@ -156,8 +184,8 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 Note: this process is currently coordinated by John Didion - please request from him a release of the updated library(ies).
 
-1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have the SonaType PGP private key on your machine, and you will need the password.
-2. Go to [nexus repository manager](https://oss.sonatype.org/#stagingRepositories), log in, and go to "Staging Repositories".
+1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have completed the "Sonatype Nexus publishing setup" instructions above.
+2. Go to [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories), log in as `dnanexus`, and go to "Staging Repositories".
 3. Check the repository to release; there should only be one, but if there are more check the contents to find yours.
 4. Click the "Close" button. After a few minutes, hit "Refresh". The "Release" button should become un-grayed. If not, wait a few more minutes and referesh again.
 5. Click the "Release" button.
