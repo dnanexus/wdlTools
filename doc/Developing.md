@@ -203,7 +203,7 @@ Resources
 
 Note: this process is currently coordinated by John Didion - please request from him a release of the updated library(ies).
 
-1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have completed the "Sonatype Nexus publishing setup" instructions above.
+1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have completed the "Sonatype Nexus publishing setup" instructions above. You will be prompted to enter your key's passphrase.
 2. Go to [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories), log in as `dnanexus`, and go to "Staging Repositories".
 3. Check the repository to release; there should only be one, but if there are more check the contents to find yours.
 4. Click the "Close" button. After a few minutes, hit "Refresh". The "Release" button should become un-grayed. If not, wait a few more minutes and referesh again.
