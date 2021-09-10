@@ -181,6 +181,10 @@ user=dnanexus
 password=<dnanexus's password>
 ```
 
+Resources
+- https://formulae.brew.sh/formula/gnupg
+- https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html
+
 ### Beginning the release
 
 1. Checkout the develop branch (either HEAD or the specific commit you want to release)
