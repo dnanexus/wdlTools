@@ -153,7 +153,7 @@ pub   rsa2048 2021-09-09 [SC] [expires: 2023-09-09]
 uid           [ultimate] <your email>
 ```
 
-- Send key to keyserver `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
+- Distribute the key `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
 - Export secret key where sbt plugin expects it `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
 - Add the following to `~/.sbt/1.0/plugins/gpg.sbt`.
 
