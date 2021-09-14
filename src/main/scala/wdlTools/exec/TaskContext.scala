@@ -10,6 +10,8 @@ case class TaskContext(task: Task,
                        inputBindings: Bindings[String, V],
                        hostEvaluator: Eval,
                        guestEvaluator: Option[Eval] = None,
+                       overrideRuntimeValues: Option[VBindings] = None,
+                       overrideHintValues: Option[VBindings] = None,
                        defaultRuntimeValues: Option[VBindings] = None,
                        taskIO: TaskInputOutput,
                        fileResolver: FileSourceResolver = FileSourceResolver.get,
@@ -47,7 +49,11 @@ case class TaskContext(task: Task,
     })
   }
   lazy val runtime: Runtime =
-    Runtime.fromTask(task, hostEvaluator, Some(evalBindings), defaultRuntimeValues)
+    Runtime.fromTask(task,
+                     hostEvaluator,
+                     Some(evalBindings),
+                     overrideRuntimeValues,
+                     defaultRuntimeValues)
 
   // The command is evaluated using the guest paths, since it will be executed within
   // the guest system (i.e. container) if applicable, otherwise host and guest are the same
@@ -143,7 +149,15 @@ object TaskContext {
                defaultRuntimeValues: Option[VBindings] = None,
                taskIO: TaskInputOutput,
                strict: Boolean = false): TaskContext = {
-    val inputs = taskIO.inputsFromJson(jsInputs, hostEvaluator, strict)
-    TaskContext(task, inputs, hostEvaluator, guestEvaluator, defaultRuntimeValues, taskIO)
+    val (inputs, overrideRuntimeValues, overrideHintValues) =
+      taskIO.inputsFromJson(jsInputs, hostEvaluator, strict)
+    TaskContext(task,
+                inputs,
+                hostEvaluator,
+                guestEvaluator,
+                overrideRuntimeValues,
+                overrideHintValues,
+                defaultRuntimeValues,
+                taskIO)
   }
 }

@@ -549,6 +549,24 @@ case class Eval(paths: EvalPaths,
     }
   }
 
+  def applyMap(exprs: Map[String, (WdlTypes.T, TAT.Expr)],
+               ctx: Bindings[String, V]): Bindings[String, V] = {
+    val init: Bindings[String, V] = WdlValueBindings.empty
+    exprs.foldLeft(init) {
+      case (bindings, (name, (wdlType, expr))) =>
+        val value = ctx.get(name).getOrElse {
+          // if the output parameter is optional, then it is okay if the
+          // expression fails to evaluate - we set the value to None
+          try {
+            applyExprAndCoerce(expr, wdlType, ctx.update(bindings.toMap))
+          } catch {
+            case _: EvalException if TypeUtils.isOptional(wdlType) => WdlValues.V_Null
+          }
+        }
+        bindings.add(name, value)
+    }
+  }
+
   /**
     * Given a multi-line string, determine the largest w such that each line
     * begins with at least w whitespace characters. Trailing whitespace is

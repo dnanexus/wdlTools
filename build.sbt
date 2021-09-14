@@ -20,7 +20,8 @@ ThisBuild / organization := "com.dnanexus"
 ThisBuild / scalaVersion := "2.13.2"
 ThisBuild / developers := List(
     Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus-rnd")),
-    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd"))
+    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd")),
+    Developer("r-i-v-a", "Riva Nathans", "rnathans-cf@dnanexus.com", url("https://github.com/dnanexus-rnd"))
 )
 ThisBuild / homepage := Some(url("https://github.com/dnanexus-rnd/wdlTools"))
 ThisBuild / scmInfo := Some(
@@ -40,17 +41,17 @@ lazy val wdlTools = root.settings(
 )
 
 lazy val dependencies = {
-  val dxCommonVersion = "0.7.0"
-  val antlr4Version = "4.9"
+  val dxCommonVersion = "0.8.0"
+  val antlr4Version = "4.9.2"
   val scallopVersion = "3.4.0"
-  val typesafeVersion = "1.3.3"
-  val scalateVersion = "1.9.6"
+  val typesafeVersion = "1.4.1"
+  val scalateVersion = "1.9.7"
   //val beardVersion = "0.3.1"
-  val sprayVersion = "1.3.5"
+  val sprayVersion = "1.3.6"
   val katanVersion = "0.6.1"
-  val re2jVersion = "1.5"
+  val re2jVersion = "1.6"
   val graphVersion = "1.13.2"
-  val scalatestVersion = "3.1.1"
+  val scalatestVersion = "3.2.9"
 
   Seq(
       "com.dnanexus" % "dxcommon" % dxCommonVersion,
