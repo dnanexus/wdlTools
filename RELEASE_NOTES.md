@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.17.0 (2021-09-15)
 
 * **Breaking Change** `Eval.applyMap` is changed to `Eval.applyAll` and takes a `Vector` rather than `Map` argument. This is done to ensure the expressions are evaluated in order in case there are dependencies between them.
 * Additional fixes to parsing `runtime.returnCodes`
