@@ -140,7 +140,9 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 ### Sonatype Nexus publishing setup
 
-- Have `dnanexus`'s password for [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories). Riva Nathans and John Didion have the password.
+We use [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories) to release artifacts. In order to set it up:
+
+- Have `dnanexus`'s password for SonaType. Riva Nathans and John Didion have the password.
 - Install gnupg `brew install gnupg`.
 - Generate a key `gpg --quick-gen-key <your email> rsa2048`. Remember the passphrase.
 - Get the key's identifier.
