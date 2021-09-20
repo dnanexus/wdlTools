@@ -245,12 +245,12 @@ wdl_type
   private def parse_placeholder_option(
       ctx: WdlDraft2Parser.Expression_placeholder_optionContext
   ): (String, Expr) = {
-    if (ctx.DEFAULT() != null) {
+    if (ctx.DEFAULTEQUAL() != null) {
       ("default", visitExpr(ctx.expr()))
     } else {
       val optionType = if (ctx.BoolLiteral() != null) {
         ctx.BoolLiteral().getText.toLowerCase()
-      } else if (ctx.SEP() != null) {
+      } else if (ctx.SEPEQUAL() != null) {
         "sep"
       } else {
         throw new SyntaxException(s"unrecognized placeholder option",

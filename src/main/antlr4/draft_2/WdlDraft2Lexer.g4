@@ -34,8 +34,8 @@ PAIR: 'Pair';
 OBJECT: 'Object';
 OBJECTLITERAL: 'object';
 
-SEP: 'sep';
-DEFAULT: 'default';
+SEPEQUAL: 'sep';
+DEFAULTEQUAL: 'default';
 
 // Primitive Literals
 IntLiteral
