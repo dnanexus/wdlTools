@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.17.1 (2021-09-23)
 
 * Fixes parsing of placeholder options in draft-2 and 1.0 such that `default` and `sep` are no longer treated as reserved words
 
