@@ -38,8 +38,8 @@ task PeakCalling {
   command {
     set -e
     macs2 callpeak \
-    --treatment ~{sep = ' ' inputBams} \
-    ~{true="--control" false="" defined(controlBams)} ~{sep = ' ' controlBams} \
+    --treatment ~{sep=' ' inputBams} \
+    ~{true="--control" false="" defined(controlBams)} ~{sep=' ' controlBams} \
     --outdir ~{outDir} \
     --name ~{sampleName} \
     ~{true='--nomodel' false='' nomodel}
