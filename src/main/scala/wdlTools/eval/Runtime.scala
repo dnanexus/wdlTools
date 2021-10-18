@@ -27,12 +27,12 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   def allows(id: String): Boolean
 
-  def contains(id: String): Boolean = {
+  def contains(id: String, followAlias: Boolean = true): Boolean = {
     allows(id) && (
         cache.contains(id) ||
         overrideValues.exists(_.contains(id)) ||
         runtime.contains(id) ||
-        (aliases.contains(id) && contains(aliases.get(id))) ||
+        (followAlias && aliases.contains(id) && contains(aliases.get(id), followAlias = false)) ||
         userDefaultValues.exists(_.contains(id)) ||
         defaults.contains(id)
     )
@@ -40,18 +40,18 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
 
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V
 
-  def get(id: String, wdlTypes: Vector[T] = Vector.empty): Option[V] = {
+  def get(id: String,
+          wdlTypes: Vector[T] = Vector.empty,
+          followAlias: Boolean = true): Option[V] = {
     cache.getOrElse(
         id, {
           // TODO: check type for overrides and user defaults
           val value = overrideValues.flatMap(_.get(id)).orElse {
             runtime.get(id) match {
-              case Some(expr) =>
-                Some(applyKv(id, expr, wdlTypes))
-              case None if aliases.contains(id) =>
-                get(aliases.get(id), wdlTypes)
-              case None =>
-                userDefaultValues.flatMap(_.get(id, wdlTypes)).orElse(defaults.get(id))
+              case Some(expr) => Some(applyKv(id, expr, wdlTypes))
+              case None if followAlias && aliases.contains(id) =>
+                get(aliases.get(id), wdlTypes, followAlias = false)
+              case None => userDefaultValues.flatMap(_.get(id, wdlTypes)).orElse(defaults.get(id))
             }
           }
           cache += (id -> value)
@@ -64,11 +64,12 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
     runtime.keys.map(key => key -> get(key).get).toMap
   }
 
-  def getSourceLocation(id: String): SourceLocation = {
+  def getSourceLocation(id: String, followAlias: Boolean = true): SourceLocation = {
     runtime.get(id) match {
-      case Some(v)                      => v.loc
-      case None if aliases.contains(id) => getSourceLocation(aliases.get(id))
-      case None                         => runtimeLocation
+      case Some(v) => v.loc
+      case None if followAlias && aliases.contains(id) =>
+        getSourceLocation(aliases.get(id), followAlias = false)
+      case None => runtimeLocation
     }
   }
 
