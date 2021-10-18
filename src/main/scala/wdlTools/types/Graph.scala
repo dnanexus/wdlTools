@@ -11,22 +11,13 @@ import wdlTools.types.WdlTypes._
 case class ElementNode(element: Element)
 
 /**
-  * Graph of the DocumentElements in a Document. The graph starts from
-  * the main Document and includes all imports.
+  * Graph of the DocumentElements in a Document. The graph starts from the main Document and includes all imports.
   *
-  * Each Document has a namespace that consists of 1) the workflow,
-  * tasks, and structs defined within that document, 2) any imported
-  * Documents, which are named either with their alias or (if they
-  * don't have an alias) the document name without the path prefix or
-  * the '.wdl' suffix, and 3) any structs in imported documents, which
-  * are named either by their alias or (if they don't have an alias) by
-  * their name. If a Document imports another Document, it has access to
-  * all the members of that Document's namespace (using dotted notation).
-  *
-  * @param graph
-  * @param wdlVersion
-  * @param namespaces
-  * @param structDefs
+  * Each Document has a namespace that consists of 1) the workflow, tasks, and structs defined within that document,
+  * 2) any imported Documents, which are named either with their alias or (if they don't have an alias) the document
+  * name without the path prefix or the '.wdl' suffix, and 3) any structs in imported documents, which are named either
+  * by their alias or (if they don't have an alias) by their name. If a Document imports another Document, it has access
+  * to all the members of that Document's namespace (using dotted notation).
   */
 case class ElementGraph(graph: Graph[ElementNode, DiEdge],
                         wdlVersion: WdlVersion,
@@ -160,6 +151,10 @@ case class ExprGraph(graph: Graph[String, DiEdge], varInfo: Map[String, VarInfo]
       case dep if varInfo(dep).kind == ExprGraph.VarKind.Output => dep
     }
   }
+
+  def layeredDependencyOrder(cmp: (String, String) => Int): Vector[(Int, Vector[String])] = {
+    GraphUtils.toOrderedLayers(graph, cmp)
+  }
 }
 
 object ExprGraph {
@@ -176,7 +171,7 @@ object ExprGraph {
     val Input, Output, Private, Scatter = Value
   }
 
-  trait VarInfo {
+  trait ScopeInfo {
 
     /**
       * The WDL Element.
@@ -184,23 +179,32 @@ object ExprGraph {
     def element: Element
 
     /**
-      * Whether the element is ever referenced. This is implicitly
-      * true for all input and output variables. For intermediate
-      * variables, this starts out as false and is updated to true
-      * during the graph building process the first time the variable
-      * is referenced.
+      * The variables upon which this scope depends.
       */
-    def referenced: Boolean
+    def imports: Map[String, T]
+
+    /**
+      * The variables exported by this scope.
+      */
+    def exports: Map[String, T]
+  }
+
+  trait VarInfo extends ScopeInfo {
 
     /**
       * The kind of variable - indicates where the variable is defined.
-      * @return
       */
     def kind: VarKind.Value
 
     /**
+      * Whether the element is ever referenced. This is implicitly true for all input and output variables. For
+      * intermediate variables, this starts out as false and is updated to true during the graph building process the
+      * first time the variable is referenced.
+      */
+    def referenced: Boolean
+
+    /**
       * Returns a copy of this VarInfo with `referenced` set to `true`.
-      * @return
       */
     def setReferenced(value: Boolean = true): VarInfo
   }
@@ -210,7 +214,14 @@ object ExprGraph {
                       expr: Option[Expr] = None,
                       kind: VarKind.Value)
       extends VarInfo {
-    override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
+    override lazy val imports: Map[String, T] =
+      expr.map(e => TypeUtils.exprDependencies(e)).getOrElse(Map.empty)
+
+    override lazy val exports: Map[String, T] = Map(element.name -> element.wdlType)
+
+    override def setReferenced(value: Boolean = true): VarInfo = {
+      copy(referenced = value)
+    }
   }
 
   abstract class ExprGraphBuilder(inputDefs: Vector[InputParameter],
@@ -453,9 +464,9 @@ object ExprGraph {
       decls ++ calls ++ conditionals ++ scatters
     }
 
-    override lazy val allVars: Map[String, VarInfo] = inputs ++ outputs ++ createBodyInfos(
-        WorkflowBodyElements(body)
-    )
+    override lazy val allVars: Map[String, VarInfo] = {
+      inputs ++ outputs ++ createBodyInfos(WorkflowBodyElements(body))
+    }
 
     private def buildBodyGraph(bodyElements: WorkflowBodyElements,
                                graph: Graph[String, DiEdge],
@@ -470,6 +481,7 @@ object ExprGraph {
         val afterDeps = call.afters.map(_.name)
         inputDeps ++ afterDeps
       }.toVector
+      // add dependencies from block (conditional and scatter) expressions
       val blockExprDeps =
         (bodyElements.conditionals.map(_.expr) ++ bodyElements.scatters.map(_.expr)).flatMap {
           expr =>
@@ -483,8 +495,7 @@ object ExprGraph {
         case (graph, cond) =>
           buildBodyGraph(cond.bodyElements, graph, scatterPath)
       }
-      // scatter blocks get access to the (uniqified) scatter variable that
-      // is not visible
+      // scatter blocks get access to the (uniqified) scatter variable that is not visible
       val graphWithScatters = bodyElements.scatters.zipWithIndex.foldLeft(graphWithConditionals) {
         case (graph, (scatter, index)) =>
           buildBodyGraph(scatter.bodyElements, graph, scatterPath :+ index)
@@ -493,8 +504,8 @@ object ExprGraph {
     }
 
     lazy val build: (ExprGraph, WorkflowBodyElements) = {
-      // we have to build graph for the nested blocks separately because we need
-      // to augment each scatter block with the scatter variable
+      // we have to build the graph for the nested blocks separately because we need to augment each scatter block with
+      // the scatter variable
       val initialNodes = inputs.filter(_._2.referenced).keySet | outputs.keySet
       val initialGraph = addDependencies(initialNodes, Graph.empty[String, DiEdge])
       val bodyElements = WorkflowBodyElements(body)
@@ -502,17 +513,15 @@ object ExprGraph {
 
       // update referenced status of variables
       val updatedVars = allVars.map {
-        case (name, info) =>
-          name -> info.setReferenced(graph.contains(name))
+        case (name, info) => name -> info.setReferenced(graph.contains(name))
       }
 
       (ExprGraph(graph, updatedVars), bodyElements)
     }
 
     /**
-      * Builds the graph and then uses it to break the workflow into blocks
-      * of elements that are optimized for parallel execution, using the
-      * following rules. Blocks are returned in dependency order.
+      * Builds the graph and then uses it to break the workflow into blocks of elements that are optimized for parallel
+      * execution, using the following rules. Blocks are returned in dependency order.
       *
       * - calls can be grouped together if
       *   - they are independent OR
@@ -521,16 +530,26 @@ object ExprGraph {
       *     - they are all marked as "shortTask" OR
       *     - `groupCalls` is `Always` OR
       *     - `groupCalls` is `Dependent` and the calls are inter-dependent
-      * - conditionals can be grouped with calls and/or with each other, so long as
-      *   they only contain calls that follow the same rules as above
+      * - conditionals can be grouped with calls and/or with each other, so long as they only contain calls that follow
+      *   the same rules as above
       * - each scatter is a block by itself
       * - a conditional that contains a nested scatter is in a block by itself
       * - a variable that is only referenced by one block is added to that block
-      * - variables referenced by no other blocks, or by 2 or more other blocks
-      *   are grouped such that they do not depend on any of the blocks that
-      *   depend on them (i.e. there is no circular reference)
+      * - variables referenced by no other blocks, or by 2 or more other blocks are grouped such that they do not depend
+      *   on any of the blocks that depend on them (i.e. there is no circular reference)
       */
-    def buildBlocks(): Unit = {}
+    def buildBlocks(): Unit = {
+      val (graph, _) = build
+
+      // sort the graph into layered topological order, with each layer ordered by node type
+      def cmp(a: String, b: String): Int = {
+        (graph.varInfo(a), graph.varInfo(b)) match {
+          case _ => ()
+        }
+      }
+
+      graph.layeredDependencyOrder(cmp)
+    }
   }
 
   object WorkflowExprGraphBuilder {
@@ -583,10 +602,8 @@ object GraphUtils {
       Vector.empty[X]
     } else {
       graph.get(root).withSubgraph().topologicalSort(ignorePredecessors = true) match {
-        case Left(cycle) =>
-          throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
-        case Right(value) =>
-          value.toVector.map(_.value).filterNot(filterNodes.contains)
+        case Right(value) => value.toVector.map(_.value).filterNot(filterNodes.contains)
+        case Left(cycle)  => throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
       }
     }
   }
@@ -603,5 +620,20 @@ object GraphUtils {
       filterNodes: Set[String] = Set(RootNode)
   ): Vector[String] = {
     toOrderedVector[String](graph, root, filterNodes)
+  }
+
+  def toOrderedLayers(
+      graph: Graph[String, DiEdge],
+      cmp: (String, String) => Int
+  ): Vector[(Int, Vector[String])] = {
+    def nodeCmp(a: graph.NodeT, b: graph.NodeT): Int = cmp(a.value, b.value)
+    val layerOrdering = graph.NodeOrdering(nodeCmp)
+    graph.get(GraphUtils.RootNode).withSubgraph().topologicalSort() match {
+      case Right(value) =>
+        value.withLayerOrdering(layerOrdering).toLayered.toVector.map {
+          case (i, nodes) => (i, nodes.toVector.map(_.value))
+        }
+      case Left(cycle) => throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
+    }
   }
 }
