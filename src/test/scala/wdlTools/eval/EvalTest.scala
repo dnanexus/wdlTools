@@ -277,15 +277,14 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     bindings("i2") shouldBe V_Int(13)
   }
 
+  private def createEvaluator(wdlVersion: WdlVersion): Eval = {
+    Eval(evalPaths, Some(wdlVersion), Vector.empty, evalFileResolver, Logger.Quiet)
+  }
+
   private def evalCommand(file: Path,
                           bindings: WdlValueBindings = WdlValueBindings.empty): String = {
     val tDoc = parseAndTypeCheck(file)
-    val evaluator =
-      Eval(evalPaths,
-           Some(wdlTools.syntax.WdlVersion.V1),
-           Vector.empty,
-           evalFileResolver,
-           Logger.Quiet)
+    val evaluator = createEvaluator(tDoc.version.value)
     val elts: Vector[TAT.DocumentElement] = tDoc.elements
     elts.nonEmpty shouldBe true
     val task = tDoc.elements.head.asInstanceOf[TAT.Task]
@@ -640,5 +639,18 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
       case _                   => throw new Exception(s"unexpected command ${command}")
     }
     FileUtils.readFileContent(Paths.get(path)) shouldBe "hello buddy\n"
+  }
+
+  it should "evaluate a runtime with no container" in {
+    val doc = parseAndTypeCheck(v1_1Dir.resolve("no_container.wdl"))
+    val tasks = doc.elements.collect {
+      case task: TAT.Task => task
+    }
+    tasks.size shouldBe 2
+    val eval = createEvaluator(WdlVersion.V1_1)
+    tasks.foreach { task =>
+      val runtime = Runtime.create(task.runtime, eval)
+      Set("docker", "container").exists(runtime.contains(_)) shouldBe false
+    }
   }
 }
