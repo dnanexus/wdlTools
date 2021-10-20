@@ -27,6 +27,8 @@ object InputOutput {
                        logger: Logger = Logger.get): Bindings[String, WdlValues.V] = {
     // resolve default values for any missing inputs
     val init: Bindings[String, WdlValues.V] = WdlValueBindings.empty
+    logger.warning("WDLTOOLS INPUTVALUES: InputOutput HERE:")
+    logger.warning(inputValues.toString())
     inputParameters.foldLeft(init) {
       case (ctx, decl) =>
         val value = decl match {
@@ -156,6 +158,8 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
         .flatten
         .map(decl.name -> _)
     }.toMap
+    println("from JSON - wdl tools")
+    println(inputValues.toString())
     val runtimeOverrideBindings =
       Option.when(runtimeOverrides.nonEmpty)(WdlValueBindings(runtimeOverrides.map {
         case (key, value) => key -> WdlValueSerde.deserialize(value)
