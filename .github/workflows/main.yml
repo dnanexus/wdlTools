@@ -1,4 +1,4 @@
-name : Main Workflow
+name: Main Workflow
 on:
   push:
     branches:
@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - develop
+  workflow_dispatch:
 
 jobs:
   test:
