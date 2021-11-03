@@ -5,119 +5,6 @@ import wdlTools.types.WdlTypes._
 import wdlTools.types.{TypedAbstractSyntax => TAT}
 import dx.util.AbstractBindings
 
-case class DocumentElements(doc: TAT.Document) {
-  val (imports, structDefs, tasks) = doc.elements.foldLeft(
-      (Vector.empty[TAT.ImportDoc], Vector.empty[TAT.StructDefinition], Vector.empty[TAT.Task])
-  ) {
-    case ((imports, structs, tasks), element: TAT.ImportDoc) =>
-      (imports :+ element, structs, tasks)
-    case ((imports, structs, tasks), element: TAT.StructDefinition) =>
-      (imports, structs :+ element, tasks)
-    case ((imports, structs, tasks), element: TAT.Task) =>
-      (imports, structs, tasks :+ element)
-    case other => throw new RuntimeException(s"Invalid document element ${other}")
-  }
-}
-
-sealed trait WorkflowBlock {
-  def inputs: Map[String, WdlTypes.T]
-  def outputs: Map[String, WdlTypes.T]
-}
-
-case class WorkflowScatter(scatter: TAT.Scatter, scatterVars: Set[String]) extends WorkflowBlock {
-  val identifier: String = scatter.identifier
-  val expr: TypedAbstractSyntax.Expr = scatter.expr
-  val bodyElements: WorkflowBodyElements =
-    WorkflowBodyElements(scatter.body, scatterVars ++ Set(identifier))
-
-  override def inputs: Map[String, T] = {
-    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
-  }
-
-  override def outputs: Map[String, T] = {
-    // scatter outputs are always arrays; if expr is non-empty than the
-    // output arrays will also be non-empty
-    val nonEmpty = expr.wdlType match {
-      case WdlTypes.T_Array(_, nonEmpty) => nonEmpty
-      case _ =>
-        throw new Exception(s"invalid scatter expression type ${expr.wdlType}")
-    }
-    bodyElements.outputs.map {
-      case (name, wdlType) => name -> WdlTypes.T_Array(wdlType, nonEmpty)
-    }
-  }
-}
-
-case class WorkflowConditional(conditional: TAT.Conditional, scatterVars: Set[String])
-    extends WorkflowBlock {
-  val expr: TypedAbstractSyntax.Expr = conditional.expr
-  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(conditional.body, scatterVars)
-
-  override lazy val inputs: Map[String, T] = {
-    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
-  }
-
-  override lazy val outputs: Map[String, T] = {
-    // conditional outputs are always optionals
-    bodyElements.outputs.map {
-      case (name, wdlType) => name -> TypeUtils.ensureOptional(wdlType)
-    }
-  }
-}
-
-case class WorkflowBodyElements(body: Vector[TAT.WorkflowElement],
-                                scatterVars: Set[String] = Set.empty)
-    extends WorkflowBlock {
-  val (privateVariables, calls, scatters, conditionals) = body.foldLeft(
-      (Map.empty[String, TAT.PrivateVariable],
-       Map.empty[String, TAT.Call],
-       Vector.empty[WorkflowScatter],
-       Vector.empty[WorkflowConditional])
-  ) {
-    case ((declarations, calls, scatters, conditionals), decl: TAT.PrivateVariable)
-        if !declarations.contains(decl.name) =>
-      (declarations + (decl.name -> decl), calls, scatters, conditionals)
-    case ((declarations, calls, scatters, conditionals), call: TAT.Call)
-        if !calls.contains(call.actualName) =>
-      (declarations, calls + (call.actualName -> call), scatters, conditionals)
-    case ((declarations, calls, scatters, conditionals), scatter: TAT.Scatter) =>
-      (declarations, calls, scatters :+ WorkflowScatter(scatter, scatterVars), conditionals)
-    case ((declarations, calls, scatters, conditionals), cond: TAT.Conditional) =>
-      (declarations, calls, scatters, conditionals :+ WorkflowConditional(cond, scatterVars))
-  }
-
-  lazy val outputs: Map[String, WdlTypes.T] = {
-    val privateVariableOutputs = privateVariables.map {
-      case (name, v) => name -> v.wdlType
-    }
-    val callOutputs = calls.flatMap {
-      case (callName, c) =>
-        Map(callName -> c.wdlType) ++ c.callee.output.map {
-          case (fieldName, wdlType) =>
-            s"${callName}.${fieldName}" -> wdlType
-        }
-    }
-    val scatterOutputs = scatters.flatMap(_.outputs).toMap
-    val conditionalOutputs = conditionals.flatMap(_.outputs).toMap
-    privateVariableOutputs ++ callOutputs ++ scatterOutputs ++ conditionalOutputs
-  }
-
-  lazy val inputs: Map[String, WdlTypes.T] = {
-    val privateVariableInputs =
-      privateVariables.values.flatMap(v => TypeUtils.exprDependencies(v.expr))
-    val callInputs =
-      calls.values.flatMap(c => c.inputs.values.flatMap(TypeUtils.exprDependencies))
-    val scatterInputs = scatters.flatMap(_.inputs)
-    val conditionalInputs = conditionals.flatMap(_.inputs)
-    // any outputs provided by this block (including those provided by
-    // nested blocks and by scatter variables of enclosing blocks) are
-    // accessible and thus not required as inputs
-    (privateVariableInputs ++ callInputs ++ scatterInputs ++ conditionalInputs).filterNot {
-      case (name, _) => scatterVars.contains(name) || outputs.contains(name)
-    }.toMap
-  }
-}
-
 case class WdlTypeBindings(bindings: Map[String, T] = Map.empty,
                            override val elementType: String = "type")
     extends AbstractBindings[String, T](bindings) {
@@ -468,48 +355,31 @@ object TypeUtils {
     */
   def exprDependencies(expr: TAT.Expr): Map[String, T] = {
     expr match {
-      case _ if isPrimitiveValue(expr) =>
-        Map.empty
-      case _: TAT.ValueNull =>
-        Map.empty
-      case _: TAT.ValueNone =>
-        Map.empty
-      case TAT.ExprIdentifier(id, wdlType) =>
-        Map(id -> wdlType)
+      case _ if isPrimitiveValue(expr)     => Map.empty
+      case _: TAT.ValueNull                => Map.empty
+      case _: TAT.ValueNone                => Map.empty
+      case TAT.ExprIdentifier(id, wdlType) => Map(id -> wdlType)
       case TAT.ExprCompoundString(valArr, _, _) =>
         valArr.flatMap(elem => exprDependencies(elem)).toMap
-      case TAT.ExprPair(l, r, _) =>
-        exprDependencies(l) ++ exprDependencies(r)
-      case TAT.ExprArray(arrVal, _) =>
-        arrVal.flatMap(elem => exprDependencies(elem)).toMap
+      case TAT.ExprPair(l, r, _)    => exprDependencies(l) ++ exprDependencies(r)
+      case TAT.ExprArray(arrVal, _) => arrVal.flatMap(elem => exprDependencies(elem)).toMap
       case TAT.ExprMap(valMap, _) =>
         valMap.flatMap { case (k, v) => exprDependencies(k) ++ exprDependencies(v) }
-      case TAT.ExprObject(fields, _) =>
-        fields.flatMap { case (_, v) => exprDependencies(v) }
+      case TAT.ExprObject(fields, _) => fields.flatMap { case (_, v) => exprDependencies(v) }
       case TAT.ExprPlaceholder(t, f, sep, default, value: TAT.Expr, _) =>
         Vector(t.map(exprDependencies),
                f.map(exprDependencies),
                sep.map(exprDependencies),
                default.map(exprDependencies)).flatten.flatten.toMap ++ exprDependencies(value)
-      // Access an array element at [index]
-      case TAT.ExprAt(value, index, _) =>
-        exprDependencies(value) ++ exprDependencies(index)
-      // conditional:
+      case TAT.ExprAt(value, index, _) => exprDependencies(value) ++ exprDependencies(index)
       case TAT.ExprIfThenElse(cond, tBranch, fBranch, _) =>
         exprDependencies(cond) ++ exprDependencies(tBranch) ++ exprDependencies(fBranch)
-      // Apply a standard library function to arguments.
-      //
-      // TODO: some arguments may be _optional_ we need to take that
-      // into account. We need to look into the function type
-      // and figure out which arguments are optional.
       case TAT.ExprApply(_, _, elements, _) =>
+        // TODO: some arguments may be _optional_ we need to take that into account. We need to look into the function
+        //  type and figure out which arguments are optional.
         elements.flatMap(exprDependencies).toMap
-      // Access a field in a call
-      //   Int z = eliminateDuplicate.fields
-      case TAT.ExprGetName(TAT.ExprIdentifier(id, wdlType), _, _) =>
-        Map(id -> wdlType)
-      case TAT.ExprGetName(expr, _, _) =>
-        exprDependencies(expr)
+      case TAT.ExprGetName(TAT.ExprIdentifier(id, wdlType), _, _) => Map(id -> wdlType)
+      case TAT.ExprGetName(expr, _, _)                            => exprDependencies(expr)
     }
   }
 

@@ -14,7 +14,7 @@ import wdlTools.eval.{
 }
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.TypedAbstractSyntax._
-import wdlTools.types.{ExprGraph, WdlTypes}
+import wdlTools.types.{TaskGraph, WdlTypes}
 import dx.util.{Bindings, FileSourceResolver, LocalFileSource, Logger}
 
 object InputOutput {
@@ -93,7 +93,7 @@ object InputOutput {
   * https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#json-input-format.
   */
 case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
-  private lazy val depOrder = ExprGraph.buildFrom(task)
+  private lazy val depOrder = TaskGraph.buildFrom(task)
   private lazy val inputParameters: Vector[InputParameter] = {
     val inputMap = task.inputs.map(i => i.name -> i).toMap
     depOrder.inputOrder.map(inputMap(_))

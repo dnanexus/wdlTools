@@ -209,18 +209,17 @@ object TypedAbstractSyntax {
       extends DocumentElement
       with Callable
 
-  // A call has three names - a fully-qualified name (FQN), an unqualified name
-  // (UQN), and an "actual" name. The UQN is the callee name without any namespace.
-  // The FQN is the callee name including dot-separated namespace(s). The actual
-  // name is the alias if there is one, else the UQN.
-  // Examples:
-  //
-  // fully-qualified-name      unqualified name   actual-name
-  // -----                     -----              ---
-  // call lib.concat as foo    concat             foo
-  // call add                  add                add
-  // call a.b.c                c                  c
-  //
+  /**
+    * A call has three names - a fully-qualified name (FQN), an unqualified name (UQN), and an "actual" name. The UQN is
+    * the callee name without any namespace. The FQN is the callee name including dot-separated namespace(s). The actual
+    * name is the alias if there is one, else the UQN.
+    * @example
+    * fullyQualifiedName        unqualifiedName    actualName
+    * -----                     -----              ---
+    * call lib.concat as foo    concat             foo
+    * call add                  add                add
+    * call a.b.c                c                  c
+    */
   case class Call(unqualifiedName: String,
                   fullyQualifiedName: String,
                   wdlType: WdlTypes.T_Call,

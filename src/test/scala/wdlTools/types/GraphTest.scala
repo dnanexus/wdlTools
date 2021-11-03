@@ -8,7 +8,7 @@ import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import scalax.collection.GraphEdge.DiEdge
 import wdlTools.syntax.Parsers
-import wdlTools.types.ExprGraph.VarKind
+import wdlTools.types.TaskGraph.VarKind
 import wdlTools.types.TypedAbstractSyntax.Task
 import wdlTools.types.WdlTypes._
 import dx.util.{FileSourceResolver, Logger}
@@ -47,7 +47,7 @@ class GraphTest extends AnyFlatSpec with Matchers {
       case t: Task => t
     }
     tasks.size shouldBe 1
-    val exprGraph = ExprGraph.buildFrom(tasks.head)
+    val exprGraph = TaskGraph.buildFrom(tasks.head)
     val ordered = exprGraph.dependencyOrder
     ordered.size shouldBe 9
     // there are mutliple equally valid sortings - we just need to make sure
@@ -58,25 +58,25 @@ class GraphTest extends AnyFlatSpec with Matchers {
         Set("dout2", "sout")
     )
     compareOrdered(expected, ordered)
-    exprGraph.varInfo.foreach {
+    exprGraph.variables.foreach {
       case ("b", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe VarKind.Input
+        info.kind shouldBe VariableKind.Input
       case ("y", info) =>
         info.referenced shouldBe false
-        info.kind shouldBe VarKind.Private
+        info.kind shouldBe VariableKind.Private
       case ("f" | "s" | "i" | "d" | "name", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.Input
+        info.kind shouldBe VariableKind.Input
       case ("x", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.Private
+        info.kind shouldBe VariableKind.Private
       case ("dout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.Private
+        info.kind shouldBe VariableKind.Private
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
-        info.kind shouldBe VarKind.Output
+        info.kind shouldBe VariableKind.Output
       case other =>
         throw new Exception(s"invalid var ${other}")
     }

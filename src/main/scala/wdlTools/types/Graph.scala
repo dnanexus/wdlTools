@@ -4,94 +4,8 @@ import scalax.collection.GraphEdge.DiEdge
 import scalax.collection.Graph
 import scalax.collection.GraphPredef._
 import wdlTools.syntax.WdlVersion
-import wdlTools.types.ExprGraph.VarInfo
 import wdlTools.types.TypedAbstractSyntax._
 import wdlTools.types.WdlTypes._
-
-case class ElementNode(element: Element)
-
-/**
-  * Graph of the DocumentElements in a Document. The graph starts from the main Document and includes all imports.
-  *
-  * Each Document has a namespace that consists of 1) the workflow, tasks, and structs defined within that document,
-  * 2) any imported Documents, which are named either with their alias or (if they don't have an alias) the document
-  * name without the path prefix or the '.wdl' suffix, and 3) any structs in imported documents, which are named either
-  * by their alias or (if they don't have an alias) by their name. If a Document imports another Document, it has access
-  * to all the members of that Document's namespace (using dotted notation).
-  */
-case class ElementGraph(graph: Graph[ElementNode, DiEdge],
-                        wdlVersion: WdlVersion,
-                        namespaces: Map[String, Document],
-                        structDefs: Map[String, StructDefinition]) {}
-
-case class ElementGraphBuilder(root: Document, followImports: Boolean) {
-  private val graph = Graph.empty[ElementNode, DiEdge]
-  private val wdlVersion: WdlVersion = root.version.value
-  private var namespaces: Map[String, Document] = Map.empty
-  private var structDefs: Map[String, StructDefinition] = Map.empty
-  private var tasks: Map[String, Task] = Map.empty
-
-  private def addDocument(doc: Document, namespace: Option[String] = None): Unit = {
-    // coherence check - all documents must have same version
-    if (doc.version.value != wdlVersion) {
-      throw new TypeException(
-          s"""Imported document ${doc.source} has different version than root document: 
-             |${wdlVersion} != ${doc.version.value}""".stripMargin,
-          doc.loc
-      )
-    }
-
-    val docElements = DocumentElements(doc)
-    // add all documents except root to the namespace table
-    if (namespace.isDefined) {
-      namespaces += (namespace.get -> doc)
-    }
-    // add all struct defs to the same table since structs use a flat namespace
-    docElements.structDefs.foreach { structDef =>
-      if (structDefs.contains(structDef.name)) {
-        throw new TypeException(
-            s"""All struct definitions in the document graph rooted at ${root} must have unique names; found 
-               |duplicate name ${structDef.name}""".stripMargin,
-            structDef.loc
-        )
-      }
-      structDefs += (structDef.name -> structDef)
-    }
-    // add tasks
-    docElements.tasks.foreach { task =>
-      val fqn = namespace.map(n => s"${n}.${task.name}").getOrElse(task.name)
-      if (tasks.contains(fqn)) {
-        throw new TypeException(s"""Found task with duplicate name ${fqn}""", task.loc)
-      }
-      tasks += (fqn -> task)
-    }
-    // descend workflow and add new elements to the graph
-    if (doc.workflow.isDefined) {
-      val wf = doc.workflow.get
-      //val fqn =
-      namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
-    }
-  }
-
-  def apply(): ElementGraph = {
-    addDocument(root)
-    ElementGraph(graph, wdlVersion, namespaces, structDefs)
-  }
-}
-
-object ElementGraph {
-
-  /**
-    * Builds an ElementGraph, which wraps a directed graph of the elements in a WDL Document, starting at
-    * the top-level WDL and including any imported WDLs.
-    * @param root the document to graph
-    * @param followImports: whether to include imports in the graph
-    * @return
-    */
-  def build(root: Document, followImports: Boolean): ElementGraph = {
-    ElementGraphBuilder(root, followImports).apply()
-  }
-}
 
 object TypeGraph {
 
@@ -129,27 +43,123 @@ object TypeGraph {
   }
 }
 
+trait ElementInfo {
+
+  /**
+    * The WDL Element.
+    */
+  def element: Element
+
+  /**
+    * The element name.
+    */
+  def name: String
+
+  /**
+    * The variables upon which this element depends.
+    */
+  def imports: Map[String, T]
+
+  /**
+    * The variables exported by this element.
+    */
+  def exports: Map[String, T]
+
+  /**
+    * Whether the element is ever referenced. This is implicitly true for all required input variables and all output
+    * variables. For other variables, this starts out as false and is updated to true during the graph building process
+    * the first time the variable is referenced.
+    */
+  def referenced: Boolean
+
+  /**
+    * Returns a copy of this VarInfo with `referenced` set to `true`.
+    */
+  private[types] def setReferenced(value: Boolean = true): ElementInfo
+}
+
+/**
+  * Different kinds of variables:
+  * - Input = a variable in the input {} section
+  * - Output = a variable in the output {} section
+  * - Private = a variable not in input or output
+  */
+object VariableKind extends Enumeration {
+  type VariableKind = Value
+  val Input, Output, Private = Value
+}
+
+case class VariableInfo(element: Variable,
+                        referenced: Boolean,
+                        expr: Option[Expr] = None,
+                        kind: VariableKind.VariableKind)
+    extends ElementInfo {
+  override def name: String = element.name
+
+  override lazy val imports: Map[String, T] =
+    expr.map(e => TypeUtils.exprDependencies(e)).getOrElse(Map.empty)
+
+  override lazy val exports: Map[String, T] = Map(element.name -> element.wdlType)
+
+  override private[types] def setReferenced(value: Boolean = true): VariableInfo = {
+    copy(referenced = value)
+  }
+}
+
+object VariableInfo {
+  def createInputs(inputs: Iterable[InputParameter]): Map[String, VariableInfo] = {
+    inputs.map {
+      case req: RequiredInputParameter =>
+        req.name -> VariableInfo(req, referenced = true, kind = VariableKind.Input)
+      case opt: OptionalInputParameter =>
+        opt.name -> VariableInfo(opt, referenced = false, kind = VariableKind.Input)
+      case optWithDefault: OverridableInputParameterWithDefault =>
+        optWithDefault.name -> VariableInfo(optWithDefault,
+                                            referenced = false,
+                                            expr = Some(optWithDefault.defaultExpr),
+                                            kind = VariableKind.Input)
+    }.toMap
+  }
+
+  def createOutputs(outputs: Iterable[OutputParameter]): Map[String, VariableInfo] = {
+    outputs.map { out =>
+      out.name -> VariableInfo(out,
+                               referenced = true,
+                               expr = Some(out.expr),
+                               kind = VariableKind.Output)
+    }.toMap
+  }
+
+  def fromPrivateVariable(privateVariable: PrivateVariable): VariableInfo = {
+    VariableInfo(privateVariable,
+                 referenced = false,
+                 expr = Some(privateVariable.expr),
+                 VariableKind.Private)
+  }
+
+  def createPrivates(privateVariables: Iterable[PrivateVariable]): Map[String, VariableInfo] = {
+    privateVariables.map { decl =>
+      decl.name -> fromPrivateVariable(decl)
+    }.toMap
+  }
+}
+
 /**
   * A directed graph of dependencies used within a task or workflow.
-  * Note that `graph` may contain cycles - the first time `dependencyOrder`
-  * is called, the graph will be flattened and an exception thrown if the
-  * graph is not acyclic.
+  * The `graph` may contain cycles - the first time `dependencyOrder` is called, the graph will be flattened and an
+  * exception thrown if the graph is not acyclic.
   * @param graph the dependency graph
-  * @param varInfo a mapping of all the variables in the graph to VarInfo
+  * @param variables a mapping of all the variables in the graph to VarInfo
   */
-case class ExprGraph(graph: Graph[String, DiEdge], varInfo: Map[String, VarInfo]) {
+case class TaskGraph(graph: Graph[String, DiEdge], variables: Map[String, VariableInfo]) {
   lazy val dependencyOrder: Vector[String] = GraphUtils.toOrderedVector(graph)
 
   def inputOrder: Vector[String] = {
-    dependencyOrder.collect {
-      case dep if varInfo(dep).kind == ExprGraph.VarKind.Input => dep
-    }
+    dependencyOrder.filter(dep => variables(dep).kind == VariableKind.Input)
   }
 
   def outputOrder: Vector[String] = {
-    dependencyOrder.collect {
-      case dep if varInfo(dep).kind == ExprGraph.VarKind.Output => dep
-    }
+    dependencyOrder.filter(dep => variables(dep).kind == VariableKind.Output)
   }
 
   def layeredDependencyOrder(cmp: (String, String) => Int): Vector[(Int, Vector[String])] = {
@@ -157,240 +167,98 @@ case class ExprGraph(graph: Graph[String, DiEdge], varInfo: Map[String, VarInfo]
   }
 }
 
-object ExprGraph {
+object TaskGraph {
+  def build(inputVariables: Vector[InputParameter] = Vector.empty,
+            outputVariables: Vector[OutputParameter] = Vector.empty,
+            privateVariables: Vector[PrivateVariable] = Vector.empty,
+            commandParts: Vector[Expr] = Vector.empty,
+            runtime: Map[String, Expr] = Map.empty): TaskGraph = {
 
-  /**
-    * Different kinds of variables:
-    * - Input = a variable in the input {} section
-    * - Output = a variable in the output {} section
-    * - Intermediate = a variable not in input or output
-    * - PostCommand = an Intermediate task variable that
-    *   depends on the command block being evaluated
-    */
-  object VarKind extends Enumeration {
-    val Input, Output, Private, Scatter = Value
-  }
-
-  trait ScopeInfo {
-
-    /**
-      * The WDL Element.
-      */
-    def element: Element
-
-    /**
-      * The variables upon which this scope depends.
-      */
-    def imports: Map[String, T]
-
-    /**
-      * The variables exported by this scope.
-      */
-    def exports: Map[String, T]
-  }
-
-  trait VarInfo extends ScopeInfo {
-
-    /**
-      * The kind of variable - indicates where the variable is defined.
-      */
-    def kind: VarKind.Value
-
-    /**
-      * Whether the element is ever referenced. This is implicitly true for all input and output variables. For
-      * intermediate variables, this starts out as false and is updated to true during the graph building process the
-      * first time the variable is referenced.
-      */
-    def referenced: Boolean
-
-    /**
-      * Returns a copy of this VarInfo with `referenced` set to `true`.
-      */
-    def setReferenced(value: Boolean = true): VarInfo
-  }
-
-  case class DeclInfo(element: Variable,
-                      referenced: Boolean,
-                      expr: Option[Expr] = None,
-                      kind: VarKind.Value)
-      extends VarInfo {
-    override lazy val imports: Map[String, T] =
-      expr.map(e => TypeUtils.exprDependencies(e)).getOrElse(Map.empty)
-
-    override lazy val exports: Map[String, T] = Map(element.name -> element.wdlType)
-
-    override def setReferenced(value: Boolean = true): VarInfo = {
-      copy(referenced = value)
-    }
-  }
-
-  abstract class ExprGraphBuilder(inputDefs: Vector[InputParameter],
-                                  outputDefs: Vector[OutputParameter]) {
-    protected lazy val inputs: Map[String, VarInfo] = {
-      inputDefs.map {
-        case req: RequiredInputParameter =>
-          req.name -> DeclInfo(req, referenced = true, kind = VarKind.Input)
-        case opt: OptionalInputParameter =>
-          opt.name -> DeclInfo(opt, referenced = false, kind = VarKind.Input)
-        case optWithDefault: OverridableInputParameterWithDefault =>
-          optWithDefault.name -> DeclInfo(optWithDefault,
-                                          referenced = false,
-                                          expr = Some(optWithDefault.defaultExpr),
-                                          kind = VarKind.Input)
-      }.toMap
+    val variables: Map[String, VariableInfo] = {
+      VariableInfo.createInputs(inputVariables) ++
+        VariableInfo.createOutputs(outputVariables) ++
+        VariableInfo.createPrivates(privateVariables)
     }
 
-    protected lazy val outputs: Map[String, VarInfo] = {
-      outputDefs.map { out =>
-        out.name -> DeclInfo(out, referenced = true, expr = Some(out.expr), kind = VarKind.Output)
-      }.toMap
-    }
-
-    protected def allVars: Map[String, VarInfo]
-
-    /**
-      * Checks that a referenced identifier exists. Also checks that, if
-      * `depName` refers to an output variable, `varName` also refers to
-      * an output variable, since output values are not reachable from
-      * outside the output section. If the variable is within a scatter
-      * block, checks whether the dependency is the scatter variable first,
-      * and if so, returns the full (uniquified) scatter variable name.
-      */
-    protected def resolveDependency(varName: String,
-                                    depName: String,
-                                    expr: Option[Expr],
-                                    scatterPath: Vector[Int] = Vector.empty): String = {
-      // first try all the possible scatter variable names
-      val scatterVar = scatterPath.inits
-        .flatMap {
-          case path if path.nonEmpty =>
-            Some(s"${GraphUtils.ScatterNodePrefix}${path.mkString("_")}_${depName}")
-          case _ =>
-            None
-        }
-        .collectFirst {
-          case name if allVars.contains(name) => name
-        }
-      if (scatterVar.nonEmpty) {
-        scatterVar.get
-      } else if (allVars.contains(depName)) {
-        if (allVars(depName).kind == VarKind.Output && allVars(depName).kind != VarKind.Output) {
-          throw new Exception(
-              s"Non-output variable ${varName} depends on output variable ${depName}"
-          )
-        }
-        depName
-      } else {
+    def checkDependency(varName: String, depName: String, expr: Option[Expr]): Unit = {
+      if (!variables.contains(depName)) {
         val exprStr = expr.map(e => s" expression ${TypeUtils.prettyFormatExpr(e)}").getOrElse("")
         throw new Exception(
             s"${varName}${exprStr} references non-task variable ${depName}"
         )
+      } else if (variables(depName).kind == VariableKind.Output && variables(varName).kind != VariableKind.Output) {
+        throw new Exception(
+            s"Non-output variable ${varName} depends on output variable ${depName}"
+        )
       }
     }
 
-    // Add all missing dependencies to the graph. Any node with no dependencies
-    // is linked to root.
-    protected def addDependencies(
-        names: Iterable[String],
-        graph: Graph[String, DiEdge],
-        scatterPath: Vector[Int] = Vector.empty
-    ): Graph[String, DiEdge] = {
+    /**
+      * Adds all missing dependencies to the graph. Any node with no dependencies is linked to root.
+      */
+    def addDependencies(names: Iterable[String],
+                        graph: Graph[String, DiEdge]): Graph[String, DiEdge] = {
       names.foldLeft(graph) {
         case (g, name) =>
-          allVars(name) match {
-            case DeclInfo(_, _, Some(expr), _) =>
-              val deps = TypeUtils.exprDependencies(expr).keySet.map { dep =>
-                (resolveDependency(name, dep, Some(expr)), name, scatterPath)
-              }
-              if (deps.isEmpty) {
-                // the node has no dependencies, so link it to root
-                g ++ Set(GraphUtils.RootNode ~> name)
-              } else {
-                // process the dependencies first, then add the edges for this node
-                val missing = deps.map(_._1) -- g.nodes.toOuter
-                val gNew = if (missing.nonEmpty) {
-                  addDependencies(missing, g)
-                } else {
-                  g
-                }
-                gNew ++ deps.map(d => d._1 ~> d._2)
-              }
-            case _ =>
-              // the node has no dependencies, so link it to root
-              g ++ Set(GraphUtils.RootNode ~> name)
+          val decl = variables(name)
+          val deps = decl.imports.keySet.map { dep =>
+            checkDependency(name, dep, decl.expr)
+            (dep, name)
+          }
+          if (deps.isEmpty) {
+            // the node has no dependencies, so link it to root
+            g ++ Set(GraphUtils.RootNode ~> name)
+          } else {
+            // process the dependencies first, then add the edges for this node
+            val missing = deps.map(_._1) -- g.nodes.toOuter
+            val gNew = if (missing.nonEmpty) {
+              addDependencies(missing, g)
+            } else {
+              g
+            }
+            gNew ++ deps.map(d => d._1 ~> d._2)
           }
       }
     }
-  }
 
-  case class TaskExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
-                                  outputDefs: Vector[OutputParameter] = Vector.empty,
-                                  privateVariables: Vector[PrivateVariable] = Vector.empty,
-                                  commandParts: Vector[Expr] = Vector.empty,
-                                  runtime: Map[String, Expr] = Map.empty)
-      extends ExprGraphBuilder(inputDefs, outputDefs) {
-    override protected lazy val allVars: Map[String, VarInfo] = {
-      // collect all variables from task
-      val decls: Map[String, VarInfo] = privateVariables.map { decl =>
-        decl.name -> DeclInfo(decl, referenced = false, expr = Some(decl.expr), VarKind.Private)
-      }.toMap
-      inputs ++ outputs ++ decls
-    }
-
-    lazy val build: ExprGraph = {
-      // Collect required nodes from input, command, runtime, and output blocks
-      val commandDeps: Set[String] =
-        commandParts.flatMap { expr =>
-          TypeUtils.exprDependencies(expr).keySet.map { dep =>
-            resolveDependency("command", dep, Some(expr))
-          }
-        }.toSet
-      val runtimeDeps: Set[String] = runtime.values.flatMap { expr =>
+    // Collect required nodes from input, command, runtime, and output blocks
+    val commandDeps: Set[String] =
+      commandParts.flatMap { expr =>
         TypeUtils.exprDependencies(expr).keySet.map { dep =>
-          resolveDependency("runtime", dep, Some(expr))
+          checkDependency("command", dep, Some(expr))
+          dep
         }
       }.toSet
-      val requiredNodes =
-        inputs.filter(_._2.referenced).keySet | commandDeps | runtimeDeps | outputs.keySet
-
-      // create the graph by iteratively adding missing nodes
-      val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
-
-      // Update referenced = true for all vars in the graph.
-      val updatedVars = allVars.map {
-        case (name, info) if graph.contains(name) => name -> info.setReferenced()
-        case other                                => other
+    val runtimeDeps: Set[String] = runtime.values.flatMap { expr =>
+      TypeUtils.exprDependencies(expr).keySet.map { dep =>
+        checkDependency("runtime", dep, Some(expr))
+        dep
       }
-
-      ExprGraph(graph, updatedVars)
+    }.toSet
+    val requiredNodes = inputVariables.collect {
+      case RequiredInputParameter(name, _) => name
+    }.toSet | commandDeps | runtimeDeps | outputVariables.map(_.name).toSet
+    // create the graph by iteratively adding missing nodes
+    val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
+    // Update referenced = true for all vars in the graph.
+    val updatedVars = variables.map {
+      case (name, info) if graph.contains(name) => name -> info.setReferenced()
+      case other                                => other
     }
-  }
-
-  object TaskExprGraphBuilder {
-    def apply(task: Task): TaskExprGraphBuilder = {
-      TaskExprGraphBuilder(
-          task.inputs,
-          task.outputs,
-          task.privateVariables,
-          task.command.parts,
-          task.runtime.map(_.kvs).getOrElse(Map.empty)
-      )
-    }
+    TaskGraph(graph, updatedVars)
   }
 
   /**
     * Builds a directed dependency graph of variables used within the scope of a task.
     *
-    * The graph is rooted by a special root node (`GraphUtils.RootNode`), which is a
-    * "dependency" of all required input variables. The graph is constructed iteratively,
-    * with all dependencies pointing to the nodes that depend on them, such that if
-    * the graph is sorted topologically starting from the root, the nodes are in the
-    * order in which they need to be evaluated.
+    * The graph is rooted by a special root node (`GraphUtils.RootNode`), which is a "dependency" of all required input
+    * variables. The graph is constructed iteratively, with all dependencies pointing to the nodes that depend on them,
+    * such that if the graph is sorted topologically starting from the root, the nodes are in the order in which they
+    * need to be evaluated.
     *
     * @param task the task to graph
-    * @return a tuple (graph, vars), where graph is a `Graph` with nodes being variable
-    *         names and directed edges, and vars being a mapping of all variable names
-    *         to `VarInfo`s.
+    * @return a tuple (graph, vars), where graph is a `Graph` with nodes being variable names and directed edges, and
+    *         vars being a mapping of all variable names to `VarInfo`s.
     * @example
     * task example {
     *   input {
@@ -407,45 +275,322 @@ object ExprGraph {
     *   }
     * }
     *
-    * In this example, `f` is a required input, so the inital graph is
-    * `__root__ ~> f`. Next, to successfully evaluate the `command` and
-    * `output` sections, we need variables `name` and `s`, so we add nodes
-    * `{f ~> s, s ~> sout, __root__ ~> name}`. Since `b` is optional and
-    * not referenced anywhere, it is not added to the graph (though it is
-    * still included in the returned `vars` map, with its `referenced`
-    * attribute set to `false`.
+    * In this example, `f` is a required input, so the inital graph is `__root__ ~> f`. Next, to successfully evaluate
+    * the `command` and `output` sections, we need variables `name` and `s`, so we add nodes
+    * `{f ~> s, s ~> sout, __root__ ~> name}`. Since `b` is optional and not referenced anywhere, it is not added to the
+    * graph (though it is still included in the returned `vars` map, with its `referenced` attribute set to `false`.
     */
-  def buildFrom(task: Task): ExprGraph = {
-    TaskExprGraphBuilder(task).build
+  def buildFrom(task: Task): TaskGraph = {
+    build(task.inputs,
+          task.outputs,
+          task.privateVariables,
+          task.command.parts,
+          task.runtime.map(_.kvs).getOrElse(Map.empty))
+  }
+}
+
+case class CallInfo(element: Call, referenced: Boolean = false) extends ElementInfo {
+  override def name: String = element.actualName
+
+  override def imports: Map[String, T] = {
+    element.inputs.values.flatMap(TypeUtils.exprDependencies).toMap
   }
 
-  case class CallInfo(element: Call,
-                      referenced: Boolean = false,
-                      kind: VarKind.Value = VarKind.Private)
-      extends VarInfo {
-    override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
+  override def exports: Map[String, T] = {
+    Map(element.actualName -> element.wdlType)
   }
 
-  case class ScatterInfo(element: Scatter,
-                         referenced: Boolean = true,
-                         kind: VarKind.Value = VarKind.Input)
-      extends VarInfo {
-    override def setReferenced(value: Boolean = true): VarInfo = copy(referenced = value)
+  override private[types] def setReferenced(value: Boolean = true): CallInfo = {
+    copy(referenced = value)
+  }
+}
+
+sealed trait WorkflowBlock {
+  def element: BlockElement
+  def inputs: Map[String, WdlTypes.T]
+  def outputs: Map[String, WdlTypes.T]
+}
+
+case class WorkflowScatter(element: Scatter, scatterVars: Set[String]) extends WorkflowBlock {
+  val identifier: String = element.identifier
+  val expr: TypedAbstractSyntax.Expr = element.expr
+  val bodyElements: WorkflowBodyElements =
+    WorkflowBodyElements(element.body, scatterVars ++ Set(identifier))
+
+  override def inputs: Map[String, T] = {
+    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
   }
 
-  case class WorkflowExprGraphBuilder(inputDefs: Vector[InputParameter] = Vector.empty,
-                                      outputDefs: Vector[OutputParameter] = Vector.empty,
-                                      body: Vector[WorkflowElement])
-      extends ExprGraphBuilder(inputDefs, outputDefs) {
-    private def getScatterPrefix(scatterPath: Vector[Int]): String = {
-      s"${GraphUtils.ScatterNodePrefix}${scatterPath.mkString("_")}_"
+  override def outputs: Map[String, T] = {
+    // scatter outputs are always arrays; if expr is non-empty than the
+    // output arrays will also be non-empty
+    val nonEmpty = expr.wdlType match {
+      case WdlTypes.T_Array(_, nonEmpty) => nonEmpty
+      case _ =>
+        throw new Exception(s"invalid scatter expression type ${expr.wdlType}")
+    }
+    bodyElements.outputs.map {
+      case (name, wdlType) => name -> WdlTypes.T_Array(wdlType, nonEmpty)
+    }
+  }
+}
+
+case class WorkflowConditional(element: Conditional, scatterVars: Set[String])
+    extends WorkflowBlock {
+  val expr: TypedAbstractSyntax.Expr = element.expr
+  val bodyElements: WorkflowBodyElements = WorkflowBodyElements(element.body, scatterVars)
+
+  override lazy val inputs: Map[String, T] = {
+    TypeUtils.exprDependencies(expr) ++ bodyElements.inputs
+  }
+
+  override lazy val outputs: Map[String, T] = {
+    // conditional outputs are always optionals
+    bodyElements.outputs.map {
+      case (name, wdlType) => name -> TypeUtils.ensureOptional(wdlType)
+    }
+  }
+}
+
+case class WorkflowBodyElements(body: Vector[WorkflowElement],
+                                scatterVars: Set[String] = Set.empty) {
+
+  def conditionals: Vector[WorkflowConditional] = blocks.collect {
+    case cond: WorkflowConditional => cond
+  }
+
+  def scatters: Vector[WorkflowScatter] = blocks.collect {
+    case scatter: WorkflowScatter => scatter
+  }
+
+  lazy val outputs: Map[String, WdlTypes.T] = {
+    val privateVariableOutputs = privateVariables.map {
+      case (name, v) => name -> v.wdlType
+    }
+    val callOutputs = calls.flatMap {
+      case (callName, c) =>
+        Map(callName -> c.wdlType) ++ c.callee.output.map {
+          case (fieldName, wdlType) =>
+            s"${callName}.${fieldName}" -> wdlType
+        }
+    }
+    val scatterOutputs = scatters.flatMap(_.outputs).toMap
+    val conditionalOutputs = conditionals.flatMap(_.outputs).toMap
+    privateVariableOutputs ++ callOutputs ++ scatterOutputs ++ conditionalOutputs
+  }
+
+  lazy val inputs: Map[String, WdlTypes.T] = {
+    val privateVariableInputs =
+      privateVariables.values.flatMap(v => TypeUtils.exprDependencies(v.expr))
+    val callInputs =
+      calls.values.flatMap(c => c.inputs.values.flatMap(TypeUtils.exprDependencies))
+    val scatterInputs = scatters.flatMap(_.inputs)
+    val conditionalInputs = conditionals.flatMap(_.inputs)
+    // any outputs provided by this block (including those provided by
+    // nested blocks and by scatter variables of enclosing blocks) are
+    // accessible and thus not required as inputs
+    (privateVariableInputs ++ callInputs ++ scatterInputs ++ conditionalInputs).filterNot {
+      case (name, _) => scatterVars.contains(name) || outputs.contains(name)
+    }.toMap
+  }
+}
+
+abstract class BlockInfo(block: WorkflowBlock, path: Vector[Int]) extends ElementInfo {
+  assert(path.nonEmpty, "path must have at least one element")
+
+  override def element: Element = block.element
+
+  override lazy val name: String = s"block_${path.mkString("_")}"
+}
+
+case class ConditionalInfo(cond: WorkflowConditional,
+                           path: Vector[Int],
+                           referenced: Boolean = false)
+    extends BlockInfo(cond, path) {
+  override def imports: Map[String, T] = {}
+
+  override def exports: Map[String, T] = {}
+
+  override private[types] def setReferenced(value: Boolean = true): ConditionalInfo = {
+    copy(referenced = value)
+  }
+}
+
+case class ScatterInfo(scatter: WorkflowScatter, path: Vector[Int], referenced: Boolean = false)
+    extends BlockInfo(scatter, path) {
+  override def imports: Map[String, T] = {}
+
+  override def exports: Map[String, T] = {}
+
+  override private[types] def setReferenced(value: Boolean = true): ScatterInfo = {
+    copy(referenced = value)
+  }
+}
+
+case class WorkflowGraph(graph: Graph[String, DiEdge], elements: Map[String, ElementInfo]) {
+
+  /**
+    * Splits the workflow into blocks of elements that are optimized for parallel execution, using the following rules.
+    * Blocks are returned in dependency order.
+    *
+    * - calls can be grouped together if
+    *   - they are independent OR
+    *   - they only depend on each other and/or on closure inputs AND
+    *   - `groupCalls` is not `Never` AND
+    *     - they are all marked as "shortTask" OR
+    *     - `groupCalls` is `Always` OR
+    *     - `groupCalls` is `Dependent` and the calls are inter-dependent
+    * - conditionals can be grouped with calls and/or with each other, so long as they only contain calls that follow
+    *   the same rules as above
+    * - each scatter is a block by itself
+    * - a conditional that contains a nested scatter is in a block by itself
+    * - a variable that is only referenced by one block is added to that block
+    * - variables referenced by no other blocks, or by 2 or more other blocks are grouped such that they do not depend
+    *   on any of the blocks that depend on them (i.e. there is no circular reference)
+    */
+  lazy val blocks: Unit = {
+    // sort the graph into layered topological order, with each layer ordered by node type
+    def cmp(a: String, b: String): Int = {
+      (graph.varInfo(a), graph.varInfo(b)) match {
+        case _ => ()
+      }
     }
 
-    private def createBodyInfos(bodyElements: WorkflowBodyElements,
-                                scatterPath: Vector[Int] = Vector.empty): Map[String, VarInfo] = {
-      val decls: Map[String, DeclInfo] = bodyElements.privateVariables.map {
+    graph.layeredDependencyOrder(cmp)
+  }
+}
+
+object WorkflowGraph {
+//  /**
+//   * Checks that a referenced identifier exists. Also checks that, if `depName` refers to an output variable,
+//   * `varName` also refers to  an output variable, since output values are not reachable from outside the output
+//   * section. If the variable is within a scatter block, checks whether the dependency is the scatter variable first,
+//   * and if so, returns the full (uniquified) scatter variable name.
+//   */
+//  protected def resolveDependency(varName: String,
+//                                  depName: String,
+//                                  expr: Option[Expr],
+//                                  scatterPath: Vector[Int] = Vector.empty): String = {
+//    // first try all the possible scatter variable names
+//    val scatterVar = scatterPath.inits
+//      .flatMap {
+//        case path if path.nonEmpty =>
+//          Some(s"${GraphUtils.ScatterNodePrefix}${path.mkString("_")}_${depName}")
+//        case _ =>
+//          None
+//      }
+//      .collectFirst {
+//        case name if allVars.contains(name) => name
+//      }
+//    if (scatterVar.nonEmpty) {
+//      scatterVar.get
+//    } else if (allVars.contains(depName)) {
+//      if (allVars(depName).kind == DeclarationKind.Output && allVars(varName).kind != DeclarationKind.Output) {
+//        throw new Exception(
+//          s"Non-output variable ${varName} depends on output variable ${depName}"
+//        )
+//      }
+//      depName
+//    } else {
+//      val exprStr = expr.map(e => s" expression ${TypeUtils.prettyFormatExpr(e)}").getOrElse("")
+//      throw new Exception(
+//        s"${varName}${exprStr} references non-task variable ${depName}"
+//      )
+//    }
+//  }
+//
+//  /**
+//   * Adds all missing dependencies to the graph. Any node with no dependencies is linked to root.
+//   */
+//  protected def addDependencies(
+//                                 names: Iterable[String],
+//                                 graph: Graph[String, DiEdge],
+//                                 scatterPath: Vector[Int] = Vector.empty
+//                               ): Graph[String, DiEdge] = {
+//    names.foldLeft(graph) {
+//      case (g, name) =>
+//        allVars(name) match {
+//          case DeclInfo(_, _, Some(expr), _) =>
+//            val deps = TypeUtils.exprDependencies(expr).keySet.map { dep =>
+//              (resolveDependency(name, dep, Some(expr)), name, scatterPath)
+//            }
+//            if (deps.isEmpty) {
+//              // the node has no dependencies, so link it to root
+//              g ++ Set(GraphUtils.RootNode ~> name)
+//            } else {
+//              // process the dependencies first, then add the edges for this node
+//              val missing = deps.map(_._1) -- g.nodes.toOuter
+//              val gNew = if (missing.nonEmpty) {
+//                addDependencies(missing, g)
+//              } else {
+//                g
+//              }
+//              gNew ++ deps.map(d => d._1 ~> d._2)
+//            }
+//          case _ =>
+//            // the node has no dependencies, so link it to root
+//            g ++ Set(GraphUtils.RootNode ~> name)
+//        }
+//    }
+//  }
+
+  private def getBodyInfos(
+      body: Vector[WorkflowElement]
+  ): (Map[String, VariableInfo], Map[String, CallInfo], Vector[WorkflowBlock]) = {
+    body.foldLeft(
+        (Map.empty[String, VariableInfo],
+         Map.empty[String, CallInfo],
+         Vector.empty[WorkflowBlock],
+         0)
+    ) {
+      case ((declarations, calls, blocks, blockIndex), decl: PrivateVariable)
+          if !declarations.contains(decl.name) =>
+        (declarations + (decl.name -> VariableInfo.fromPrivateVariable(decl)),
+         calls,
+         blocks,
+         blockIndex)
+      case ((declarations, calls, blocks, blockIndex), call: Call)
+          if !calls.contains(call.actualName) =>
+        (declarations, calls + (call.actualName -> CallInfo(call)), blocks, blockIndex)
+      case ((declarations, calls, blocks, blockIndex), scatter: Scatter) =>
+        (declarations, calls, blocks :+ WorkflowScatter(scatter, scatterVars), blockIndex + 1)
+      case ((declarations, calls, blocks, blockIndex), cond: Conditional) =>
+        (declarations, calls, blocks :+ WorkflowConditional(cond, scatterVars), blockIndex + 1)
+    }
+  }
+
+  def build(inputVariables: Vector[InputParameter] = Vector.empty,
+            outputVariables: Vector[OutputParameter] = Vector.empty,
+            body: Vector[WorkflowElement],
+            blockPath: Vector[Int] = Vector.empty): WorkflowGraph = {
+
+    val elements: Map[String, ElementInfo] = {
+      val inputs: Map[String, VariableInfo] = VariableInfo.createInputs(inputVariables)
+      val outputs: Map[String, VariableInfo] = VariableInfo.createOutputs(outputVariables)
+      val bodyElements = WorkflowBodyElements(body)
+      val (privates, calls, blocks) = getBodyInfos(body)
+
+      val blocks = bodyElements.blocks.zipWithIndex.map {
+        case (cond: WorkflowConditional, idx) =>
+          val info = ConditionalInfo(cond, blockPath :+ idx)
+          info.name -> info
+        case (scatter: WorkflowScatter, idx) =>
+          val info = ScatterInfo(scatter, blockPath :+ idx)
+          info.name -> info
+      }
+      inputs ++ outputs ++ privates ++ calls ++ blocks
+    }
+
+    def createBodyInfos(
+        bodyElements: WorkflowBodyElements,
+        scatterPath: Vector[Int] = Vector.empty
+    ): Map[String, ElementInfo] = {
+      val decls: Map[String, VariableInfo] = bodyElements.privateVariables.map {
         case (name, decl) =>
-          name -> DeclInfo(decl, referenced = false, expr = Some(decl.expr), kind = VarKind.Private)
+          name -> VariableInfo(decl,
+                               referenced = false,
+                               expr = Some(decl.expr),
+                               kind = VariableKind.Private)
       }
       val calls = bodyElements.calls.map {
         case (actualName, call) => actualName -> CallInfo(call)
@@ -458,19 +603,15 @@ object ExprGraph {
           // we make the scatter variable name unique
           val scatterPrefix = getScatterPrefix(scatterPath :+ index)
           val scatterVar =
-            Map(s"${scatterPrefix}${scatter.identifier}" -> ScatterInfo(scatter.scatter))
+            Map(s"${scatterPrefix}${scatter.identifier}" -> ScatterInfo(scatter.element))
           scatterVar ++ createBodyInfos(scatter.bodyElements, scatterPath)
       }
       decls ++ calls ++ conditionals ++ scatters
     }
 
-    override lazy val allVars: Map[String, VarInfo] = {
-      inputs ++ outputs ++ createBodyInfos(WorkflowBodyElements(body))
-    }
-
-    private def buildBodyGraph(bodyElements: WorkflowBodyElements,
-                               graph: Graph[String, DiEdge],
-                               scatterPath: Vector[Int] = Vector.empty): Graph[String, DiEdge] = {
+    def buildBodyGraph(bodyElements: WorkflowBodyElements,
+                       graph: Graph[String, DiEdge],
+                       scatterPath: Vector[Int] = Vector.empty): Graph[String, DiEdge] = {
       // add top-level dependencies
       val callDeps: Vector[String] = bodyElements.calls.values.flatMap { call =>
         val inputDeps = call.inputs.values.flatMap { expr =>
@@ -503,80 +644,70 @@ object ExprGraph {
       graphWithScatters
     }
 
-    lazy val build: (ExprGraph, WorkflowBodyElements) = {
-      // we have to build the graph for the nested blocks separately because we need to augment each scatter block with
-      // the scatter variable
-      val initialNodes = inputs.filter(_._2.referenced).keySet | outputs.keySet
-      val initialGraph = addDependencies(initialNodes, Graph.empty[String, DiEdge])
-      val bodyElements = WorkflowBodyElements(body)
-      val graph = buildBodyGraph(bodyElements, initialGraph)
-
-      // update referenced status of variables
-      val updatedVars = allVars.map {
-        case (name, info) => name -> info.setReferenced(graph.contains(name))
+    def checkDependency(varName: String, depName: String, expr: Option[Expr]): Unit = {
+      if (!elements.contains(depName)) {
+        val exprStr = expr.map(e => s" expression ${TypeUtils.prettyFormatExpr(e)}").getOrElse("")
+        throw new Exception(
+            s"${varName}${exprStr} references non-task variable ${depName}"
+        )
+      } else if (elements(depName).kind == VariableKind.Output && elements(varName).kind != VariableKind.Output) {
+        throw new Exception(
+            s"Non-output variable ${varName} depends on output variable ${depName}"
+        )
       }
-
-      (ExprGraph(graph, updatedVars), bodyElements)
     }
 
     /**
-      * Builds the graph and then uses it to break the workflow into blocks of elements that are optimized for parallel
-      * execution, using the following rules. Blocks are returned in dependency order.
-      *
-      * - calls can be grouped together if
-      *   - they are independent OR
-      *   - they only depend on each other and/or on closure inputs AND
-      *   - `groupCalls` is not `Never` AND
-      *     - they are all marked as "shortTask" OR
-      *     - `groupCalls` is `Always` OR
-      *     - `groupCalls` is `Dependent` and the calls are inter-dependent
-      * - conditionals can be grouped with calls and/or with each other, so long as they only contain calls that follow
-      *   the same rules as above
-      * - each scatter is a block by itself
-      * - a conditional that contains a nested scatter is in a block by itself
-      * - a variable that is only referenced by one block is added to that block
-      * - variables referenced by no other blocks, or by 2 or more other blocks are grouped such that they do not depend
-      *   on any of the blocks that depend on them (i.e. there is no circular reference)
+      * Adds all missing dependencies to the graph. Any node with no dependencies is linked to root.
       */
-    def buildBlocks(): Unit = {
-      val (graph, _) = build
-
-      // sort the graph into layered topological order, with each layer ordered by node type
-      def cmp(a: String, b: String): Int = {
-        (graph.varInfo(a), graph.varInfo(b)) match {
-          case _ => ()
-        }
+    def addDependencies(names: Iterable[String],
+                        graph: Graph[String, DiEdge]): Graph[String, DiEdge] = {
+      names.foldLeft(graph) {
+        case (g, name) =>
+          val decl = elements(name)
+          val deps = decl.imports.keySet.map { dep =>
+            checkDependency(name, dep, decl.expr)
+            (dep, name)
+          }
+          if (deps.isEmpty) {
+            // the node has no dependencies, so link it to root
+            g ++ Set(GraphUtils.RootNode ~> name)
+          } else {
+            // process the dependencies first, then add the edges for this node
+            val missing = deps.map(_._1) -- g.nodes.toOuter
+            val gNew = if (missing.nonEmpty) {
+              addDependencies(missing, g)
+            } else {
+              g
+            }
+            gNew ++ deps.map(d => d._1 ~> d._2)
+          }
       }
-
-      graph.layeredDependencyOrder(cmp)
     }
-  }
 
-  object WorkflowExprGraphBuilder {
-    def apply(wf: Workflow): WorkflowExprGraphBuilder = {
-      WorkflowExprGraphBuilder(wf.inputs, wf.outputs, wf.body)
+    val initialGraph = addDependencies(inputVariables.collect {
+      case RequiredInputParameter(name, _) => name
+    }.toSet, Graph.empty[String, DiEdge])
+
+    val bodyElements = WorkflowBodyElements(body)
+    val graph = buildBodyGraph(bodyElements, initialGraph)
+
+    // update referenced status of variables
+    val updatedVars = elements.map {
+      case (name, info) => name -> info.setReferenced(graph.contains(name))
     }
+
+    WorkflowGraph(graph, updatedVars)
   }
 
   /**
-    * Builds a dependency graph from a workflow.
-    *
-    * This works similarly to building a task dependency graph, with the
+    * Builds a dependency graph from a workflow. This works similarly to building a task dependency graph, with the
     * special exception of scatter variables. According to the WDL scoping rules
     * (https://github.com/openwdl/wdl/blob/main/versions/development/SPEC.md#value-scopes-and-visibility)
     * a scatter variable is only visible within it's block and sub-blocks.
-    * Scatter variables are added to the graph, but with a special "uniqified"
-    * name. For example:
-    *
-    *  __scatter__1_2_foo
-    *
-    * indicates this is second sub-scatter within the first scatter of the workflow,
-    * and the scatter variable name is 'foo'.
-    * @param wf the workflow
-    * @return
     */
-  def buildFrom(wf: Workflow): (ExprGraph, WorkflowBodyElements) = {
-    WorkflowExprGraphBuilder(wf).build
+  def buildFrom(wf: Workflow): WorkflowGraph = {
+    build(wf.inputs, wf.outputs, wf.body)
   }
 }
 
@@ -635,5 +766,102 @@ object GraphUtils {
         }
       case Left(cycle) => throw new Exception(s"Graph ${graph} has a cycle at ${cycle}")
     }
+  }
+}
+
+case class ElementNode(element: Element)
+
+/**
+  * Graph of the DocumentElements in a Document. The graph starts from the main Document and includes all imports.
+  *
+  * Each Document has a namespace that consists of 1) the workflow, tasks, and structs defined within that document,
+  * 2) any imported Documents, which are named either with their alias or (if they don't have an alias) the document
+  * name without the path prefix or the '.wdl' suffix, and 3) any structs in imported documents, which are named either
+  * by their alias or (if they don't have an alias) by their name. If a Document imports another Document, it has access
+  * to all the members of that Document's namespace (using dotted notation).
+  */
+case class DocumentGraph(graph: Graph[ElementNode, DiEdge],
+                         wdlVersion: WdlVersion,
+                         namespaces: Map[String, Document],
+                         structDefs: Map[String, StructDefinition]) {}
+
+case class DocumentGraphBuilder(root: Document, followImports: Boolean) {
+  private val graph = Graph.empty[ElementNode, DiEdge]
+  private val wdlVersion: WdlVersion = root.version.value
+  private var namespaces: Map[String, Document] = Map.empty
+  private var structDefs: Map[String, StructDefinition] = Map.empty
+  private var tasks: Map[String, Task] = Map.empty
+
+  private def addDocument(doc: Document, namespace: Option[String] = None): Unit = {
+    // coherence check - all documents must have same version
+    if (doc.version.value != wdlVersion) {
+      throw new TypeException(
+          s"""Imported document ${doc.source} has different version than root document: 
+             |${wdlVersion} != ${doc.version.value}""".stripMargin,
+          doc.loc
+      )
+    }
+
+    // add all documents except root to the namespace table
+    if (namespace.isDefined) {
+      namespaces += (namespace.get -> doc)
+    }
+
+    val (docImports, docStructDefs, docTasks) = doc.elements.foldLeft(
+        (Vector.empty[ImportDoc], Vector.empty[StructDefinition], Vector.empty[Task])
+    ) {
+      case ((imports, structs, tasks), element: ImportDoc) =>
+        (imports :+ element, structs, tasks)
+      case ((imports, structs, tasks), element: StructDefinition) =>
+        (imports, structs :+ element, tasks)
+      case ((imports, structs, tasks), element: Task) =>
+        (imports, structs, tasks :+ element)
+      case other => throw new RuntimeException(s"Invalid document element ${other}")
+    }
+
+    // add all struct defs to the same table since structs use a flat namespace
+    docStructDefs.foreach { structDef =>
+      if (structDefs.contains(structDef.name)) {
+        throw new TypeException(
+            s"""All struct definitions in the document graph rooted at ${root} must have unique names; found 
+               |duplicate name ${structDef.name}""".stripMargin,
+            structDef.loc
+        )
+      }
+      structDefs += (structDef.name -> structDef)
+    }
+    // add tasks
+    docTasks.foreach { task =>
+      val fqn = namespace.map(n => s"${n}.${task.name}").getOrElse(task.name)
+      if (tasks.contains(fqn)) {
+        throw new TypeException(s"""Found task with duplicate name ${fqn}""", task.loc)
+      }
+      tasks += (fqn -> task)
+    }
+    // descend workflow and add new elements to the graph
+    if (doc.workflow.isDefined) {
+      val wf = doc.workflow.get
+      //val fqn =
+      namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
+    }
+  }
+
+  def apply(): DocumentGraph = {
+    addDocument(root)
+    DocumentGraph(graph, wdlVersion, namespaces, structDefs)
+  }
+}
+
+object DocumentGraph {
+
+  /**
+    * Builds an ElementGraph, which wraps a directed graph of the elements in a WDL Document, starting at
+    * the top-level WDL and including any imported WDLs.
+    * @param root the document to graph
+    * @param followImports: whether to include imports in the graph
+    * @return
+    */
+  def build(root: Document, followImports: Boolean): DocumentGraph = {
+    DocumentGraphBuilder(root, followImports).apply()
   }
 }
