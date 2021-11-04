@@ -6,7 +6,9 @@ on:
       release-version:
         description: 'Release version'
         required: false
-
+permissions:
+  contents: write
+  packages: read
 jobs:
   run-release:
     name: wdlTools Release

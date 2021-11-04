@@ -9,7 +9,9 @@ on:
       - main
       - develop
   workflow_dispatch:
-
+permissions:
+  contents: read
+  packages: read
 jobs:
   test:
     name: Test
