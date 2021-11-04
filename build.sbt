@@ -19,14 +19,16 @@ name := "wdlTools"
 ThisBuild / organization := "com.dnanexus"
 ThisBuild / scalaVersion := "2.13.2"
 ThisBuild / developers := List(
-    Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus-rnd")),
-    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus-rnd")),
-    Developer("r-i-v-a", "Riva Nathans", "rnathans-cf@dnanexus.com", url("https://github.com/dnanexus-rnd"))
+    Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus")),
+    Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus")),
+    Developer("r-i-v-a",
+              "Riva Nathans",
+              "rnathans-cf@dnanexus.com",
+              url("https://github.com/dnanexus"))
 )
-ThisBuild / homepage := Some(url("https://github.com/dnanexus-rnd/wdlTools"))
+ThisBuild / homepage := Some(url("https://github.com/dnanexus/wdlTools"))
 ThisBuild / scmInfo := Some(
-    ScmInfo(url("https://github.com/dnanexus-rnd/wdlTools"),
-            "git@github.com:dnanexus-rnd/wdlTools.git")
+    ScmInfo(url("https://github.com/dnanexus/wdlTools"), "git@github.com:dnanexus/wdlTools.git")
 )
 ThisBuild / licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))
 
@@ -81,7 +83,7 @@ lazy val dependencies = {
 //)
 
 val githubDxScalaResolver = Resolver.githubPackages("dnanexus", "dxScala")
-val githubWdlToolsResolver = Resolver.githubPackages("dnanexus-rnd", "wdlTools")
+val githubWdlToolsResolver = Resolver.githubPackages("dnanexus", "wdlTools")
 resolvers ++= Vector(githubWdlToolsResolver, githubDxScalaResolver)
 
 val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("github")
@@ -108,7 +110,7 @@ lazy val settings = Seq(
           Opts.resolver.sonatypeStaging
         }
     ),
-    githubOwner := "dnanexus-rnd",
+    githubOwner := "dnanexus",
     githubRepository := "wdlTools",
     publishMavenStyle := true,
     // If an exception is thrown during tests, show the full

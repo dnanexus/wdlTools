@@ -23,7 +23,7 @@ The `fix` command attempts to automatically fix WDL files with the following spe
     Int x = ceil(size(myfile))
     ```
 
-Additional fixes will be added as needed. Please request them by opening an [issue](https://github.com/dnanexus-rnd/wdlTools/issues).
+Additional fixes will be added as needed. Please request them by opening an [issue](https://github.com/dnanexus/wdlTools/issues).
 
 ## Issues that cannot be fixed (partial list)
 
