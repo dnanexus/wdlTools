@@ -29,7 +29,7 @@ The wdlTools JAR also provides various command line tools to accelerate and simp
 $ java -jar wdlTools.jar [command] --help
 ```
 
-The following commands are currently available. They should be considered "beta" quality - please report any bugs/enhancements using the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
+The following commands are currently available. They should be considered "beta" quality - please report any bugs/enhancements using the [issue tracker](https://github.com/dnanexus/wdlTools/issues).
 
 * [check](doc/Commands/Check.md): type-check a WDL file
 * [docgen](doc/Commands/Docgen.md): generate documentation for WDL tasks/workflows
@@ -71,4 +71,4 @@ See the [documentation](doc/Developing.md) for full details.
 
 ## Support
 
-wdlTools is _not_ an official product of DNAnexus. Please do not contact DNAnexus (or any employees thereof) for support. To report a bug or feature request, please open an issue in the [issue tracker](https://github.com/dnanexus-rnd/wdlTools/issues).
+wdlTools is _not_ an official product of DNAnexus. Please do not contact DNAnexus (or any employees thereof) for support. To report a bug or feature request, please open an issue in the [issue tracker](https://github.com/dnanexus/wdlTools/issues).

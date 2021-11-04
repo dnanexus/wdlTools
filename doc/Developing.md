@@ -43,7 +43,7 @@
 
 ## Getting the source code
 
-* Clone or fork the [wdlTools repository](https://github.com/dnanexus-rnd/wdlTools) (depending on whether you have commit permissions)
+* Clone or fork the [wdlTools repository](https://github.com/dnanexus/wdlTools) (depending on whether you have commit permissions)
 * Checkout an existing branch or create a new branch (e.g. feat/42-my-feature)
 * Add pre-commit hooks:
     * Create/edit a file .git/hooks/pre-commit
