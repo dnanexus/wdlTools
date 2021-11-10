@@ -8,7 +8,7 @@ on:
         required: false
 permissions:
   contents: write
-  packages: read
+  packages: write
 jobs:
   run-release:
     name: wdlTools Release
