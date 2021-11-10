@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.17.2 (2021-11-10)
 
 * Fixes infinite loop when calling `wdlTools.eval.Runtime.contains` with "docker" or "container"
 
