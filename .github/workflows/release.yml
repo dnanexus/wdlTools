@@ -104,6 +104,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git pull
           git push origin HEAD:${{ github.ref }}
           git push origin HEAD:${{ steps.version.outputs.version }}
       - name: Publish package
