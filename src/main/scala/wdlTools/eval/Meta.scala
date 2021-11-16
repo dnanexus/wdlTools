@@ -61,9 +61,9 @@ class Meta(kvs: Map[String, TAT.MetaValue],
   }
 
   override def get(id: String, wdlTypes: Vector[WdlTypes.T] = Vector.empty): Option[WdlValues.V] = {
-    overrideValues.flatMap(_.get(id, wdlTypes))
-    super
-      .get(id, wdlTypes)
+    overrideValues
+      .flatMap(_.get(id, wdlTypes))
+      .orElse(super.get(id, wdlTypes))
       .orElse(userDefaultValues.flatMap(_.get(id, wdlTypes)))
       .orElse(defaults.get(id))
   }
