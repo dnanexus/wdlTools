@@ -4,6 +4,14 @@
 
 * Updates dxCommon dependency
 
+## in develop
+
+* Fixes `eval.Meta.get` to respect override values
+
+## 0.17.3 (2021-11-15)
+
+* Updates to latest dxCommon
+
 ## 0.17.2 (2021-11-10)
 
 * Fixes infinite loop when calling `wdlTools.eval.Runtime.contains` with "docker" or "container"
