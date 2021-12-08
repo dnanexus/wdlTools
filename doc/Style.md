@@ -91,7 +91,7 @@ task Greet {
 ## Line breaks/wrapping
 
 * The maximum line width is 100 characters
-    * You may choose to use a maximum line wIdth (e.g. values of 79, 80, and 88 are popular)
+    * You may choose to use a lesser maximum line width (e.g. values of 79, 80, and 88 are popular)
 * When possible, wrap lines longer than the maximum length
     * WDL does not have a facility for wrapping long strings - instead, use interpolation when possible
         ```wdl
