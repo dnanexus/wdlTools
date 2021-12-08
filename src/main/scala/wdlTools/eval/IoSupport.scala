@@ -78,7 +78,7 @@ case class IoSupport(paths: EvalPaths,
     */
   def glob(pattern: String): Vector[String] = {
     logger.trace(s"glob(${pattern})")
-    val baseDir = paths.getWorkDir(ensureExists = true)
+    val baseDir = paths.getWorkDir(ensureExists = true).asJavaPath
     val retval =
       if (!Files.exists(baseDir)) {
         Vector.empty[String]
@@ -100,6 +100,6 @@ case class IoSupport(paths: EvalPaths,
   }
 
   def mkTempFile(prefix: String = "wdlTools", suffix: String = ""): Path = {
-    Files.createTempFile(paths.getTempDir(true), prefix, suffix)
+    Files.createTempFile(paths.getTempDir(true).asJavaPath, prefix, suffix)
   }
 }

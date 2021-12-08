@@ -24,7 +24,8 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
   private val linesep = System.lineSeparator()
   private val evalPaths: EvalPaths = DefaultEvalPaths.createFromTemp()
-  private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getWorkDir()))
+  private val evalFileResolver =
+    FileSourceResolver.create(Vector(evalPaths.getWorkDir().asJavaPath))
 
   def parseAndTypeCheck(file: Path): TAT.Document = {
     val doc = parsers.parseDocument(fileResolver.fromPath(FileUtils.absolutePath(file)))
@@ -513,11 +514,11 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
     val evaluator = createEvaluator()
     val fastq1 = evalPaths.getRootDir(ensureExists = true).resolve("fastq1.gz")
-    FileUtils.writeFileContent(fastq1, "fastq1")
+    FileUtils.writeFileContent(fastq1.asJavaPath, "fastq1")
     val fastq2 = evalPaths.getRootDir(ensureExists = true).resolve("fastq2.gz")
-    FileUtils.writeFileContent(fastq2, "fastq2")
+    FileUtils.writeFileContent(fastq2.asJavaPath, "fastq2")
     val index = evalPaths.getRootDir(ensureExists = true).resolve("genome_index.tar.gz")
-    FileUtils.writeFileContent(index, "index")
+    FileUtils.writeFileContent(index.asJavaPath, "index")
     val inputs: Map[String, V] = Map(
         "sample_name" -> V_String("sample"),
         "fastq1_gz" -> V_File(fastq1.toString),
@@ -614,7 +615,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val command = evaluator.applyCommand(task.command, bindings)
     val (_, stdout, _) = SysUtils.execCommand(command)
     stdout shouldBe "1^I1$\n2\\t2$\n3\\^I3$\n4\\\\t4$\n"
-    FileUtils.writeFileContent(evaluator.paths.getStdoutFile(), stdout)
+    FileUtils.writeFileContent(evaluator.paths.getStdoutFile().asJavaPath, stdout)
     val outputExpr = task.outputs.head.expr
     evaluator.applyExpr(outputExpr) shouldBe V_String("1^I1$\n2\\t2$\n3\\^I3$\n4\\\\t4$")
   }

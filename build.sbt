@@ -50,9 +50,9 @@ lazy val dependencies = {
   val scalateVersion = "1.9.7"
   //val beardVersion = "0.3.1"
   val sprayVersion = "1.3.6"
-  val katanVersion = "0.6.1"
+  val katanVersion = "0.6.2"
   val re2jVersion = "1.6"
-  val graphVersion = "1.13.2"
+  val graphVersion = "1.13.3"
   val scalatestVersion = "3.2.9"
 
   Seq(

@@ -1,8 +1,8 @@
 package wdlTools.eval
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Files
 import wdlTools.syntax.SourceLocation
-import dx.util.{BaseEvalPaths, FileUtils}
+import dx.util.{BaseEvalPaths, FileUtils, PosixPath}
 
 /**
   * Paths configuration for evaluation of IO-related expressions. The general structure of an
@@ -21,25 +21,25 @@ import dx.util.{BaseEvalPaths, FileUtils}
   * @param rootDir  the root directory - all other paths (except possibly tmpDir) are under this dir
   * @param tempDir  directory for placing temporary files.
   */
-class DefaultEvalPaths(rootDir: Path, tempDir: Path) extends BaseEvalPaths {
-  def getRootDir(ensureExists: Boolean = false): Path = {
+class DefaultEvalPaths(rootDir: PosixPath, tempDir: PosixPath) extends BaseEvalPaths {
+  def getRootDir(ensureExists: Boolean = false): PosixPath = {
     getOrCreateDir("root", rootDir, ensureExists)
   }
 
-  def getTempDir(ensureExists: Boolean = false): Path = {
+  def getTempDir(ensureExists: Boolean = false): PosixPath = {
     getOrCreateDir("temp", tempDir, ensureExists)
   }
 
   /**
     * The execution directory - used as the base dir for relative paths (e.g. for glob search).
     */
-  def getWorkDir(ensureExists: Boolean = false): Path = {
+  def getWorkDir(ensureExists: Boolean = false): PosixPath = {
     getOrCreateDir(DefaultEvalPaths.DefaultWorkDir,
                    getRootDir(ensureExists).resolve(DefaultEvalPaths.DefaultWorkDir),
                    ensureExists)
   }
 
-  def getMetaDir(ensureExists: Boolean = false): Path = {
+  def getMetaDir(ensureExists: Boolean = false): PosixPath = {
     getOrCreateDir(DefaultEvalPaths.DefaultMetaDir,
                    getRootDir(ensureExists).resolve(DefaultEvalPaths.DefaultMetaDir),
                    ensureExists)
@@ -48,14 +48,14 @@ class DefaultEvalPaths(rootDir: Path, tempDir: Path) extends BaseEvalPaths {
   /**
     * The file that has a copy of standard output.
     */
-  def getStdoutFile(ensureParentExists: Boolean = false): Path = {
+  def getStdoutFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultEvalPaths.DefaultStdout)
   }
 
   /**
     * The file that has a copy of standard error.
     */
-  def getStderrFile(ensureParentExists: Boolean = false): Path = {
+  def getStderrFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultEvalPaths.DefaultStderr)
   }
 }
@@ -67,23 +67,24 @@ object DefaultEvalPaths {
   val DefaultStdout = "stdout"
   val DefaultStderr = "stderr"
 
-  def apply(rootDir: Path, tempDir: Path): DefaultEvalPaths = {
+  def apply(rootDir: PosixPath, tempDir: PosixPath): DefaultEvalPaths = {
     new DefaultEvalPaths(rootDir, tempDir)
   }
 
   def create(): DefaultEvalPaths = {
-    DefaultEvalPaths(FileUtils.cwd(absolute = true), FileUtils.systemTempDir)
+    DefaultEvalPaths(PosixPath(FileUtils.cwd(absolute = true).toString),
+                     PosixPath(FileUtils.systemTempDir.toString))
   }
 
   def createFromTemp(): DefaultEvalPaths = {
-    val rootDir = Files.createTempDirectory("eval")
+    val rootDir = PosixPath(Files.createTempDirectory("eval").toString)
     val tempDir = rootDir.resolve(DefaultTempDir)
     DefaultEvalPaths(rootDir, tempDir)
   }
 
   // an EvalConfig where all the paths point to /dev/null - only useful for
   // testing where there are no I/O functions used
-  lazy val NullPath: Path = Paths.get("/dev/null")
+  val NullPath: PosixPath = PosixPath("/dev/null")
   lazy val empty: DefaultEvalPaths = DefaultEvalPaths(NullPath, NullPath)
 }
 

@@ -63,7 +63,7 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
             )
         )
     }
-    val commandFile = hostPaths.getCommandFile(true)
+    val commandFile = hostPaths.getCommandFile(true).asJavaPath
     logger.traceLimited(s"writing bash script to ${commandFile}")
     FileUtils.writeFileContent(commandFile, script, makeExecutable = true)
     commandFile
@@ -86,7 +86,7 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
             "maxMemory" -> maxMemory
         )
     )
-    val commandFile = hostPaths.getContainerCommandFile(true)
+    val commandFile = hostPaths.getContainerCommandFile(true).asJavaPath
     logger.traceLimited(s"writing docker run script to ${commandFile}")
     FileUtils.writeFileContent(commandFile, dockerRunScript, makeExecutable = true)
     commandFile
@@ -165,10 +165,10 @@ case class TaskExecutor(taskContext: TaskContext,
               )
           ),
           "commandStdout" -> JsString(
-              FileUtils.readFileContent(hostPaths.getStdoutFile(), mustExist = false)
+              FileUtils.readFileContent(hostPaths.getStdoutFile().asJavaPath, mustExist = false)
           ),
           "commandStderr" -> JsString(
-              FileUtils.readFileContent(hostPaths.getStderrFile(), mustExist = false)
+              FileUtils.readFileContent(hostPaths.getStderrFile().asJavaPath, mustExist = false)
           )
       )
     } else {

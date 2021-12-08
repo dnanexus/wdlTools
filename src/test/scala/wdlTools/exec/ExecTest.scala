@@ -18,7 +18,8 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
   private val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
   private val evalPaths: EvalPaths = DefaultEvalPaths.createFromTemp()
-  private val evalFileResolver = FileSourceResolver.create(Vector(evalPaths.getWorkDir()))
+  private val evalFileResolver =
+    FileSourceResolver.create(Vector(evalPaths.getWorkDir().asJavaPath))
   private val evaluator =
     Eval(evalPaths, Some(WdlVersion.V1), Vector.empty, evalFileResolver, Logger.Quiet)
 

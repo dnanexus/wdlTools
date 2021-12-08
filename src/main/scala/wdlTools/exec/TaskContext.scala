@@ -29,7 +29,8 @@ case class TaskContext(task: Task,
     // just allow them to be localized on demand (for example, if they're required to
     // evaluate an output value expression).
     WdlValueBindings(if (hasCommand) {
-      val disambiguator = SafeLocalizationDisambiguator(hostEvaluator.paths.getRootDir(true))()
+      val disambiguator =
+        SafeLocalizationDisambiguator(hostEvaluator.paths.getRootDir(true).asJavaPath)()
       // TODO: put localization behind a trait so we can swap in e.g. a parallelized implementation
       bindings.map {
         case (name, V_File(uri)) =>
@@ -109,7 +110,7 @@ case class TaskContext(task: Task,
 
   def outputs: Map[String, WdlValues.V] = {
     val outputFileResolver =
-      fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getWorkDir()))
+      fileResolver.addToLocalSearchPath(Vector(hostEvaluator.paths.getWorkDir().asJavaPath))
     task.outputs.map { output =>
       val value = outputBindings.get(output.name)
       val resolved: WdlValues.V =
