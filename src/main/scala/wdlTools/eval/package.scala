@@ -1,7 +1,6 @@
 package wdlTools.eval
 
-import java.nio.file.{Files, Path}
-
+import java.nio.file.{Files, Path, Paths}
 import wdlTools.syntax.SourceLocation
 import dx.util.{BaseEvalPaths, FileUtils}
 
@@ -84,7 +83,8 @@ object DefaultEvalPaths {
 
   // an EvalConfig where all the paths point to /dev/null - only useful for
   // testing where there are no I/O functions used
-  lazy val empty: DefaultEvalPaths = DefaultEvalPaths(FileUtils.NullPath, FileUtils.NullPath)
+  lazy val NullPath: Path = Paths.get("/dev/null")
+  lazy val empty: DefaultEvalPaths = DefaultEvalPaths(NullPath, NullPath)
 }
 
 // A runtime error
