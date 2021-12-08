@@ -1,10 +1,6 @@
 # Change log
 
-## 0.17.3 (2021-11-15)
-
-* Updates dxCommon dependency
-
-## in develop
+## 0.17.4 (2021-11-17)
 
 * Fixes `eval.Meta.get` to respect override values
 
