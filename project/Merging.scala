@@ -37,12 +37,14 @@ object Merging {
       path map {
         _.toLowerCase
       } match {
-        case "spring.tooling" :: xs =>
+        case "spring.tooling" :: _                 => MergeStrategy.discard
+        case "io.netty.versions.properties" :: Nil => MergeStrategy.first
+        case "maven" :: "com.google.guava" :: _    => MergeStrategy.first
+        case _ :+ ("asm-license.txt" | "module-info.class" | "overview.html" |
+            "cobertura.properties") =>
           MergeStrategy.discard
-        case "io.netty.versions.properties" :: Nil =>
-          MergeStrategy.first
-        case "maven" :: "com.google.guava" :: xs =>
-          MergeStrategy.first
+        case _ :+ ("generated-layer.xml" | "namedservices.index" | "java.lang.runnable") =>
+          MergeStrategy.discard
         case _ =>
           val oldStrategy = (assemblyMergeStrategy in assembly).value
           oldStrategy(x)
@@ -57,7 +59,9 @@ object Merging {
           val oldStrategy = (assemblyMergeStrategy in assembly).value
           oldStrategy(x)
       }
-    case "asm-license.txt" | "module-info.class" | "overview.html" | "cobertura.properties" =>
+    case PathList(
+        "asm-license.txt" | "module-info.class" | "overview.html" | "cobertura.properties"
+        ) =>
       MergeStrategy.discard
     case PathList("mime.types") =>
       MergeStrategy.last
