@@ -43,16 +43,16 @@ lazy val wdlTools = root.settings(
 )
 
 lazy val dependencies = {
-  val dxCommonVersion = "0.8.1-SNAPSHOT"
-  val antlr4Version = "4.9.2"
-  val scallopVersion = "3.4.0"
+  val dxCommonVersion = "0.10.0"
+  val antlr4Version = "4.9.3"
+  val scallopVersion = "4.1.0"
   val typesafeVersion = "1.4.1"
   val scalateVersion = "1.9.7"
   //val beardVersion = "0.3.1"
   val sprayVersion = "1.3.6"
-  val katanVersion = "0.6.1"
+  val katanVersion = "0.6.2"
   val re2jVersion = "1.6"
-  val graphVersion = "1.13.2"
+  val graphVersion = "1.13.3"
   val scalatestVersion = "3.2.9"
 
   Seq(

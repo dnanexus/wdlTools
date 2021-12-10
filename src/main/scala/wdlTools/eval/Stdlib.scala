@@ -808,7 +808,7 @@ case class Stdlib(paths: EvalPaths,
   private def stdout(ctx: FunctionContext): V_File = {
     ctx.assertNoArgs()
     val stdoutFile = paths.getStdoutFile(true)
-    ioSupport.ensureFileExists(stdoutFile, "stdout", ctx.loc)
+    ioSupport.ensureFileExists(stdoutFile.asJavaPath, "stdout", ctx.loc)
     V_File(stdoutFile.toString)
   }
 
@@ -816,7 +816,7 @@ case class Stdlib(paths: EvalPaths,
   private def stderr(ctx: FunctionContext): V_File = {
     ctx.assertNoArgs()
     val stderrFile = paths.getStdoutFile(true)
-    ioSupport.ensureFileExists(stderrFile, "stderr", ctx.loc)
+    ioSupport.ensureFileExists(stderrFile.asJavaPath, "stderr", ctx.loc)
     V_File(stderrFile.toString)
   }
 

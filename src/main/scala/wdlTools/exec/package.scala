@@ -1,8 +1,7 @@
 package wdlTools.exec
 
-import java.nio.file.{Files, Path, Paths}
-
-import dx.util.{ExecPaths, FileUtils}
+import java.nio.file.{Files, Path}
+import dx.util.{ExecPaths, FileUtils, PosixPath}
 import wdlTools.eval.DefaultEvalPaths
 import wdlTools.syntax.SourceLocation
 
@@ -24,22 +23,22 @@ object ExecException {
   }
 }
 
-class DefaultExecPaths(rootDir: Path, tempDir: Path)
+class DefaultExecPaths(rootDir: PosixPath, tempDir: PosixPath)
     extends DefaultEvalPaths(rootDir, tempDir)
     with ExecPaths {
-  def getCommandFile(ensureParentExists: Boolean = false): Path = {
+  def getCommandFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultCommandScript)
   }
 
-  def getReturnCodeFile(ensureParentExists: Boolean = false): Path = {
+  def getReturnCodeFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultReturnCode)
   }
 
-  def getContainerCommandFile(ensureParentExists: Boolean = false): Path = {
+  def getContainerCommandFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultContainerRunScript)
   }
 
-  def getContainerIdFile(ensureParentExists: Boolean = false): Path = {
+  def getContainerIdFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultContainerId)
   }
 }
@@ -50,7 +49,7 @@ object DefaultExecPaths {
   val DefaultContainerRunScript = "containerRunScript"
   val DefaultContainerId = "containerId"
 
-  def apply(executionDir: Path, tempDir: Path): ExecPaths = {
+  def apply(executionDir: PosixPath, tempDir: PosixPath): ExecPaths = {
     new DefaultExecPaths(executionDir, tempDir)
   }
 
@@ -59,24 +58,24 @@ object DefaultExecPaths {
     if (!Files.isDirectory(executionDir)) {
       throw new ExecException(s"${executionDir} does not exist or is not a directory")
     }
-    DefaultExecPaths(executionDir, tempDir)
+    DefaultExecPaths(PosixPath(executionDir.toString), PosixPath(tempDir.toString))
   }
 
   def createLocalPathsFromTemp(): ExecPaths = {
-    val rootDir = Files.createTempDirectory("wdlTools")
+    val rootDir = PosixPath(Files.createTempDirectory("wdlTools").toString)
     val tempDir = rootDir.resolve(DefaultEvalPaths.DefaultTempDir)
     DefaultExecPaths(rootDir, tempDir)
   }
 
-  def createContainerPaths(containerExecutionDir: Path,
-                           containerTempDir: Path = Paths.get("/tmp")): ExecPaths = {
+  def createContainerPaths(containerExecutionDir: PosixPath,
+                           containerTempDir: PosixPath = PosixPath("/tmp")): ExecPaths = {
     DefaultExecPaths(containerExecutionDir, containerTempDir)
   }
 
   def createLocalContainerPair(
       useWorkingDir: Boolean = false,
-      containerMountDir: Path,
-      containerTempDir: Path = Paths.get("/tmp")
+      containerMountDir: PosixPath,
+      containerTempDir: PosixPath = PosixPath("/tmp")
   ): (ExecPaths, ExecPaths) = {
     val localPaths = if (useWorkingDir) {
       createLocalPathsFromDir()

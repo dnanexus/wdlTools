@@ -1,7 +1,6 @@
 package wdlTools.eval
 
 import java.nio.file.{Files, Paths}
-
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -13,6 +12,7 @@ import dx.util.{
   FileSourceResolver,
   FileUtils,
   Logger,
+  PosixPath,
   StringFileNode
 }
 
@@ -29,9 +29,10 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val baseDir = Files.createTempDirectory("eval")
     baseDir.toFile.deleteOnExit()
     val tmpDir = baseDir.resolve("tmp")
-    val evalPaths = DefaultEvalPaths(baseDir, tmpDir)
+    val evalPaths = DefaultEvalPaths(PosixPath(baseDir.toString), PosixPath(tmpDir.toString))
     val fileResolver =
-      FileSourceResolver.create(Vector(srcDir, evalPaths.getWorkDir()), Vector(DxProtocol))
+      FileSourceResolver.create(Vector(srcDir, evalPaths.getWorkDir().asJavaPath),
+                                Vector(DxProtocol))
     (evalPaths, fileResolver)
   }
 
@@ -80,7 +81,7 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     val file2 = workDir.resolve("file2.txt")
     val files = Set(file1, file2)
     files.foreach { path =>
-      FileUtils.writeFileContent(path, "foo")
+      FileUtils.writeFileContent(path.asJavaPath, "foo")
     }
     val ioSupp = IoSupport(evalPaths, fileResolver, logger)
     val globFiles = ioSupp.glob("./*.txt")

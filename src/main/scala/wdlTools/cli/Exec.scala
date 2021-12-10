@@ -1,7 +1,5 @@
 package wdlTools.cli
 
-import java.nio.file.Paths
-
 import spray.json.JsValue
 import wdlTools.eval.{Eval, WdlValueBindings, WdlValueSerde}
 import wdlTools.exec.{
@@ -15,7 +13,7 @@ import wdlTools.exec.{
 }
 import wdlTools.syntax.Parsers
 import wdlTools.types.{TypeInfer, TypedAbstractSyntax => TAT}
-import dx.util.{ExecPaths, FileSourceResolver, FileUtils, JsUtils, Logger, errorMessage}
+import dx.util.{ExecPaths, FileSourceResolver, FileUtils, JsUtils, Logger, PosixPath, errorMessage}
 
 import scala.language.reflectiveCalls
 
@@ -63,7 +61,7 @@ case class Exec(conf: WdlToolsConf) extends Command {
     val wdlVersion = doc.version.value
     val (hostPaths: ExecPaths, guestPaths: Option[ExecPaths]) = if (conf.exec.container()) {
       val (host, guest) =
-        DefaultExecPaths.createLocalContainerPair(containerMountDir = Paths.get("/home/wdlTools"))
+        DefaultExecPaths.createLocalContainerPair(containerMountDir = PosixPath("/home/wdlTools"))
       (host, Some(guest))
     } else {
       (DefaultExecPaths.createLocalPathsFromTemp(), None)
