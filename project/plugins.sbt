@@ -18,8 +18,8 @@ libraryDependencies ++= {
   if (baseDirectory.value / "../.git" isDirectory)
     Seq(
         Defaults.sbtPluginExtra("com.typesafe.sbt" % "sbt-git" % "1.0.0",
-                                (sbtBinaryVersion in update).value,
-                                (scalaBinaryVersion in update).value)
+                                (update / sbtBinaryVersion).value,
+                                (update / scalaBinaryVersion).value)
     )
   else {
     println("sbt-git plugin not loaded")

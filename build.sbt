@@ -39,7 +39,7 @@ lazy val wdlTools = root.settings(
     settings,
     assemblySettings,
     libraryDependencies ++= dependencies,
-    assemblyJarName in assembly := "wdlTools.jar"
+    assembly / assemblyJarName := "wdlTools.jar"
 )
 
 lazy val dependencies = {
@@ -168,8 +168,8 @@ val compilerOptions = Seq(
 
 // Assembly
 lazy val assemblySettings = Seq(
-    logLevel in assembly := Level.Info,
+    assembly / logLevel := Level.Info,
     // comment out this line to enable tests in assembly
-    test in assembly := {},
-    assemblyMergeStrategy in assembly := customMergeStrategy.value
+    assembly / test := {},
+    assembly / assemblyMergeStrategy := customMergeStrategy.value
 )
