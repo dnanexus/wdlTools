@@ -91,7 +91,8 @@ val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("githu
 lazy val settings = Seq(
     scalacOptions ++= compilerOptions,
     // exclude Java sources from scaladoc
-    scalacOptions in (Compile, doc) ++= Seq("-no-java-comments", "-no-link-warnings"),
+    Compile / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
+    doc / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
     javacOptions ++= Seq("-Xlint:deprecation"),
     // reduce the maximum number of errors shown by the Scala compiler
     maxErrors := 20,
