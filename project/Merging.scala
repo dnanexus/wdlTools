@@ -46,7 +46,7 @@ object Merging {
         case _ :+ ("generated-layer.xml" | "namedservices.index" | "java.lang.runnable") =>
           MergeStrategy.discard
         case _ =>
-          val oldStrategy = (assemblyMergeStrategy in assembly).value
+          val oldStrategy = (assembly / assemblyMergeStrategy).value
           oldStrategy(x)
       }
     case x @ PathList("OSGI-INF", path @ _*) =>
@@ -56,7 +56,7 @@ object Merging {
         case "l10n" :: "bundle.properties" :: Nil =>
           MergeStrategy.concat
         case _ =>
-          val oldStrategy = (assemblyMergeStrategy in assembly).value
+          val oldStrategy = (assembly / assemblyMergeStrategy).value
           oldStrategy(x)
       }
     case PathList(
@@ -66,7 +66,7 @@ object Merging {
     case PathList("mime.types") =>
       MergeStrategy.last
     case x =>
-      val oldStrategy = (assemblyMergeStrategy in assembly).value
+      val oldStrategy = (assembly / assemblyMergeStrategy).value
       OnErrorMergeStrategy(oldStrategy(x), MergeStrategy.first)
   }
 }
