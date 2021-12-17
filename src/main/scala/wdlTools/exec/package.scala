@@ -23,8 +23,8 @@ object ExecException {
   }
 }
 
-class DefaultExecPaths(rootDir: PosixPath, tempDir: PosixPath)
-    extends DefaultEvalPaths(rootDir, tempDir)
+class DefaultExecPaths(rootDir: PosixPath, val tempDir: PosixPath, isLocal: Boolean)
+    extends DefaultEvalPaths(rootDir, tempDir, isLocal)
     with ExecPaths {
   def getCommandFile(ensureParentExists: Boolean = false): PosixPath = {
     getMetaDir(ensureParentExists).resolve(DefaultExecPaths.DefaultCommandScript)
@@ -49,8 +49,8 @@ object DefaultExecPaths {
   val DefaultContainerRunScript = "containerRunScript"
   val DefaultContainerId = "containerId"
 
-  def apply(executionDir: PosixPath, tempDir: PosixPath): ExecPaths = {
-    new DefaultExecPaths(executionDir, tempDir)
+  def apply(executionDir: PosixPath, tempDir: PosixPath, isLocal: Boolean): ExecPaths = {
+    new DefaultExecPaths(executionDir, tempDir, isLocal)
   }
 
   def createLocalPathsFromDir(executionDir: Path = FileUtils.cwd(absolute = true),
@@ -58,18 +58,18 @@ object DefaultExecPaths {
     if (!Files.isDirectory(executionDir)) {
       throw new ExecException(s"${executionDir} does not exist or is not a directory")
     }
-    DefaultExecPaths(PosixPath(executionDir.toString), PosixPath(tempDir.toString))
+    DefaultExecPaths(PosixPath(executionDir.toString), PosixPath(tempDir.toString), isLocal = true)
   }
 
   def createLocalPathsFromTemp(): ExecPaths = {
-    val rootDir = PosixPath(Files.createTempDirectory("wdlTools").toString)
+    val rootDir = PosixPath(Files.createTempDirectory("wdlTools").toRealPath().toString)
     val tempDir = rootDir.resolve(DefaultEvalPaths.DefaultTempDir)
-    DefaultExecPaths(rootDir, tempDir)
+    DefaultExecPaths(rootDir, tempDir, isLocal = true)
   }
 
   def createContainerPaths(containerExecutionDir: PosixPath,
                            containerTempDir: PosixPath = PosixPath("/tmp")): ExecPaths = {
-    DefaultExecPaths(containerExecutionDir, containerTempDir)
+    DefaultExecPaths(containerExecutionDir, containerTempDir, isLocal = false)
   }
 
   def createLocalContainerPair(

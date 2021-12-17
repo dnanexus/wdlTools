@@ -19,7 +19,7 @@ class FixerTest extends AnyFlatSpec with Matchers {
   private def fix(name: String, validate: Boolean): Unit = {
     val fixer = Fixer()
     val docSource = getWdlSource(name, "before")
-    val outputDir = Files.createTempDirectory("fix")
+    val outputDir = Files.createTempDirectory("fix").toRealPath()
     outputDir.toFile.deleteOnExit()
     val fixedSource = fixer.fix(docSource, outputDir)
     if (validate) {
