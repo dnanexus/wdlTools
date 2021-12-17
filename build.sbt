@@ -32,15 +32,16 @@ ThisBuild / scmInfo := Some(
 )
 ThisBuild / licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))
 
-lazy val root = project.in(file("."))
-lazy val wdlTools = root.settings(
-    name := "wdlTools",
-    version := getVersion,
-    settings,
-    assemblySettings,
-    libraryDependencies ++= dependencies,
-    assembly / assemblyJarName := "wdlTools.jar"
-)
+lazy val wdlTools = project
+  .in(file("."))
+  .settings(
+      name := "wdlTools",
+      version := getVersion,
+      settings,
+      assemblySettings,
+      libraryDependencies ++= dependencies,
+      assembly / assemblyJarName := "wdlTools.jar"
+  )
 
 lazy val dependencies = {
   val dxCommonVersion = "0.10.0"
@@ -53,7 +54,7 @@ lazy val dependencies = {
   val katanVersion = "0.6.2"
   val re2jVersion = "1.6"
   val graphVersion = "1.13.3"
-  val scalatestVersion = "3.2.9"
+  val scalatestVersion = "3.2.10"
 
   Seq(
       "com.dnanexus" % "dxcommon" % dxCommonVersion,
@@ -91,13 +92,13 @@ val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("githu
 lazy val settings = Seq(
     scalacOptions ++= compilerOptions,
     // exclude Java sources from scaladoc
-    Compile / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
-    doc / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
+    //Compile / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
+    //doc / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
     javacOptions ++= Seq("-Xlint:deprecation"),
     // reduce the maximum number of errors shown by the Scala compiler
     maxErrors := 20,
     // scalafmt
-    scalafmtConfig := root.base / ".scalafmt.conf",
+    scalafmtConfig := baseDirectory.value / ".scalafmt.conf",
     // disable publish with scala version, otherwise artifact name will include scala version
     // e.g wdlTools_2.11
     crossPaths := false,
