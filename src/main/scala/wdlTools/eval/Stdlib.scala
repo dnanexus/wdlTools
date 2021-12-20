@@ -815,7 +815,7 @@ case class Stdlib(paths: EvalPaths,
   // since: draft-1
   private def stderr(ctx: FunctionContext): V_File = {
     ctx.assertNoArgs()
-    val stderrFile = paths.getStdoutFile(true)
+    val stderrFile = paths.getStderrFile(true)
     ioSupport.ensureFileExists(stderrFile.asJavaPath, "stderr", ctx.loc)
     V_File(stderrFile.toString)
   }
