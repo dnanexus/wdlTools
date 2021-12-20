@@ -1,11 +1,11 @@
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.6")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "1.1.0")
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.8")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.3")
-//addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
+// addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 // sbt-sonatype plugin used to publish artifact to maven central via sonatype nexus
 // sbt-pgp plugin used to sign the artifcat with pgp keys
-//addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "2.3")
-//addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
+// addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "2.3")
+// addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
 // sbt-github-packages plugin used to publish snapshot versions to github packages
 addSbtPlugin("com.codecommit" % "sbt-github-packages" % "0.5.2")
 
@@ -17,8 +17,8 @@ libraryDependencies ++= {
   if ((baseDirectory.value / "../.git").isDirectory)
     Seq(
         Defaults.sbtPluginExtra("com.typesafe.sbt" % "sbt-git" % "1.0.0",
-                                (sbtBinaryVersion in update).value,
-                                (scalaBinaryVersion in update).value)
+                                (update / sbtBinaryVersion).value,
+                                (update / scalaBinaryVersion).value)
     )
   else {
     println("sbt-git plugin not loaded")
