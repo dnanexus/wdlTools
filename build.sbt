@@ -96,7 +96,7 @@ lazy val settings = Seq(
     // reduce the maximum number of errors shown by the Scala compiler
     maxErrors := 20,
     // scalafmt
-    scalafmtConfig := baseDirectory.value / ".scalafmt.conf",
+    scalafmtConfig := file(".") / ".scalafmt.conf",
     // disable publish with scala version, otherwise artifact name will include scala version
     // e.g wdlTools_2.11
     crossPaths := false,
