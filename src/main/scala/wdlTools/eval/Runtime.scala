@@ -476,6 +476,11 @@ object Runtime {
           case Vector(a, b, c, d) =>
             val bytes = EvalUtils.floatToInt(EvalUtils.sizeToFloat(b.toDouble, c, loc))
             DiskRequest(bytes, Some(a), Some(d))
+          case other =>
+            throw new EvalException(
+                s"Invalid ${Runtime.DisksKey} value ${other}",
+                loc
+            )
         }
         Vector(t)
       case other =>

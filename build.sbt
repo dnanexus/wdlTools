@@ -17,7 +17,7 @@ def getVersion: String = {
 name := "wdlTools"
 
 ThisBuild / organization := "com.dnanexus"
-ThisBuild / scalaVersion := "2.13.2"
+ThisBuild / scalaVersion := "2.13.7"
 ThisBuild / developers := List(
     Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus")),
     Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus")),
@@ -150,7 +150,6 @@ val compilerOptions = Seq(
     "-Xlint:doc-detached",
     "-Xlint:inaccessible",
     "-Xlint:infer-any",
-    "-Xlint:nullary-override",
     "-Xlint:nullary-unit",
     "-Xlint:option-implicit",
     "-Xlint:package-object-classes",

@@ -273,7 +273,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
             case e: AST.ValueInt     => TAT.ValueInt(e.value, T_Int)(e.loc)
             case e: AST.ValueFloat   => TAT.ValueFloat(e.value, T_Float)(e.loc)
             case e: AST.ValueString  => TAT.ValueString(e.value, T_String, e.quoting)(e.loc)
-
             // complex types
             case e: AST.ExprPair =>
               val l2 = nested(e.left, nextState)
@@ -354,7 +353,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
               }
               val valueType = unifyTypes(values.map(_.wdlType), "map values", e.loc, unifyCtx)
               TAT.ExprMap(tMembers, T_Map(keyType, valueType))(e.loc)
-
             case e: AST.ExprIdentifier =>
               // an identifier has to be bound to a known type. Lookup the the type,
               // and add it to the expression.
@@ -365,7 +363,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   T_Any
               }
               TAT.ExprIdentifier(e.id, t)(e.loc)
-
             case e: AST.ExprPlaceholder =>
               val unifyCtx =
                 UnificationContext(Some(ctx.version), section, nextState >= ExprState.InPlaceholder)
@@ -463,7 +460,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 case _ =>
                   throw new Exception(s"invalid combination of placeholder options: ${nestedExpr}")
               }
-
             case e: AST.ExprIfThenElse =>
               // if (x == 1) then "Sunday" else "Weekday"
               val eCond = nested(e.cond, nextState)
@@ -495,7 +491,6 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                 }
               }
               TAT.ExprIfThenElse(eCond, eTrueBranch, eFalseBranch, t)(e.loc)
-
             case e: AST.ExprAt =>
               // Access an array element at [index: Int] or a map value at [key: K]
               val eIndex = nested(e.index, nextState)
@@ -526,14 +521,12 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   eCollection.wdlType
               }
               TAT.ExprAt(eCollection, eIndex, t)(e.loc)
-
             case e: AST.ExprGetName =>
               // Access a field in a struct or an object. For example "x.a" in:
               //   Int z = x.a
               val lhsExpr = nested(e.expr, nextState)
               val wdlType = typeEvalExprGetName(lhsExpr, e.id, ctx)
               TAT.ExprGetName(lhsExpr, e.id, wdlType)(e.loc)
-
             // vectorize any mathematical operations
             case applyExpr: AST.ExprApply if canVectorize(applyExpr) =>
               nested(vectorize(applyExpr), nestedState)
@@ -550,6 +543,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
                   handleError(e.getMessage, nestedExpr.loc)
                   TAT.ValueNone(T_Any)(nestedExpr.loc)
               }
+            case other => throw new Exception(s"unexpected expression ${other}")
           }
       }
     }

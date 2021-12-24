@@ -16,9 +16,6 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v2
-      - name: Scala formatting
-        run: |
-          sbt scalafmtCheckAll
       - name: Install java
         uses: actions/setup-java@v1
         with:
@@ -31,7 +28,9 @@ jobs:
       - name: Unit Tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=4G -Xmx4G -Xms1G"
         run: |
+          sbt scalafmtCheckAll
           sbt test
       - name: Get version
         id: version

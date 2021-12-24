@@ -121,7 +121,7 @@ case class ProjectGenerator(name: String,
           )
           if (predefinedChoice.isDefined) {
             fields :+= predefinedChoiceMap(predefinedChoice.get).copy(linked = true)
-            break
+            break()
           }
         }
         val name = console.askRequired[String](prompt = "Name")

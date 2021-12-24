@@ -61,7 +61,7 @@ case class Lint(conf: WdlToolsConf) extends Command {
   private def readJsonSource(src: Source): Map[String, JsValue] = {
     val jsObj =
       try {
-        src.getLines.mkString(System.lineSeparator).parseJson
+        src.getLines().mkString(System.lineSeparator).parseJson
       } catch {
         case _: NullPointerException =>
           throw new Exception(s"Could not open resource ${RULES_RESOURCE}")

@@ -35,7 +35,7 @@ jobs:
       - name: Unit Tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=2G -Xmx2G -Xms1G"
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=4G -Xmx4G -Xms1G"
         run: |
           sbt scalafmtCheckAll
           sbt test
