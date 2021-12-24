@@ -12,7 +12,7 @@ permissions:
 jobs:
   run-release:
     name: wdlTools Release
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Git checkout
         uses: actions/checkout@v2
