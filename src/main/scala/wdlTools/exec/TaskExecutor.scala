@@ -1,10 +1,9 @@
 package wdlTools.exec
 
 import java.nio.file.{Files, Path}
-
 import spray.json.{JsNumber, JsObject, JsString, JsValue}
 import wdlTools.generators.Renderer
-import dx.util.{ExecPaths, FileUtils, Logger, SysUtils, errorMessage}
+import dx.util.{ExecPaths, FileUtils, Logger, StdMode, SysUtils, errorMessage}
 
 sealed trait TaskExecutorResult {
   def toJson: Map[String, JsValue]
@@ -140,12 +139,18 @@ case class TaskExecutor(taskContext: TaskContext,
     }
     logger.trace(s"Executing command file ${commandFile}")
     // execute the shell script in a child job - this call will only fail on timeout
-    val (retcode, stdout, stderr) =
-      SysUtils.execScript(commandFile, timeout, exceptionOnFailure = false)
+    val (retcode, _, _) =
+      SysUtils.runCommand(commandFile.toString,
+                          timeout,
+                          exceptionOnFailure = false,
+                          stdoutMode = StdMode.Forward,
+                          stderrMode = StdMode.Forward)
     if (taskContext.runtime.isValidReturnCode(retcode)) {
-      TaskExecutorSuccess(retcode, taskContext.jsonOutputs, stdout, stderr)
+      //TaskExecutorSuccess(retcode, taskContext.jsonOutputs, stdout, stderr)
+      TaskExecutorSuccess(retcode, taskContext.jsonOutputs, "", "")
     } else {
-      TaskExecutorCommandFailure(retcode, stdout, stderr)
+      //TaskExecutorCommandFailure(retcode, stdout, stderr)
+      TaskExecutorCommandFailure(retcode, "", "")
     }
   }
 

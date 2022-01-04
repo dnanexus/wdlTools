@@ -26,10 +26,11 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
   }
 
   private def setup(): (EvalPaths, FileSourceResolver) = {
-    val baseDir = Files.createTempDirectory("eval")
+    val baseDir = Files.createTempDirectory("eval").toRealPath()
     baseDir.toFile.deleteOnExit()
     val tmpDir = baseDir.resolve("tmp")
-    val evalPaths = DefaultEvalPaths(PosixPath(baseDir.toString), PosixPath(tmpDir.toString))
+    val evalPaths =
+      DefaultEvalPaths(PosixPath(baseDir.toString), PosixPath(tmpDir.toString), isLocal = true)
     val fileResolver =
       FileSourceResolver.create(Vector(srcDir, evalPaths.getWorkDir().asJavaPath),
                                 Vector(DxProtocol))

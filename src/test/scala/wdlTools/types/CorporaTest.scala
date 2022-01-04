@@ -22,7 +22,7 @@ class CorporaTest extends AnyWordSpec with Matchers {
   if (corporaAvailable) {
     val logger = Logger.Quiet
     lazy val fixDir = {
-      val fixDir = Files.createTempDirectory("fix")
+      val fixDir = Files.createTempDirectory("fix").toRealPath()
       fixDir.toFile.deleteOnExit()
       fixDir
     }

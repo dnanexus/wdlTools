@@ -21,7 +21,8 @@ import dx.util.{BaseEvalPaths, FileUtils, PosixPath}
   * @param rootDir  the root directory - all other paths (except possibly tmpDir) are under this dir
   * @param tempDir  directory for placing temporary files.
   */
-class DefaultEvalPaths(rootDir: PosixPath, tempDir: PosixPath) extends BaseEvalPaths {
+class DefaultEvalPaths(rootDir: PosixPath, tempDir: PosixPath, isLocal: Boolean)
+    extends BaseEvalPaths(isLocal) {
   def getRootDir(ensureExists: Boolean = false): PosixPath = {
     getOrCreateDir("root", rootDir, ensureExists)
   }
@@ -67,25 +68,25 @@ object DefaultEvalPaths {
   val DefaultStdout = "stdout"
   val DefaultStderr = "stderr"
 
-  def apply(rootDir: PosixPath, tempDir: PosixPath): DefaultEvalPaths = {
-    new DefaultEvalPaths(rootDir, tempDir)
+  def apply(rootDir: PosixPath, tempDir: PosixPath, isLocal: Boolean): DefaultEvalPaths = {
+    new DefaultEvalPaths(rootDir, tempDir, isLocal)
   }
 
   def create(): DefaultEvalPaths = {
     DefaultEvalPaths(PosixPath(FileUtils.cwd(absolute = true).toString),
-                     PosixPath(FileUtils.systemTempDir.toString))
+                     PosixPath(FileUtils.systemTempDir.toString),
+                     isLocal = true)
   }
 
   def createFromTemp(): DefaultEvalPaths = {
-    val rootDir = PosixPath(Files.createTempDirectory("eval").toString)
+    val rootDir = PosixPath(Files.createTempDirectory("eval").toRealPath().toString)
     val tempDir = rootDir.resolve(DefaultTempDir)
-    DefaultEvalPaths(rootDir, tempDir)
+    DefaultEvalPaths(rootDir, tempDir, isLocal = true)
   }
 
-  // an EvalConfig where all the paths point to /dev/null - only useful for
-  // testing where there are no I/O functions used
   val NullPath: PosixPath = PosixPath("/dev/null")
-  lazy val empty: DefaultEvalPaths = DefaultEvalPaths(NullPath, NullPath)
+  // a DefaultEvalPaths where all paths point to /dev/null - only useful for testing, and only if no I/O functions used
+  lazy val empty: DefaultEvalPaths = DefaultEvalPaths(NullPath, NullPath, isLocal = false)
 }
 
 // A runtime error
