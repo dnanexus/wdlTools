@@ -1,5 +1,12 @@
 # Change log
 
+## 0.17.6 (2022-01-05)
+
+* Fixes `stderr()` function - previously it was returning the file for stdout
+* Update dxCommon version
+* Updates code to compile with JDK11
+* Updates build environment to JDK11, Scala 2.13.7, and SBT 1.5.7
+
 ## 0.17.5 (2021-12-09)
 
 * Update dxCommon version
