@@ -12,17 +12,14 @@ permissions:
 jobs:
   run-release:
     name: wdlTools Release
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Git checkout
         uses: actions/checkout@v2
-      - name: Scala formatting
-        run: |
-          sbt scalafmtCheckAll
       - name: Install java
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: 11
       - name: Install & build
         run: |
           # compile antlr4 sources
@@ -31,7 +28,9 @@ jobs:
       - name: Unit Tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx4G -Xms1G"
         run: |
+          sbt scalafmtCheckAll
           sbt test
       - name: Get version
         id: version

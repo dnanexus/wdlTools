@@ -169,6 +169,7 @@ object EvalUtils {
           }
           .mkString(", ")
         s"${name} { input: ${memberStr} }"
+      case other => throw new Exception(s"unexpected value ${other}")
     }
   }
 

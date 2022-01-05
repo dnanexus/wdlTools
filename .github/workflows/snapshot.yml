@@ -10,14 +10,14 @@ permissions:
 jobs:
   publish:
     name: Publish Snapshot
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Git Checkout
         uses: actions/checkout@v2
       - name: Install Java
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: 11
       - name: Install other dependencies
         run: |
           sudo apt update -y && sudo apt install -y jq

@@ -15,14 +15,14 @@ permissions:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Git Checkout
         uses: actions/checkout@v2
       - name: Install Java
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: 11
       - name: Install & build
         run: |
           # compile antlr4 sources
@@ -35,7 +35,7 @@ jobs:
       - name: Unit Tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=2G -Xmx2G -Xms1G"
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx4G -Xms1G"
         run: |
           sbt scalafmtCheckAll
           sbt test

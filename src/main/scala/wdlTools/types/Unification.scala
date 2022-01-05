@@ -350,10 +350,18 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
                 (vt.add(a.index, z), minPriority2)
               case (None, Some(z)) if a.bounds.isEmpty || a.bounds.contains(z) =>
                 (vt.add(a.index, z), minPriority2)
+              case (None, Some(z)) =>
+                throw new TypeUnificationException(
+                    s"variable ${a} is not compatible with type ${z}"
+                )
               case (Some(z: T_Var), None) if b.bounds.isEmpty || (b.bounds & z.bounds).nonEmpty =>
                 (vt.add(b.index, z), minPriority2)
               case (Some(z), None) if b.bounds.isEmpty || b.bounds.contains(z) =>
                 (vt.add(b.index, z), minPriority2)
+              case (Some(z), None) =>
+                throw new TypeUnificationException(
+                    s"variable ${a} is not compatible with type ${z}"
+                )
               case (Some(z), Some(w)) =>
                 val (_, newVarTypes, newPriority) = inner(z, w, vt, minPriority2)
                 (newVarTypes, newPriority)
@@ -361,16 +369,18 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           (newVarTypes(a.index), newVarTypes, newPriority)
         case (a: T_Var, z) =>
           vt.get(a.index) match {
-            case None if a.bounds.isEmpty || a.bounds.contains(z) =>
-              // found a binding for a type variable
-              (z, vt.add(a.index, z), Enum.max(minPriority, Priority.VarMatch))
             case Some(w) =>
               // a binding already exists, choose the more general type
               inner(w, z, vt, Enum.max(minPriority, Priority.VarMatch))
+            case None if a.bounds.isEmpty || a.bounds.contains(z) =>
+              // found a binding for a type variable
+              (z, vt.add(a.index, z), Enum.max(minPriority, Priority.VarMatch))
+            case None =>
+              throw new TypeUnificationException(s"variable ${a} is not compatible with type ${z}")
           }
         case _ =>
           throw new TypeUnificationException(
-              s"There is no common type to which $x and $y are coercible"
+              s"there is no common type to which $x and $y are coercible"
           )
       }
     }

@@ -17,7 +17,7 @@ def getVersion: String = {
 name := "wdlTools"
 
 ThisBuild / organization := "com.dnanexus"
-ThisBuild / scalaVersion := "2.13.2"
+ThisBuild / scalaVersion := "2.13.7"
 ThisBuild / developers := List(
     Developer("orodeh", "orodeh", "orodeh@dnanexus.com", url("https://github.com/dnanexus")),
     Developer("jdidion", "jdidion", "jdidion@dnanexus.com", url("https://github.com/dnanexus")),
@@ -92,11 +92,11 @@ val releaseTarget = Option(System.getProperty("releaseTarget")).getOrElse("githu
 lazy val settings = Seq(
     scalacOptions ++= compilerOptions,
     Compile / doc / scalacOptions ++= Seq("-no-java-comments", "-no-link-warnings"),
-    javacOptions ++= Seq("-Xlint:deprecation"),
+    javacOptions ++= Seq("-Xlint:deprecation", "-source", "1.8", "-target", "1.8"),
     // reduce the maximum number of errors shown by the Scala compiler
     maxErrors := 20,
     // scalafmt
-    scalafmtConfig := baseDirectory.value / ".scalafmt.conf",
+    scalafmtConfig := file(".") / ".scalafmt.conf",
     // disable publish with scala version, otherwise artifact name will include scala version
     // e.g wdlTools_2.11
     crossPaths := false,
@@ -150,7 +150,6 @@ val compilerOptions = Seq(
     "-Xlint:doc-detached",
     "-Xlint:inaccessible",
     "-Xlint:infer-any",
-    "-Xlint:nullary-override",
     "-Xlint:nullary-unit",
     "-Xlint:option-implicit",
     "-Xlint:package-object-classes",

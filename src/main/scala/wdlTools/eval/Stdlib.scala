@@ -862,7 +862,7 @@ case class Stdlib(paths: EvalPaths,
   private def read_lines(ctx: FunctionContext): V_Array = {
     val file = getWdlFile(ctx.getOneArg, ctx.loc)
     val content = ioSupport.readFile(file.value, ctx.loc)
-    V_Array(Source.fromString(content).getLines.map(V_String).toVector)
+    V_Array(Source.fromString(content).getLines().map(V_String).toVector)
   }
 
   private val tsvConf = CsvConfiguration('\t', '"', QuotePolicy.WhenNeeded, Header.None)

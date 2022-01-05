@@ -78,7 +78,8 @@ object WdlValueSerde {
       }
       innerValue match {
         case JsNull                               => V_Null
-        case JsBoolean(value)                     => V_Boolean(value)
+        case JsFalse                              => V_Boolean(false)
+        case JsTrue                               => V_Boolean(true)
         case JsNumber(value) if value.isValidLong => V_Int(value.toLongExact)
         case JsNumber(value)                      => V_Float(value.toDouble)
         case JsString(value)                      => V_String(value)
