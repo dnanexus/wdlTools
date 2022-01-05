@@ -2,26 +2,26 @@
 
 ## Setting up your development environment
 
-* Install JDK 8
-    * On mac with [homebrew]() installed:
+* Install JDK 11
+    * On mac with [homebrew](https://brew.sh/) installed:
     ```
     $ brew tap AdoptOpenJDK/openjdk
-    $ brew cask install adoptopenjdk8
+    $ brew cask install adoptopenjdk11
     # Use java_home to find the location of JAVA_HOME to set
     $ /usr/libexec/java_home -V
     $ export JAVA_HOME=/Library/Java/...
     ```
     * On Linux (assuming Ubuntu 16.04)
     ```
-    $ sudo apt install openjdk-8-jre-headless
+    $ sudo apt install openjdk-11-jre-headless
     ```
-    * Scala will compile with JDK 11, but the JDK on DNAnexus worker instances is JDK 8 and will not be able to run a JAR file with classes compiled by a later version of Java
+    * Note that wdlTools will compile with JDK8 or JDK11 and that JDK8 is used as the build target so the resulting JAR file can be executed with JRE8 or later.
 * Install [sbt](https://www.scala-sbt.org/), which also installs Scala. Sbt is a make-like utility that works with the ```scala``` language.
     * On MacOS: `brew install sbt`
     * On Linux:
     ```
-    $ wget www.scala-lang.org/files/archive/scala-2.12.1.deb
-    $ sudo dpkg -i scala-2.12.1.deb
+    $ wget www.scala-lang.org/files/archive/scala-2.13.7.deb
+    $ sudo dpkg -i scala-2.13.7.deb
     $ echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
     $ sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
     $ sudo apt-get update
