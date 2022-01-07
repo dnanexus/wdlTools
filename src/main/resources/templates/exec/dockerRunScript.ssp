@@ -18,6 +18,7 @@ extraFlags="--user ${bashDollar}(id -u):${bashDollar}(id -g) --hostname ${bashDo
 
 # run as in the original configuration
 docker run \\
+-a stdout -a stderr \\
 --memory=${maxMemory.toString} \\
 --cidfile ${containerIdFile} \\
 ${bashDollar}{extraFlags} \\

@@ -3,7 +3,7 @@ package wdlTools.exec
 import java.nio.file.{Files, Path}
 import spray.json.{JsNumber, JsObject, JsString, JsValue}
 import wdlTools.generators.Renderer
-import dx.util.{ExecPaths, FileUtils, Logger, StdMode, SysUtils, errorMessage}
+import dx.util.{ExecPaths, FileUtils, Logger, SysUtils, errorMessage}
 
 sealed trait TaskExecutorResult {
   def toJson: Map[String, JsValue]
@@ -139,18 +139,17 @@ case class TaskExecutor(taskContext: TaskContext,
     }
     logger.trace(s"Executing command file ${commandFile}")
     // execute the shell script in a child job - this call will only fail on timeout
-    val (retcode, _, _) =
-      SysUtils.runCommand(commandFile.toString,
-                          timeout,
-                          exceptionOnFailure = false,
-                          stdoutMode = StdMode.Forward,
-                          stderrMode = StdMode.Forward)
-    if (taskContext.runtime.isValidReturnCode(retcode)) {
-      //TaskExecutorSuccess(retcode, taskContext.jsonOutputs, stdout, stderr)
-      TaskExecutorSuccess(retcode, taskContext.jsonOutputs, "", "")
+    val (_, stdout, stderr) = SysUtils.execCommand(commandFile.toString, timeout)
+    // scriptRc should always be 0 - the actual return code of the command script is in returnCodeFile
+    val commandRcFile = hostPaths.getReturnCodeFile().asJavaPath
+    if (!Files.exists(commandRcFile)) {
+      throw new Exception(s"return code file ${commandRcFile} does not exist")
+    }
+    val commandRc = FileUtils.readFileContent(commandRcFile).trim.toInt
+    if (taskContext.runtime.isValidReturnCode(commandRc)) {
+      TaskExecutorSuccess(commandRc, taskContext.jsonOutputs, stdout, stderr)
     } else {
-      //TaskExecutorCommandFailure(retcode, stdout, stderr)
-      TaskExecutorCommandFailure(retcode, "", "")
+      TaskExecutorCommandFailure(commandRc, stdout, stderr)
     }
   }
 
