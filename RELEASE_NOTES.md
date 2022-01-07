@@ -3,6 +3,7 @@
 ## in develop
 
 * Correctly attaches to docker stdout/stderr
+* Fixes `exec` command to correctly localize paths and handle return code when running in container
 
 ## 0.17.6 (2022-01-05)
 
