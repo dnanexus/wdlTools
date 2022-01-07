@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+
+* Correctly attaches to docker stdout/stderr
+
 ## 0.17.6 (2022-01-05)
 
 * Fixes `stderr()` function - previously it was returning the file for stdout

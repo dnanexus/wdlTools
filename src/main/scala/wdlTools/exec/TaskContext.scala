@@ -4,7 +4,14 @@ import spray.json._
 import wdlTools.eval.WdlValues._
 import wdlTools.eval.{Eval, Runtime, VBindings, WdlValueBindings, WdlValueSerde, WdlValues}
 import wdlTools.types.TypedAbstractSyntax._
-import dx.util.{Bindings, DockerUtils, FileSourceResolver, Logger, SafeLocalizationDisambiguator}
+import dx.util.{
+  Bindings,
+  DockerUtils,
+  FileSourceResolver,
+  Logger,
+  PosixPath,
+  SafeLocalizationDisambiguator
+}
 
 case class TaskContext(task: Task,
                        inputBindings: Bindings[String, V],
@@ -59,8 +66,22 @@ case class TaskContext(task: Task,
   // The command is evaluated using the guest paths, since it will be executed within
   // the guest system (i.e. container) if applicable, otherwise host and guest are the same
   lazy val command: Option[String] = if (hasCommand) {
-    val guestEval = guestEvaluator.getOrElse(hostEvaluator)
-    guestEval.applyCommand(task.command, evalBindings) match {
+    val (guestEval, guestBindings) = guestEvaluator
+      .map { guestEval =>
+        // if we're running in a container we need to update paths to be relative to the guest root dir
+        val hostRoot = hostEvaluator.paths.getRootDir()
+        val guestRoot = guestEval.paths.getRootDir()
+        val guestBindings = WdlValueBindings(evalBindings.toMap.map {
+          case (name, V_File(hostPath)) =>
+            name -> V_File(guestRoot.resolve(hostRoot.relativize(PosixPath(hostPath))).toString())
+          case (name, V_Directory(hostPath)) =>
+            name -> V_File(guestRoot.resolve(hostRoot.relativize(PosixPath(hostPath))).toString())
+          case other => other
+        })
+        (guestEval, guestBindings)
+      }
+      .getOrElse((hostEvaluator, evalBindings))
+    guestEval.applyCommand(task.command, guestBindings) match {
       case s if s.trim.isEmpty => None
       case s                   => Some(s)
     }
