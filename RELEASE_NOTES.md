@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.17.7 (2022-01-07)
 
 * Correctly attaches to docker stdout/stderr
 * Fixes `exec` command to correctly localize paths and handle return code when running in container
