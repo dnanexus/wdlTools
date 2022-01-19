@@ -1,6 +1,6 @@
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "1.1.0")
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.8")
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.3")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 // addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 // sbt-sonatype plugin used to publish artifact to maven central via sonatype nexus
 // sbt-pgp plugin used to sign the artifcat with pgp keys
