@@ -77,7 +77,7 @@ case class ElementGraphBuilder(root: Document, followImports: Boolean) {
     // descend workflow and add new elements to the graph
     if (doc.workflow.isDefined) {
       val wf = doc.workflow.get
-      //val fqn =
+      // val fqn =
       namespace.map(n => s"${n}.${wf.name}").getOrElse(wf.name)
     }
   }

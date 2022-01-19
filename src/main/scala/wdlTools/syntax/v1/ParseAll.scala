@@ -40,9 +40,10 @@ case class ParseAll(followImports: Boolean = false,
         case t: CST.TypeIdentifier => AST.TypeIdentifier(t.id)(t.loc)
         case t: CST.TypeObject     => AST.TypeObject()(t.loc)
         case t: CST.TypeStruct =>
-          AST.TypeStruct(t.name, t.members.map { member: CST.StructMember =>
-            AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
-          })(t.loc)
+          AST.TypeStruct(t.name,
+                         t.members.map { member: CST.StructMember =>
+                           AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
+                         })(t.loc)
       }
     }
 
@@ -310,9 +311,10 @@ case class ParseAll(followImports: Boolean = false,
     }
 
     def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
-      AST.TypeStruct(struct.name, struct.members.map { member: CST.StructMember =>
-        AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
-      })(
+      AST.TypeStruct(struct.name,
+                     struct.members.map { member: CST.StructMember =>
+                       AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
+                     })(
           struct.loc
       )
     }
@@ -366,7 +368,7 @@ case class ParseAll(followImports: Boolean = false,
           }
           translateImportDoc(importDoc, importedDoc)
         case task: ConcreteSyntax.Task => translateTask(task)
-        case other                     => throw new Exception(s"unrecognized document element ${other}")
+        case other => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(doc.version.value)(doc.version.loc)

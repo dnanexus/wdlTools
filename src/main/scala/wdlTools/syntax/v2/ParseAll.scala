@@ -39,9 +39,10 @@ case class ParseAll(followImports: Boolean = false,
         case t: CST.TypeFloat      => AST.TypeFloat()(t.loc)
         case t: CST.TypeIdentifier => AST.TypeIdentifier(t.id)(t.loc)
         case t: CST.TypeStruct =>
-          AST.TypeStruct(t.name, t.members.map { member: CST.StructMember =>
-            AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
-          })(t.loc)
+          AST.TypeStruct(t.name,
+                         t.members.map { member: CST.StructMember =>
+                           AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
+                         })(t.loc)
       }
     }
 
@@ -71,9 +72,11 @@ case class ParseAll(followImports: Boolean = false,
             AST.ExprMember(translateExpr(member.key), translateExpr(member.value))(member.loc)
           })(e.loc)
         case e: CST.ExprStructLiteral =>
-          AST.ExprStruct(e.name, e.members.map { member =>
-            AST.ExprMember(translateExpr(member.key), translateExpr(member.value))(member.loc)
-          })(e.loc)
+          AST.ExprStruct(
+              e.name,
+              e.members.map { member =>
+                AST.ExprMember(translateExpr(member.key), translateExpr(member.value))(member.loc)
+              })(e.loc)
 
         // operators on one argument
         case e: CST.ExprUnaryPlus =>
@@ -316,9 +319,10 @@ case class ParseAll(followImports: Boolean = false,
     }
 
     private def translateStruct(struct: CST.TypeStruct): AST.TypeStruct = {
-      AST.TypeStruct(struct.name, struct.members.map { member: CST.StructMember =>
-        AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
-      })(
+      AST.TypeStruct(struct.name,
+                     struct.members.map { member: CST.StructMember =>
+                       AST.StructMember(member.name, translateType(member.wdlType))(member.loc)
+                     })(
           struct.loc
       )
     }
@@ -372,7 +376,7 @@ case class ParseAll(followImports: Boolean = false,
           }
           translateImportDoc(importDoc, importedDoc)
         case task: ConcreteSyntax.Task => translateTask(task)
-        case other                     => throw new Exception(s"unrecognized document element ${other}")
+        case other => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(doc.version.value)(doc.version.loc)

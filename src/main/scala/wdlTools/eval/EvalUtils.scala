@@ -46,7 +46,7 @@ object EvalUtils {
     sizeString match {
       case stringSizeRegexp(d, u) if u == null => d.toDouble * getSizeMultiplier(defaultSuffix, loc)
       case stringSizeRegexp(d, u)              => d.toDouble * getSizeMultiplier(u, loc)
-      case other                               => throw new EvalException(s"Invalid size string ${other}", loc)
+      case other => throw new EvalException(s"Invalid size string ${other}", loc)
     }
   }
 
@@ -207,8 +207,7 @@ trait VBindings extends Bindings[String, V] {
     val value = get(id)
     if (wdlTypes.nonEmpty) {
       value.map(value =>
-        Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions)
-      )
+        Coercion.coerceToFirst(wdlTypes, value, sourceLocation, allowNonstandardCoercions))
     } else {
       value
     }

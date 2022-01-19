@@ -82,9 +82,10 @@ object InputOutput {
                       evaluator: Eval,
                       ctx: WdlValueBindings): Bindings[String, WdlValues.V] = {
     evaluator.applyAll(outputParameters.map {
-      case OutputParameter(name, wdlType, expr) =>
-        (name, (wdlType, expr))
-    }, ctx)
+                         case OutputParameter(name, wdlType, expr) =>
+                           (name, (wdlType, expr))
+                       },
+                       ctx)
   }
 }
 

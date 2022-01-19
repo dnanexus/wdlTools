@@ -30,11 +30,11 @@ class ConcreteSyntaxV2Test extends AnyFlatSpec with Matchers {
     val task = elem.asInstanceOf[Task]
 
     val InputSection(decls) = task.input.get
-    decls(0) should matchPattern { case Declaration("i", TypeInt(), None)       => }
-    decls(1) should matchPattern { case Declaration("s", TypeString(), None)    => }
-    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None)     => }
-    decls(3) should matchPattern { case Declaration("b", TypeBoolean(), None)   => }
-    decls(4) should matchPattern { case Declaration("f", TypeFile(), None)      => }
+    decls(0) should matchPattern { case Declaration("i", TypeInt(), None) => }
+    decls(1) should matchPattern { case Declaration("s", TypeString(), None) => }
+    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None) => }
+    decls(3) should matchPattern { case Declaration("b", TypeBoolean(), None) => }
+    decls(4) should matchPattern { case Declaration("f", TypeFile(), None) => }
     decls(5) should matchPattern { case Declaration("d", TypeDirectory(), None) => }
   }
 

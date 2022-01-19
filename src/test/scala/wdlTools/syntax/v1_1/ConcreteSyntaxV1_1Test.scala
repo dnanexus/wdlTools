@@ -46,10 +46,10 @@ class ConcreteSyntaxV1_1Test extends AnyFlatSpec with Matchers {
     kvmap.keySet shouldBe Set("dx_timeout", "dx_instance_type", "dx_restart")
     kvmap("dx_restart") should matchPattern {
       case ExprObjectLiteral(
-          Vector(
-              ExprMember(ExprString("max", _), ExprInt(1)),
-              ExprMember(ExprString("default", _), ExprInt(2))
-          )
+              Vector(
+                  ExprMember(ExprString("max", _), ExprInt(1)),
+                  ExprMember(ExprString("default", _), ExprInt(2))
+              )
           ) =>
     }
   }

@@ -293,7 +293,8 @@ object TypeUtils {
       // A function with three arguments. For example:
       // String sub(String, String, String)
       case T_Function3(name, arg1, arg2, arg3, output) =>
-        s"${name}(${prettyFormatType(arg1)}, ${prettyFormatType(arg2)}, ${prettyFormatType(arg3)}) -> ${prettyFormatType(output)}"
+        s"${name}(${prettyFormatType(arg1)}, ${prettyFormatType(arg2)}, ${prettyFormatType(
+            arg3)}) -> ${prettyFormatType(output)}"
     }
   }
 
@@ -426,7 +427,7 @@ object TypeUtils {
           val args = elements.map(x => inner(x, disableQuoting)).mkString(", ")
           s"${funcName}(${args})"
         case TAT.ExprGetName(e, id: String, _) => s"${inner(e, disableQuoting)}.${id}"
-        case other                             => throw new Exception(s"unexpected expression ${other}")
+        case other => throw new Exception(s"unexpected expression ${other}")
       }
     }
     inner(expr, noQuoting)

@@ -30,11 +30,11 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   def contains(id: String, followAlias: Boolean = true): Boolean = {
     allows(id) && (
         cache.contains(id) ||
-        overrideValues.exists(_.contains(id)) ||
-        runtime.contains(id) ||
-        (followAlias && aliases.contains(id) && contains(aliases.get(id), followAlias = false)) ||
-        userDefaultValues.exists(_.contains(id)) ||
-        defaults.contains(id)
+          overrideValues.exists(_.contains(id)) ||
+          runtime.contains(id) ||
+          (followAlias && aliases.contains(id) && contains(aliases.get(id), followAlias = false)) ||
+          userDefaultValues.exists(_.contains(id)) ||
+          defaults.contains(id)
     )
   }
 
@@ -315,7 +315,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       case Some(V_Array(a)) =>
         a.map {
           case V_String(s) => s
-          case other       => throw new EvalException(s"Invalid container array item value ${other}")
+          case other => throw new EvalException(s"Invalid container array item value ${other}")
         }
       case other =>
         throw new EvalException(

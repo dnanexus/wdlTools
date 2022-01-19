@@ -42,11 +42,11 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     val task = elem.asInstanceOf[Task]
 
     val InputSection(decls) = task.input.get
-    decls(0) should matchPattern { case Declaration("i", TypeInt(_), None)     => }
-    decls(1) should matchPattern { case Declaration("s", TypeString(_), None)  => }
-    decls(2) should matchPattern { case Declaration("x", TypeFloat(_), None)   => }
+    decls(0) should matchPattern { case Declaration("i", TypeInt(_), None) => }
+    decls(1) should matchPattern { case Declaration("s", TypeString(_), None) => }
+    decls(2) should matchPattern { case Declaration("x", TypeFloat(_), None) => }
     decls(3) should matchPattern { case Declaration("b", TypeBoolean(_), None) => }
-    decls(4) should matchPattern { case Declaration("f", TypeFile(_), None)    => }
+    decls(4) should matchPattern { case Declaration("f", TypeFile(_), None) => }
     decls(5) should matchPattern {
       case Declaration("p1", TypePair(_: TypeInt, _: TypeString), None) =>
     }
@@ -159,9 +159,9 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
 
     task.declarations(19) should matchPattern {
       case Declaration(
-          "ia",
-          TypeArray(_: TypeInt, false),
-          Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+              "ia",
+              TypeArray(_: TypeInt, false),
+              Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
     task.declarations(20) should matchPattern {
@@ -531,10 +531,10 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     decl.name shouldBe "a"
     decl.expr.get should matchPattern {
       case ExprApply(
-          "select_first",
-          Vector(
-              ExprArrayLiteral(Vector(ExprInt(3), ExprApply("round", Vector(ExprInt(100)))))
-          )
+              "select_first",
+              Vector(
+                  ExprArrayLiteral(Vector(ExprInt(3), ExprApply("round", Vector(ExprInt(100)))))
+              )
           ) =>
         ()
     }
@@ -600,24 +600,24 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     paramMetaKvs.size shouldBe 1
     paramMetaKvs(0) should matchPattern {
       case MetaKV(
-          "i",
-          MetaValueObject(
-              Vector(
-                  MetaKV("description", MetaValueString("An int", Quoting.Double)),
-                  MetaKV("default", MetaValueInt(3)),
-                  MetaKV("array_of_objs",
-                         MetaValueArray(
-                             Vector(
-                                 MetaValueObject(
-                                     Vector(
-                                         MetaKV("foo", MetaValueBoolean(false)),
-                                         MetaKV("bar", MetaValueFloat(1.0))
+              "i",
+              MetaValueObject(
+                  Vector(
+                      MetaKV("description", MetaValueString("An int", Quoting.Double)),
+                      MetaKV("default", MetaValueInt(3)),
+                      MetaKV("array_of_objs",
+                             MetaValueArray(
+                                 Vector(
+                                     MetaValueObject(
+                                         Vector(
+                                             MetaKV("foo", MetaValueBoolean(false)),
+                                             MetaKV("bar", MetaValueFloat(1.0))
+                                         )
                                      )
                                  )
-                             )
-                         ))
+                             ))
+                  )
               )
-          )
           ) =>
     }
   }
@@ -641,31 +641,31 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     wf.body.size shouldBe 4
     wf.body(0) should matchPattern {
       case Declaration(
-          "a",
-          TypeArray(TypeInt(_), false),
-          Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+              "a",
+              TypeArray(TypeInt(_), false),
+              Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
     wf.body(1) should matchPattern {
       case Declaration(
-          "m",
-          TypeMap(TypeString(_), TypeInt(_)),
-          Some(
-              ExprMapLiteral(
-                  Vector(ExprMember(ExprString("hello", Quoting.Double), ExprInt(1)))
+              "m",
+              TypeMap(TypeString(_), TypeInt(_)),
+              Some(
+                  ExprMapLiteral(
+                      Vector(ExprMember(ExprString("hello", Quoting.Double), ExprInt(1)))
+                  )
               )
-          )
           ) =>
     }
     wf.body(2) should matchPattern {
       case Declaration(
-          "obj",
-          TypeObject(_),
-          Some(
-              ExprObjectLiteral(
-                  Vector(ExprMember(ExprString("foo", Quoting.None), ExprInt(2)))
+              "obj",
+              TypeObject(_),
+              Some(
+                  ExprObjectLiteral(
+                      Vector(ExprMember(ExprString("foo", Quoting.None), ExprInt(2)))
+                  )
               )
-          )
           ) =>
     }
     wf.body(3) should matchPattern {
@@ -679,11 +679,12 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
     meta.size shouldBe 5
     meta should matchPattern {
       case Vector(
-          MetaKV("x", MetaValueString("'", Quoting.Double)),
-          MetaKV("y", MetaValueString("\"", Quoting.Single)),
-          MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1))))),
-          MetaKV("baz", MetaValueArray(Vector(MetaValueInt(1), MetaValueInt(2), MetaValueInt(3)))),
-          MetaKV("blorf", MetaValueArray(Vector()))
+              MetaKV("x", MetaValueString("'", Quoting.Double)),
+              MetaKV("y", MetaValueString("\"", Quoting.Single)),
+              MetaKV("foo", MetaValueObject(Vector(MetaKV("bar", MetaValueInt(1))))),
+              MetaKV("baz",
+                     MetaValueArray(Vector(MetaValueInt(1), MetaValueInt(2), MetaValueInt(3)))),
+              MetaKV("blorf", MetaValueArray(Vector()))
           ) =>
     }
   }
@@ -730,7 +731,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       .getOrElse(throw new Exception("missing declaration actual_read_group"))
     val s = decl.expr match {
       case Some(
-          ExprApply("select_first", Vector(ExprArrayLiteral(Vector(_, cs))))
+              ExprApply("select_first", Vector(ExprArrayLiteral(Vector(_, cs))))
           ) =>
         getString(cs)
       case _ =>
@@ -752,7 +753,7 @@ class ConcreteSyntaxV1Test extends AnyFlatSpec with Matchers {
       .getOrElse(throw new Exception("missing declaration actual_read_group"))
     val strings = decl.expr match {
       case Some(
-          ExprArrayLiteral(strings)
+              ExprArrayLiteral(strings)
           ) =>
         strings.map(getString)
       case _ =>

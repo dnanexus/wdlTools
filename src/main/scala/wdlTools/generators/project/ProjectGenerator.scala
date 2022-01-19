@@ -60,8 +60,8 @@ case class ProjectGenerator(name: String,
   def requiresEvaluation(expr: Expr): Boolean = {
     expr match {
       case _: ValueString | _: ValueBoolean | _: ValueInt | _: ValueFloat => false
-      case ExprPair(l, r)                                                 => requiresEvaluation(l) || requiresEvaluation(r)
-      case ExprArray(value)                                               => value.exists(requiresEvaluation)
+      case ExprPair(l, r)   => requiresEvaluation(l) || requiresEvaluation(r)
+      case ExprArray(value) => value.exists(requiresEvaluation)
       case ExprMap(value) =>
         value.exists(elt => requiresEvaluation(elt.key) || requiresEvaluation(elt.value))
       case ExprObject(members)    => members.exists(member => requiresEvaluation(member.value))
@@ -356,9 +356,8 @@ object ProjectGenerator {
                           Some(MetaValueArray(choices.toVector)(SourceLocation.empty))
                         })
       ).collect {
-          case (key, Some(value)) => key -> value
-        }
-        .map(item => MetaKV(item._1, item._2)(SourceLocation.empty))
+        case (key, Some(value)) => key -> value
+      }.map(item => MetaKV(item._1, item._2)(SourceLocation.empty))
         .toVector
       if (metaMap.isEmpty) {
         None

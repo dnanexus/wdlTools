@@ -324,7 +324,7 @@ case class ParseAll(followImports: Boolean = false,
           }
           translateImportDoc(importDoc, importedDoc)
         case task: ConcreteSyntax.Task => translateTask(task)
-        case other                     => throw new Exception(s"unrecognized document element ${other}")
+        case other => throw new Exception(s"unrecognized document element ${other}")
       }
       val aWf = doc.workflow.map(translateWorkflow)
       val version = AST.Version(WdlVersion.Draft_2)(SourceLocation.empty)

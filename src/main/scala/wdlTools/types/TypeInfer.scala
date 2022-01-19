@@ -1329,8 +1329,8 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
   // with types.
   //
   def apply(doc: AST.Document): (TAT.Document, TypeContext) = {
-    //val (tDoc, _) = applyDoc(doc)
-    //tDoc
+    // val (tDoc, _) = applyDoc(doc)
+    // tDoc
     val (tDoc, ctx) = applyDoc(doc)
     if (errors.nonEmpty && errorHandler.forall(eh => eh.handleTypeErrors(errors))) {
       throw new TypeException(errors)

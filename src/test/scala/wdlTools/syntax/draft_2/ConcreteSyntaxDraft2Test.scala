@@ -36,11 +36,11 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     val task = elem.asInstanceOf[Task]
 
     val InputSection(decls) = task.input.get
-    decls(0) should matchPattern { case Declaration("i", TypeInt(), None)     => }
-    decls(1) should matchPattern { case Declaration("s", TypeString(), None)  => }
-    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None)   => }
+    decls(0) should matchPattern { case Declaration("i", TypeInt(), None) => }
+    decls(1) should matchPattern { case Declaration("s", TypeString(), None) => }
+    decls(2) should matchPattern { case Declaration("x", TypeFloat(), None) => }
     decls(3) should matchPattern { case Declaration("b", TypeBoolean(), None) => }
-    decls(4) should matchPattern { case Declaration("f", TypeFile(), None)    => }
+    decls(4) should matchPattern { case Declaration("f", TypeFile(), None) => }
     decls(5) should matchPattern {
       case Declaration("p1", TypePair(_: TypeInt, _: TypeString), None) =>
     }
@@ -101,9 +101,9 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
     task.input.get.declarations(5) should matchPattern {
       case Declaration(
-          "ia",
-          TypeArray(_: TypeInt, false),
-          Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+              "ia",
+              TypeArray(_: TypeInt, false),
+              Some(ExprArrayLiteral(Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
     task.input.get.declarations(6) should matchPattern {
@@ -182,9 +182,9 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
     task.declarations(15) should matchPattern {
       case Declaration(
-          "k2",
-          _: TypeInt,
-          Some(ExprApply("f", Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
+              "k2",
+              _: TypeInt,
+              Some(ExprApply("f", Vector(ExprInt(1), ExprInt(2), ExprInt(3))))
           ) =>
     }
 
@@ -281,7 +281,7 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     }
     task.declarations should matchPattern {
       case Vector(
-          Declaration("i", TypeInt(), Some(ExprAdd(ExprInt(4), ExprInt(5))))
+              Declaration("i", TypeInt(), Some(ExprAdd(ExprInt(4), ExprInt(5))))
           ) =>
     }
     task.output.get should matchPattern {
@@ -472,10 +472,10 @@ class ConcreteSyntaxDraft2Test extends AnyFlatSpec with Matchers {
     decl.name shouldBe "a"
     decl.expr.get should matchPattern {
       case ExprApply(
-          "select_first",
-          Vector(
-              ExprArrayLiteral(Vector(ExprInt(3), ExprApply("round", Vector(ExprInt(100)))))
-          )
+              "select_first",
+              Vector(
+                  ExprArrayLiteral(Vector(ExprInt(3), ExprApply("round", Vector(ExprInt(100)))))
+              )
           ) =>
         ()
     }

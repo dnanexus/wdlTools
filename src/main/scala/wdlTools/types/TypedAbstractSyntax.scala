@@ -185,7 +185,10 @@ object TypedAbstractSyntax {
   case class ImportAlias(id1: String, id2: String, referee: WdlTypes.T_Struct)(
       val loc: SourceLocation
   ) extends Element
-  case class ImportDoc(namespace: String, aliases: Vector[ImportAlias], addr: String, doc: Document)(
+  case class ImportDoc(namespace: String,
+                       aliases: Vector[ImportAlias],
+                       addr: String,
+                       doc: Document)(
       val loc: SourceLocation
   ) extends DocumentElement
 

@@ -17,7 +17,7 @@ class TypeInferComplianceTest extends AnyWordSpec with Matchers {
           Paths.get(getClass.getResource("/types/v2").getPath)
       )
   )
-  //private val logger = Logger(quiet = false, traceLevel = TraceLevel.VVerbose)
+  // private val logger = Logger(quiet = false, traceLevel = TraceLevel.VVerbose)
   private val logger = Logger.Quiet
   private val parser = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
 

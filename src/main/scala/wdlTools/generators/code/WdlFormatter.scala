@@ -833,11 +833,12 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
                                ctx: ExpressionContext,
                                override val bounds: SourceLocation)
       extends Group(ends = if (ctx.groupOperation(oper)) {
-        Some(Literal.fromStart(Symbols.GroupOpen, bounds),
-             Literal.fromEnd(Symbols.GroupClose, bounds))
-      } else {
-        None
-      }, wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
+                      Some(Literal.fromStart(Symbols.GroupOpen, bounds),
+                           Literal.fromEnd(Symbols.GroupClose, bounds))
+                    } else {
+                      None
+                    },
+                    wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
       with BoundedComposite {
 
     override lazy val body: Option[Composite] = {
@@ -1490,7 +1491,7 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
           case call: Call               => CallBlock(call)
           case scatter: Scatter         => ScatterBlock(scatter)
           case conditional: Conditional => ConditionalBlock(conditional)
-          case other                    => throw new Exception(s"Unexpected workflow body element $other")
+          case other => throw new Exception(s"Unexpected workflow body element $other")
         })
     }
 
@@ -1505,7 +1506,9 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
       extends OpenSection(emtpyLineBetweenStatements = true)
 
   private case class CallInputArgsContainer(args: Vector[Container])
-      extends Container(args, delimiter = Some(Symbols.ArrayDelimiter), wrapping = Wrapping.Always) {
+      extends Container(args,
+                        delimiter = Some(Symbols.ArrayDelimiter),
+                        wrapping = Wrapping.Always) {
     require(args.nonEmpty)
 
     override def line: Int = args.head.line
@@ -1664,8 +1667,8 @@ case class WdlFormatter(targetVersion: Option[WdlVersion] = None,
     private val commandStartRegexp = "(?s)^([^\n\r]*)[\n\r]*(.*)$".r
     private val commandEndRegexp = "\\s+$".r
     private val commentRegexp = "#+\\s*(.+)".r
-    //private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
-    //private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
+    // private val commandStartRegexp = "(?s)^(.*?)[\n\r]+([ \\t]*)(.*)".r
+    // private val commandSingletonRegexp = "(?s)^(.*?)[\n\r]*[ \\t]*(.*?)\\s*$".r
 
     // check whether there is at least one non-whitespace command part
     private def hasCommand: Boolean = {

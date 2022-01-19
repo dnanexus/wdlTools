@@ -18,14 +18,14 @@ class GatkTest extends AnyWordSpec with Matchers {
   private val sources = Vector(
       // broad removed the terra version - the main version doesn't work because it's import statement uses
       // a relative local path path instead of a URL
-      //"https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/JointGenotyping.wdl",
+      // "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/a576e26b11219c3d176d83375c648972410626f1/JointGenotyping.wdl",
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-germline-snps-indels/master/haplotypecaller-gvcf-gatk4.wdl",
       // Uses the keyword "version "
-      //"https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
+      // "https://raw.githubusercontent.com/gatk-workflows/gatk4-data-processing/master/processing-for-variant-discovery-gatk4.wdl"
       "https://raw.githubusercontent.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/master/JointGenotypingWf.wdl",
       "https://raw.githubusercontent.com/gatk-workflows/gatk4-genome-processing-pipeline/1.3.0/WholeGenomeGermlineSingleSample.wdl"
       // Non standard usage of place holders
-      //"https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
+      // "https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl"
       //
       // https://github.com/gatk-workflows/broad-prod-wgs-germline-snps-indels/blob/master/PairedEndSingleSampleWf.wdl#L1208
       //  Array[String]? ignore

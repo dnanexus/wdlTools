@@ -275,7 +275,8 @@ class WdlToolsConf(args: Seq[String]) extends ScallopConf(args) {
         default = Some(false)
     )
     val check: ScallopOption[Boolean] = toggle(
-        descrYes = "(Default) Check generated code to make sure it parses and type-checks correctly",
+        descrYes =
+          "(Default) Check generated code to make sure it parses and type-checks correctly",
         descrNo = "Do not parse and type-check generated code",
         default = Some(true)
     )

@@ -7,7 +7,7 @@ import wdlTools.syntax.{Comment, Parsers, SyntaxUtils}
 import dx.util.{FileNode, FileSourceResolver, FileUtils}
 
 object DocumentationGenerator {
-  //private val TemplatePrefix = "/templates/documentation/"
+  // private val TemplatePrefix = "/templates/documentation/"
   private val DocumentTemplate = "/templates/documentation/document.ssp"
   private val StructsTemplate = "/templates/documentation/structs.ssp"
   private val IndexTemplate = "/templates/documentation/index.ssp"
@@ -163,8 +163,8 @@ object DocumentationGenerator {
           case ExprObject(value) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
-                  )
+                  .map(v =>
+                    prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line))
                   .toMap,
                 None,
                 comment
@@ -172,8 +172,8 @@ object DocumentationGenerator {
           case ExprStruct(name, members) =>
             DocumentationGenerator.MapValueDocumentation(
                 members
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
-                  )
+                  .map(v =>
+                    prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line))
                   .toMap,
                 Some(name),
                 comment
@@ -181,8 +181,8 @@ object DocumentationGenerator {
           case ExprMap(value) =>
             DocumentationGenerator.MapValueDocumentation(
                 value
-                  .map(v => prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line)
-                  )
+                  .map(v =>
+                    prettyFormatExpr(v.key) -> getValueDocumentation(v.value, expr.loc.line))
                   .toMap,
                 None,
                 comment
@@ -297,8 +297,7 @@ object DocumentationGenerator {
                 .map(inp =>
                   getDeclarationDocumentation(inp.parameters,
                                               wf.parameterMeta,
-                                              defaultAllowed = false)
-                )
+                                              defaultAllowed = false))
                 .getOrElse(Vector.empty),
               getCallDocumentation(wf.body),
               wf.meta.map(getMetaDocumentation).getOrElse(Vector.empty),
@@ -316,8 +315,7 @@ object DocumentationGenerator {
                 .map(inp =>
                   getDeclarationDocumentation(inp.parameters,
                                               task.parameterMeta,
-                                              defaultAllowed = false)
-                )
+                                              defaultAllowed = false))
                 .getOrElse(Vector.empty),
               task.runtime
                 .map(
@@ -326,8 +324,7 @@ object DocumentationGenerator {
                           kv.id,
                           getValueDocumentation(kv.expr, kv.loc.line),
                           getDocumentationComment(kv)
-                      )
-                    )
+                      ))
                 )
                 .getOrElse(Vector.empty),
               task.hints
@@ -337,8 +334,7 @@ object DocumentationGenerator {
                           kv.id,
                           getMetaValueDocumentation(kv.value, kv.loc.line),
                           getDocumentationComment(kv)
-                      )
-                    )
+                      ))
                 )
                 .getOrElse(Vector.empty),
               task.meta.map(getMetaDocumentation).getOrElse(Vector.empty),

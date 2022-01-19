@@ -97,8 +97,7 @@ object RuntimeAttributes {
       sourceLocation: Option[SourceLocation] = None
   ): RuntimeAttributes = {
     val runtime = runtimeSection.map(r =>
-      Runtime.create(Some(r), evaluator, ctx, runtimeLocation = sourceLocation)
-    )
+      Runtime.create(Some(r), evaluator, ctx, runtimeLocation = sourceLocation))
     val hints = hintsSection.map(h => Hints.create(Some(h)))
     RuntimeAttributes(runtime, hints, overrideRuntimeValues, overrideHintValues, defaultValues)
   }

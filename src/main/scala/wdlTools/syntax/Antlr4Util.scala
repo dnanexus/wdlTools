@@ -217,8 +217,7 @@ object Antlr4Util {
           Set.empty
         }
         (beforeTokens ++ withinTokens ++ afterTokens).toVector.sortWith((left, right) =>
-          left.getTokenIndex < right.getTokenIndex
-        )
+          left.getTokenIndex < right.getTokenIndex)
       }
     }
 

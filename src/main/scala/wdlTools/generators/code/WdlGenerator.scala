@@ -479,10 +479,11 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
                                vectorizable: Boolean,
                                ctx: ExpressionContext)
       extends Group(ends = if (ctx.groupOperation(oper)) {
-        Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
-      } else {
-        None
-      }, wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
+                      Some(Literal(Symbols.GroupOpen), Literal(Symbols.GroupClose))
+                    } else {
+                      None
+                    },
+                    wrapping = if (ctx.inString()) Wrapping.Never else Wrapping.AsNeeded)
       with Composite {
 
     override lazy val body: Option[Composite] = {
@@ -614,12 +615,14 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
           ExprPair(inner(left, innerCtx), inner(right, innerCtx), wdlType)(p.loc)
         case m @ ExprMap(value, wdlType) =>
           ExprMap(value.map {
-            case (k, v) => (inner(k, innerCtx), inner(v, innerCtx))
-          }, wdlType)(m.loc)
+                    case (k, v) => (inner(k, innerCtx), inner(v, innerCtx))
+                  },
+                  wdlType)(m.loc)
         case o @ ExprObject(value, wdlType) =>
           ExprObject(value.map {
-            case (k, v) => k -> inner(v, innerCtx)
-          }, wdlType)(o.loc)
+                       case (k, v) => k -> inner(v, innerCtx)
+                     },
+                     wdlType)(o.loc)
         case s @ ExprCompoundString(value, wdlType, quoting) =>
           ExprCompoundString(value.map(inner(_, innerCtx)), wdlType, quoting)(s.loc)
         case _ =>
@@ -1082,7 +1085,7 @@ case class WdlGenerator(targetVersion: Option[WdlVersion] = None,
           case call: Call               => CallBlock(call)
           case scatter: Scatter         => ScatterBlock(scatter)
           case conditional: Conditional => ConditionalBlock(conditional)
-          case other                    => throw new Exception(s"Unexpected workflow body element $other")
+          case other => throw new Exception(s"Unexpected workflow body element $other")
         })
     }
 

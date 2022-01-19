@@ -66,7 +66,7 @@ case class Eval(paths: EvalPaths,
         case ExprState.Start         => ExprState.InString
         case ExprState.InString      => ExprState.InPlaceholder
         case ExprState.InPlaceholder => ExprState.InString // nested string
-        case _                       => throw new Exception(s"Cannot advance state from ${exprState}")
+        case _ => throw new Exception(s"Cannot advance state from ${exprState}")
       }
       if (condition.exists(_ < newState)) {
         throw new Exception(s"Context in an invalid state ${newState} >= ${condition.get}")

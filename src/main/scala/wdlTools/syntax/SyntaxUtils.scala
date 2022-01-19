@@ -80,7 +80,7 @@ object SyntaxUtils {
           val args = elements.map(x => inner(x, disableQuoting)).mkString(", ")
           s"${funcName}(${args})"
         case ExprGetName(e: Expr, id: String) => s"${inner(e, disableQuoting)}.${id}"
-        case other                            => throw new Exception(s"unexpected expression ${other}")
+        case other => throw new Exception(s"unexpected expression ${other}")
       }
     }
     inner(expr, noQuoting)

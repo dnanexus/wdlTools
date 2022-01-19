@@ -109,9 +109,10 @@ object Coercion {
                 loc
             )
           }
-          V_Struct(name1, members2.map {
-            case (key, value) => key -> inner(members1(key), value)
-          })
+          V_Struct(name1,
+                   members2.map {
+                     case (key, value) => key -> inner(members1(key), value)
+                   })
         case (WdlTypes.T_Map(WdlTypes.T_String, valueType), V_Object(fields)) =>
           val mapFields: SeqMap[V, V] = fields.map {
             case (k, v) => V_String(k) -> inner(valueType, v)
@@ -165,7 +166,7 @@ object Coercion {
               array
                 .map {
                   case V_Pair(l, r) => (inner(k, l), inner(v, r))
-                  case _            => throw new EvalException(s"Cannot coerce array ${array} to Map", loc)
+                  case _ => throw new EvalException(s"Cannot coerce array ${array} to Map", loc)
                 }
                 .to(TreeSeqMap)
           )

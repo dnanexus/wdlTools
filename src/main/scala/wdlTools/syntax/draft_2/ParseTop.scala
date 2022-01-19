@@ -426,7 +426,7 @@ wdl_type
     ExprPair(arg0, arg1)(getSourceLocation(grammar.docSource, ctx))
   }
 
-  //| LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
+  // | LBRACE (expr COLON expr (COMMA expr COLON expr)*)* RBRACE #map_literal
   override def visitMap_literal(ctx: WdlDraft2Parser.Map_literalContext): Expr = {
     val elements = ctx
       .expr()
@@ -941,20 +941,35 @@ any_decls
     val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems = ctx.task_element().asScala.toVector
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
-      case x: Task_output_elementContext => visitTask_output(x.task_output())
-    }, "output", ctx)
+                                                           case x: Task_output_elementContext =>
+                                                             visitTask_output(x.task_output())
+                                                         },
+                                                         "output",
+                                                         ctx)
     val command: CommandSection = exactlyOneSection(elems.collect {
-      case x: Task_command_elementContext => visitTask_command(x.task_command())
-    }, "command", ctx)
+                                                      case x: Task_command_elementContext =>
+                                                        visitTask_command(x.task_command())
+                                                    },
+                                                    "command",
+                                                    ctx)
     val meta: Option[MetaSection] = atMostOneSection(elems.collect {
-      case x: Task_meta_elementContext => visitMeta(x.meta())
-    }, "meta", ctx)
-    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
-      case x: Task_parameter_meta_elementContext => visitParameter_meta(x.parameter_meta())
-    }, "parameter_meta", ctx)
+                                                       case x: Task_meta_elementContext =>
+                                                         visitMeta(x.meta())
+                                                     },
+                                                     "meta",
+                                                     ctx)
+    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(
+        elems.collect {
+          case x: Task_parameter_meta_elementContext => visitParameter_meta(x.parameter_meta())
+        },
+        "parameter_meta",
+        ctx)
     val runtime: Option[RuntimeSection] = atMostOneSection(elems.collect {
-      case x: Task_runtime_elementContext => visitTask_runtime(x.task_runtime())
-    }, "runtime", ctx)
+                                                             case x: Task_runtime_elementContext =>
+                                                               visitTask_runtime(x.task_runtime())
+                                                           },
+                                                           "runtime",
+                                                           ctx)
 
     val loc = getSourceLocation(grammar.docSource, ctx)
     // We treat as an input any unbound declaration as well as any bound declaration
@@ -1174,18 +1189,27 @@ scatter
       case x: WdlDraft2Parser.Wf_decl_elementContext =>
         visitUnbound_decls(x.unbound_decls())
     }
-    val output: Option[OutputSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.Wf_output_elementContext =>
-        visitWorkflow_output(x.workflow_output())
-    }, "output", ctx)
-    val meta: Option[MetaSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.Wf_meta_elementContext =>
-        visitMeta(x.meta())
-    }, "meta", ctx)
-    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(elems.collect {
-      case x: WdlDraft2Parser.Wf_parameter_meta_elementContext =>
-        visitParameter_meta(x.parameter_meta())
-    }, "parameter_meta", ctx)
+    val output: Option[OutputSection] = atMostOneSection(
+        elems.collect {
+          case x: WdlDraft2Parser.Wf_output_elementContext =>
+            visitWorkflow_output(x.workflow_output())
+        },
+        "output",
+        ctx)
+    val meta: Option[MetaSection] = atMostOneSection(
+        elems.collect {
+          case x: WdlDraft2Parser.Wf_meta_elementContext =>
+            visitMeta(x.meta())
+        },
+        "meta",
+        ctx)
+    val parameterMeta: Option[ParameterMetaSection] = atMostOneSection(
+        elems.collect {
+          case x: WdlDraft2Parser.Wf_parameter_meta_elementContext =>
+            visitParameter_meta(x.parameter_meta())
+        },
+        "parameter_meta",
+        ctx)
     val wfElems: Vector[WorkflowElement] = elems.collect {
       case x: WdlDraft2Parser.Wf_inner_elementContext =>
         visitInner_workflow_element(x.inner_workflow_element())
