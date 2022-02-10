@@ -84,6 +84,8 @@ case class Eval(paths: EvalPaths,
   private def exprGetName(value: V, id: String, loc: SourceLocation): V = {
     value match {
       case V_Struct(name, members) =>
+        // DEBUG
+        logger.trace(s"--> Accessing ${id} in struct ${name}")
         members.get(id) match {
           case None =>
             throw new EvalException(s"Struct ${name} does not have member ${id}", loc)
@@ -91,6 +93,8 @@ case class Eval(paths: EvalPaths,
         }
 
       case V_Object(members) =>
+        // DEBUG
+        logger.trace(s"--> Accessing ${id} in object")
         members.get(id) match {
           case None =>
             throw new EvalException(s"Object does not have member ${id}", loc)
@@ -563,6 +567,8 @@ case class Eval(paths: EvalPaths,
             case _: EvalException if TypeUtils.isOptional(wdlType) => WdlValues.V_Null
           }
         }
+        // DEBUG
+        logger.trace(s"--> Adding name ${name}: value ${value} to variable bindings")
         bindings.add(name, value)
     }
   }
