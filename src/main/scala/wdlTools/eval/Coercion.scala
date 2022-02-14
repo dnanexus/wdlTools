@@ -22,6 +22,8 @@ object Coercion {
     if (fieldTypes.keys.toSet != fieldValues.keys.toSet) {
       throw new EvalException(s"struct ${structName} has wrong fields", loc)
     }
+    // DEBUG
+    logger.trace(s"--> Coercing to struct ${structName}, nonstandard coercions: ${allowNonstandardCoercions}")
 
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
@@ -85,6 +87,8 @@ object Coercion {
           logger.trace(s"--> Coercing V_Object ${EvalUtils.prettyFormat(obj)} to T_Object")
           obj
         case (WdlTypes.T_Struct(name1, members1), V_Struct(name2, members2)) =>
+          // DEBUG
+          logger.trace(s"--> Coercing V_Struct ${EvalUtils.prettyFormat(V_Struct(name2, members2))} to T_Struct")
           if (name1 != name2) {
             throw new EvalException(s"cannot coerce struct ${name2} to struct ${name1}", loc)
           }

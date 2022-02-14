@@ -300,6 +300,7 @@ object TaskInputOutput {
         WdlValues.V_Map()
       case (WdlTypes.T_Object, None | Some(WdlValues.V_Null)) =>
         WdlValues.V_Object()
+      // TODO related to optionals in structs
       case (WdlTypes.T_Struct(name, memberTypes), None | Some(WdlValues.V_Null))
           if memberTypes.values.forall {
             case WdlTypes.T_Optional(_) => true
