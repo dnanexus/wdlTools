@@ -1,5 +1,7 @@
 package wdlTools.eval
 
+import dx.util.Logger
+
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.SourceLocation
 import wdlTools.types.WdlTypes
@@ -8,6 +10,9 @@ import scala.collection.immutable.{SeqMap, TreeSeqMap}
 import scala.util.{Success, Try}
 
 object Coercion {
+  // DEBUG
+  val logger: Logger = Logger.Verbose
+
   private def coerceToStruct(structName: String,
                              fieldTypes: SeqMap[String, WdlTypes.T],
                              fieldValues: SeqMap[String, V],
@@ -21,6 +26,8 @@ object Coercion {
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
       case (name, t) =>
+        // DEBUG
+        logger.trace(s"--> Coercing field ${t} ${name} to struct field")
         name -> coerceTo(t, fieldValues(name), loc, allowNonstandardCoercions, isReadResult)
     }
 
@@ -74,6 +81,8 @@ object Coercion {
         case (WdlTypes.T_Pair(lt, rt), V_Pair(l, r)) =>
           V_Pair(inner(lt, l), inner(rt, r))
         case (WdlTypes.T_Object, obj: V_Object) =>
+          // DEBUG
+          logger.trace(s"--> Coercing V_Object ${EvalUtils.prettyFormat(obj)} to T_Object")
           obj
         case (WdlTypes.T_Struct(name1, members1), V_Struct(name2, members2)) =>
           if (name1 != name2) {
@@ -118,6 +127,8 @@ object Coercion {
           }
           V_Map(mapFields)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Object(fields)) =>
+          // DEBUG
+          logger.trace(s"--> Coercing V_Object ${EvalUtils.prettyFormat(V_Object(fields))} to T_Struct")
           coerceToStruct(name, fieldTypes, fields, loc, allowNonstandardCoercions, isReadResult)
         case (WdlTypes.T_Struct(name, fieldTypes), V_Map(fields)) =>
           // this should probably be considered non-standard

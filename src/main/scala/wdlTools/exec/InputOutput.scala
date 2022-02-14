@@ -206,6 +206,9 @@ case class TaskInputOutput(task: Task, logger: Logger = Logger.Quiet) {
 }
 
 object TaskInputOutput {
+  // DEBUG
+  val logger: Logger = Logger.Verbose
+
   def deserialize(jsValue: JsValue, inputDef: InputParameter, name: String): Option[WdlValues.V] = {
     jsValue match {
       case null | JsNull =>
@@ -358,6 +361,8 @@ object TaskInputOutput {
             key -> value
         })
       case (_, Some(WdlValues.V_Object(members))) =>
+        // DEBUG
+        logger.trace(s"--> Resolving output as object")
         WdlValues.V_Object(members.map {
           case (k, v) =>
             k -> resolveOutputValue(s"${name}.${k}",
@@ -369,6 +374,8 @@ object TaskInputOutput {
         })
       case (WdlTypes.T_Struct(structName, memberTypes),
             Some(WdlValues.V_Struct(_, memberValues))) =>
+        // DEBUG
+        logger.trace(s"--> Resolving output as struct")
         WdlValues.V_Struct(
             structName,
             memberTypes
