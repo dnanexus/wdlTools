@@ -138,55 +138,6 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 ## Releasing
 
-### Sonatype Nexus publishing setup
-
-We use [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories) to release artifacts. In order to set it up:
-
-- Have `dnanexus`'s password for SonaType. Riva Nathans and John Didion have the password.
-- Install gnupg `brew install gnupg`.
-- Generate a key `gpg --quick-gen-key <your email> rsa2048`. Remember the passphrase.
-- Get the key's identifier.
-
-```
-% gpg --list-keys
-
-pub   rsa2048 2021-09-09 [SC] [expires: 2023-09-09]
-      <key identifier is this string>
-uid           [ultimate] <your email>
-```
-
-- Distribute the key `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
-- Export secret key for sbt plugin `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
-- Add the following to `~/.sbt/1.0/plugins/gpg.sbt`.
-
-```
-credentials += Credentials(
-  "GnuPG Key ID",
-  "gpg",
-  "<key identifer>", // key identifier
-  "ignored" // this field is ignored; passwords are supplied by pinentry
-)
-```
-
-- Add the following to `~/.sbt/1.0/sonatype.sbt`.
-
-```
-credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
-```
-
-- Add the following to `~/.sbt/sonatype_credentials`.
-
-```
-realm=Sonatype Nexus Repository Manager
-host=oss.sonatype.org
-user=dnanexus
-password=<dnanexus's password>
-```
-
-Resources
-- https://formulae.brew.sh/formula/gnupg
-- https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html
-
 ### Beginning the release
 
 1. Checkout the develop branch (either HEAD or the specific commit you want to release)
@@ -200,16 +151,6 @@ Resources
 1. Push the release branch to GitHub.
 2. Run the release action.
 3. Go to the "Releases" page on GitHub and publish the draft release.
-
-### Releasing to Maven
-
-Note: this process is currently coordinated by Riva Nathans & John Didion -- please contact them to request a release of the updated library(ies).
-
-1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have completed the "Sonatype Nexus publishing setup" instructions above. You will be prompted to enter your key's passphrase.
-2. Go to [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories), log in as `dnanexus`, and go to "Staging Repositories".
-3. Check the repository to release; there should only be one, but if there are more check the contents to find yours.
-4. Click the "Close" button. After a few minutes, hit "Refresh". The "Release" button should become un-grayed. If not, wait a few more minutes and referesh again.
-5. Click the "Release" button.
 
 ### Completing the release
 
