@@ -164,6 +164,7 @@ Unfortunately, the tags that are created on the release branch are not merged in
 $ git tag wdlTools-0.12.10 -am "release wdlTools 0.12.10"
 $ git push origin wdlTools-0.12.10
 ```
+
 ## wdlTools CLI
 
 ### Adding a new command
