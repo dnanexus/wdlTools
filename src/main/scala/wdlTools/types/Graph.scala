@@ -339,13 +339,15 @@ object ExprGraph {
           resolveDependency("runtime", dep, Some(expr))
         }
       }.toSet
-      val privateDeps: Set[String] = privateVariables.flatMap{ p =>
-          TypeUtils.exprDependencies(p.expr).keySet.map { dep =>
-            resolveDependency(p.name, dep, Some(p.expr))
-          }
-        }.toSet
+      val privateDeps: Set[String] = privateVariables.flatMap { p =>
+        TypeUtils.exprDependencies(p.expr).keySet.map { dep =>
+          resolveDependency(p.name, dep, Some(p.expr))
+        }
+      }.toSet
       val requiredNodes =
-        inputs.filter(_._2.referenced).keySet | commandDeps | runtimeDeps | privateDeps | outputs.keySet
+        inputs
+          .filter(_._2.referenced)
+          .keySet | commandDeps | runtimeDeps | privateDeps | outputs.keySet
 
       // create the graph by iteratively adding missing nodes
       val graph = addDependencies(requiredNodes, Graph.empty[String, DiEdge])
