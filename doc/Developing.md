@@ -156,14 +156,11 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 If you encounter any additional issues while creating the release, you will need to make the fixes in `develop` and then merge them into the release branch.
 
-To complete the release, open a PR to merge the release branch into main. The easiest way to do this is to run `git merge main -X ours` from the release branch, commit, and push. Then set the base to `main` on the PR and merge the PR. You can then delete the release branch.
-
-Unfortunately, the tags that are created on the release branch are not merged into `main` when merging the PR. Thus, after merging the PR, you must manually tag the `main` branch with the release, e.g.
-
-```
-$ git tag wdlTools-0.12.10 -am "release wdlTools 0.12.10"
-$ git push origin wdlTools-0.12.10
-```
+To complete the release:
+1. Create branch `post-release-X.Y.Z` based on branch `release-X.Y.Z`
+2. Increment the working version from e.g. 1.2.3-SNAPSHOT to 1.2.4-SNAPSHOT in `src/main/resources/application.conf`.
+3. Open pull request from branch post-release-X.Y.Z to develop. Fix release notes and resolve conflicts as needed.
+4. Do not remove the branch release-X.Y.Z and don't merge it back to `main` nor `develop`. We keep this branch for tagging purposes. The `main` branch is deprecated.
 
 ## wdlTools CLI
 
