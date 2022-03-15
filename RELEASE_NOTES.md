@@ -1,5 +1,9 @@
 # Change log
 
+## 0.17.8 (2022-03-15)
+
+* Input variables are now evaluated and added to the dependency graph, even when they are optional and not used. They need to be a part of the graph in the case when they are assigned to other (unused) variables for a proper expression evaluation.
+
 ## 0.17.7 (2022-01-07)
 
 * Correctly attaches to docker stdout/stderr
