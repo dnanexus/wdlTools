@@ -44,7 +44,7 @@ jobs:
           version_id=`echo $version_json | jq -r ".data.repository.packages.nodes[0].version.id"`
           echo ::set-output name=version_id::"${version_id}"
       - name: Delete existing snapshot
-        uses: actions/delete-package-versions@v1
+        uses: actions/delete-package-versions@v2
         if: ${{ steps.versions.outputs.version_id != 'null' }}
         with:
           repo: dnanexus

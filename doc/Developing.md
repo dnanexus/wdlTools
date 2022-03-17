@@ -138,55 +138,6 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 
 ## Releasing
 
-### Sonatype Nexus publishing setup
-
-We use [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories) to release artifacts. In order to set it up:
-
-- Have `dnanexus`'s password for SonaType. Riva Nathans and John Didion have the password.
-- Install gnupg `brew install gnupg`.
-- Generate a key `gpg --quick-gen-key <your email> rsa2048`. Remember the passphrase.
-- Get the key's identifier.
-
-```
-% gpg --list-keys
-
-pub   rsa2048 2021-09-09 [SC] [expires: 2023-09-09]
-      <key identifier is this string>
-uid           [ultimate] <your email>
-```
-
-- Distribute the key `gpg --keyserver keyserver.ubuntu.com --send-keys <key identifier>`.
-- Export secret key for sbt plugin `gpg --armor --export-secret-key > ~/.sbt/gpg/secring.asc`. You will need to enter the passphrase.
-- Add the following to `~/.sbt/1.0/plugins/gpg.sbt`.
-
-```
-credentials += Credentials(
-  "GnuPG Key ID",
-  "gpg",
-  "<key identifer>", // key identifier
-  "ignored" // this field is ignored; passwords are supplied by pinentry
-)
-```
-
-- Add the following to `~/.sbt/1.0/sonatype.sbt`.
-
-```
-credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
-```
-
-- Add the following to `~/.sbt/sonatype_credentials`.
-
-```
-realm=Sonatype Nexus Repository Manager
-host=oss.sonatype.org
-user=dnanexus
-password=<dnanexus's password>
-```
-
-Resources
-- https://formulae.brew.sh/formula/gnupg
-- https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html
-
 ### Beginning the release
 
 1. Checkout the develop branch (either HEAD or the specific commit you want to release)
@@ -201,28 +152,15 @@ Resources
 2. Run the release action.
 3. Go to the "Releases" page on GitHub and publish the draft release.
 
-### Releasing to Maven
-
-Note: this process is currently coordinated by Riva Nathans & John Didion -- please contact them to request a release of the updated library(ies).
-
-1. From the release branch, run `sbt publishSigned -DreleaseTarget=sonatype`. You will need to have completed the "Sonatype Nexus publishing setup" instructions above. You will be prompted to enter your key's passphrase.
-2. Go to [Sonatype Nexus repository manager](https://oss.sonatype.org/#stagingRepositories), log in as `dnanexus`, and go to "Staging Repositories".
-3. Check the repository to release; there should only be one, but if there are more check the contents to find yours.
-4. Click the "Close" button. After a few minutes, hit "Refresh". The "Release" button should become un-grayed. If not, wait a few more minutes and referesh again.
-5. Click the "Release" button.
-
 ### Completing the release
 
 If you encounter any additional issues while creating the release, you will need to make the fixes in `develop` and then merge them into the release branch.
 
-To complete the release, open a PR to merge the release branch into main. The easiest way to do this is to run `git merge main -X ours` from the release branch, commit, and push. Then set the base to `main` on the PR and merge the PR. You can then delete the release branch.
-
-Unfortunately, the tags that are created on the release branch are not merged into `main` when merging the PR. Thus, after merging the PR, you must manually tag the `main` branch with the release, e.g.
-
-```
-$ git tag wdlTools-0.12.10 -am "release wdlTools 0.12.10"
-$ git push origin wdlTools-0.12.10
-```
+To complete the release:
+1. Create branch `post-release-X.Y.Z` based on branch `release-X.Y.Z`
+2. Increment the working version from e.g. 1.2.3-SNAPSHOT to 1.2.4-SNAPSHOT in `src/main/resources/application.conf`.
+3. Open pull request from branch `post-release-X.Y.Z` to develop. Fix release notes and resolve conflicts as needed.
+4. Do not remove the branch `release-X.Y.Z` and don't merge it back to `main` nor `develop`. We keep this branch for tagging purposes. The `main` branch is deprecated.
 
 ## wdlTools CLI
 

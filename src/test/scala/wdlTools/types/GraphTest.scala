@@ -49,11 +49,11 @@ class GraphTest extends AnyFlatSpec with Matchers {
     tasks.size shouldBe 1
     val exprGraph = ExprGraph.buildFrom(tasks.head)
     val ordered = exprGraph.dependencyOrder
-    ordered.size shouldBe 9
+    ordered.size shouldBe 10
     // there are mutliple equally valid sortings - we just need to make sure
     // the contents of each 'block' are the same and the blocks are ordered
     val expected: Vector[Set[String]] = Vector(
-        Set("f", "i", "name", "d"),
+        Set("f", "i", "name", "d", "extra_int"),
         Set("s", "x", "dout"),
         Set("dout2", "sout")
     )
@@ -73,6 +73,12 @@ class GraphTest extends AnyFlatSpec with Matchers {
         info.kind shouldBe VarKind.Private
       case ("dout", info) =>
         info.referenced shouldBe true
+        info.kind shouldBe VarKind.Private
+      case ("extra_int", info) =>
+        info.referenced shouldBe true
+        info.kind shouldBe VarKind.Input
+      case ("extra_var", info) =>
+        info.referenced shouldBe false
         info.kind shouldBe VarKind.Private
       case ("dout2" | "sout", info) =>
         info.referenced shouldBe true
