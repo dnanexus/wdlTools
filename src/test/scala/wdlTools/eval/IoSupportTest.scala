@@ -56,6 +56,21 @@ class IoSupportTest extends AnyFlatSpec with Matchers with Inside {
     }
   }
 
+  it should "be able to read file chars based on SourceLocation" in {
+    val p = Files.createTempFile("Y", ".txt")
+    try {
+      val buf = "hello bunny\nhello owl\nsee ya"
+      val docSrc = StringFileNode(buf)
+      docSrc.localize(p, overwrite = true)
+      val (evalPaths, fileResolver) = setup()
+      val ioSupp = IoSupport(evalPaths, fileResolver, logger)
+      val data = ioSupp.readFilePosition(p.toString, SourceLocation(docSrc, 2, 6, 3, 4))
+      data shouldBe "hello owl\nsee ya"
+    } finally {
+      Files.delete(p)
+    }
+  }
+
   it should "be able to use size from Stdlib" in {
     val p = Files.createTempFile("Y", ".txt")
     val buf = "make Shasta full"
