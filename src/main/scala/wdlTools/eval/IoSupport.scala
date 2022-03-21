@@ -61,6 +61,23 @@ case class IoSupport(paths: EvalPaths,
   }
 
   /**
+    * Read text in file with exact positioning.
+    * @param pathOrUri Location of a file on disc or network
+    * @param loc SourceLocation object
+    * @return Text based on location
+    */
+  def readFilePosition(pathOrUri: String, loc: SourceLocation): String = {
+    val file =
+      try {
+        getFileSource(pathOrUri, loc).readLines
+      } catch {
+        case e: Throwable =>
+          throw new EvalException(s"error reading file ${pathOrUri}, msg=${e.getMessage}", loc)
+      }
+    file.slice(math.max(0, loc.line - 1), loc.endLine).mkString("\n")
+  }
+
+  /**
     * Write "content" to the specified "path" location
     */
   def writeFile(p: Path, content: String, loc: SourceLocation): Unit = {

@@ -2,7 +2,7 @@
 
 ## in develop
 
-* ..
+* `TAT.Workflow` has a `source` attribute in analogy to `TAT.Document` to be used for checksum calculation for App/Job reuse
 
 ## 0.17.8 (2022-03-15)
 
