@@ -1,7 +1,7 @@
 package wdlTools.types
 
 import wdlTools.syntax.{CommentMap, Quoting, SourceLocation, WdlVersion}
-import dx.util.FileNode
+import dx.util.{FileNode, StringFileNode}
 
 // Use SeqMap for all map attributes, which maintains insert
 // order - this is important for the code formatter to be
@@ -251,7 +251,8 @@ object TypedAbstractSyntax {
                       outputs: Vector[OutputParameter],
                       meta: Option[MetaSection],
                       parameterMeta: Option[MetaSection],
-                      body: Vector[WorkflowElement])(val loc: SourceLocation)
+                      body: Vector[WorkflowElement],
+                      source: StringFileNode = StringFileNode("."))(val loc: SourceLocation)
       extends Element
       with Callable
 

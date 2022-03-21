@@ -1,5 +1,9 @@
 # Change log
 
+## in develop
+* `TAT.Workflow` has a `source` attribute in analogy to `TAT.Document` to be used for checksum calculation for App/Job 
+reuse
+
 ## 0.17.7 (2022-01-07)
 
 * Correctly attaches to docker stdout/stderr
