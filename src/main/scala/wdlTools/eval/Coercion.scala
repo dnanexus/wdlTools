@@ -23,7 +23,7 @@ object Coercion {
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
       case (name, t) =>
-        name -> coerceTo(t, fieldValues(name), loc, allowNonstandardCoercions, isReadResult)
+        name -> coerceTo(t, fieldValues.getOrElse(name, V_Null), loc, allowNonstandardCoercions, isReadResult)
     }
 
     V_Struct(structName, coercedValues)
