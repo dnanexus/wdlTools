@@ -35,7 +35,11 @@ object InputOutput {
             // ensure the required value is not T_Optional
             val v = WdlValueUtils.unwrapOptional(inputValues(decl.name))
             val t = param.wdlType
-            Coercion.coerceTo(t, v, SourceLocation.empty, evaluator.allowNonstandardCoercions,false)
+            Coercion.coerceTo(t,
+                              v,
+                              SourceLocation.empty,
+                              evaluator.allowNonstandardCoercions,
+                              false)
           case RequiredInputParameter(_, WdlTypes.T_Array(_, false)) if nullCollectionAsEmpty =>
             // Special handling for required input Arrays that are non-optional but
             // allowed to be empty and do not have a value specified - set the value
@@ -56,7 +60,11 @@ object InputOutput {
             // ensure the optional value is T_Optional
             val v = inputValues(param.name)
             val t = param.wdlType
-            Coercion.coerceTo(t, v, SourceLocation.empty, evaluator.allowNonstandardCoercions,false)
+            Coercion.coerceTo(t,
+                              v,
+                              SourceLocation.empty,
+                              evaluator.allowNonstandardCoercions,
+                              false)
           case _: OptionalInputParameter =>
             WdlValues.V_Null
           case OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>

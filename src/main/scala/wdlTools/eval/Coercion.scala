@@ -17,13 +17,20 @@ object Coercion {
     val requiredFieldTypes = fieldTypes.filterNot(_._2.isInstanceOf[WdlTypes.T_Optional])
     if (!requiredFieldTypes.keys.toSet.subsetOf(fieldValues.keys.toSet)) {
       val missingFieldTypes = requiredFieldTypes.keys.toSet.diff(fieldValues.keys.toSet)
-      throw new EvalException(s"struct ${structName} has missing required fields: ${missingFieldTypes.mkString(",")}", loc)
+      throw new EvalException(
+          s"struct ${structName} has missing required fields: ${missingFieldTypes.mkString(",")}",
+          loc
+      )
     }
 
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
       case (name, t) =>
-        name -> coerceTo(t, fieldValues.getOrElse(name, V_Null), loc, allowNonstandardCoercions, isReadResult)
+        name -> coerceTo(t,
+                         fieldValues.getOrElse(name, V_Null),
+                         loc,
+                         allowNonstandardCoercions,
+                         isReadResult)
     }
 
     V_Struct(structName, coercedValues)
