@@ -617,7 +617,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     }
     calls.size shouldBe 1
     val call = calls.head
-    val evaluator = createEvaluator()
+    val evaluator = createEvaluator(WdlVersion.V1_1)
     val inputs =
       Map("database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(5))))
 
