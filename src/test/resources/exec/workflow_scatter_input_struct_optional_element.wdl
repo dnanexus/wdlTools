@@ -5,17 +5,19 @@ import "structs.wdl"
 workflow test_workflow {
   input {
     MyStructDB database
-    String prefix
+    Array[String] prefixes
   }
 
-  call test_task {
+  scatter (prefix in prefixes) {
+    call test_task {
       input:
         prefix = prefix,
         database = database
     }
+  }
   
   output {
-    File final_output = test_task.task_output
+    Array[File] final_output = test_task.task_output
   }
 }
 
