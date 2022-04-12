@@ -67,25 +67,4 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
                                          "num_columns" -> V_Null,
                                          "num_rows" -> V_Int(5))
   }
-
-  it should "evaluate workflow input struct with optional element" in {
-    val doc = parseAndTypeCheck(execDir.resolve("workflow_input_struct_optional_element.wdl"))
-    val wf = doc.workflow.getOrElse(
-        throw new ExecException("expected workflow")
-    )
-    val inputValues = Map(
-        "database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(5)))
-    )
-    val values = InputOutput.inputsFromValues(wf.name,
-                                              wf.inputs,
-                                              inputValues,
-                                              evaluator,
-                                              ignoreDefaultEvalError = false,
-                                              nullCollectionAsEmpty = true)
-    values("database") shouldBe V_Struct("MyStructDB",
-                                         "database_name" -> V_Null,
-                                         "num_columns" -> V_Null,
-                                         "num_rows" -> V_Int(5),
-                                         "value_types" -> V_Null)
-  }
 }
