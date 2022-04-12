@@ -55,7 +55,7 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
     // )
     val task = doc.elements.collectFirst({ case t: TAT.Task => t }).get
     val inputValues = Map(
-        "database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(5)))
+        "database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(10)))
     )
     val values = InputOutput.inputsFromValues(task.name,
                                               task.inputs,
