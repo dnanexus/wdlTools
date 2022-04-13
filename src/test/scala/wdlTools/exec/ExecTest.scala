@@ -50,9 +50,6 @@ class ExecTest extends AnyFlatSpec with Matchers with Inside {
 
   it should "evaluate task input struct with optional element" in {
     val doc = parseAndTypeCheck(execDir.resolve("task_input_struct_optional_element.wdl"))
-    // val wf = doc.workflow.getOrElse(
-    //     None
-    // )
     val task = doc.elements.collectFirst({ case t: TAT.Task => t }).get
     val inputValues = Map(
         "database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(10)))
