@@ -12,6 +12,7 @@ import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT
 import wdlTools.types.WdlTypes._
 
 import java.io.File
+import scala.collection.immutable.SeqMap
 
 class EvalTest extends AnyFlatSpec with Matchers with Inside {
   private val v1Dir = Paths.get(getClass.getResource("/eval/v1").getPath)
@@ -602,6 +603,57 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
         "RG_LB" -> (T_String, V_String("dataset_dataset_str1"))
     )
     evaluator.applyExprAndCoerce(call.inputs("rg"), T_String, Eval.createBindingsFromEnv(env))
+  }
+
+  it should "coerce workflow object input to struct with optional elements" in {
+    val tDoc = parseAndTypeCheck(execDir.resolve("workflow_input_struct_optional_element.wdl"))
+    val calls = tDoc.workflow.get.body.collect {
+      case call: TAT.Call => call
+    }
+
+    calls.size shouldBe 1
+    val call = calls.head
+    val evaluator = createEvaluator(WdlVersion.V1_1)
+    val inputs =
+      Map("database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(10))),
+          "prefix" -> V_String("a"))
+
+    val value = evaluator.applyExprAndCoerce(call.inputs("database"),
+                                             call.callee.input("database")._1,
+                                             WdlValueBindings(inputs))
+    value shouldBe V_Struct("MyStructDB",
+                            "database_name" -> V_Null,
+                            "num_columns" -> V_Null,
+                            "num_rows" -> V_Int(5),
+                            "value_types" -> V_Null)
+  }
+
+  it should "coerce workflow scatter object input to struct with optional elements" in {
+    val tDoc =
+      parseAndTypeCheck(execDir.resolve("workflow_scatter_input_struct_optional_element.wdl"))
+    val scatters = tDoc.workflow.get.body.collect {
+      case scatter: TAT.Scatter => scatter
+    }
+    scatters.size shouldBe 1
+    val scatter = scatters.head
+    val calls = scatter.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.size shouldBe 1
+    val call = calls.head
+    val evaluator = createEvaluator(WdlVersion.V1_1)
+    val inputs =
+      Map("database" -> V_Object(SeqMap("num_rows" -> V_Int(5), "num_rows_extra" -> V_Int(10))),
+          "prefixes" -> V_Array(V_String("a"), V_String("b")))
+
+    val value = evaluator.applyExprAndCoerce(call.inputs("database"),
+                                             call.callee.input("database")._1,
+                                             WdlValueBindings(inputs))
+    value shouldBe V_Struct("MyStructDB",
+                            "database_name" -> V_Null,
+                            "num_columns" -> V_Null,
+                            "num_rows" -> V_Int(5),
+                            "value_types" -> V_Null)
   }
 
   it should "handle escape sequences" in {

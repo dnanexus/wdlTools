@@ -14,14 +14,23 @@ object Coercion {
                              loc: SourceLocation,
                              allowNonstandardCoercions: Boolean,
                              isReadResult: Boolean): V_Struct = {
-    if (fieldTypes.keys.toSet != fieldValues.keys.toSet) {
-      throw new EvalException(s"struct ${structName} has wrong fields", loc)
+    val requiredFieldTypes = fieldTypes.filterNot(_._2.isInstanceOf[WdlTypes.T_Optional])
+    if (!requiredFieldTypes.keys.toSet.subsetOf(fieldValues.keys.toSet)) {
+      val missingFieldTypes = requiredFieldTypes.keys.toSet.diff(fieldValues.keys.toSet)
+      throw new EvalException(
+          s"struct ${structName} has missing required fields: ${missingFieldTypes.mkString(",")}",
+          loc
+      )
     }
 
     // coerce each member to the struct type
     val coercedValues = fieldTypes.map {
       case (name, t) =>
-        name -> coerceTo(t, fieldValues(name), loc, allowNonstandardCoercions, isReadResult)
+        name -> coerceTo(t,
+                         fieldValues.getOrElse(name, V_Null),
+                         loc,
+                         allowNonstandardCoercions,
+                         isReadResult)
     }
 
     V_Struct(structName, coercedValues)
