@@ -1,6 +1,6 @@
 # Change log
 
-## in develop
+## 0.17.9 (2022-04-18)
 
 * `TAT.Workflow` has a `source` attribute in analogy to `TAT.Document` to be used for checksum calculation for App/Job reuse
 * Fixes evaluation of structs as input parameters of workflow/scatter: hash inputs are coerced from object to struct, and their optional elements are assigned to Null if not specified in job inputs.
