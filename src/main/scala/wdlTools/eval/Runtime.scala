@@ -109,6 +109,13 @@ abstract class Runtime(runtime: Map[String, TAT.Expr],
   def isValidReturnCode(returnCode: Int): Boolean = {
     returnCodes.forall(_.contains(returnCode))
   }
+
+  def isDefaultSystemRequirements: Boolean = {
+    cpu == Runtime.CpuDefault &&
+    memory == Runtime.MemoryDefault &&
+    disks == Runtime.parseDisks(V_String(Runtime.DisksDefault))
+  }
+
 }
 
 case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
@@ -166,7 +173,7 @@ case class DefaultRuntime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
-  override def cpu: Double = {
+  lazy val cpu: Double = {
     get(Runtime.CpuKey, Vector(T_Int, T_Float, T_String)) match {
       case Some(V_Int(i))    => i.toDouble
       case Some(V_Float(f))  => f
@@ -325,7 +332,7 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
     }
   }
 
-  override def cpu: Double = {
+  lazy val cpu: Double = {
     get(Runtime.CpuKey, Vector(T_Float)) match {
       case Some(V_Float(f)) => f
       case None             => throw new RuntimeException("Missing default value for runtime.cpu")

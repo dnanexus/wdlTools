@@ -34,7 +34,7 @@ class RuntimeTest extends AnyFlatSpec with Matchers {
          allowNonstandardCoercions)
   }
 
-  it should "evaluate a runtime with no container" in {
+  it should "evaluate a runtime with as a default runtime" in {
     val doc = parseAndTypeCheck(v1_1Dir.resolve("apps_1177_native_default_instance.wdl"))
     val tasks = doc.elements.collect {
       case task: TAT.Task => task
@@ -44,6 +44,21 @@ class RuntimeTest extends AnyFlatSpec with Matchers {
     tasks.foreach { task =>
       val runtime = Runtime.create(task.runtime, eval)
       runtime.getClass shouldBe classOf[DefaultRuntime]
+      runtime.isDefaultSystemRequirements shouldBe (true)
+    }
+  }
+
+  it should "evaluate a runtime with as a custom runtime" in {
+    val doc = parseAndTypeCheck(v1_1Dir.resolve("apps_1177_native_memory_override.wdl"))
+    val tasks = doc.elements.collect {
+      case task: TAT.Task => task
+    }
+    tasks.size shouldBe 1
+    val eval = createEvaluator(WdlVersion.V1_1)
+    tasks.foreach { task =>
+      val runtime = Runtime.create(task.runtime, eval)
+      runtime.getClass shouldBe classOf[DefaultRuntime]
+      runtime.isDefaultSystemRequirements shouldBe (false)
     }
   }
 }
