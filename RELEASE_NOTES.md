@@ -2,7 +2,7 @@
 
 ## in develop
 
-..
+* Runtime object is aware if it was created with default system requirements (`Runtime.isDefaultSystemRequirements`)
 
 ## 0.17.9 (2022-04-18)
 
