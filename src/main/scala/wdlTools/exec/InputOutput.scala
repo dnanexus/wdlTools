@@ -3,6 +3,7 @@ package wdlTools.exec
 import java.nio.file.Files
 import spray.json._
 import wdlTools.eval.{
+  Coercion,
   Eval,
   EvalException,
   VBindings,
@@ -32,7 +33,13 @@ object InputOutput {
         val value = decl match {
           case param: RequiredInputParameter if inputValues.contains(param.name) =>
             // ensure the required value is not T_Optional
-            WdlValueUtils.unwrapOptional(inputValues(decl.name))
+            val v = WdlValueUtils.unwrapOptional(inputValues(decl.name))
+            val t = param.wdlType
+            Coercion.coerceTo(t,
+                              v,
+                              SourceLocation.empty,
+                              evaluator.allowNonstandardCoercions,
+                              false)
           case RequiredInputParameter(_, WdlTypes.T_Array(_, false)) if nullCollectionAsEmpty =>
             // Special handling for required input Arrays that are non-optional but
             // allowed to be empty and do not have a value specified - set the value
@@ -51,7 +58,13 @@ object InputOutput {
             )
           case param if inputValues.contains(param.name) =>
             // ensure the optional value is T_Optional
-            inputValues(param.name)
+            val v = inputValues(param.name)
+            val t = param.wdlType
+            Coercion.coerceTo(t,
+                              v,
+                              SourceLocation.empty,
+                              evaluator.allowNonstandardCoercions,
+                              false)
           case _: OptionalInputParameter =>
             WdlValues.V_Null
           case OverridableInputParameterWithDefault(name, wdlType, defaultExpr) =>
