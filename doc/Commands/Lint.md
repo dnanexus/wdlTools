@@ -39,7 +39,8 @@ Options:
 * (P002) odd_indent: Indent by odd number of whitespace characters
 * (P003) multiple_blank_lines: More than one blank line between sections
 * (P004) top_level_indent: A top-level element is indented
-* (P005) deprecated_command_style: Deprecated command block style - use ~{} instead
+* (P005) deprecated_command_style: Deprecated command 
+* block style - use ~{} instead
 
 ### Other
 
