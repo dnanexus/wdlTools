@@ -29,8 +29,6 @@ ${imageName} ${commandFile}
 # get the return code (working even if the container was detached)
 rc=${bashDollar}(docker wait `cat ${containerIdFile}`)
 
-# remove the container after waiting
-docker rm `cat ${containerIdFile}`
 
 # return exit code
 exit ${bashDollar}rc
