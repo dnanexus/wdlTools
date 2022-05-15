@@ -2,7 +2,7 @@
 
 ## in develop
 
-..
+* Keep the docker container after a task finishes running, so users can debug docker related job failures.
 
 ## 0.17.10 (2022-05-11)
 
