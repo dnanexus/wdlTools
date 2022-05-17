@@ -1,6 +1,9 @@
 # Change log
 
 ## in develop
+..
+
+## 0.17.11 (2022-05-16)
 
 * Keep the docker container after a task finishes running, so users can debug docker related job failures.
 
