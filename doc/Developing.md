@@ -144,7 +144,7 @@ When a PR is merged into `develop`, SNAPSHOT packages are automatically publishe
 2. Create a release branch named with the version number, e.g. `release-2.4.2`
 3. Update the version numbers in application.conf files (remove "-SNAPSHOT")
 4. Update the release notes
-    - Change the top header from "in develop" to "<version> (<date>)"
+    - Change the top header from "in develop" to "\<version\> (\<date\>)"
 
 ### Releasing to GitHub
 
