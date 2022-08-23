@@ -656,7 +656,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
                             "value_types" -> V_Null)
   }
 
-  it should "scatter over array of optional values and output correct types" in {
+  it should "scatter over simple stdlib function evaluation with optional inputs" in {
     val tDoc =
       parseAndTypeCheck(v1Dir.resolve("apps_1318_simple.wdl"))
     val scatters = tDoc.workflow.get.body.collect {
@@ -667,7 +667,21 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     val calls = scatter.body.collect {
       case call: TAT.Call => call
     }
-    calls.head shouldBe ()
+    calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
+  }
+
+  it should "scatter over nested stdlib function evaluation with optional inputs" in {
+    val tDoc =
+      parseAndTypeCheck(v1Dir.resolve("apps_1318_nested.wdl"))
+    val scatters = tDoc.workflow.get.body.collect {
+      case scatter: TAT.Scatter => scatter
+    }
+    scatters.size shouldBe 1
+    val scatter = scatters.head
+    val calls = scatter.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
   }
 
   it should "handle escape sequences" in {
