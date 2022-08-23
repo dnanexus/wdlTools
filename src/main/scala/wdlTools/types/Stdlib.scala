@@ -44,10 +44,10 @@ case class Stdlib(regime: TypeCheckingRegime,
   private val unify = Unification(regime)
 
   // Some functions are overloaded and can take several kinds of arguments.
-  // A particulary problematic one is size.
+  // A particularly problematic one is size.
   // There is WDL code that calls size with File, and File?. So what is the prototype of "size" ?
   //
-  // We chould use:
+  // We could use:
   //       T_File -> T_Float
   // or
   //       T_File? -> T_Float
