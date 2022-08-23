@@ -269,7 +269,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         x: T,
         y: T,
         vt: Bindings[Int, T],
-        minPriority: Priority.Priority
+        minPriority: Priority.Priority,
+        wasOptional: Boolean = false // APPS-1318, means to preserve the Optionality of the outputs
     ): (T, Bindings[Int, T], Priority.Priority) = {
       if (x == y) {
         // exact match
@@ -290,7 +291,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         case (T_Object, _: T_Struct) =>
           (T_Object, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
         case (T_Optional(l), T_Optional(r)) =>
-          val (t, newVarTypes, newMinPriority) = inner(l, r, vt, minPriority)
+          val (t, newVarTypes, newMinPriority) = inner(l, r, vt, minPriority, wasOptional = true)
           (T_Optional(t), newVarTypes, newMinPriority)
         case (T_Optional(l), r) if ctx.section == Section.Call =>
           // in a call, we can provide a non-optional value to an optional parameter
@@ -306,7 +307,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
           (T_Optional(t), newVarTypes, newPriority)
         case (l, T_Optional(r)) =>
           val (t, newVarTypes, newPriority) =
-            inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed))
+            inner(l, r, vt, Enum.max(minPriority, Priority.AlwaysAllowed), wasOptional = true)
           (T_Optional(t), newVarTypes, newPriority)
         case (T_Array(l, lNonEmpty), T_Array(r, rNonEmpty)) =>
           val (t, newVarTypes, newPriority) = inner(l, r, vt, minPriority)
@@ -372,6 +373,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
             case Some(w) =>
               // a binding already exists, choose the more general type
               inner(w, z, vt, Enum.max(minPriority, Priority.VarMatch))
+            case None if (a.bounds.isEmpty || a.bounds.contains(z)) && wasOptional =>
+              (z, vt.add(a.index, T_Optional(z)), Enum.max(minPriority, Priority.VarMatch))
             case None if a.bounds.isEmpty || a.bounds.contains(z) =>
               // found a binding for a type variable
               (z, vt.add(a.index, z), Enum.max(minPriority, Priority.VarMatch))
@@ -494,7 +497,11 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
       output: T,
       ctx: UnificationContext
   ): (T, Priority.Priority) = {
-    assert(to.size == from.size)
+    if (to.size != from.size) {
+      throw new TypeUnificationException(
+          "Input (`from`) and target (`to`) function parameter types have different sizes"
+      )
+    }
     if (to.isEmpty) {
       (output, Priority.Exact)
     } else {
@@ -503,6 +510,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         to.zip(from).foldLeft((Priority.Exact, init)) {
           case ((priority, vt), (lt, rt)) =>
             val (_, vt2, priority2) = unify(lt, rt, ctx, vt, reversible = false)
+
             (Enum.max(priority, priority2), vt2)
         }
       val unifiedType = substitute(output, newVarTypes)
