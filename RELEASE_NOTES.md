@@ -1,7 +1,8 @@
 # Change log
 
 ## in develop
-..
+
+* Optional types are preserved when using outputs from the standard library functions without explicit declaration. 
 
 ## 0.17.11 (2022-05-16)
 
