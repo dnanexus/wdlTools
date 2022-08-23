@@ -1,5 +1,5 @@
 version 1.0
-workflow apps_1318 {
+workflow apps_1318_nested {
   input {
     Array[Int] foo = [1, 2, 3]
     Array[Int] bar = [100, 200, 300]

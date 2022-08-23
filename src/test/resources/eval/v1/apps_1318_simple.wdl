@@ -1,5 +1,5 @@
 version 1.0
-workflow apps_1318 {
+workflow apps_1318_simple {
   input {
     Array[Int] foo = [1, 2, 3]
   }
