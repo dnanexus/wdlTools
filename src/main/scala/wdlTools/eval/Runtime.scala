@@ -253,34 +253,15 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
   override val aliases: SymmetricBiMap[String] =
     SymmetricBiMap(Map(Runtime.DockerKey -> Runtime.ContainerKey))
 
-  private def intersectTypes(t1: Vector[T], t2: Vector[T]): Vector[T] = {
-    (t1, t2) match {
-      case (Vector(), v) => v
-      case (v, Vector()) => v
-      case (v1, v2) =>
-        val intersection = (v1.toSet & v2.toSet).toVector
-        if (intersection.isEmpty) {
-          throw new EvalException(s"incompatible types ${t1} does not intersect ${t2}")
-        }
-        intersection
-    }
-  }
-
   protected def applyKv(id: String, expr: TAT.Expr, wdlType: Vector[T] = Vector.empty): V = {
     def getValue(allowed: Vector[T]): V = {
-      (ctx, wdlType) match {
-        case (Some(c), Vector()) =>
-          evaluator.applyExprAndCoerce(expr, allowed, c)
-        case (Some(c), v) =>
-          evaluator.applyExprAndCoerce(expr, intersectTypes(allowed, v), c)
-        case (None, Vector()) =>
-          evaluator.applyConstAndCoerce(expr, allowed)
-        case (None, v) =>
-          evaluator.applyConstAndCoerce(expr, intersectTypes(allowed, v))
+      ctx match {
+        case Some(c) => evaluator.applyExprAndCoerce(expr, allowed, c)
+        case None    => evaluator.applyConstAndCoerce(expr, allowed)
       }
     }
 
-    id match {
+    val v = id match {
       case Runtime.ContainerKey =>
         getValue(Vector(T_String, T_Array(T_String)))
       case Runtime.CpuKey =>
@@ -313,6 +294,10 @@ case class V2Runtime(runtime: Option[TAT.RuntimeSection],
       case other =>
         throw new EvalException(s"Runtime key ${other} not allowed in WDL version 2.0+", expr.loc)
     }
+
+    Coercion.coerceToFirst(wdlType,
+                           v,
+                           allowNonstandardCoercions = evaluator.allowNonstandardCoercions)
   }
 
   lazy val container: Vector[String] = {
