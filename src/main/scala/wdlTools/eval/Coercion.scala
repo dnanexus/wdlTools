@@ -44,15 +44,16 @@ object Coercion {
     def inner(innerType: WdlTypes.T, innerValue: V): V = {
       (innerType, innerValue) match {
         // basic coercion of primitive types
-        case (WdlTypes.T_Optional(_), V_Null)    => V_Null
-        case (WdlTypes.T_Boolean, b: V_Boolean)  => b
-        case (WdlTypes.T_Int, i: V_Int)          => i
-        case (WdlTypes.T_Float, f: V_Float)      => f
-        case (WdlTypes.T_Float, V_Int(n))        => V_Float(n.toFloat)
-        case (WdlTypes.T_String, s: V_String)    => s
-        case (WdlTypes.T_File, f: V_File)        => f
-        case (WdlTypes.T_File, V_String(s))      => V_File(s)
-        case (WdlTypes.T_Directory, V_String(s)) => V_Directory(s)
+        case (WdlTypes.T_Optional(_), V_Null)       => V_Null
+        case (WdlTypes.T_Boolean, b: V_Boolean)     => b
+        case (WdlTypes.T_Int, i: V_Int)             => i
+        case (WdlTypes.T_Float, f: V_Float)         => f
+        case (WdlTypes.T_Float, V_Int(n))           => V_Float(n.toFloat)
+        case (WdlTypes.T_String, s: V_String)       => s
+        case (WdlTypes.T_File, f: V_File)           => f
+        case (WdlTypes.T_File, V_String(s))         => V_File(s)
+        case (WdlTypes.T_Directory, d: V_Directory) => d
+        case (WdlTypes.T_Directory, V_String(s))    => V_Directory(s)
 
         // primitives to string - I believe this is legal, but it may need to be non-standard
         case (WdlTypes.T_String, V_Boolean(b)) => V_String(b.toString)
