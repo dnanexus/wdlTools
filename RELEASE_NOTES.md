@@ -2,7 +2,7 @@
 
 ## in develop
 
-...
+* Fix for V_Directory in Struct to Directory input
 
 ## 0.17.12 (2022-08-23)
 
