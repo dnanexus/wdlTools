@@ -270,6 +270,27 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
                                           V_String("b") -> V_String("goodbye"))
   }
 
+  it should "perform coercions for v2 with directory mapping in struct" in {
+    val tDoc = parseAndTypeCheck(v2Dir.resolve("apps_1353_v_dir_coercion.wdl"))
+    val calls = tDoc.workflow.get.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.size shouldBe 1
+    val call = calls.head
+    val evaluator = createEvaluator(WdlVersion.V2)
+    val inputs =
+      Map(
+          "idx" -> V_Object(
+              SeqMap("index_dir" -> V_Directory("foo/bar"), "prefix" -> V_String("lol"))
+          )
+      )
+
+    val value = evaluator.applyExprAndCoerce(call.inputs("WorkingDir"),
+                                             call.callee.input("WorkingDir")._1,
+                                             WdlValueBindings(inputs))
+    value shouldBe V_Optional(V_Directory("foo/bar"))
+  }
+
   it should "perform non-standard coercions" in {
     val file = v1Dir.resolve("non_standard_coercions.wdl")
     val (evaluator, decls) =
@@ -654,6 +675,34 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
                             "num_columns" -> V_Null,
                             "num_rows" -> V_Int(5),
                             "value_types" -> V_Null)
+  }
+
+  it should "scatter over simple stdlib function evaluation with optional inputs" in {
+    val tDoc =
+      parseAndTypeCheck(v1Dir.resolve("apps_1318_simple.wdl"))
+    val scatters = tDoc.workflow.get.body.collect {
+      case scatter: TAT.Scatter => scatter
+    }
+    scatters.size shouldBe 1
+    val scatter = scatters.head
+    val calls = scatter.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
+  }
+
+  it should "scatter over nested stdlib function evaluation with optional inputs" in {
+    val tDoc =
+      parseAndTypeCheck(v1Dir.resolve("apps_1318_nested.wdl"))
+    val scatters = tDoc.workflow.get.body.collect {
+      case scatter: TAT.Scatter => scatter
+    }
+    scatters.size shouldBe 1
+    val scatter = scatters.head
+    val calls = scatter.body.collect {
+      case call: TAT.Call => call
+    }
+    calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
   }
 
   it should "handle escape sequences" in {
