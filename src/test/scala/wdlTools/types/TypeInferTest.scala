@@ -42,7 +42,7 @@ class TypeInferTest extends AnyFlatSpec with Matchers {
   }
 
   "TypeInfer" should "handle a directory output" in {
-    check(draft2Dir, "wdldir.wdl")
+    check(v2Dir, "apps_1421_dir_output.wdl")
   }
 
   it should "handle a conditional in draft2 workflow" in {
