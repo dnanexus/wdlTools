@@ -158,7 +158,7 @@ If you encounter any additional issues while creating the release, you will need
 
 To complete the release:
 1. Create branch `post-release-X.Y.Z` based on branch `release-X.Y.Z`
-2. Increment the working version from e.g. 1.2.3-SNAPSHOT to 1.2.4-SNAPSHOT in `src/main/resources/application.conf`.
+2. Increment the working version from e.g. published 1.2.3 to 1.2.4-SNAPSHOT in `src/main/resources/application.conf`.
 3. Open pull request from branch `post-release-X.Y.Z` to develop. Fix release notes and resolve conflicts as needed.
 4. Do not remove the branch `release-X.Y.Z` and don't merge it back to `main` nor `develop`. We keep this branch for tagging purposes. The `main` branch is deprecated.
 
