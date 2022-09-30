@@ -13,7 +13,7 @@ task foldertest {
     mv ~{WorkingDir}/* folderoutput/
   }
   output {
-    Directory outdir = "dx://project-Fy9QqgQ0yzZbg9KXKP4Jz6Yq:/folderoutput/"
+    Directory outdir = "folderoutput/"
   }
 }
 
