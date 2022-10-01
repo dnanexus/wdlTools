@@ -1,6 +1,6 @@
 version development
 
-task foldertest {
+task apps_1421_task_01 {
   input {
     String sid
     Directory WorkingDir
@@ -17,13 +17,13 @@ task foldertest {
   }
 }
 
-workflow folderrun {
+workflow apps_1421_dir_output {
   input {
     Directory WorkingDir
     String sid
   }
 
-  call foldertest {
+  call apps_1421_task_01 {
     input: 
       WorkingDir=WorkingDir, sid=sid
   }
