@@ -37,7 +37,19 @@ object WdlTypes {
   case class T_Map(k: T, v: T) extends T_Collection
   case object T_Object extends T_Collection
   // a user-defined structure
-  case class T_Struct(name: String, members: SeqMap[String, T]) extends T_Collection
+  case class T_Struct(name: String, members: SeqMap[String, T]) extends T_Collection {
+
+    def flattenMembers(members: SeqMap[String, T] = members,
+                       parentKey: String = ""): SeqMap[String, T] = {
+      members.foldLeft(SeqMap.empty[String, T]) {
+        case (acc, (key: String, value: T_Struct)) =>
+          acc ++ flattenMembers(value.members,
+                                s"${parentKey}.${key}".stripPrefix(".").stripSuffix("."))
+        case (acc, (key: String, value: T)) =>
+          acc + (s"${parentKey}.${key}".stripPrefix(".").stripSuffix(".") -> value)
+      }
+    }
+  }
 
   /**
     * A polymorphic function can accept multiple parameter types and there is covariance of multiple
