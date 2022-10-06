@@ -1,17 +1,17 @@
 package wdlTools.eval
 
 import dx.util.{EvalPaths, FileSourceResolver, FileUtils, Logger}
+import java.nio.file.{Path, Paths}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wdlTools.syntax.{Parsers, WdlVersion}
-
-import java.nio.file.{Path, Paths}
 import wdlTools.types.{TypeCheckingRegime, TypeInfer, TypedAbstractSyntax => TAT}
 
 class RuntimeTest extends AnyFlatSpec with Matchers {
   private val logger = Logger.Normal
   private val v1_1Dir = Paths.get(getClass.getResource("/eval/v1.1").getPath)
-  private val fileResolver = FileSourceResolver.create(Vector(v1_1Dir))
+  private val v2Dir = Paths.get(getClass.getResource("/eval/v2").getPath)
+  private val fileResolver = FileSourceResolver.create(Vector(v1_1Dir, v2Dir))
   private val parsers = Parsers(followImports = true, fileResolver = fileResolver, logger = logger)
   private val typeInfer = TypeInfer(regime = TypeCheckingRegime.Lenient)
   private val evalPaths: EvalPaths = DefaultEvalPaths.createFromTemp()
@@ -59,6 +59,20 @@ class RuntimeTest extends AnyFlatSpec with Matchers {
       val runtime = Runtime.create(task.runtime, eval)
       runtime.getClass shouldBe classOf[DefaultRuntime]
       runtime.isDefaultSystemRequirements shouldBe (false)
+    }
+  }
+
+  it should "evaluate a V2 runtime with memory specified as String" in {
+    val doc = parseAndTypeCheck(v2Dir.resolve("bug_230.wdl"))
+    val tasks = doc.elements.collect {
+      case task: TAT.Task => task
+    }
+    tasks.size shouldBe 1
+    val eval = createEvaluator(WdlVersion.V2)
+    tasks.foreach { task =>
+      val runtime = Runtime.create(task.runtime, eval)
+      runtime.getClass shouldBe classOf[V2Runtime]
+      runtime.memory shouldBe 1024 * 1024 * 1024
     }
   }
 }
