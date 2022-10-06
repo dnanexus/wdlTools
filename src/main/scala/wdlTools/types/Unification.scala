@@ -59,7 +59,7 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
     * @param toType coerce to this type
     * @param fromType coerce from this type
     * @param ctx the context in which the coercion is performed - used for
-    *            context-specific coersions
+    *            context-specific coercions
     * @return If the coercion can be performed, returns Some(priority), where
     *         priority is the preference of the coercion; otherwise, None.
     * @throws TypeUnificationException If the types cannot be unified
@@ -123,6 +123,8 @@ case class Unification(regime: TypeCheckingRegime, logger: Logger = Logger.get) 
         // Other coercions are not generally allowed, but are either allowed
         // in specific contexts or are used often "in the wild" and so allowed
         // under less strict regimes
+        case (T_Directory, T_String) if ctx.version.get == WdlVersion.V2 =>
+          Some(Priority.VersionAllowed)
         case (T_String, T_Optional(r)) if ctx.inPlaceholder =>
           // Within a placeholder, an optional value can be coerced to a String -
           // None values result in the empty string
