@@ -2,7 +2,7 @@
 
 ## 0.17.14 (2022-10-20)
 
-* Minor fixes of type coercions
+* Added support for Directory type outputs for WDL 2.0
 
 ## 0.17.13 (2022-09-29)
 
