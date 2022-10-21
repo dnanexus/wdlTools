@@ -4,6 +4,10 @@
 
 ...
 
+## 0.17.14 (2022-10-20)
+
+* Added support for Directory type outputs for WDL 2.0 (aka _development_)
+
 ## 0.17.13 (2022-09-29)
 
 * Fix for V_Directory in Struct to Directory input
