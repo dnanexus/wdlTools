@@ -2,7 +2,7 @@
 
 ## 0.17.14 (2022-10-20)
 
-* Minor fixes with type coercions
+* Minor fixes of type coercions
 
 ## 0.17.13 (2022-09-29)
 
