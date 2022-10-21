@@ -877,7 +877,7 @@ case class TypeInfer(regime: TypeCheckingRegime = TypeCheckingRegime.Moderate,
     val tRuntime = task.runtime.map(applyRuntime(_, declCtx))
     val tHints = task.hints.map(applyHints(_, declCtx))
 
-    // Check that all expressions can be coereced to a string inside
+    // Check that all expressions can be coerced to a string inside
     // the command section. If type is T_Any we allow it here - the
     // actual type will be checked at runtime.
     val tCommandParts = task.command.parts.map { expr =>
