@@ -113,8 +113,8 @@ class ASTWalker(followImports: Boolean = false) extends ASTVisitor {
       visitImportDoc(createContext[ImportDoc, Document](imp, ctx))
     }
 
-    ctx.element.elements.collect { case struct: TypeStruct => struct }.foreach { imp =>
-      visitStruct(createContext[TypeStruct, Document](imp, ctx))
+    ctx.element.elements.collect { case struct: TypeStruct => struct }.foreach { struct =>
+      visitStruct(createContext[TypeStruct, Document](struct, ctx))
     }
 
     if (ctx.element.workflow.isDefined) {
