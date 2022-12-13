@@ -1,8 +1,8 @@
 # Change log
 
-## in develop
+## 0.17.15 (2022-12-13)
 
-...
+* Minor fixes and refactoring
 
 ## 0.17.14 (2022-10-20)
 
