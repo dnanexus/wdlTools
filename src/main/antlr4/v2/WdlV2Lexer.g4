@@ -78,6 +78,7 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
+MULTILINE: '<<<' -> pushMode(MultilineInterpolatedString);
 
 WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
@@ -85,21 +86,32 @@ Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;
 
-EscStringPart: EscapeSequence;
+EscStringPart: StringEscapeSequence;
 SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
 SQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[$~{\r\n'\\]+;
+StringPart: ~[~{\r\n'\\]+;
 
 mode DquoteInterpolatedString;
 
-DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
+DQuoteEscapedChar: StringEscapeSequence -> type(EscStringPart);
 DQuoteTildeString: '~' -> type(StringPart);
-DQUoteCurlString: '{' -> type(StringPart);
+DQUoteCurlyString: '{' -> type(StringPart);
 DQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
-EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[$~{\r\n"\\]+ -> type(StringPart);
+EndDQuote: '"' -> popMode, type(DQUOTE);
+DQuoteStringPart: ~[~{\r\n"\\]+ -> type(StringPart);
+
+mode MultilineInterpolatedString;
+
+MultilineEscapedChar: HereDocEscapeSequence -> type(EscStringPart);
+MultilineTildeString: '~' -> type(StringPart);
+MultilineCurlyString: '{' -> type(StringPart);
+MultilineCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+MultilineEscapedEnd: '\\>>>' -> type(StringPart);
+EndMultiline: '>>>' -> popMode, type(MULTILINE);
+MultilineEscapedArrow: ( '>' | '>>' | '>>>>' '>'*) -> type(StringPart);
+MultilineStringPart: ~[~{>\\]+ -> type(StringPart);
 
 mode Command;
 
@@ -160,13 +172,13 @@ MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaSquoteString;
 
-MetaEscStringPart: EscapeSequence;
+MetaEscStringPart: MetaEscapeSequence;
 MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
 MetaStringPart: ~[\r\n'\\]+;
 
 mode MetaDquoteString;
 
-MetaDquoteEscapedChar: EscapeSequence -> type(MetaEscStringPart);
+MetaDquoteEscapedChar: MetaEscapeSequence -> type(MetaEscStringPart);
 MetaEndDquote: '"' ->  popMode, type(MetaDquote), popMode;
 MetaDquoteStringPart: ~[\r\n"\\]+ -> type(MetaStringPart);
 
@@ -226,12 +238,26 @@ fragment UnicodeEsc2
 	: 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
 	;
 
-fragment EscapeSequence
-	: ESC [tn"'\\]
+fragment SpecialEscapeSequence
 	| ESC OctEsc
 	| ESC HexEsc
 	| ESC UnicodeEsc
 	| ESC UnicodeEsc2
+	;
+
+fragment StringEscapeSequence
+	: ESC [~tn"'\\]
+	| SpecialEscapeSequence
+	;
+
+fragment HereDocEscapeSequence
+	: ESC [~>\\]
+	| SpecialEscapeSequence
+	;
+
+fragment MetaEscapeSequence
+	: ESC [tn"'\\]
+	| SpecialEscapeSequence
 	;
 
 fragment Digit
