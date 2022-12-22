@@ -69,7 +69,6 @@ OPTIONAL: '?';
 STAR: '*';
 PLUS: '+';
 MINUS: '-';
-DOLLAR: '$';
 COMMA: ',';
 SEMI: ';';
 DOT: '.';
@@ -87,10 +86,9 @@ Identifier: CompleteIdentifier;
 mode SquoteInterpolatedString;
 
 EscStringPart: EscapeSequence;
-SQuoteDollarString: '$'  -> type(StringPart);
 SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
-SQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
+SQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
 StringPart: ~[$~{\r\n'\\]+;
 
@@ -98,9 +96,8 @@ mode DquoteInterpolatedString;
 
 DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
 DQuoteTildeString: '~' -> type(StringPart);
-DQuoteDollarString: '$' -> type(StringPart);
 DQUoteCurlString: '{' -> type(StringPart);
-DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+DQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
 DQuoteStringPart: ~[$~{\r\n"\\]+ -> type(StringPart);
 
@@ -123,9 +120,8 @@ HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
 mode CurlyCommand;
 
 CommandTildeString: '~'  -> type(CommandStringPart);
-CommandDollarString: '$' -> type(CommandStringPart);
 CommandCurlyString: '{' -> type(CommandStringPart);
-StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
+StringCommandStart:  '~{' -> pushMode(DEFAULT_MODE);
 EndCommand: '}' -> mode(DEFAULT_MODE);
 CommandStringPart: ~[$~{}]+;
 
