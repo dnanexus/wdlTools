@@ -4,6 +4,10 @@
 
 ...
 
+## 0.17.15 (2022-12-13)
+
+* Minor fixes and refactoring
+
 ## 0.17.14 (2022-10-20)
 
 * Added support for Directory type outputs for WDL 2.0 (aka _development_)
