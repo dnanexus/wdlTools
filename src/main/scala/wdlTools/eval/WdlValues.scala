@@ -9,6 +9,7 @@ object WdlValues {
 
   // primitive values
   case object V_Null extends V
+  case object V_ForcedNull extends V
   case class V_Boolean(value: Boolean) extends V
   case class V_String(value: String) extends V
 
