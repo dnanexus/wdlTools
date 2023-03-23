@@ -45,6 +45,7 @@ object Coercion {
       (innerType, innerValue) match {
         // basic coercion of primitive types
         case (WdlTypes.T_Optional(_), V_Null)       => V_Null
+        case (WdlTypes.T_Optional(_), V_ForcedNull) => V_ForcedNull
         case (WdlTypes.T_Boolean, b: V_Boolean)     => b
         case (WdlTypes.T_Int, i: V_Int)             => i
         case (WdlTypes.T_Float, f: V_Float)         => f

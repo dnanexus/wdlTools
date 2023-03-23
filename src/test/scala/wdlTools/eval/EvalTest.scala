@@ -705,6 +705,25 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
   }
 
+  it should "pass" in {
+    val tDoc =
+      parseAndTypeCheck(v1_1Dir.resolve("apps_1341.wdl"))
+    val calls = tDoc.workflow.get.body.collect {
+      case call: TAT.Call => call
+    }
+    val call = calls.head
+    val evaluator = createEvaluator(WdlVersion.V1_1)
+    val inputs =
+      Map(
+          "wf_inp_00" -> V_String("hello")
+      )
+
+    val value = evaluator.applyExprAndCoerce(call.inputs("inp_01"),
+                                             call.callee.input("inp_01")._1,
+                                             WdlValueBindings(inputs))
+    value shouldBe V_ForcedNull
+  }
+
   it should "handle escape sequences" in {
     val tDoc = parseAndTypeCheck(v1_1Dir.resolve("escape_sequences.wdl"))
     val task = tDoc.elements match {
