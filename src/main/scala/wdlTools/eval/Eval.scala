@@ -5,6 +5,7 @@ import dx.util.CollectionUtils.IterableOnceExtensions
 import wdlTools.eval.WdlValues._
 import wdlTools.syntax.{SourceLocation, WdlVersion}
 import wdlTools.types.ExprState.ExprState
+import wdlTools.types.WdlTypes.T_Optional
 import wdlTools.types.{ExprState, TypeUtils, WdlTypes, TypedAbstractSyntax => TAT}
 
 import scala.collection.immutable.TreeSeqMap
@@ -269,6 +270,8 @@ case class Eval(paths: EvalPaths,
 
         case TAT.ExprIdentifier(id, _) if updatedCtx.bindings.contains(id) =>
           updatedCtx.bindings(id)
+        case TAT.ExprIdentifier(_, _: T_Optional) =>
+          V_ForcedNull
         case TAT.ExprIdentifier(id, _) =>
           throw new EvalException(s"identifier ${id} not found")
 
