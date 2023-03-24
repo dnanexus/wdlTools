@@ -18,13 +18,13 @@ object WdlValueSerde {
         return v.get
       }
       innerValue match {
-        case V_Null             => JsNull
-        case V_Boolean(value)   => JsBoolean(value)
-        case V_Int(value)       => JsNumber(value)
-        case V_Float(value)     => JsNumber(value)
-        case V_String(value)    => JsString(value)
-        case V_File(value)      => JsString(value)
-        case V_Directory(value) => JsString(value)
+        case V_Null | V_ForcedNull => JsNull
+        case V_Boolean(value)      => JsBoolean(value)
+        case V_Int(value)          => JsNumber(value)
+        case V_Float(value)        => JsNumber(value)
+        case V_String(value)       => JsString(value)
+        case V_File(value)         => JsString(value)
+        case V_Directory(value)    => JsString(value)
 
         // compound values
         case V_Optional(v) =>

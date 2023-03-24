@@ -107,6 +107,7 @@ object EvalUtils {
   def isPrimitive(value: V): Boolean = {
     value match {
       case V_Null         => true
+      case V_ForcedNull   => true
       case V_Boolean(_)   => true
       case V_Int(_)       => true
       case V_Float(_)     => true
@@ -123,6 +124,7 @@ object EvalUtils {
   def formatPrimitive(value: V, loc: SourceLocation = SourceLocation.empty): String = {
     value match {
       case V_Null             => "null"
+      case V_ForcedNull       => "null"
       case V_Boolean(value)   => value.toString
       case V_Int(value)       => value.toString
       case V_Float(value)     => value.toString
