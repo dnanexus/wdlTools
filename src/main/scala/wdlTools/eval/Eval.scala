@@ -231,7 +231,7 @@ case class Eval(paths: EvalPaths,
       }
       val v = EvalUtils.unwrapOptional(nestedExpr match {
         case _: TAT.ValueNull      => V_Null
-        case _: TAT.ValueNone      => V_ForcedNull
+        case _: TAT.ValueNone      => V_Null
         case x: TAT.ValueBoolean   => V_Boolean(x.value)
         case x: TAT.ValueInt       => V_Int(x.value)
         case x: TAT.ValueFloat     => V_Float(x.value)
