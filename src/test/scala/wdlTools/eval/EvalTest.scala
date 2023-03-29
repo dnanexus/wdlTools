@@ -705,7 +705,7 @@ class EvalTest extends AnyFlatSpec with Matchers with Inside {
     calls.head.inputs.last._2.wdlType shouldBe T_Optional(T_String)
   }
 
-  it should "pass" in {
+  it should "evaluate optional to a V_ForcedNull" in {
     val tDoc =
       parseAndTypeCheck(v1_1Dir.resolve("apps_1341.wdl"))
     val calls = tDoc.workflow.get.body.collect {
