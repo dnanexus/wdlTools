@@ -507,7 +507,7 @@ case class Stdlib(paths: EvalPaths,
   private def equality(ctx: FunctionContext): V_Boolean = {
     def inner(l: V, r: V): Boolean = {
       (l, r) match {
-        case (V_Null, V_Null)                                 => true
+        case (V_Null | V_ForcedNull, V_Null | V_ForcedNull)   => true
         case (V_Optional(v1), V_Optional(v2))                 => inner(v1, v2)
         case (V_Optional(v1), v2)                             => inner(v1, v2)
         case (v1, V_Optional(v2))                             => inner(v1, v2)
@@ -556,13 +556,13 @@ case class Stdlib(paths: EvalPaths,
 
   private def lessThan(ctx: FunctionContext): V_Boolean = {
     val result = ctx.getTwoArgs match {
-      case (V_Null, V_Null)               => false
-      case (V_Int(n1), V_Int(n2))         => n1 < n2
-      case (V_Float(x1), V_Int(n2))       => x1 < n2
-      case (V_Int(n1), V_Float(x2))       => n1 < x2
-      case (V_Float(x1), V_Float(x2))     => x1 < x2
-      case (V_String(s1), V_String(s2))   => s1 < s2
-      case (V_Boolean(b1), V_Boolean(b2)) => b1 < b2
+      case (V_Null | V_ForcedNull, V_Null | V_ForcedNull) => false
+      case (V_Int(n1), V_Int(n2))                         => n1 < n2
+      case (V_Float(x1), V_Int(n2))                       => x1 < n2
+      case (V_Int(n1), V_Float(x2))                       => n1 < x2
+      case (V_Float(x1), V_Float(x2))                     => x1 < x2
+      case (V_String(s1), V_String(s2))                   => s1 < s2
+      case (V_Boolean(b1), V_Boolean(b2))                 => b1 < b2
       case other =>
         throw new EvalException(s"Invalid operands to < ${other}", ctx.loc)
     }
@@ -571,13 +571,13 @@ case class Stdlib(paths: EvalPaths,
 
   private def lessThanOrEqual(ctx: FunctionContext): V_Boolean = {
     val result = ctx.getTwoArgs match {
-      case (V_Null, V_Null)               => false
-      case (V_Int(n1), V_Int(n2))         => n1 <= n2
-      case (V_Float(x1), V_Int(n2))       => x1 <= n2
-      case (V_Int(n1), V_Float(x2))       => n1 <= x2
-      case (V_Float(x1), V_Float(x2))     => x1 <= x2
-      case (V_String(s1), V_String(s2))   => s1 <= s2
-      case (V_Boolean(b1), V_Boolean(b2)) => b1 <= b2
+      case (V_Null | V_ForcedNull, V_Null | V_ForcedNull) => false
+      case (V_Int(n1), V_Int(n2))                         => n1 <= n2
+      case (V_Float(x1), V_Int(n2))                       => x1 <= n2
+      case (V_Int(n1), V_Float(x2))                       => n1 <= x2
+      case (V_Float(x1), V_Float(x2))                     => x1 <= x2
+      case (V_String(s1), V_String(s2))                   => s1 <= s2
+      case (V_Boolean(b1), V_Boolean(b2))                 => b1 <= b2
       case other =>
         throw new EvalException(s"Invalid operands to <= ${other}", ctx.loc)
     }
@@ -586,13 +586,13 @@ case class Stdlib(paths: EvalPaths,
 
   private def greaterThan(ctx: FunctionContext): V_Boolean = {
     val result = ctx.getTwoArgs match {
-      case (V_Null, V_Null)               => false
-      case (V_Int(n1), V_Int(n2))         => n1 > n2
-      case (V_Float(x1), V_Int(n2))       => x1 > n2
-      case (V_Int(n1), V_Float(x2))       => n1 > x2
-      case (V_Float(x1), V_Float(x2))     => x1 > x2
-      case (V_String(s1), V_String(s2))   => s1 > s2
-      case (V_Boolean(b1), V_Boolean(b2)) => b1 > b2
+      case (V_Null | V_ForcedNull, V_Null | V_ForcedNull) => false
+      case (V_Int(n1), V_Int(n2))                         => n1 > n2
+      case (V_Float(x1), V_Int(n2))                       => x1 > n2
+      case (V_Int(n1), V_Float(x2))                       => n1 > x2
+      case (V_Float(x1), V_Float(x2))                     => x1 > x2
+      case (V_String(s1), V_String(s2))                   => s1 > s2
+      case (V_Boolean(b1), V_Boolean(b2))                 => b1 > b2
       case other =>
         throw new EvalException(s"Invalid operands to > ${other}", ctx.loc)
     }
@@ -602,6 +602,8 @@ case class Stdlib(paths: EvalPaths,
   private def greaterThanOrEqual(ctx: FunctionContext): V_Boolean = {
     val result = ctx.getTwoArgs match {
       case (V_Null, V_Null)               => false
+      case (V_ForcedNull, V_ForcedNull)   => false
+      case (V_ForcedNull, V_Null)         => false
       case (V_Int(n1), V_Int(n2))         => n1 >= n2
       case (V_Float(x1), V_Int(n2))       => x1 >= n2
       case (V_Int(n1), V_Float(x2))       => n1 >= x2
@@ -634,9 +636,9 @@ case class Stdlib(paths: EvalPaths,
         case (V_Boolean(b1), V_String(s2)) => V_String(b1.toString + s2)
         case (V_String(s1), V_File(s2))    => V_String(s1 + s2)
         // Addition of arguments with optional types is allowed within interpolations
-        case (V_Null, _) if exprState >= ExprState.InPlaceholder =>
+        case (V_Null | V_ForcedNull, _) if exprState >= ExprState.InPlaceholder =>
           V_Null
-        case (_, V_Null) if exprState >= ExprState.InPlaceholder =>
+        case (_, V_Null | V_ForcedNull) if exprState >= ExprState.InPlaceholder =>
           V_Null
         case (V_Optional(v1), V_Optional(v2)) if exprState >= ExprState.InPlaceholder =>
           V_Optional(add2(v1, v2, exprState, loc))
@@ -1225,11 +1227,11 @@ case class Stdlib(paths: EvalPaths,
     def sizeInBytes(arg: V, loc: SourceLocation): BigDecimal = {
       def inner(arg: V, loc: SourceLocation): BigDecimal = {
         arg match {
-          case V_String(path)    => BigDecimal.valueOf(ioSupport.size(path, loc))
-          case V_File(path)      => BigDecimal.valueOf(ioSupport.size(path, loc).toDouble)
-          case V_Array(items)    => items.map(item => inner(item, loc)).sum
-          case V_Optional(value) => inner(value, loc)
-          case V_Null            => 0
+          case V_String(path)        => BigDecimal.valueOf(ioSupport.size(path, loc))
+          case V_File(path)          => BigDecimal.valueOf(ioSupport.size(path, loc).toDouble)
+          case V_Array(items)        => items.map(item => inner(item, loc)).sum
+          case V_Optional(value)     => inner(value, loc)
+          case V_Null | V_ForcedNull => 0
           case _ =>
             throw new EvalException(s"size: invalid argument ${arg}")
         }
@@ -1443,8 +1445,8 @@ case class Stdlib(paths: EvalPaths,
   // since: draft-2
   private def defined(ctx: FunctionContext): V = {
     EvalUtils.unwrapOptional(ctx.getOneArg) match {
-      case V_Null => V_Boolean(false)
-      case _      => V_Boolean(true)
+      case V_Null | V_ForcedNull => V_Boolean(false)
+      case _                     => V_Boolean(true)
     }
   }
 
@@ -1454,8 +1456,8 @@ case class Stdlib(paths: EvalPaths,
   private def select_all(ctx: FunctionContext): V = {
     val array = getWdlVector(ctx.getOneArg, ctx.loc)
     val values = array.flatMap {
-      case V_Null => None
-      case x      => Some(EvalUtils.unwrapOptional(x))
+      case V_Null | V_ForcedNull => None
+      case x                     => Some(EvalUtils.unwrapOptional(x))
     }
     V_Array(values)
   }
@@ -1466,8 +1468,8 @@ case class Stdlib(paths: EvalPaths,
   private def select_first(ctx: FunctionContext): V = {
     val array = getWdlVector(ctx.getOneArg, ctx.loc)
     val values = array.flatMap {
-      case V_Null => None
-      case x      => Some(EvalUtils.unwrapOptional(x))
+      case V_Null | V_ForcedNull => None
+      case x                     => Some(EvalUtils.unwrapOptional(x))
     }
     values.headOption.getOrElse(
         throw new EvalException("select_first: found no non-null elements", ctx.loc)

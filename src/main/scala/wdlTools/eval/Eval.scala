@@ -197,7 +197,8 @@ case class Eval(paths: EvalPaths,
   private def interpolationValueToString(V: V, loc: SourceLocation): String = {
     V match {
       // within an interpolation, null/None renders as empty string
-      case V_Null | V_Optional(V_Null) => ""
+      case V_Null | V_Optional(V_Null)             => ""
+      case V_ForcedNull | V_Optional(V_ForcedNull) => ""
       case other =>
         EvalUtils.formatPrimitive(other, loc)
     }
@@ -625,8 +626,8 @@ case class Eval(paths: EvalPaths,
     val commandStr = command.parts
       .map { expr =>
         apply(expr, ctx) match {
-          case V_Null => ""
-          case value  => EvalUtils.formatPrimitive(value, expr.loc)
+          case V_Null | V_ForcedNull => ""
+          case value                 => EvalUtils.formatPrimitive(value, expr.loc)
         }
       }
       .mkString("")
