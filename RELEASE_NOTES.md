@@ -2,7 +2,11 @@
 
 ## in develop
 
-...
+* Draft-2 parser. Previous behavior: if `version` is not declared, it is assumed to be `draft-2`, which has no formal 
+input definitions for tasks and workflows. However, if a user forgets to declare the `version` while working on workflow 
+of a version greater than `draft-2` with formal definition of `input`, the parser fails to follow the syntax and throws 
+the errors not related to the version or the formatting of the input section. Here this behavior is fixed: if `version` 
+is not detected and `draft-2` is assumed, we check if the `input` section is defined and throw an exception in this case. 
 
 ## 0.17.15 (2022-12-13)
 
