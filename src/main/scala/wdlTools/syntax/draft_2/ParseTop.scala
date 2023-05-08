@@ -935,9 +935,15 @@ any_decls
     * declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring evaluation), and
     * 3) bound with an expression requiring evaluation. Only the first two types of declarations may
     * be inputs; however, all three types of declarations can be mixed together. This method creates
-    * a synthetic InputSection contianing only declarations of type 1 and 2.
+    * a synthetic InputSection containing only declarations of type 1 and 2.
     */
   override def visitTask(ctx: WdlDraft2Parser.TaskContext): Task = {
+    if (hasFormalInputSection(ctx)) {
+      throw new SyntaxException(
+          "Draft 2 version of WDL should not contain a formal `input` section",
+          getSourceLocation(grammar.docSource, ctx)
+      )
+    }
     val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems = ctx.task_element().asScala.toVector
     val output: Option[OutputSection] = atMostOneSection(elems.collect {
@@ -1144,6 +1150,12 @@ scatter
     }
   }
 
+  /**
+    * */
+  private def hasFormalInputSection(ctx: ParserRuleContext): Boolean = {
+    ctx.children.asScala.toList.exists(x => x.getText == "input")
+  }
+
   /*
   workflow_element
     : workflow_input #input
@@ -1164,9 +1176,15 @@ scatter
     * There are three types of declarations: 1) unbound, 2) bound with a literal value (i.e. not requiring
     * evaluation), and 3) bound with an expression requiring evaluation. Only the first two types of
     * declarations may be inputs; however, all three types of declarations can be mixed together. This method
-    * creates a synthetic InputSection contianing only declarations of type 1 and 2.
+    * creates a synthetic InputSection containing only declarations of type 1 and 2.
     */
   override def visitWorkflow(ctx: WdlDraft2Parser.WorkflowContext): Workflow = {
+    if (hasFormalInputSection(ctx)) {
+      throw new SyntaxException(
+          "Draft 2 version of WDL should not contain a formal `input` section",
+          getSourceLocation(grammar.docSource, ctx)
+      )
+    }
     val name = getIdentifierText(ctx.Identifier(), ctx)
     val elems: Vector[WdlDraft2Parser.Workflow_elementContext] =
       ctx.workflow_element().asScala.toVector
