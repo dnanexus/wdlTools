@@ -1,5 +1,8 @@
 # Change log
 
+## in develop
+...
+
 ## 0.17.16 (2023-05-26)
 
 * New value type `V_ForcedNull` is used to avoid an addition of an explicit `null` input to an Optional value. Previously, 
