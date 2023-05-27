@@ -1,6 +1,6 @@
 # Change log
 
-## 0.17.15 (2023-05-26)
+## 0.17.16 (2023-05-26)
 
 * New value type `V_ForcedNull` is used to avoid an addition of an explicit `null` input to an Optional value. Previously, 
 if a task was wrapped in a frag - in some cases Optionals without a value were forced to be an explicit `null`. This version 
