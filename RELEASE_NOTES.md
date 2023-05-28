@@ -1,7 +1,13 @@
 # Change log
 
 ## in develop
+...
 
+## 0.17.16 (2023-05-26)
+
+* New value type `V_ForcedNull` is used to avoid an addition of an explicit `null` input to an Optional value. Previously, 
+if a task was wrapped in a frag - in some cases Optionals without a value were forced to be an explicit `null`. This version 
+fixes such behavior.
 * Draft-2 parser. Previous behavior: if `version` is not declared, it is assumed to be `draft-2`, which has no formal 
 input definitions for tasks and workflows. However, if a user forgets to declare the `version` while working on workflow 
 of a version greater than `draft-2` with formal definition of `input`, the parser fails to follow the syntax and throws 
