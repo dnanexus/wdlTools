@@ -1,5 +1,5 @@
 ROOT_DIR:=$(shell pwd)
-ANTLR_VERSION=9
+ANTLR_VERSION=13.1
 
 all : download_antlr_jar draft2 v1 v1_1 v2
 
