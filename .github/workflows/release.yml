@@ -12,14 +12,16 @@ permissions:
 jobs:
   run-release:
     name: wdlTools Release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install java
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@d202f5dbf7256730fb690ec59f6381650114feb2 # v1.4.3
         with:
           java-version: 11
+      - name: Install SBT
+        uses: ./.github/workflows/actions/install-sbt
       - name: Install & build
         run: |
           # compile antlr4 sources
@@ -67,7 +69,7 @@ jobs:
           sed -n '/## ${{ steps.version.outputs.version }}/,/##/p' RELEASE_NOTES.md | sed '1d; $d' > $RELEASE_NOTES_PATH
           echo ::set-output name=release-notes-path::$(echo "${RELEASE_NOTES_PATH}")
       - name: Commit changes to application.conf files
-        uses: EndBug/add-and-commit@v7
+        uses: EndBug/add-and-commit@8c12ff729a98cfbcd3fe38b49f55eceb98a5ec02 # v7.5.0
         with:
           message: 'Release ${{ steps.version.outputs.version }}'
           add: '[
@@ -77,7 +79,7 @@ jobs:
           tag: ${{ steps.version.outputs.version }}
       - name: Create release entry
         id: create-release
-        uses: actions/create-release@v1
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -88,7 +90,7 @@ jobs:
           prerelease: false
       - name: Upload assembly JAR
         id: upload-release-assembly
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@e8f9f06c4b078e705bd2ea027f0926603fc9b4d5 # v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -112,7 +114,7 @@ jobs:
           sbt publish
       - name: Rollback release if unsuccessfull
         if: ${{ cancelled() || failure() }}
-        uses: author/action-rollback@stable
+        uses: author/action-rollback@f4473931b1155b601092ec00eb1fa4882b80219f # 1.0.4
         with:
           release_id: ${{ steps.create-release.outputs.id }}
           tag: ${{ steps.version.outputs.version }}
