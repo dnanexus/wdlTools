@@ -62,8 +62,10 @@
       ]
     },
     {
-      "url": "https://github.com/broadinstitute/gtex-pipeline.git",
-      "tag": "eb6835bad68d63c176be695b986898b5527d7588",
+      "_url": "https://github.com/broadinstitute/gtex-pipeline.git",
+      "_tag": "eb6835bad68d63c176be695b986898b5527d7588",
+      "url": "https://github.com/wormsik/gtex-pipeline.git",
+      "tag": "rnasec_samtofastq_update",
       "entrypoints": [
         {
           "dir": "rnaseq",
