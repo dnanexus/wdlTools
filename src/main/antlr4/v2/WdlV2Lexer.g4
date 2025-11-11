@@ -69,7 +69,6 @@ OPTIONAL: '?';
 STAR: '*';
 PLUS: '+';
 MINUS: '-';
-DOLLAR: '$';
 COMMA: ',';
 SEMI: ';';
 DOT: '.';
@@ -79,6 +78,7 @@ DIVIDE: '/';
 MOD: '%';
 SQUOTE: '\'' -> pushMode(SquoteInterpolatedString);
 DQUOTE: '"' -> pushMode(DquoteInterpolatedString);
+MULTILINE: '<<<' -> pushMode(MultilineInterpolatedString);
 
 WHITESPACE: [ \t\r\n]+ -> channel(HIDDEN);
 
@@ -86,29 +86,37 @@ Identifier: CompleteIdentifier;
 
 mode SquoteInterpolatedString;
 
-EscStringPart: EscapeSequence;
-SQuoteDollarString: '$'  -> type(StringPart);
+EscStringPart: StringEscapeSequence;
 SQuoteTildeString: '~' -> type(StringPart);
 SQuoteCurlyString: '{' -> type(StringPart);
-SQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE) , type(StringCommandStart);
+SQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 EndSquote: '\'' ->  popMode, type(SQUOTE);
-StringPart: ~[$~{\r\n'\\]+;
+StringPart: ~[~{\r\n'\\]+;
 
 mode DquoteInterpolatedString;
 
-DQuoteEscapedChar: EscapeSequence -> type(EscStringPart);
+DQuoteEscapedChar: StringEscapeSequence -> type(EscStringPart);
 DQuoteTildeString: '~' -> type(StringPart);
-DQuoteDollarString: '$' -> type(StringPart);
-DQUoteCurlString: '{' -> type(StringPart);
-DQuoteCommandStart: ('${' | '~{' ) -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+DQUoteCurlyString: '{' -> type(StringPart);
+DQuoteCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
 EndDQuote: '"' ->  popMode, type(DQUOTE);
-DQuoteStringPart: ~[$~{\r\n"\\]+ -> type(StringPart);
+DQuoteStringPart: ~[~{\r\n"\\]+ -> type(StringPart);
+
+mode MultilineInterpolatedString;
+
+MultilineEscapedChar: MultilineEscapeSequence -> type(EscStringPart);
+MultilineTildeString: '~' -> type(StringPart);
+MultilineCurlyString: '{' -> type(StringPart);
+MultilineCommandStart: '~{' -> pushMode(DEFAULT_MODE), type(StringCommandStart);
+MultilineEscapedEnd: '\\>>>' -> type(StringPart);
+EndMultiline: '>>>' -> popMode, type(MULTILINE);
+MultilineEscapedArrow: ( '>' | '>>' | '>>>>' '>'*) -> type(StringPart);
+MultilineStringPart: ~[~{>\\]+ -> type(StringPart);
 
 mode Command;
 
 BeginWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 BeginHereDoc: '<<<' -> mode(HereDocCommand);
-BeginLBrace: '{' -> mode(CurlyCommand);
 
 mode HereDocCommand;
 
@@ -119,15 +127,6 @@ HereDocEscapedEnd: '\\>>>' -> type(CommandStringPart);
 EndHereDocCommand: '>>>' -> mode(DEFAULT_MODE), type(EndCommand);
 HereDocEscape: ( '>' | '>>' | '>>>>' '>'*) -> type(CommandStringPart);
 HereDocStringPart: ~[~{>]+ -> type(CommandStringPart);
-
-mode CurlyCommand;
-
-CommandTildeString: '~'  -> type(CommandStringPart);
-CommandDollarString: '$' -> type(CommandStringPart);
-CommandCurlyString: '{' -> type(CommandStringPart);
-StringCommandStart:  ('${' | '~{' ) -> pushMode(DEFAULT_MODE);
-EndCommand: '}' -> mode(DEFAULT_MODE);
-CommandStringPart: ~[$~{}]+;
 
 mode Version;
 
@@ -164,7 +163,7 @@ MetaValueWhitespace: [ \t\r\n]+ -> channel(HIDDEN);
 
 mode MetaSquoteString;
 
-MetaEscStringPart: EscapeSequence;
+MetaEscStringPart: MetaEscapeSequence;
 MetaEndSquote: '\'' ->  popMode, type(MetaSquote), popMode;
 MetaStringPart: ~[\r\n'\\]+;
 
@@ -230,12 +229,26 @@ fragment UnicodeEsc2
 	: 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
 	;
 
-fragment EscapeSequence
-	: ESC [tn"'\\]
+fragment SpecialEscapeSequence
 	| ESC OctEsc
 	| ESC HexEsc
 	| ESC UnicodeEsc
 	| ESC UnicodeEsc2
+	;
+
+fragment StringEscapeSequence
+	: ESC [~tn"'\\]
+	| SpecialEscapeSequence
+	;
+
+fragment MultilineEscapeSequence
+	: ESC [~>\\]
+	| SpecialEscapeSequence
+	;
+
+fragment MetaEscapeSequence
+	: ESC [tn"'\\]
+	| SpecialEscapeSequence
 	;
 
 fragment Digit
