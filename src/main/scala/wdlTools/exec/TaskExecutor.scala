@@ -71,7 +71,9 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
   def writeDockerRunScript(imageName: String,
                            hostPaths: ExecPaths,
                            guestPaths: ExecPaths,
-                           maxMemory: Long = SysUtils.totalMemorySize): Path = {
+                           maxMemory: Long = SysUtils.totalMemorySize,
+                           shmSize: Option[String] = None,
+                           ipcMode: Option[String] = None): Path = {
     val dockerRunScript = renderer.render(
         TaskCommandFileGenerator.DefaultDockerRunScript,
         Map(
@@ -82,7 +84,9 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
             "stdoutFile" -> guestPaths.getStdoutFile().toString,
             "stderrFile" -> guestPaths.getStderrFile().toString,
             "imageName" -> imageName,
-            "maxMemory" -> maxMemory
+            "maxMemory" -> maxMemory,
+            "shmSize" -> shmSize,
+            "ipcMode" -> ipcMode
         )
     )
     val commandFile = hostPaths.getContainerCommandFile(true).asJavaPath
@@ -93,11 +97,17 @@ case class TaskCommandFileGenerator(logger: Logger = Logger.get) {
 
   def apply(command: Option[String],
             hostPaths: ExecPaths,
-            container: Option[(String, ExecPaths)] = None): Path = {
+            container: Option[(String, ExecPaths)] = None,
+            shmSize: Option[String] = None,
+            ipcMode: Option[String] = None): Path = {
     if (container.isDefined) {
       val (containerImage, guestPaths) = container.get
       writeCommandScript(command, hostPaths, Some(guestPaths))
-      writeDockerRunScript(containerImage, hostPaths, guestPaths)
+      writeDockerRunScript(containerImage,
+                           hostPaths,
+                           guestPaths,
+                           shmSize = shmSize,
+                           ipcMode = ipcMode)
     } else {
       writeCommandScript(command, hostPaths)
     }
