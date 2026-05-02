@@ -5,6 +5,8 @@
 <%@ val commandFile: String %>
 <%@ val imageName: String %>
 <%@ val maxMemory: Long %>
+<%@ val shmSize: Option[String] %>
+<%@ val ipcMode: Option[String] %>
 <% val bashDollar: String = "$" %>
 #!/bin/bash -x
 
@@ -22,6 +24,12 @@ docker run \\
 --memory=${maxMemory.toString} \\
 --cidfile ${containerIdFile} \\
 ${bashDollar}{extraFlags} \\
+#if (shmSize.isDefined)
+"--shm-size=${shmSize.get}" \\
+#end
+#if (ipcMode.isDefined)
+"--ipc=${ipcMode.get}" \\
+#end
 --entrypoint /bin/bash \\
 -v ${hostRootDir}:${containerRootDir} \\
 ${imageName} ${commandFile}

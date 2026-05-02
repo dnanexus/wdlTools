@@ -2,7 +2,11 @@
 
 ## in develop
 
-...
+* `TaskCommandFileGenerator.writeDockerRunScript` and `apply` now accept optional
+  `shmSize` and `ipcMode` parameters that emit `--shm-size=<size>` and `--ipc=<mode>`
+  flags in the generated `docker run` script. Both default to `None` (no flag emitted),
+  so existing callers are unaffected. Enables multi-GPU NCCL workloads that need more
+  than Docker's 64 MB default `/dev/shm`. (APPS-3954)
 
 ## 0.17.17 (2024-02-29)
 
